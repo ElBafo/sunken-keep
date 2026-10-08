@@ -1,0 +1,124 @@
+# Expected Assets for Artist Delivery
+
+## Wall Rendering System
+
+The game uses pre-rendered wall pieces at three distances for first-person perspective. All pieces should be drawn in cold green swamp tones with warm orange brazier accents.
+
+### Front Wall Pieces
+- **Near distance** (player is 1 square away):
+  - Size: 160×140 pixels
+  - Placement: Centered in viewport at y=30
+  
+- **Mid distance** (2 squares away):
+  - Size: 120×100 pixels
+  - Placement: Centered in viewport at y=50
+  
+- **Far distance** (3 squares away):
+  - Size: 80×70 pixels
+  - Placement: Centered in viewport at y=65
+
+### Side Wall Pieces  
+- **Near distance**: 40×140 pixels
+- **Mid distance**: 30×100 pixels
+- **Far distance**: 20×70 pixels
+
+**File naming:**
+- `wall_front_near.png`, `wall_front_mid.png`, `wall_front_far.png`
+- `wall_left_near.png`, `wall_left_mid.png`, `wall_left_far.png`
+- `wall_right_near.png`, `wall_right_mid.png`, `wall_right_far.png`
+
+**Style guide:**
+- Cold green swamp: #1a3830 (near), #152e28 (mid), #102420 (far)
+- Stone texture with moss/water damage
+- Occasional orange brazier glow (#ff8844) for accent
+- Dwarven architectural details (columns, carved borders)
+
+### Door Pieces
+Same sizes as front walls, but showing:
+- Locked door (red lock indicator area in center)
+- Open door (showing corridor beyond)
+
+**Files:**
+- `door_locked_near.png`, `door_locked_mid.png`, `door_locked_far.png`
+- `door_open_near.png`, `door_open_mid.png`, `door_open_far.png`
+
+### Secret Wall Pieces
+Same sizes as front walls, should look like normal walls but with subtle hints:
+- Slightly different stone pattern
+- Faint seam lines
+- After discovered, slides aside to show opening
+
+**Files:**
+- `secret_closed_near.png`, `secret_closed_mid.png`, `secret_closed_far.png`
+- `secret_open_near.png`, `secret_open_mid.png`, `secret_open_far.png`
+
+## Monster Sprites
+
+Placeholder green slime is implemented. Need proper monster sprites for:
+- **Slime** (current): Amorphous blob with glowing eyes
+- **Drowned dwarf**: Waterlogged, shambling
+- **Hollow Tide creature**: Aquatic aberration with tentacles
+
+Each monster needs 3 sizes:
+- Near: 80×60 pixels at y=100
+- Mid: 50×40 pixels at y=100  
+- Far: 30×25 pixels at y=100
+
+**File naming:** `{monster}_near.png`, `{monster}_mid.png`, `{monster}_far.png`
+
+## Additional Portrait Expressions
+
+Current system uses health-state variants (healthy/wounded/near_death) for all four characters. 
+
+### Optional Enhancement: Expression Overlays
+If adding expression variants, each character would need:
+- `{name}_{expression}_{healthstate}.png` (64×64)
+- Expressions: neutral, smirk, wince, shocked
+
+Current approach uses a single portrait per health state with animated mouth for talking. Expression overlays would be additive only.
+
+## Deep Water Tiles
+
+Floor tiles showing flooded corridors:
+- `water_shallow.png` - ankle-deep water (64×64 floor tile view)
+- `water_deep.png` - chest-deep water with ripples
+
+## Item Sprites  
+
+Small pickup items rendered at near/mid/far:
+- Rusty key (current: simple placeholder)
+- Treasure chest
+- Potion bottles
+- Ancient scrolls
+
+**Sizes:** Same as monsters (near: 80×60, mid: 50×40, far: 30×25)
+
+## Background/Environment Variants
+
+Additional floor textures and ceiling details:
+- Flooded stone floor (with reflections)
+- Dry upper floor (less water damage)
+- Ceiling variations (stalactites, collapsed sections)
+
+## Status
+
+### ✅ Complete
+- All character health-state portraits (brannoc, wren, ilsevar, mags)
+- All wall carving decals (start, door, secret)
+- Hit flash overlays
+- Intro cutscene art (6 shots, sprites, title)
+- All audio (music, ambience, SFX)
+
+### 🔲 Needed
+- Wall rendering pieces (front/left/right at 3 distances)
+- Door pieces (locked/open)
+- Secret wall pieces (closed/open)
+- Monster sprites (3 types × 3 distances)
+- Deep water floor tiles
+- Item pickup sprites
+
+## Reference
+
+See `public/art/preview/mock_screen_4x.png` for the intended layout and perspective.
+
+Current placeholder walls are generated in code (green rectangles with simple detail) and can be seen in the built game.
