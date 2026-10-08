@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<body>
+<canvas id="c192" width="192" height="192"></canvas>
+<canvas id="c512" width="512" height="512"></canvas>
+<script>
+function makeIcon(size) {
+  const canvas = document.getElementById('c' + size);
+  const ctx = canvas.getContext('2d');
+  
+  // Dark background
+  ctx.fillStyle = '#0a1612';
+  ctx.fillRect(0, 0, size, size);
+  
+  // Green swamp border
+  ctx.strokeStyle = '#1a3830';
+  ctx.lineWidth = size / 20;
+  ctx.strokeRect(size / 20, size / 20, size - size / 10, size - size / 10);
+  
+  // Orange brazier accent
+  ctx.fillStyle = '#ff8844';
+  ctx.beginPath();
+  ctx.arc(size / 2, size / 2, size / 8, 0, Math.PI * 2);
+  ctx.fill();
+  
+  // Download
+  canvas.toBlob(blob => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'icon-' + size + '.png';
+    a.click();
+  });
+}
+
+makeIcon(192);
+setTimeout(() => makeIcon(512), 500);
+</script>
+</body>
+</html>

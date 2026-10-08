@@ -1,0 +1,46 @@
+{
+ "sfx": {
+  "step": "sfx_step",
+  "bump": "sfx_bump",
+  "door": "sfx_door",
+  "key": "sfx_key",
+  "hit": "sfx_hit",
+  "hurt": "sfx_hurt",
+  "secret_wall": "sfx_secret_wall",
+  "bark": "sfx_bark",
+  "tide_sigh": "sfx_tide_sigh"
+ },
+ "music": {
+  "intro": {
+   "file": "music_intro",
+   "loop": false,
+   "length_s": 37.5,
+   "cues_s": {
+    "shot1": 0,
+    "shot2": 6,
+    "thunder": 6.2,
+    "tide_sigh": 10.3,
+    "shot3": 12,
+    "shot4": 18,
+    "shot5": 24,
+    "shot6": 29,
+    "title_hit": 33.0
+   }
+  },
+  "amb_swamp": {
+   "file": "amb_swamp_loop",
+   "loop": true,
+   "length_s": 24,
+   "volume": 0.5
+  }
+ },
+ "formats": [
+  "ogg",
+  "mp3"
+ ],
+ "notes": {
+  "tide_sigh": "Scale volume with depth: ~0.25 floor 1, up to 1.0 deep. Play on tapping the glowing carving.",
+  "bark": "Very short blip; play once per bubble, not per letter.",
+  "hurt": "Party member taking damage; 'hit' is the party striking an enemy."
+ }
+}

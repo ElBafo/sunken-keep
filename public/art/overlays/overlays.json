@@ -1,0 +1,14 @@
+{
+ "size": "64x64, see-through, draw on top of any expression",
+ "blood": [
+  "blood_light.png",
+  "blood_wounded.png",
+  "blood_badly_hurt.png"
+ ],
+ "bloodNote": "each level already includes the one before it, so show only one at a time",
+ "hitFlash": [
+  "hit_flash_1.png",
+  "hit_flash_2.png"
+ ],
+ "hitFlashTiming": "about 60 ms each, then remove"
+}

@@ -1,0 +1,90 @@
+{
+  "width": 270,
+  "height": 200,
+  "scenes": [
+    {
+      "duration": 4000,
+      "layers": [
+        {
+          "image": "/sunken-keep/art/cutscenes/scene1_bg.png",
+          "x": 0,
+          "y": 0,
+          "fadeIn": 1000
+        },
+        {
+          "image": "/sunken-keep/art/cutscenes/scene1_torchlight.png",
+          "x": 0,
+          "y": 0,
+          "flicker": {
+            "minAlpha": 0.6,
+            "maxAlpha": 1.0,
+            "speed": 3
+          }
+        }
+      ],
+      "captions": [
+        {
+          "text": "Karak Durn sank in a single night.",
+          "startTime": 1000,
+          "duration": 3000
+        }
+      ],
+      "tapToAdvance": true
+    },
+    {
+      "duration": 4000,
+      "layers": [
+        {
+          "image": "/sunken-keep/art/cutscenes/scene2_sinking.png",
+          "x": 0,
+          "y": 0,
+          "pan": {
+            "startX": 0,
+            "startY": -20,
+            "endX": 0,
+            "endY": 0,
+            "duration": 4000
+          }
+        },
+        {
+          "image": "/sunken-keep/art/cutscenes/scene2_water.png",
+          "x": 0,
+          "y": 120,
+          "parallax": 0.5
+        }
+      ],
+      "captions": [
+        {
+          "text": "Its forges went cold. Its people did not leave.",
+          "startTime": 500,
+          "duration": 3500
+        }
+      ],
+      "tapToAdvance": true
+    },
+    {
+      "duration": 4000,
+      "layers": [
+        {
+          "image": "/sunken-keep/art/cutscenes/scene3_gate.png",
+          "x": 0,
+          "y": 0
+        },
+        {
+          "image": "/sunken-keep/art/cutscenes/scene3_silhouettes.png",
+          "x": 0,
+          "y": 0,
+          "fadeIn": 1500
+        }
+      ],
+      "captions": [
+        {
+          "text": "Four fools have come to find out why.",
+          "startTime": 1000,
+          "duration": 3000
+        }
+      ],
+      "tapToAdvance": true
+    }
+  ]
+}
