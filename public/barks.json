@@ -1,0 +1,312 @@
+[
+  {
+    "trigger": "secret_wall",
+    "speaker": "brannoc",
+    "text": "Dwarven work. You'd never find it without a dwarf.",
+    "face": "smirk"
+  },
+  {
+    "trigger": "secret_wall",
+    "speaker": "brannoc",
+    "text": "Hollow. Like Mags's promises.",
+    "face": "smirk"
+  },
+  {
+    "trigger": "secret_wall",
+    "speaker": "mags",
+    "text": "Ooh, someone's been hiding the good stuff.",
+    "face": "smirk"
+  },
+  {
+    "trigger": "secret_wall",
+    "speaker": "wren",
+    "text": "The Ember reveals what is hidden.",
+    "face": "neutral"
+  },
+  {
+    "trigger": "secret_wall",
+    "speaker": "wren",
+    "text": "Even walls have secrets. Let's hope theirs are nicer than ours.",
+    "face": "neutral"
+  },
+  {
+    "trigger": "secret_wall",
+    "speaker": "ilsevar",
+    "text": "There's a draught behind it. It smells like the sea.",
+    "face": "neutral"
+  },
+  {
+    "trigger": "secret_wall",
+    "speaker": "ilsevar",
+    "text": "Fascinating masonry. Mags, stop licking it.",
+    "face": "wince"
+  },
+  {
+    "trigger": "secret_wall",
+    "speaker": "mags",
+    "text": "Push it, Brannoc. Harder. ...See? Was that so difficult?",
+    "face": "smirk",
+    "listener": "brannoc",
+    "listenerFace": "wince"
+  },
+  {
+    "trigger": "secret_wall",
+    "speaker": "brannoc",
+    "text": "You could help, you know.",
+    "face": "neutral",
+    "listener": "mags",
+    "listenerFace": "smirk"
+  },
+  {
+    "trigger": "deep_water",
+    "speaker": "brannoc",
+    "text": "Up to my beard. Not up to my dignity.",
+    "face": "neutral"
+  },
+  {
+    "trigger": "deep_water",
+    "speaker": "brannoc",
+    "text": "Dwarves don't float. We sink with style.",
+    "face": "smirk"
+  },
+  {
+    "trigger": "deep_water",
+    "speaker": "mags",
+    "text": "It's up to my everything, thanks for asking.",
+    "face": "wince"
+  },
+  {
+    "trigger": "deep_water",
+    "speaker": "wren",
+    "text": "Keep the lantern dry!",
+    "face": "shocked"
+  },
+  {
+    "trigger": "deep_water",
+    "speaker": "wren",
+    "text": "Cold. So cold. Ember, give me strength.",
+    "face": "wince"
+  },
+  {
+    "trigger": "deep_water",
+    "speaker": "ilsevar",
+    "text": "It's... warm? Never mind.",
+    "face": "neutral"
+  },
+  {
+    "trigger": "deep_water",
+    "speaker": "ilsevar",
+    "text": "The water's listening. Don't say anything rude.",
+    "face": "neutral"
+  },
+  {
+    "trigger": "deep_water",
+    "speaker": "mags",
+    "text": "Someone carry me. Brannoc. Not like that.",
+    "face": "shocked",
+    "listener": "brannoc",
+    "listenerFace": "smirk"
+  },
+  {
+    "trigger": "deep_water",
+    "speaker": "brannoc",
+    "text": "Sit on my shoulders and stop wriggling.",
+    "face": "neutral",
+    "listener": "mags",
+    "listenerFace": "smirk"
+  },
+  {
+    "trigger": "loot",
+    "speaker": "brannoc",
+    "text": "My grandfather's. Probably. Hand it over.",
+    "face": "neutral"
+  },
+  {
+    "trigger": "loot",
+    "speaker": "mags",
+    "text": "Mine.",
+    "face": "smirk"
+  },
+  {
+    "trigger": "loot",
+    "speaker": "wren",
+    "text": "A tenth of that goes to the Ember.",
+    "face": "neutral"
+  },
+  {
+    "trigger": "loot",
+    "speaker": "wren",
+    "text": "Is it stealing if they're dead? ...Don't answer that.",
+    "face": "wince"
+  },
+  {
+    "trigger": "loot",
+    "speaker": "ilsevar",
+    "text": "Careful, it could be cursed. ...Fine, I'll hold it.",
+    "face": "neutral"
+  },
+  {
+    "trigger": "loot",
+    "speaker": "ilsevar",
+    "text": "The runes say 'property of'. The rest is barnacles.",
+    "face": "neutral"
+  },
+  {
+    "trigger": "loot",
+    "speaker": "brannoc",
+    "text": "That's dwarven. Technically, that's mine.",
+    "face": "neutral",
+    "listener": "mags",
+    "listenerFace": "smirk"
+  },
+  {
+    "trigger": "loot",
+    "speaker": "mags",
+    "text": "Finders keepers, losers weepers, dwarves grumpers.",
+    "face": "smirk",
+    "listener": "brannoc",
+    "listenerFace": "wince"
+  },
+  {
+    "trigger": "low_health",
+    "speaker": "brannoc",
+    "text": "Just a scratch. A big, gushing scratch.",
+    "face": "wince"
+  },
+  {
+    "trigger": "low_health",
+    "speaker": "brannoc",
+    "text": "Tell my beard I loved it.",
+    "face": "wince"
+  },
+  {
+    "trigger": "low_health",
+    "speaker": "mags",
+    "text": "I'd like a refund on this dungeon.",
+    "face": "wince"
+  },
+  {
+    "trigger": "low_health",
+    "speaker": "wren",
+    "text": "Physician, heal thyself... quickly, please.",
+    "face": "wince"
+  },
+  {
+    "trigger": "low_health",
+    "speaker": "wren",
+    "text": "My flame is guttering.",
+    "face": "wince"
+  },
+  {
+    "trigger": "low_health",
+    "speaker": "ilsevar",
+    "text": "The water says it can make the pain stop. ...I'm fine.",
+    "face": "neutral"
+  },
+  {
+    "trigger": "low_health",
+    "speaker": "ilsevar",
+    "text": "Not now. I haven't finished my notes.",
+    "face": "wince"
+  },
+  {
+    "trigger": "low_health",
+    "speaker": "mags",
+    "text": "Wren, I need your hands on me. Healing hands. HEALING.",
+    "face": "wince",
+    "listener": "wren",
+    "listenerFace": "shocked"
+  },
+  {
+    "trigger": "new_monster",
+    "speaker": "brannoc",
+    "text": "Ugly. Shall we?",
+    "face": "neutral"
+  },
+  {
+    "trigger": "new_monster",
+    "speaker": "mags",
+    "text": "Big, slimy and coming straight at me. Story of my love life.",
+    "face": "smirk"
+  },
+  {
+    "trigger": "new_monster",
+    "speaker": "wren",
+    "text": "Abomination! ...Do we have a plan?",
+    "face": "shocked"
+  },
+  {
+    "trigger": "new_monster",
+    "speaker": "wren",
+    "text": "Ember, burn bright.",
+    "face": "neutral"
+  },
+  {
+    "trigger": "new_monster",
+    "speaker": "ilsevar",
+    "text": "I want to study it. Preferably dead.",
+    "face": "smirk"
+  },
+  {
+    "trigger": "new_monster",
+    "speaker": "ilsevar",
+    "text": "It knows my name. Why does it know my name?",
+    "face": "shocked"
+  },
+  {
+    "trigger": "new_monster",
+    "speaker": "mags",
+    "text": "Brannoc, your cousin's here.",
+    "face": "smirk",
+    "listener": "brannoc",
+    "listenerFace": "wince"
+  },
+  {
+    "trigger": "new_monster",
+    "speaker": "brannoc",
+    "text": "I've seen worse. I've kissed worse.",
+    "face": "smirk",
+    "listener": "mags",
+    "listenerFace": "shocked"
+  },
+  {
+    "trigger": "idle",
+    "speaker": "brannoc",
+    "text": "Are we waiting for the water to drain?",
+    "face": "neutral"
+  },
+  {
+    "trigger": "idle",
+    "speaker": "wren",
+    "text": "Ember, grant me patience. And a chair.",
+    "face": "neutral"
+  },
+  {
+    "trigger": "idle",
+    "speaker": "ilsevar",
+    "text": "Yes... I hear you. Wait, did someone speak?",
+    "face": "shocked"
+  },
+  {
+    "trigger": "idle",
+    "speaker": "ilsevar",
+    "text": "Fine. More time for notes.",
+    "face": "neutral"
+  },
+  {
+    "trigger": "idle",
+    "speaker": "mags",
+    "text": "If we're stopping, I'm checking everyone's pockets.",
+    "face": "smirk",
+    "listener": "brannoc",
+    "listenerFace": "wince"
+  },
+  {
+    "trigger": "idle",
+    "speaker": "brannoc",
+    "text": "Stop snoring, halfling. Wait, that was me.",
+    "face": "wince",
+    "listener": "mags",
+    "listenerFace": "smirk"
+  }
+]

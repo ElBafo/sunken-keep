@@ -1,0 +1,109 @@
+{
+ "canvas": "270x480",
+ "note": "Each shot is 854x480 (art drawn at 2x the game's pixel size). Show a 270x480 window and pan it sideways by panX (from -> to, in px, left edge of the window).",
+ "shots": {
+  "1": {
+   "file": "shot1_keep.png",
+   "panX": [
+    150,
+    430
+   ],
+   "direction": "pan right across the keep"
+  },
+  "2": {
+   "file": "shot2_sinking.png",
+   "panX": [
+    430,
+    150
+   ],
+   "direction": "pan back left while the keep sinks; shake and lightning flashes in code"
+  },
+  "3": {
+   "file": "shot3_forge.png",
+   "panX": [
+    292,
+    292
+   ],
+   "direction": "hold on the anvil and dying forge; bubbles, light rays and the falling hammer in code"
+  },
+  "4": {
+   "file": "shot4_drowned.png",
+   "panX": [
+    100,
+    420
+   ],
+   "direction": "slow pan right as the eyes open one by one",
+   "eyes": {
+    "sprite": "eyes.png",
+    "frames": "3 frames of 8x2 (scale 1) or 16x4 (scale 2): closed, half, open",
+    "positions": [
+     {
+      "x": 430,
+      "y": 272,
+      "scale": 1
+     },
+     {
+      "x": 338,
+      "y": 273,
+      "scale": 1
+     },
+     {
+      "x": 528,
+      "y": 273,
+      "scale": 1
+     },
+     {
+      "x": 385,
+      "y": 276,
+      "scale": 1
+     },
+     {
+      "x": 260,
+      "y": 284,
+      "scale": 1
+     },
+     {
+      "x": 485,
+      "y": 284,
+      "scale": 1
+     },
+     {
+      "x": 564,
+      "y": 275,
+      "scale": 1
+     },
+     {
+      "x": 146,
+      "y": 298,
+      "scale": 2
+     }
+    ],
+    "timing": "open one pair every ~0.6 s, last one is closest"
+   }
+  },
+  "5": {
+   "file": "shot5_swamp.png",
+   "panX": [
+    292,
+    292
+   ],
+   "direction": "hold; boat sprite glides up from the bottom, fog layers drift in code",
+   "boat": {
+    "sprite": "boat.png",
+    "path": "from (x 427, y 500) to (x 427, y 330), centre of sprite, over ~5 s, ease out"
+   }
+  },
+  "6": {
+   "file": "shot6_gate.png",
+   "panX": [
+    0,
+    584
+   ],
+   "direction": "slow pan left to right so each party member gets their beat, then the title fades in"
+  }
+ },
+ "title": {
+  "file": "title.png",
+  "place": "centred at y 60 on shot 6, fade in over 1.5 s"
+ }
+}
