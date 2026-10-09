@@ -22,7 +22,7 @@ export const floor1: FloorData = {
     [ { wall: true }, { shallowWater: true }, { deepWater: true }, { shallowWater: true }, { wall: true }, m('rust_crab', 18), { item: 'potion_red' }, {}, { wall: true } ],
     [ { wall: true }, { shallowWater: true }, { shallowWater: true }, { shallowWater: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true } ],
     [ { wall: true }, {}, { item: 'key' }, {}, {}, { item: 'potion_blue' }, { chest: true }, m('keep_rat', 12), { wall: true } ],
-    [ { wall: true }, { carving: 'carving_start' }, {}, {}, { wall: true }, {}, {}, {}, { wall: true } ],
+    [ { wall: true }, { carving: 'carving_start' }, {}, {}, { wall: true }, {}, { item: 'oil' }, {}, { wall: true } ],
     [ { wall: true }, {}, {}, {}, { wall: true }, {}, {}, { item: 'potion_green' }, { wall: true } ],
     [ { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true } ]
   ]
@@ -50,11 +50,12 @@ function relocateLeechesOffDoor(floor: FloorData) {
 }
 relocateLeechesOffDoor(floor1);
 
-export const floor1Sconces: readonly Sconce[] = [
-  { x: 0, y: 6, face: 'E', lit: true },
-  { x: 4, y: 1, face: 'W', lit: true },
-  { x: 0, y: 3, face: 'E', lit: false },
-  { x: 4, y: 6, face: 'W', lit: true },
-  { x: 8, y: 6, face: 'W', lit: false },
-  { x: 8, y: 1, face: 'W', lit: false },
+export const floor1Sconces: Sconce[] = [
+  { x: 0, y: 6, face: 'E', lit: true, capped: false },
+  { x: 4, y: 1, face: 'W', lit: true, capped: false },
+  { x: 6, y: 4, face: 'S', lit: true, capped: false },
+  { x: 4, y: 6, face: 'W', lit: false, capped: false },
+  { x: 8, y: 1, face: 'W', lit: false, capped: false },
+  { x: 0, y: 3, face: 'E', lit: false, capped: true },
+  { x: 8, y: 6, face: 'W', lit: false, capped: true }
 ];

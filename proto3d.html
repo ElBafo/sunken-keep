@@ -149,6 +149,19 @@
       z-index: 200;
       display: none; /* Hidden by default, shown with ?debug=1 */
     }
+    #oil-readout {
+      position: fixed;
+      top: calc(10px + env(safe-area-inset-top, 0px));
+      right: 10px;
+      background: rgba(0, 0, 0, 0.65);
+      color: #e8c98a;
+      padding: 4px 8px;
+      font-family: monospace;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      z-index: 200;
+      pointer-events: none;
+    }
   </style>
 </head>
 <body>
@@ -167,6 +180,7 @@
     <button id="btn-right" class="control-btn">→</button>
   </div>
   <div id="message-toast"></div>
+  <div id="oil-readout">Oil 2/4</div>
   <div id="fps-counter">FPS: --</div>
   <script type="module" src="/src/proto3d/main.ts"></script>
 </body>

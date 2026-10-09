@@ -259,15 +259,12 @@ test('proto3d iPhone fixes: sorting, items, walls, water, doors, no 404s', async
   expect(lit1.frame.x, 'door is lit at the wall plane, not the origin').toBeGreaterThan(6.5);
   expect(lit1.frame.x, 'door is lit at the wall plane, not the origin').toBeLessThan(7.5);
 
-  // Party-distance bands for the west door plane (x=7): 3sq→0.42, 2sq→0.65, 1sq→1.0.
-  // Walking closer must brighten the door, never darken it.
-  expect(lit3.frame.r, '3sq frame uses the two-square falloff').toBeGreaterThan(0.35);
-  expect(lit3.frame.r, '3sq frame uses the two-square falloff').toBeLessThan(0.55);
-  expect(lit2.frame.r, '2sq frame uses the one-square falloff').toBeGreaterThan(0.55);
-  expect(lit2.frame.r, '2sq frame uses the one-square falloff').toBeLessThan(0.8);
-  expect(lit1.frame.r, '1sq frame is fully lit like a near wall').toBeGreaterThan(0.9);
-  expect(lit1.frame.r).toBeGreaterThan(lit2.frame.r);
-  expect(lit2.frame.r).toBeGreaterThan(lit3.frame.r);
+  // Door at (4,2) sits in the (4,1) torch pool, so it stays lit at 3/2/1 squares.
+  // The old party-distance bands (0.42 / 0.65 / 1.0) no longer apply.
+  expect(lit3.frame.r, '3sq door is in the torch pool').toBeGreaterThan(0.3);
+  expect(lit2.frame.r, '2sq door is in the torch pool').toBeGreaterThan(0.3);
+  expect(lit1.frame.r, '1sq door is in the torch pool').toBeGreaterThan(0.3);
+  expect(lit1.frame.r, 'closer does not darken the torch-lit door').toBeGreaterThanOrEqual(lit3.frame.r - 0.08);
 
   for (const [label, lit] of [
     ['3sq', lit3],

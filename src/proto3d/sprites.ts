@@ -1,20 +1,13 @@
 import * as THREE from 'three';
 import {
   CELL_SIZE,
-  CUTOUT_ALPHA_TEST,
-  FACE_INTO_ROOM,
-  SCONCE_ANIM_FPS,
-  SCONCE_HEIGHT_TILES,
-  SCONCE_WALL_OFFSET_TILES,
-  SCONCE_WIDTH_TILES,
   SPRITE_SURFACE_LIFT,
   WATER_SURFACE_Y,
   cameraOffsetXZ,
   isWaterTile,
-  sconceNeedsMirror,
   tileBedY
 } from './constants';
-import { FloorData, Sconce, Tile } from './types';
+import { FloorData, Tile } from './types';
 
 /** World size of near idle billboards. Leeches sit low on the water. */
 const MONSTER_SPRITE: Record<string, { w: number; h: number }> = {
@@ -24,13 +17,15 @@ const MONSTER_SPRITE: Record<string, { w: number; h: number }> = {
   keep_rat: { w: 1.3, h: 1.2 }
 };
 
-const ITEM_SPRITE: Record<string, { file: string; w: number; h: number }> = {
+const ITEM_SPRITE: Record<string, { file: string; w: number; h: number; base?: string; prefix?: string }> = {
   key: { file: 'item_key_near.png', w: 0.62, h: 0.32 },
   potion_red: { file: 'item_potion_red_near.png', w: 0.3, h: 0.44 },
   potion_blue: { file: 'item_potion_blue_near.png', w: 0.3, h: 0.44 },
   potion_green: { file: 'item_potion_green_near.png', w: 0.3, h: 0.44 },
   chest: { file: 'item_chest_near.png', w: 0.72, h: 0.5 },
-  scroll: { file: 'item_scroll_near.png', w: 0.42, h: 0.32 }
+  scroll: { file: 'item_scroll_near.png', w: 0.42, h: 0.32 },
+  oil: { file: 'item_oil_near.png', w: 0.3, h: 0.44, base: 'proto3d/tex3d/torch', prefix: 'item_oil' },
+  oil_flask: { file: 'item_oil_near.png', w: 0.3, h: 0.44, base: 'proto3d/tex3d/torch', prefix: 'item_oil' }
 };
 
 const OWN_SQUARE_SCALE = 0.72;
@@ -53,6 +48,7 @@ interface SpriteInfo {
   baseH: number;
   floorY: number;
   frames?: THREE.Texture[];
+  lod?: THREE.Texture[];
   currentFrame: number;
   animSpeed: number;
   lastFrameTime: number;
@@ -102,28 +98,6 @@ function makeBillboard(
   return sprite;
 }
 
-function placeOnWall(
-  obj: THREE.Object3D,
-  cellX: number,
-  cellY: number,
-  face: Sconce['face'],
-  y: number,
-  insetTiles: number
-) {
-  const { nx, nz, rotY } = FACE_INTO_ROOM[face];
-  const dist = CELL_SIZE / 2 + insetTiles * CELL_SIZE;
-  obj.position.set(cellX * CELL_SIZE + nx * dist, y, cellY * CELL_SIZE + nz * dist);
-  obj.rotation.y = rotY;
-}
-
-function flipUVs(geo: THREE.PlaneGeometry) {
-  const uv = geo.attributes.uv;
-  for (let i = 0; i < uv.count; i++) {
-    uv.setX(i, 1 - uv.getX(i));
-  }
-  uv.needsUpdate = true;
-}
-
 export class SpriteManager {
   sprites: SpriteInfo[] = [];
   camera: THREE.Camera;
@@ -140,12 +114,7 @@ export class SpriteManager {
     }
   }
 
-  async loadSprites(
-    scene: THREE.Scene,
-    floorData: FloorData,
-    sconces: readonly Sconce[],
-    cappedSconces: Set<string> = new Set()
-  ) {
+  async loadSprites(scene: THREE.Scene, floorData: FloorData) {
     const loader = new THREE.TextureLoader();
     const baseUrl = import.meta.env.BASE_URL;
 
@@ -205,10 +174,20 @@ export class SpriteManager {
             w: 0.4,
             h: 0.4
           };
-          const tex = await loadTex(`art/dungeon/${def.file}`);
+          const folder = def.base ?? 'art/dungeon';
+          const nearPath = def.prefix ? `${folder}/${def.prefix}_near.png` : `${folder}/${def.file}`;
+          const tex = await loadTex(nearPath);
+          let lod: THREE.Texture[] | undefined;
+          if (def.prefix) {
+            lod = await Promise.all([
+              tex,
+              loadTex(`${folder}/${def.prefix}_mid.png`),
+              loadTex(`${folder}/${def.prefix}_far.png`)
+            ]);
+          }
           const mat = makeSpriteMaterial(tex);
           const sprite = makeBillboard(mat, x * CELL_SIZE, feetY, y * CELL_SIZE, def.w, def.h);
-          sprite.userData.item = itemName;
+          sprite.userData.item = itemName === 'oil_flask' ? 'oil' : itemName;
           scene.add(sprite);
 
           this.sprites.push({
@@ -220,6 +199,7 @@ export class SpriteManager {
             baseW: def.w,
             baseH: def.h,
             floorY: feetY,
+            lod,
             currentFrame: 0,
             animSpeed: 0,
             lastFrameTime: 0
@@ -227,64 +207,6 @@ export class SpriteManager {
         }
       }
     }
-
-    const [sconceDead, sconceLit1, sconceLit2, sconceLit3] = await Promise.all([
-      loadTex('proto3d/tex3d/sconce_dead.png'),
-      loadTex('proto3d/tex3d/sconce_lit_1.png'),
-      loadTex('proto3d/tex3d/sconce_lit_2.png'),
-      loadTex('proto3d/tex3d/sconce_lit_3.png')
-    ]);
-    const litFrames = [sconceLit1, sconceLit2, sconceLit3];
-    const sconceW = SCONCE_WIDTH_TILES * CELL_SIZE;
-    const sconceH = SCONCE_HEIGHT_TILES * CELL_SIZE;
-    const midHeight = CELL_SIZE / 2;
-    const frameMs = 1000 / SCONCE_ANIM_FPS;
-
-    for (const sconce of sconces) {
-      if (!sconce.lit && cappedSconces.has(`${sconce.x},${sconce.y}`)) continue;
-      const map = sconce.lit ? litFrames[0] : sconceDead;
-      const geo = new THREE.PlaneGeometry(sconceW, sconceH);
-      if (sconceNeedsMirror(sconce.face)) flipUVs(geo);
-
-      const mat = new THREE.MeshBasicMaterial({
-        map,
-        color: 0xffffff,
-        transparent: true,
-        alphaTest: CUTOUT_ALPHA_TEST,
-        depthTest: true,
-        depthWrite: true,
-        fog: false,
-        toneMapped: false,
-        side: THREE.FrontSide
-      });
-
-      const mesh = new THREE.Mesh(geo, mat);
-      placeOnWall(mesh, sconce.x, sconce.y, sconce.face, midHeight, SCONCE_WALL_OFFSET_TILES);
-      mesh.renderOrder = 1;
-      mesh.userData.skipVertexLighting = true;
-      mesh.userData.isSconce = true;
-      scene.add(mesh);
-
-      this.sprites.push({
-        object: mesh,
-        material: mat,
-        x: sconce.x,
-        y: sconce.y,
-        kind: 'sconce',
-        baseW: sconceW,
-        baseH: sconceH,
-        floorY: midHeight,
-        frames: sconce.lit ? litFrames : undefined,
-        currentFrame: 0,
-        animSpeed: sconce.lit ? frameMs : 0,
-        lastFrameTime: 0
-      });
-    }
-  }
-
-  sconceFrame(): number {
-    const lit = this.sprites.find((s) => s.frames && s.frames.length === 3 && s.animSpeed > 0);
-    return lit?.currentFrame ?? 0;
   }
 
   layoutItems(playerX: number, playerY: number, dir: number) {
@@ -305,9 +227,19 @@ export class SpriteManager {
           camZ + fz * OWN_SQUARE_FORWARD
         );
         sprite.object.scale.set(sprite.baseW * OWN_SQUARE_SCALE, sprite.baseH * OWN_SQUARE_SCALE, 1);
+        if (sprite.lod) {
+          sprite.material.map = sprite.lod[0];
+          sprite.material.needsUpdate = true;
+        }
       } else {
         sprite.object.position.set(sprite.x * CELL_SIZE, sprite.floorY, sprite.y * CELL_SIZE);
         sprite.object.scale.set(sprite.baseW, sprite.baseH, 1);
+        if (sprite.lod) {
+          const dist = Math.max(Math.abs(sprite.x - playerX), Math.abs(sprite.y - playerY));
+          const lodIndex = dist <= 1 ? 0 : dist === 2 ? 1 : 2;
+          sprite.material.map = sprite.lod[lodIndex];
+          sprite.material.needsUpdate = true;
+        }
       }
     }
   }

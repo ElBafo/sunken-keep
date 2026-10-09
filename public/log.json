@@ -214,5 +214,10 @@
  {
   "key": "out_of_reach",
   "text": "{hero} can't reach from the back."
+ },
+ {
+  "key": "oil_pickup",
+  "text": "Oil flask. Wren's lantern drinks it.",
+  "when": "on picking up an oil flask"
  }
 ]

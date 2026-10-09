@@ -1,15 +1,26 @@
 import * as THREE from 'three';
 import { Atmosphere } from './atmosphere';
 import { AudioManager } from './audio';
-import { CELL_SIZE, DOOR_UNLOCK_LEAD_MS } from './constants';
+import {
+  BRIGHT_MAX,
+  BRIGHT_MIN,
+  CELL_SIZE,
+  DOOR_UNLOCK_LEAD_MS,
+  OIL_FLASK,
+  OIL_MAX,
+  OIL_START,
+  OIL_TORCH_COST
+} from './constants';
 import { Dressing } from './dressing';
 import { floor1, floor1Sconces } from './floor-data';
 import { InputManager } from './input';
 import { MoveResult, Player } from './player';
+import { loadProgress, persistEnabled, saveProgress } from './progress';
 import { qualityFromSearch, QualityLevel } from './quality';
 import { PixelRenderer } from './renderer';
 import { SceneBuilder } from './scene-builder';
 import { SpriteManager } from './sprites';
+import { TorchSystem, torchWorldPos } from './torches';
 import { VertexLightingManager } from './vertex-lighting';
 import { WaterSystem } from './water';
 
@@ -24,7 +35,12 @@ class Game {
   atmosphere!: Atmosphere;
   dressing!: Dressing;
   water!: WaterSystem;
+  torches!: TorchSystem;
   quality: QualityLevel = 'high';
+  bright = 1;
+  oil = OIL_START;
+  persist = true;
+  oilPickupText = 'Oil flask. Wren\'s lantern drinks it.';
   lastMessage = '';
   messageTimer = 0;
 
@@ -40,6 +56,12 @@ class Game {
     const canvas = document.getElementById('render-canvas') as HTMLCanvasElement;
     const params = new URLSearchParams(window.location.search);
     this.quality = qualityFromSearch(params);
+    this.persist = persistEnabled();
+    const brightRaw = Number(params.get('bright'));
+    if (Number.isFinite(brightRaw)) {
+      this.bright = Math.min(BRIGHT_MAX, Math.max(BRIGHT_MIN, brightRaw));
+    }
+    this.oil = loadProgress(floor1Sconces, this.persist);
 
     this.renderer = new PixelRenderer(canvas);
     await this.renderer.loadPalette();
@@ -69,18 +91,24 @@ class Game {
       this.player.setPosition(startX, startY, startDir);
     }
 
-    this.vertexLighting = new VertexLightingManager(floor1, floor1Sconces);
+    this.vertexLighting = new VertexLightingManager(floor1, floor1Sconces, {
+      floor: 1,
+      bright: this.bright,
+      sunbeams: this.dressing.marks.sunbeams,
+      oil: () => this.oil
+    });
     this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
+
+    this.torches = new TorchSystem(this.renderer.camera);
+    await this.torches.load(this.renderer.scene, floor1Sconces);
+
     this.vertexLighting.registerScene(this.renderer.scene);
     this.vertexLighting.updateAllMeshes(this.renderer.scene);
 
     this.spriteManager = new SpriteManager(this.renderer.camera);
-    await this.spriteManager.loadSprites(
-      this.renderer.scene,
-      floor1,
-      floor1Sconces,
-      this.dressing.marks.cappedSconces
-    );
+    await this.spriteManager.loadSprites(this.renderer.scene, floor1);
+    this.updateOilHud();
+    await this.loadLogText();
 
     this.audioManager = new AudioManager(this.renderer.camera, this.quality);
     await this.audioManager.init();
@@ -109,13 +137,13 @@ class Game {
     const tile = this.player.tileAt(x, y);
     if (!tile) return;
     if (tile.deepWater) {
-      this.audioManager.playUi('step_water_deep', 0.7);
+      this.audioManager.playStep('step_water_deep');
       this.atmosphere.spawnStepSplash(x * CELL_SIZE, y * CELL_SIZE);
     } else if (tile.shallowWater) {
-      this.audioManager.playUi('step_water_shallow', 0.7);
+      this.audioManager.playStep('step_water_shallow');
       this.atmosphere.spawnStepSplash(x * CELL_SIZE, y * CELL_SIZE);
     } else {
-      this.audioManager.playUi('step', 0.5);
+      this.audioManager.playStep('step');
     }
   }
 
@@ -152,10 +180,87 @@ class Game {
     return true;
   }
 
+  pickupOilAt(x: number, y: number): boolean {
+    const tile = this.player.tileAt(x, y);
+    if (!tile || (tile.item !== 'oil' && tile.item !== 'oil_flask')) return false;
+    tile.item = undefined;
+    this.spriteManager.hideItemAt(x, y);
+    this.audioManager.playUi('oil_pickup', 0.85);
+    window.setTimeout(() => this.audioManager.playUi('lantern_refill', 0.8), 280);
+    const wasEmpty = this.oil <= 0;
+    this.oil = Math.min(OIL_MAX, this.oil + OIL_FLASK);
+    if (wasEmpty) this.audioManager.startLanternLoop(true);
+    this.updateOilHud();
+    saveProgress(floor1Sconces, this.oil, this.persist);
+    this.vertexLighting.updateAllMeshes(this.renderer.scene);
+    this.showMessage(this.oilPickupText);
+    return true;
+  }
+
+  updateOilHud() {
+    const el = document.getElementById('oil-readout');
+    if (!el) return;
+    el.textContent = `Oil ${this.oil}/${OIL_MAX}`;
+  }
+
+  async loadLogText() {
+    try {
+      const baseUrl = import.meta.env.BASE_URL;
+      const res = await fetch(`${baseUrl}log.json`);
+      const lines = (await res.json()) as Array<{ key: string; text: string }>;
+      const line = lines.find((l) => l.key === 'oil_pickup');
+      if (line?.text) this.oilPickupText = line.text;
+    } catch {
+      // keep fallback
+    }
+  }
+
+  setOil(value: number) {
+    const next = Math.min(OIL_MAX, Math.max(0, Math.floor(value)));
+    const prev = this.oil;
+    this.oil = next;
+    if (prev > 0 && next <= 0) {
+      this.audioManager.playUi('oil_empty', 0.85);
+      this.audioManager.startLanternLoop(false);
+    } else if (prev <= 0 && next > 0) {
+      this.audioManager.startLanternLoop(true);
+    }
+    this.updateOilHud();
+    saveProgress(floor1Sconces, this.oil, this.persist);
+    this.vertexLighting.updateAllMeshes(this.renderer.scene);
+  }
+
+  lightFacingTorch(): boolean {
+    const sconce = this.torches.facingTorch(this.player.x, this.player.y, this.player.dir);
+    if (!sconce) return false;
+    if (sconce.capped) {
+      this.audioManager.playDoor('door_locked', sconce.x, sconce.y);
+      this.showMessage('Sealed.');
+      return true;
+    }
+    if (sconce.lit) return false;
+    if (this.oil < OIL_TORCH_COST) {
+      this.showMessage('No oil to spare.');
+      return true;
+    }
+    const now = performance.now();
+    this.torches.ignite(sconce, now);
+    this.vertexLighting.relight();
+    const pos = torchWorldPos(sconce);
+    this.audioManager.playPositional('torch_ignite', pos.x, pos.y, pos.z, 0.8);
+    window.setTimeout(() => this.audioManager.startTorchLoop(sconce), (1000 / 12) * 6);
+    this.setOil(this.oil - OIL_TORCH_COST);
+    this.water.addSconceGlint(sconce);
+    return true;
+  }
+
   interact() {
     if (this.pickupKeyAt(this.player.x, this.player.y)) return;
+    if (this.pickupOilAt(this.player.x, this.player.y)) return;
     const facing = this.player.facingPos(1);
     if (this.pickupKeyAt(facing.x, facing.y)) return;
+    if (this.pickupOilAt(facing.x, facing.y)) return;
+    if (this.lightFacingTorch()) return;
 
     const ahead = this.doorAhead();
     if (ahead) this.handleDoor(ahead.x, ahead.y);
@@ -320,6 +425,20 @@ class Game {
       },
       hasKey: () => this.player.hasKey,
       lastMessage: () => this.lastMessage,
+      getOil: () => this.oil,
+      setOil: (n: number) => this.setOil(n),
+      getBright: () => this.bright,
+      setBright: (n: number) => {
+        this.bright = Math.min(BRIGHT_MAX, Math.max(BRIGHT_MIN, n));
+        this.vertexLighting.setBright(this.bright);
+        this.vertexLighting.updateAllMeshes(this.renderer.scene);
+        this.renderer.render();
+      },
+      torchStates: () =>
+        floor1Sconces.map((s) => ({ x: s.x, y: s.y, face: s.face, lit: s.lit, capped: !!s.capped })),
+      tileBrightness: (x: number, y: number) =>
+        this.vertexLighting.calculateBrightness(x, y, !!floor1.tiles[y]?.[x]?.floorNDark),
+      lightFacingTorch: () => this.lightFacingTorch(),
       tryMoveForward: () => {
         const before = { x: this.player.x, y: this.player.y };
         const result = this.player.moveForward();
@@ -357,6 +476,7 @@ class Game {
       tapToStart.classList.add('hidden');
       this.audioManager.unlock();
       await this.audioManager.loadSounds(this.renderer.scene, floor1Sconces);
+      this.audioManager.startLanternLoop(this.oil > 0);
       this.audioManager.attachDressing(this.renderer.scene, this.dressing.marks);
       this.audioManager.attachLeeches(this.renderer.scene, floor1);
       this.audioManager.attachWaterPools(this.renderer.scene, floor1);
@@ -400,9 +520,10 @@ class Game {
     this.atmosphere.update(dtSec, now, this.renderer.camera);
     this.audioManager.update(now, this.renderer.camera.position.x, this.renderer.camera.position.z);
 
-    const prevFrame = this.spriteManager.sconceFrame();
+    const prevFrame = this.torches.flameFrame();
+    this.torches.update(now);
     this.spriteManager.update(now, this.player.x, this.player.y, this.player.dir);
-    const nextFrame = this.spriteManager.sconceFrame();
+    const nextFrame = this.torches.flameFrame();
     if (nextFrame !== prevFrame) this.vertexLighting.setFlickerFrame(nextFrame);
 
     if (this.messageTimer && now >= this.messageTimer) {

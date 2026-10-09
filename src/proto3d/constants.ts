@@ -58,10 +58,32 @@ export const MIRROR_BAKED_SCONCE_LEAN = false;
 export const SCONCE_WIDTH_TILES = 0.25;
 export const SCONCE_HEIGHT_TILES = 0.5;
 export const SCONCE_WALL_OFFSET_TILES = 0.015;
+/** Front bracket / flame sit this far off the wall (artist spec). */
+export const SCONCE_FRONT_OFFSET_TILES = 0.14;
 export const SCONCE_ANIM_FPS = 8;
-/** Flame-frame multipliers for the sconce warm term (keep flicker readable). */
+export const FLARE_ANIM_FPS = 12;
+/** Flame-frame multipliers for the torch warm term (keep flicker readable). */
 export const SCONCE_FLICKER = [0.78, 0.58, 1.08] as const;
-export const SCONCE_RADIUS_TILES = 1.5;
+/** Lit torch pool — warm, smooth falloff. */
+export const SCONCE_RADIUS_TILES = 2.5;
+export const TORCH_INTENSITY = 1.0;
+/** Wren's lantern with oil — smaller, dimmer, cooler than a torch. */
+export const LANTERN_RADIUS_TILES = 1.5;
+export const LANTERN_INTENSITY = 0.48;
+/** Ember-only lantern — smaller blue-white glow. */
+export const EMBER_RADIUS_TILES = 0.85;
+export const EMBER_INTENSITY = 0.3;
+/** Cold sunbeam from a ceiling crack. */
+export const SUNBEAM_RADIUS_TILES = 2.0;
+export const SUNBEAM_INTENSITY = 0.38;
+/** Per-floor ambient (never 0). Floors 1–2 stay brighter; deeper floors go darker. */
+export const FLOOR_AMBIENT: readonly number[] = [0, 0.2, 0.18, 0.12, 0.1, 0.08, 0.07, 0.06, 0.05];
+export const BRIGHT_MIN = 0.6;
+export const BRIGHT_MAX = 1.6;
+export const OIL_START = 2;
+export const OIL_MAX = 4;
+export const OIL_FLASK = 1;
+export const OIL_TORCH_COST = 1;
 export const FACE_SEGMENTS = 4;
 export const CUTOUT_ALPHA_TEST = 0.5;
 

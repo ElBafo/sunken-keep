@@ -118,5 +118,18 @@
       "empty_hand"
     ]
   },
-  "_expected_floor1": "With the front-two rule: leeches ~3s, rat ~3s, crab ~8s, slime ~10s. About 24 HP lost across the floor before potions."
+  "_expected_floor1": "With the front-two rule: leeches ~3s, rat ~3s, crab ~8s, slime ~10s. About 24 HP lost across the floor before potions.",
+  "items": {
+    "oil_flask": {
+      "slot": "bag",
+      "use": "tap: +1 oil to Wren's lantern (max 4)"
+    }
+  },
+  "oil": {
+    "_note": "Wren's lantern oil. 1 oil lights 1 dead torch. Her ember never goes out.",
+    "lanternStart": 2,
+    "lanternMax": 4,
+    "torchCost": 1,
+    "flask": 1
+  }
 }
