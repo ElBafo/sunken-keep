@@ -69,7 +69,7 @@ export const SCONCE_RADIUS_TILES = 2.5;
 export const TORCH_INTENSITY = 1.0;
 /** Wren's lantern with oil — smaller, dimmer, cooler than a torch. */
 export const LANTERN_RADIUS_TILES = 1.5;
-export const LANTERN_INTENSITY = 0.48;
+export const LANTERN_INTENSITY = 0.55;
 /** Ember-only lantern — smaller blue-white glow. */
 export const EMBER_RADIUS_TILES = 0.85;
 export const EMBER_INTENSITY = 0.3;
@@ -77,7 +77,7 @@ export const EMBER_INTENSITY = 0.3;
 export const SUNBEAM_RADIUS_TILES = 2.0;
 export const SUNBEAM_INTENSITY = 0.38;
 /** Per-floor ambient (never 0). Floors 1–2 stay brighter; deeper floors go darker. */
-export const FLOOR_AMBIENT: readonly number[] = [0, 0.2, 0.18, 0.12, 0.1, 0.08, 0.07, 0.06, 0.05];
+export const FLOOR_AMBIENT: readonly number[] = [0, 0.28, 0.24, 0.16, 0.13, 0.1, 0.08, 0.07, 0.06];
 export const BRIGHT_MIN = 0.6;
 export const BRIGHT_MAX = 1.6;
 export const OIL_START = 2;

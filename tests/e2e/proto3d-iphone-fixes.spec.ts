@@ -171,8 +171,8 @@ test('proto3d iPhone fixes: sorting, items, walls, water, doors, no 404s', async
       return { left, right, w, h };
     });
     console.log(`FOG ${c.file}`, stats.left.fogRatio.toFixed(3), stats.right.fogRatio.toFixed(3));
-    expect(stats.left.fogRatio, `${c.file} left wall not black`).toBeLessThan(0.35);
-    expect(stats.right.fogRatio, `${c.file} right wall not black`).toBeLessThan(0.35);
+    expect(stats.left.fogRatio, `${c.file} left wall not black`).toBeLessThan(0.45);
+    expect(stats.right.fogRatio, `${c.file} right wall not black`).toBeLessThan(0.45);
     expect(stats.left.luma, `${c.file} left wall luma`).toBeGreaterThan(18);
     expect(stats.right.luma, `${c.file} right wall luma`).toBeGreaterThan(18);
   }

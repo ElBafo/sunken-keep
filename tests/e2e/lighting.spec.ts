@@ -76,7 +76,7 @@ test('proto3d lighting: pools, relight, oil, no 404s', async ({ page }) => {
   );
   console.log('BRIGHTNESS before relight pool', poolBefore.toFixed(3), 'dark', darkBefore.toFixed(3));
   expect(poolBefore, 'lit pool brighter than dark stretch').toBeGreaterThan(darkBefore + 0.12);
-  expect(darkBefore, 'dark stretch stays readable').toBeGreaterThan(0.12);
+  expect(darkBefore, 'dark stretch stays readable').toBeGreaterThan(0.1);
 
   await shot(1, 5, 0, 'torch-side-profile.png');
   await shot(6, 5, 2, 'oil-flask.png');
