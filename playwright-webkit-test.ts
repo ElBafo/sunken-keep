@@ -1,8 +1,8 @@
-import { chromium, webkit, devices } from 'playwright';
+import { webkit, devices } from 'playwright';
 
 async function testWebKit() {
   const iPhone15 = devices['iPhone 15 Pro'];
-  const browser = await chromium.launch({ headless: true }); // Test with Chromium first
+  const browser = await webkit.launch({ headless: true }); // Use WebKit for Safari testing
   const context = await browser.newContext({
     ...iPhone15,
   });
@@ -83,7 +83,7 @@ async function testWebKit() {
   const bodyText = await page.locator('body').textContent();
   console.log('Page text:', bodyText?.slice(0, 200));
 
-  // Check canvas is rendering (not black)
+  // Check canvas is rendering (not black, walls visible)
   const canvas = page.locator('canvas').first();
   if (await canvas.isVisible()) {
     const canvasData = await canvas.evaluate((el: HTMLCanvasElement) => {
@@ -100,11 +100,32 @@ async function testWebKit() {
           nonBlackPixels++;
         }
       }
-      return { width: el.width, height: el.height, nonBlackPixels };
+      
+      // Check view region (270x380) for color variety (walls should be visible)
+      const viewWidth = Math.min(270, el.width);
+      const viewHeight = Math.min(380, el.height);
+      const viewImageData = ctx.getImageData(0, 0, viewWidth, viewHeight);
+      const colorSet = new Set<string>();
+      for (let i = 0; i < viewImageData.data.length; i += 40) { // Sample every 10 pixels
+        const r = viewImageData.data[i];
+        const g = viewImageData.data[i + 1];
+        const b = viewImageData.data[i + 2];
+        colorSet.add(`${r},${g},${b}`);
+      }
+      
+      return { 
+        width: el.width, 
+        height: el.height, 
+        nonBlackPixels,
+        viewColorVariety: colorSet.size
+      };
     });
     console.log('Canvas data:', canvasData);
     if (canvasData && canvasData.nonBlackPixels === 0) {
       errors.push('Canvas is completely black!');
+    }
+    if (canvasData && canvasData.viewColorVariety < 3) {
+      errors.push(`View region appears to be a single flat color (only ${canvasData.viewColorVariety} colors detected - walls not visible)`);
     }
   } else {
     errors.push('Canvas not visible!');

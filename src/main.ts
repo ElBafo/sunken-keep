@@ -143,15 +143,17 @@ async function main() {
   // Show install hint on iOS Safari when not standalone (one-time)
   const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
   const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-  const installHintShown = localStorage.getItem('installHintShown');
+  const installHintDismissed = localStorage.getItem('installHintDismissed');
   
-  if (isIOS && isSafari && !isStandalone && !installHintShown) {
+  // Dismiss hint on tap
+  installHint.addEventListener('click', () => {
+    installHint.classList.add('hidden');
+    localStorage.setItem('installHintDismissed', 'true');
+  });
+  
+  if (isIOS && isSafari && !isStandalone && !installHintDismissed) {
     setTimeout(() => {
       installHint.classList.remove('hidden');
-      setTimeout(() => {
-        installHint.classList.add('hidden');
-        localStorage.setItem('installHintShown', 'true');
-      }, 8000);
     }, 3000);
   }
   
@@ -449,27 +451,32 @@ async function main() {
         // Render 585 UI
         uiRenderer585.render(ctx, state, now);
         
-        // Debug info
-        ctx.save();
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '12px monospace';
-        ctx.fillText(`Floor ${state.party.floor}`, 10, 20);
-        ctx.fillText(`Pos: (${state.party.x}, ${state.party.y})`, 10, 35);
+        // Debug info (only if ?debug=1)
+        const urlParams = new URLSearchParams(window.location.search);
+        const debugMode = urlParams.get('debug') === '1';
         
-        // Check for stairs
-        const stairs = gameController.checkStairs();
-        if (stairs) {
-          ctx.fillText(`Stairs ${stairs} - Press Space`, 10, 50);
-        }
-        
-        // Show combat status
-        if (combatController.isInCombat()) {
-          const info = combatController.getCombatInfo();
-          if (info) {
-            ctx.fillText(`Combat: ${info.monster} ${info.monsterHp}/${info.monsterMaxHp}`, 10, 65);
+        if (debugMode) {
+          ctx.save();
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '12px monospace';
+          ctx.fillText(`Floor ${state.party.floor}`, 10, 20);
+          ctx.fillText(`Pos: (${state.party.x}, ${state.party.y})`, 10, 35);
+          
+          // Check for stairs
+          const stairs = gameController.checkStairs();
+          if (stairs) {
+            ctx.fillText(`Stairs ${stairs} - Press Space`, 10, 50);
           }
+          
+          // Show combat status
+          if (combatController.isInCombat()) {
+            const info = combatController.getCombatInfo();
+            if (info) {
+              ctx.fillText(`Combat: ${info.monster} ${info.monsterHp}/${info.monsterMaxHp}`, 10, 65);
+            }
+          }
+          ctx.restore();
         }
-        ctx.restore();
       }
     }
     requestAnimationFrame(gameLoop);
