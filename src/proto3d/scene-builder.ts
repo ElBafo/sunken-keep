@@ -20,26 +20,45 @@ export class SceneBuilder {
     const loader = new THREE.TextureLoader();
     const baseUrl = import.meta.env.BASE_URL;
     
-    const loadTex = (path: string) => {
-      const tex = loader.load(`${baseUrl}${path}`);
-      tex.magFilter = THREE.NearestFilter;
-      tex.minFilter = THREE.NearestFilter;
-      tex.generateMipmaps = false;
-      tex.wrapS = THREE.RepeatWrapping;
-      tex.wrapT = THREE.RepeatWrapping;
-      return tex;
+    const loadTex = (path: string): Promise<THREE.Texture> => {
+      return new Promise((resolve, reject) => {
+        loader.load(
+          `${baseUrl}${path}`,
+          (tex) => {
+            tex.magFilter = THREE.NearestFilter;
+            tex.minFilter = THREE.NearestFilter;
+            tex.generateMipmaps = false;
+            tex.wrapS = THREE.RepeatWrapping;
+            tex.wrapT = THREE.RepeatWrapping;
+            resolve(tex);
+          },
+          undefined,
+          (err) => reject(err)
+        );
+      });
     };
+    
+    const [wallPlain, wallPilaster, wallKnot, doorLocked, floorStone, floorWater, ceiling] = await Promise.all([
+      loadTex('art/tex3d/wall_plain.png'),
+      loadTex('art/tex3d/wall_pilaster.png'),
+      loadTex('art/tex3d/wall_knot.png'),
+      loadTex('art/tex3d/door_locked.png'),
+      loadTex('art/tex3d/floor_stone.png'),
+      loadTex('art/tex3d/floor_water.png'),
+      loadTex('art/tex3d/ceiling.png')
+    ]);
     
     this.textures = {
-      wallPlain: loadTex('art/tex3d/wall_plain.png'),
-      wallPilaster: loadTex('art/tex3d/wall_pilaster.png'),
-      wallKnot: loadTex('art/tex3d/wall_knot.png'),
-      doorLocked: loadTex('art/tex3d/door_locked.png'),
-      floorStone: loadTex('art/tex3d/floor_stone.png'),
-      floorWater: loadTex('art/tex3d/floor_water.png'),
-      ceiling: loadTex('art/tex3d/ceiling.png')
+      wallPlain,
+      wallPilaster,
+      wallKnot,
+      doorLocked,
+      floorStone,
+      floorWater,
+      ceiling
     };
     
+    console.log('All textures loaded successfully');
     return this.textures;
   }
   
@@ -71,11 +90,14 @@ export class SceneBuilder {
         
         // Floor
         const isWater = tile.deepWater || tile.shallowWater;
+        const floorTex = isWater ? this.textures!.floorWater : this.textures!.floorStone;
         const floorY = isWater ? -0.15 : 0;
         
         const floorGeo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE);
-        const floorMat = new THREE.MeshBasicMaterial({ 
-          color: isWater ? 0x0055ff : 0x888888,
+        const floorMat = new THREE.MeshStandardMaterial({ 
+          map: floorTex,
+          roughness: 0.9,
+          metalness: 0.1,
           side: THREE.DoubleSide
         });
         const floor = new THREE.Mesh(floorGeo, floorMat);
@@ -85,8 +107,10 @@ export class SceneBuilder {
         
         // Ceiling
         const ceilingGeo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE);
-        const ceilingMat = new THREE.MeshBasicMaterial({ 
-          color: 0x444444,
+        const ceilingMat = new THREE.MeshStandardMaterial({ 
+          map: this.textures!.ceiling,
+          roughness: 0.9,
+          metalness: 0.1,
           side: THREE.DoubleSide
         });
         const ceiling = new THREE.Mesh(ceilingGeo, ceilingMat);
@@ -139,9 +163,17 @@ export class SceneBuilder {
       const neighbor = tiles[nz][nx];
       if (!neighbor.wall && !neighbor.door) {
         // Build wall face
+        let texture = this.textures!.wallPlain;
+        
+        if (tile.door && tile.doorLocked) {
+          texture = this.textures!.doorLocked;
+        }
+        
         const geo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE);
-        const mat = new THREE.MeshBasicMaterial({ 
-          color: tile.door ? 0xff0000 : 0xcccccc,
+        const mat = new THREE.MeshStandardMaterial({ 
+          map: texture,
+          roughness: 0.9,
+          metalness: 0.1,
           side: THREE.DoubleSide
         });
         const wall = new THREE.Mesh(geo, mat);

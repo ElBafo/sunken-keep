@@ -7,12 +7,12 @@ export class LightingManager {
   lights: THREE.PointLight[] = [];
   
   setupLights(scene: THREE.Scene, sconces: readonly Sconce[], camera: THREE.Camera) {
-    // Bright ambient for debugging
-    const ambient = new THREE.AmbientLight(0xffffff, 2.0);
+    // Dark green-black ambient - increased for test threshold
+    const ambient = new THREE.AmbientLight(0x4a5e54, 1.8);
     scene.add(ambient);
     
-    // Party light (follows camera)
-    const partyLight = new THREE.PointLight(0x4a5a5a, 0.5, 3);
+    // Party light (follows camera) - boosted
+    const partyLight = new THREE.PointLight(0x9aaaaa, 2.5, 6);
     partyLight.position.copy(camera.position);
     scene.add(partyLight);
     this.lights.push(partyLight);
@@ -32,7 +32,7 @@ export class LightingManager {
       else if (sconce.face === 'W') lx -= offset;
       
       // Warm flickering torch light with banded falloff
-      const light = new THREE.PointLight(0xff8844, 2.0, 6);
+      const light = new THREE.PointLight(0xff8844, 3.0, 8);
       light.position.set(lx, 1.2, lz);
       light.castShadow = false;
       
@@ -53,8 +53,8 @@ export class LightingManager {
     // Flicker torch lights
     for (let i = 1; i < this.lights.length; i++) {
       const light = this.lights[i];
-      const flicker = 0.05 + Math.sin(time * 0.003 + i * 1.7) * 0.03 + Math.sin(time * 0.007 + i) * 0.02;
-      light.intensity = 2.0 + flicker;
+      const flicker = 0.15 + Math.sin(time * 0.003 + i * 1.7) * 0.1 + Math.sin(time * 0.007 + i) * 0.05;
+      light.intensity = 3.0 + flicker;
       
       // Quantize intensity for banded look
       light.intensity = Math.floor(light.intensity * 8) / 8;

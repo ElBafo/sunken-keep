@@ -27,13 +27,6 @@ class Game {
     
     // Setup renderer
     this.renderer = new PixelRenderer(canvas);
-    
-    // DEBUG: Remove red background now that we're checking render target
-    // this.renderer.scene.background = new THREE.Color(0xff0000);
-    
-    // Temporarily disable palette for debugging
-    this.renderer.setPaletteEnabled(false);
-    
     await this.renderer.loadPalette();
     
     // Check for palette toggle

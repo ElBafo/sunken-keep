@@ -19,16 +19,15 @@ export class PixelRenderer {
     
     // Main scene
     this.scene = new THREE.Scene();
-    // Disable fog for debugging
-    // this.scene.fog = new THREE.FogExp2(0x0a0f0a, 0.08);
+    this.scene.fog = new THREE.FogExp2(0x0a0f0a, 0.025); // Further reduced density
     
     // Camera
     this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 20);
     this.camera.position.set(0, 0, 0);
     
-    // WebGL renderer with preserveDrawingBuffer for screenshots
+    // WebGL renderer with preserveDrawingBuffer only for ?test=1
     const params = new URLSearchParams(window.location.search);
-    const preserveBuffer = params.get('test') === '1' || true; // Always enable for debugging
+    const preserveBuffer = params.get('test') === '1';
     
     this.renderer = new THREE.WebGLRenderer({ 
       canvas,
