@@ -25,7 +25,6 @@ const BASE_FILES = [
   'floor_water.png',
   'ceiling.png',
   'sconce_dead.png',
-  'sconce_glow.png',
   'sconce_lit_1.png',
   'sconce_lit_2.png',
   'sconce_lit_3.png'

@@ -58,6 +58,7 @@ export class WaterSystem {
   private frame = 0;
   private lastFrameAt = 0;
   private glintMap: THREE.Texture | null = null;
+  private placeGlint: ((x: number, y: number, scale: number, phase: number) => void) | null = null;
 
   async load(): Promise<void> {
     const loader = new THREE.TextureLoader();
@@ -169,6 +170,18 @@ export class WaterSystem {
       const { nx, nz } = FACE_INTO_ROOM[sconce.face];
       place(sconce.x + Math.round(nx), sconce.y + Math.round(nz), CELL_SIZE * 0.45, sconce.x + sconce.y);
     }
+    this.placeGlint = place;
+  }
+
+  addSconceGlint(sconce: Sconce) {
+    if (!sconce.lit || !this.placeGlint) return;
+    const { nx, nz } = FACE_INTO_ROOM[sconce.face];
+    this.placeGlint(
+      sconce.x + Math.round(nx),
+      sconce.y + Math.round(nz),
+      CELL_SIZE * 0.45,
+      sconce.x + sconce.y
+    );
   }
 
   update(now: number) {

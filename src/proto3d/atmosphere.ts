@@ -141,11 +141,11 @@ export class Atmosphere {
       geo.setAttribute('position', attr);
       const mat = new THREE.PointsMaterial({
         map: atlas,
-        color: 0xffe6c0,
+        color: 0x3a3228,
         size: 0.04,
         sizeAttenuation: true,
         transparent: true,
-        opacity: 0.62,
+        opacity: 0.22,
         depthWrite: false,
         fog: true,
         alphaTest: 0.05

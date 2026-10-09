@@ -1,17 +1,31 @@
 import * as THREE from 'three';
 import { Atmosphere } from './atmosphere';
 import { AudioManager } from './audio';
-import { CELL_SIZE, DOOR_UNLOCK_LEAD_MS } from './constants';
+import {
+  BRIGHT_MAX,
+  BRIGHT_MIN,
+  CELL_SIZE,
+  DOOR_UNLOCK_LEAD_MS,
+  OIL_FLASK,
+  OIL_MAX,
+  OIL_START,
+  OIL_TORCH_COST,
+  parseAmbientFloor
+} from './constants';
 import { Dressing } from './dressing';
 import { floor1, floor1Sconces } from './floor-data';
 import { InputManager } from './input';
 import { MoveResult, Player } from './player';
+import { loadProgress, persistEnabled, saveProgress } from './progress';
 import { qualityFromSearch, QualityLevel } from './quality';
 import { PixelRenderer } from './renderer';
 import { SceneBuilder } from './scene-builder';
 import { SpriteManager } from './sprites';
+import { TorchSystem, torchWorldPos } from './torches';
 import { VertexLightingManager } from './vertex-lighting';
 import { WaterSystem } from './water';
+import { DarkFx } from './dark-fx';
+import { PropBuilder } from './props';
 
 class Game {
   renderer!: PixelRenderer;
@@ -24,8 +38,18 @@ class Game {
   atmosphere!: Atmosphere;
   dressing!: Dressing;
   water!: WaterSystem;
+  torches!: TorchSystem;
+  darkFx!: DarkFx;
+  props!: PropBuilder;
   quality: QualityLevel = 'high';
+  bright = 1;
+  oil = OIL_START;
+  persist = true;
+  oilPickupText = 'Oil flask. Wren\'s lantern drinks it.';
   lastMessage = '';
+  lampNote = { title: "Lamp-keeper's note", text: '' };
+  noteOpen = false;
+  interactCount = 0;
   messageTimer = 0;
 
   lastTime = 0;
@@ -40,6 +64,15 @@ class Game {
     const canvas = document.getElementById('render-canvas') as HTMLCanvasElement;
     const params = new URLSearchParams(window.location.search);
     this.quality = qualityFromSearch(params);
+    this.persist = persistEnabled();
+    const brightParam = params.get('bright');
+    if (brightParam != null && brightParam !== '') {
+      const brightRaw = Number(brightParam);
+      if (Number.isFinite(brightRaw)) {
+        this.bright = Math.min(BRIGHT_MAX, Math.max(BRIGHT_MIN, brightRaw));
+      }
+    }
+    this.oil = loadProgress(floor1Sconces, this.persist);
 
     this.renderer = new PixelRenderer(canvas);
     await this.renderer.loadPalette();
@@ -55,8 +88,10 @@ class Game {
 
     this.dressing = new Dressing();
     this.water = new WaterSystem();
-    await Promise.all([this.dressing.load(), this.water.load()]);
+    this.props = new PropBuilder();
+    await Promise.all([this.dressing.load(), this.water.load(), this.props.load()]);
     await this.dressing.place(this.renderer.scene, floor1);
+    this.props.place(this.renderer.scene, floor1);
 
     this.atmosphere.build(this.renderer.scene, floor1, this.dressing);
     this.water.build(this.renderer.scene, floor1, floor1Sconces, this.dressing.marks.sunbeams);
@@ -69,18 +104,26 @@ class Game {
       this.player.setPosition(startX, startY, startDir);
     }
 
-    this.vertexLighting = new VertexLightingManager(floor1, floor1Sconces);
+    this.vertexLighting = new VertexLightingManager(floor1, floor1Sconces, {
+      floor: parseAmbientFloor(params.get('ambientFloor'), 1),
+      bright: this.bright,
+      sunbeams: this.dressing.marks.sunbeams,
+      oil: () => this.oil
+    });
     this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
+
+    this.torches = new TorchSystem(this.renderer.camera);
+    await this.torches.load(this.renderer.scene, floor1Sconces);
+
     this.vertexLighting.registerScene(this.renderer.scene);
     this.vertexLighting.updateAllMeshes(this.renderer.scene);
 
     this.spriteManager = new SpriteManager(this.renderer.camera);
-    await this.spriteManager.loadSprites(
-      this.renderer.scene,
-      floor1,
-      floor1Sconces,
-      this.dressing.marks.cappedSconces
-    );
+    await this.spriteManager.loadSprites(this.renderer.scene, floor1);
+    this.darkFx = new DarkFx();
+    await this.darkFx.load(this.renderer.scene, floor1, this.spriteManager);
+    this.updateOilHud();
+    await Promise.all([this.loadLogText(), this.loadLampNote()]);
 
     this.audioManager = new AudioManager(this.renderer.camera, this.quality);
     await this.audioManager.init();
@@ -109,13 +152,13 @@ class Game {
     const tile = this.player.tileAt(x, y);
     if (!tile) return;
     if (tile.deepWater) {
-      this.audioManager.playUi('step_water_deep', 0.7);
+      this.audioManager.playStep('step_water_deep');
       this.atmosphere.spawnStepSplash(x * CELL_SIZE, y * CELL_SIZE);
     } else if (tile.shallowWater) {
-      this.audioManager.playUi('step_water_shallow', 0.7);
+      this.audioManager.playStep('step_water_shallow');
       this.atmosphere.spawnStepSplash(x * CELL_SIZE, y * CELL_SIZE);
     } else {
-      this.audioManager.playUi('step', 0.5);
+      this.audioManager.playStep('step');
     }
   }
 
@@ -147,18 +190,145 @@ class Game {
     tile.item = undefined;
     this.player.hasKey = true;
     this.spriteManager.hideItemAt(x, y);
+    this.darkFx.hideItemAt(x, y);
     this.audioManager.playUi('key', 0.8);
     this.showMessage('Key.');
     return true;
   }
 
+  pickupOilAt(x: number, y: number): boolean {
+    const tile = this.player.tileAt(x, y);
+    if (!tile || (tile.item !== 'oil' && tile.item !== 'oil_flask')) return false;
+    tile.item = undefined;
+    this.spriteManager.hideItemAt(x, y);
+    this.audioManager.playUi('oil_pickup', 0.85);
+    window.setTimeout(() => this.audioManager.playUi('lantern_refill', 0.8), 280);
+    const wasEmpty = this.oil <= 0;
+    this.oil = Math.min(OIL_MAX, this.oil + OIL_FLASK);
+    if (wasEmpty) this.audioManager.startLanternLoop(true);
+    this.updateOilHud();
+    saveProgress(floor1Sconces, this.oil, this.persist);
+    this.vertexLighting.updateAllMeshes(this.renderer.scene);
+    this.showMessage(this.oilPickupText);
+    return true;
+  }
+
+  updateOilHud() {
+    const el = document.getElementById('oil-readout');
+    if (!el) return;
+    el.textContent = `Oil ${this.oil}/${OIL_MAX}`;
+  }
+
+  async loadLogText() {
+    try {
+      const baseUrl = import.meta.env.BASE_URL;
+      const res = await fetch(`${baseUrl}log.json`);
+      const lines = (await res.json()) as Array<{ key: string; text: string }>;
+      const line = lines.find((l) => l.key === 'oil_pickup');
+      if (line?.text) this.oilPickupText = line.text;
+    } catch {
+      // keep fallback
+    }
+  }
+
+  async loadLampNote() {
+    try {
+      const baseUrl = import.meta.env.BASE_URL;
+      const res = await fetch(`${baseUrl}story/note_lampkeeper.json`);
+      const note = (await res.json()) as { title?: string; text?: string };
+      if (note.title) this.lampNote.title = note.title;
+      if (note.text) this.lampNote.text = note.text;
+    } catch {
+      this.lampNote.text =
+        "They took the lamps first. Then the oil. Thane's orders. I kept one. Don't tell him. - Pell, lamp-keeper";
+    }
+  }
+
+  showNote() {
+    const text = this.lampNote.text;
+    this.lastMessage = text;
+    const overlay = document.getElementById('note-overlay');
+    const titleEl = document.getElementById('note-title');
+    const textEl = document.getElementById('note-text');
+    if (titleEl) titleEl.textContent = this.lampNote.title;
+    if (textEl) textEl.textContent = text.replace(/\. /g, '.\n');
+    if (overlay) overlay.classList.add('show');
+    document.getElementById('message-toast')?.classList.remove('show');
+    this.noteOpen = true;
+    this.messageTimer = performance.now() + 6000;
+  }
+
+  hideNote() {
+    document.getElementById('note-overlay')?.classList.remove('show');
+    this.noteOpen = false;
+  }
+
+  readFacingDesk(): boolean {
+    const { x, y } = this.player.facingPos(1);
+    const tile = this.player.tileAt(x, y);
+    if (!tile) return false;
+    if (tile.prop !== 'desk' && !tile.readNote) return false;
+    if (this.noteOpen) {
+      this.hideNote();
+      this.messageTimer = 0;
+      return true;
+    }
+    this.showNote();
+    return true;
+  }
+
+  setOil(value: number) {
+    const next = Math.min(OIL_MAX, Math.max(0, Math.floor(value)));
+    const prev = this.oil;
+    this.oil = next;
+    if (prev > 0 && next <= 0) {
+      this.audioManager.playUi('oil_empty', 0.85);
+      this.audioManager.startLanternLoop(false);
+    } else if (prev <= 0 && next > 0) {
+      this.audioManager.startLanternLoop(true);
+    }
+    this.updateOilHud();
+    saveProgress(floor1Sconces, this.oil, this.persist);
+    this.vertexLighting.updateAllMeshes(this.renderer.scene);
+  }
+
+  lightFacingTorch(): boolean {
+    const sconce = this.torches.facingTorch(this.player.x, this.player.y, this.player.dir);
+    if (!sconce) return false;
+    if (sconce.capped) {
+      this.audioManager.playDoor('door_locked', sconce.x, sconce.y);
+      this.showMessage('Sealed.');
+      return true;
+    }
+    if (sconce.lit) return false;
+    if (this.oil < OIL_TORCH_COST) {
+      this.showMessage('No oil to spare.');
+      return true;
+    }
+    const now = performance.now();
+    this.torches.ignite(sconce, now);
+    this.vertexLighting.relight();
+    const pos = torchWorldPos(sconce);
+    this.audioManager.playPositional('torch_ignite', pos.x, pos.y, pos.z, 0.8);
+    window.setTimeout(() => this.audioManager.startTorchLoop(sconce), (1000 / 12) * 6);
+    this.setOil(this.oil - OIL_TORCH_COST);
+    this.water.addSconceGlint(sconce);
+    return true;
+  }
+
   interact() {
+    this.interactCount += 1;
     if (this.pickupKeyAt(this.player.x, this.player.y)) return;
+    if (this.pickupOilAt(this.player.x, this.player.y)) return;
     const facing = this.player.facingPos(1);
     if (this.pickupKeyAt(facing.x, facing.y)) return;
+    if (this.pickupOilAt(facing.x, facing.y)) return;
+    if (this.lightFacingTorch()) return;
+    if (this.readFacingDesk()) return;
 
     const ahead = this.doorAhead();
     if (ahead) this.handleDoor(ahead.x, ahead.y);
+    else this.hideNote();
   }
 
   handleDoor(x: number, y: number) {
@@ -193,6 +363,14 @@ class Game {
         this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
         this.vertexLighting.updateAllMeshes(this.renderer.scene);
         this.spriteManager.update(performance.now(), this.player.x, this.player.y, this.player.dir);
+        this.darkFx.update(
+          performance.now(),
+          this.vertexLighting,
+          this.spriteManager,
+          this.audioManager,
+          this.player.x,
+          this.player.y
+        );
         this.updateDoorButton();
         this.renderer.render();
       },
@@ -315,17 +493,47 @@ class Game {
         this.audioManager.setQuality(q);
       },
       interact: () => this.interact(),
+      interactCount: () => this.interactCount,
       giveKey: () => {
         this.player.hasKey = true;
       },
       hasKey: () => this.player.hasKey,
       lastMessage: () => this.lastMessage,
+      lastNote: () => this.lampNote,
+      noteOpen: () => this.noteOpen,
+      getOil: () => this.oil,
+      setOil: (n: number) => this.setOil(n),
+      getBright: () => this.bright,
+      getAmbientFloor: () => this.vertexLighting.getAmbientFloor(),
+      getAmbient: () => this.vertexLighting.ambientBrightness(),
+      setBright: (n: number) => {
+        this.bright = Math.min(BRIGHT_MAX, Math.max(BRIGHT_MIN, n));
+        this.vertexLighting.setBright(this.bright);
+        this.vertexLighting.updateAllMeshes(this.renderer.scene);
+        this.renderer.render();
+      },
+      torchStates: () =>
+        floor1Sconces.map((s) => ({ x: s.x, y: s.y, face: s.face, lit: s.lit, capped: !!s.capped })),
+      tileBrightness: (x: number, y: number) =>
+        this.vertexLighting.calculateBrightness(x, y, !!floor1.tiles[y]?.[x]?.floorNDark),
+      isSquareLit: (x: number, y: number) => this.vertexLighting.isSquareLit(x, y),
+      setFlickerFrame: (frame: number) => {
+        this.vertexLighting.setFlickerFrame(frame);
+        this.renderer.render();
+      },
+      darkFx: () => this.darkFx.snapshot(),
+      lightFacingTorch: () => this.lightFacingTorch(),
       tryMoveForward: () => {
         const before = { x: this.player.x, y: this.player.y };
         const result = this.player.moveForward();
         this.handleMove(result);
-        return { result, before, after: { x: this.player.x, y: this.player.y, dir: this.player.dir } };
+        const dest = this.player.isMoving
+          ? { x: this.player.moveToX, y: this.player.moveToY, dir: this.player.moveToDir }
+          : { x: this.player.x, y: this.player.y, dir: this.player.dir };
+        return { result, before, after: dest };
       },
+      tryTurnLeft: () => this.player.turnLeft(),
+      tryTurnRight: () => this.player.turnRight(),
       doorOpen: (x: number, y: number) => !!this.sceneBuilder.doors.get(x, y)?.tile.doorOpen,
       openDoor: (x: number, y: number) => {
         const visual = this.sceneBuilder.doors.get(x, y);
@@ -357,9 +565,17 @@ class Game {
       tapToStart.classList.add('hidden');
       this.audioManager.unlock();
       await this.audioManager.loadSounds(this.renderer.scene, floor1Sconces);
+      this.audioManager.startLanternLoop(this.oil > 0);
       this.audioManager.attachDressing(this.renderer.scene, this.dressing.marks);
       this.audioManager.attachLeeches(this.renderer.scene, floor1);
       this.audioManager.attachWaterPools(this.renderer.scene, floor1);
+      this.audioManager.startNamedLoop(
+        'lamp_hooks',
+        11 * CELL_SIZE,
+        0.55,
+        9 * CELL_SIZE,
+        0.38
+      );
       this.lastTime = performance.now();
       this.fpsLastTime = this.lastTime;
       requestAnimationFrame(() => this.gameLoop());
@@ -400,14 +616,17 @@ class Game {
     this.atmosphere.update(dtSec, now, this.renderer.camera);
     this.audioManager.update(now, this.renderer.camera.position.x, this.renderer.camera.position.z);
 
-    const prevFrame = this.spriteManager.sconceFrame();
+    const prevFrame = this.torches.flameFrame();
+    this.torches.update(now);
     this.spriteManager.update(now, this.player.x, this.player.y, this.player.dir);
-    const nextFrame = this.spriteManager.sconceFrame();
+    this.darkFx.update(now, this.vertexLighting, this.spriteManager, this.audioManager, this.player.x, this.player.y);
+    const nextFrame = this.torches.flameFrame();
     if (nextFrame !== prevFrame) this.vertexLighting.setFlickerFrame(nextFrame);
 
     if (this.messageTimer && now >= this.messageTimer) {
       this.messageTimer = 0;
       document.getElementById('message-toast')?.classList.remove('show');
+      this.hideNote();
     }
 
     this.renderer.render();

@@ -28,6 +28,7 @@ export interface Sconce {
   y: number;
   face: 'N' | 'E' | 'S' | 'W';
   lit: boolean;
+  capped?: boolean;
 }
 
 export interface SpriteData {

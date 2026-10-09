@@ -37,9 +37,12 @@ export function isWaterTile(tile: Pick<Tile, 'deepWater' | 'shallowWater'>): boo
   return !!(tile.deepWater || tile.shallowWater);
 }
 
-export const FOG_COLOR = 0x060504;
-export const FOG_NEAR = 3.2;
-export const FOG_FAR = 12.0;
+/** Near-black — distant stone must be able to reach this, not a brown lift. */
+export const FOG_COLOR = 0x010101;
+/** Start well past a torch pool so distance does not dim torch light. */
+export const FOG_NEAR = 10.0;
+/** Slow fade only; CAMERA_FAR is 32. */
+export const FOG_FAR = 28.0;
 
 /** Panel slides up this far (texture door is ~1.33 tall); thud at 1.45s / slam at 0.6s. */
 export const DOOR_SLIDE = 1.42;
@@ -58,10 +61,58 @@ export const MIRROR_BAKED_SCONCE_LEAN = false;
 export const SCONCE_WIDTH_TILES = 0.25;
 export const SCONCE_HEIGHT_TILES = 0.5;
 export const SCONCE_WALL_OFFSET_TILES = 0.015;
+/** Front bracket / flame sit this far off the wall (artist spec). */
+export const SCONCE_FRONT_OFFSET_TILES = 0.14;
 export const SCONCE_ANIM_FPS = 8;
-/** Flame-frame multipliers for the sconce warm term (keep flicker readable). */
+export const FLARE_ANIM_FPS = 12;
+/** Flame-frame multipliers for the torch warm term (keep flicker readable). */
 export const SCONCE_FLICKER = [0.78, 0.58, 1.08] as const;
-export const SCONCE_RADIUS_TILES = 1.5;
+/** Lit torch pool — warm, smooth falloff. */
+export const SCONCE_RADIUS_TILES = 2.5;
+export const TORCH_INTENSITY = 1.45;
+/** Wren's lantern with oil — full on the party square, near-ambient by 1.5. */
+export const LANTERN_RADIUS_TILES = 1.5;
+export const LANTERN_INTENSITY = 0.64;
+/** Ember-only lantern — dies just past the next square's near edge. */
+export const EMBER_RADIUS_TILES = 1.1;
+export const EMBER_INTENSITY = 0.4;
+/** Own-square floor stays full; falloff starts near the tile edge. */
+export const LANTERN_CORE_TILES = 0.28;
+/** Held-lantern height (world Y) so ceilings use 3D falloff. */
+export const LANTERN_HEIGHT = 0.88;
+/** Cold sunbeam from a ceiling crack. */
+export const SUNBEAM_RADIUS_TILES = 2.0;
+export const SUNBEAM_INTENSITY = 0.38;
+/**
+ * Per-floor ambient as a fraction of full white (never 0).
+ * Floors 1–2: faint fill so unlit stone beyond the lantern is barely readable.
+ * Floors 3+: near-black (~2%) beyond torch and lantern light.
+ * Override the lookup with ?ambientFloor=N (floor 1 is the only playable map).
+ */
+export const FLOOR_AMBIENT: readonly number[] = [0, 0.068, 0.055, 0.018, 0.017, 0.016, 0.016, 0.016, 0.016];
+export const AMBIENT_MIN = 0.014;
+/** Torch/lantern weight below this counts as unlit for eye/item glints. */
+export const DARK_LIGHT_THRESHOLD = 0.08;
+export const EYE_ANIM_FPS = 8;
+export const GLINT_ANIM_FPS = 12;
+export const GLINT_REST_MIN_MS = 1500;
+export const GLINT_REST_MAX_MS = 3000;
+/** 3 dB duck on halls ambience in true dark. */
+export const DARK_AMB_DUCK_DB = 3;
+
+/** Clamp a floor index for FLOOR_AMBIENT. Missing / invalid values keep `fallback`. */
+export function parseAmbientFloor(raw: string | null | undefined, fallback = 1): number {
+  if (raw == null || raw === '') return fallback;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(1, Math.min(FLOOR_AMBIENT.length - 1, Math.floor(n)));
+}
+export const BRIGHT_MIN = 0.6;
+export const BRIGHT_MAX = 1.6;
+export const OIL_START = 2;
+export const OIL_MAX = 4;
+export const OIL_FLASK = 1;
+export const OIL_TORCH_COST = 1;
 export const FACE_SEGMENTS = 4;
 export const CUTOUT_ALPHA_TEST = 0.5;
 

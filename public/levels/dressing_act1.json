@@ -11,6 +11,11 @@
         "x": 2,
         "y": 6,
         "note": "soft beam near the start so the first view isn't flat"
+      },
+      {
+        "x": 11,
+        "y": 2,
+        "note": "guard hall: ceiling_crack.png + shaft_2.png, light falls across the fallen beams"
       }
     ],
     "water_line": [
@@ -89,20 +94,20 @@
         "face": "E"
       },
       {
-        "x": 8,
-        "y": 6,
-        "face": "W"
+        "x": 9,
+        "y": 0,
+        "face": "S"
       }
     ],
     "chains": [
       {
         "x": 8,
-        "y": 2,
+        "y": 3,
         "face": "W"
       },
       {
-        "x": 8,
-        "y": 3,
+        "x": 14,
+        "y": 1,
         "face": "W"
       }
     ],
@@ -116,10 +121,10 @@
     ],
     "banner_torn": [
       {
-        "x": 6,
-        "y": 0,
-        "face": "S",
-        "note": "Stonevow banner above the way to the stairs (7,1)"
+        "x": 14,
+        "y": 2,
+        "face": "W",
+        "note": "Stonevow banner in the guard hall, above the way to the stairs (13,4)"
       }
     ],
     "bones": [
@@ -132,6 +137,11 @@
         "x": 6,
         "y": 2,
         "note": "what the slime left"
+      },
+      {
+        "x": 13,
+        "y": 1,
+        "note": "a guard who never left the hall"
       }
     ],
     "cobweb_ceiling_corner": [
@@ -146,9 +156,72 @@
       {
         "x": 5,
         "y": 1
+      },
+      {
+        "x": 13,
+        "y": 10
+      },
+      {
+        "x": 9,
+        "y": 10
       }
     ],
-    "wet_strip": "every edge between a stone floor square and a water square (auto)"
+    "wet_strip": "every edge between a stone floor square and a water square (auto)",
+    "lamp_hooks": [
+      {
+        "x": 10,
+        "y": 7,
+        "face": "S"
+      },
+      {
+        "x": 12,
+        "y": 7,
+        "face": "S"
+      },
+      {
+        "x": 14,
+        "y": 8,
+        "face": "W",
+        "note": "empty hook rails with soot; sfx_lamp_hooks_loop plays from the room centre (11,9)"
+      }
+    ],
+    "jar_rack": [
+      {
+        "x": 9,
+        "y": 10,
+        "against": "W",
+        "note": "3D shelves, not a flat picture; blocks nothing, sits against the wall"
+      }
+    ],
+    "desk_note": [
+      {
+        "x": 12,
+        "y": 9,
+        "note": "the P square in the map, 3D desk; tap it to read Pell's note"
+      }
+    ],
+    "lamp_capped": [
+      {
+        "x": 13,
+        "y": 9,
+        "note": "Pell's capped lantern, a floor prop"
+      }
+    ],
+    "beams_fallen": [
+      {
+        "x": 12,
+        "y": 2
+      },
+      {
+        "x": 10,
+        "y": 3,
+        "mirror": true
+      },
+      {
+        "x": 12,
+        "y": 4
+      }
+    ]
   },
   "floor2": {
     "sunbeam": [
@@ -248,6 +321,243 @@
         "x": 7,
         "y": 9,
         "note": "floor piece in the flooded room, drifting under water, seen through the glass-water doorway (6,8)"
+      }
+    ]
+  },
+  "_art_names": {
+    "sunbeam": "ceiling_crack decal on that square's ceiling + shaft_1/shaft_2 down to the floor",
+    "cobweb_ceiling_corner": "cobweb_corner_l/_r on the two walls meeting at that open square's darkest corner (pick l or r by which side the corner is on)",
+    "water_line": "water_line",
+    "tally": "tally_marks",
+    "ash_bowl": "ash_bowl",
+    "sconce_capped": "sconce_capped (replaces sconce_dead at that sconce)",
+    "chains": "chains",
+    "rust_stain": "rust_stain",
+    "banner_torn": "banner_torn",
+    "bones": "bones (floor pile)",
+    "banner_sunken": "Pixelartie draws it with the glass-water doorway",
+    "wet_strip": "water_edge"
+  },
+  "floor3": {
+    "banner_torn": [
+      {
+        "x": 6,
+        "y": 2,
+        "face": "W",
+        "note": "Stonevow banner over the mess hall tables"
+      }
+    ],
+    "chains": [
+      {
+        "x": 6,
+        "y": 11,
+        "face": "E"
+      }
+    ],
+    "rust_stain": [
+      {
+        "x": 6,
+        "y": 11,
+        "face": "E"
+      }
+    ],
+    "water_line": [
+      {
+        "x": 7,
+        "y": 13,
+        "face": "N"
+      },
+      {
+        "x": 8,
+        "y": 13,
+        "face": "N"
+      },
+      {
+        "x": 9,
+        "y": 13,
+        "face": "N"
+      },
+      {
+        "x": 10,
+        "y": 13,
+        "face": "N"
+      },
+      {
+        "x": 11,
+        "y": 13,
+        "face": "N"
+      }
+    ],
+    "tally": [
+      {
+        "x": 0,
+        "y": 9,
+        "face": "E",
+        "note": "armoury tally of weapons issued, stops partway"
+      }
+    ],
+    "sconce_capped": [
+      {
+        "x": 6,
+        "y": 4,
+        "face": "E"
+      },
+      {
+        "x": 13,
+        "y": 9,
+        "face": "W"
+      }
+    ],
+    "bones": [
+      {
+        "x": 1,
+        "y": 12,
+        "note": "by the stairs down"
+      },
+      {
+        "x": 12,
+        "y": 3,
+        "note": "a bunk that wasn't slept in"
+      }
+    ],
+    "cobweb_ceiling_corner": [
+      {
+        "x": 1,
+        "y": 1
+      },
+      {
+        "x": 12,
+        "y": 1
+      },
+      {
+        "x": 12,
+        "y": 4
+      },
+      {
+        "x": 3,
+        "y": 9
+      }
+    ]
+  },
+  "floor4": {
+    "banner_torn": [
+      {
+        "x": 13,
+        "y": 4,
+        "face": "W",
+        "note": "Ashmantle anvil banner behind Captain Dural"
+      }
+    ],
+    "chains": [
+      {
+        "x": 11,
+        "y": 10,
+        "face": "E"
+      },
+      {
+        "x": 11,
+        "y": 12,
+        "face": "E"
+      }
+    ],
+    "rust_stain": [
+      {
+        "x": 11,
+        "y": 10,
+        "face": "E"
+      }
+    ],
+    "tally": [
+      {
+        "x": 8,
+        "y": 11,
+        "face": "E",
+        "note": "inside Tam's cell, his own count of days, fresh scratches"
+      }
+    ],
+    "water_line": [
+      {
+        "x": 15,
+        "y": 8,
+        "face": "W"
+      },
+      {
+        "x": 15,
+        "y": 9,
+        "face": "W"
+      },
+      {
+        "x": 15,
+        "y": 10,
+        "face": "W"
+      },
+      {
+        "x": 15,
+        "y": 11,
+        "face": "W"
+      },
+      {
+        "x": 15,
+        "y": 12,
+        "face": "W"
+      },
+      {
+        "x": 15,
+        "y": 13,
+        "face": "W"
+      },
+      {
+        "x": 7,
+        "y": 12,
+        "face": "S"
+      },
+      {
+        "x": 8,
+        "y": 12,
+        "face": "S"
+      },
+      {
+        "x": 9,
+        "y": 12,
+        "face": "S"
+      },
+      {
+        "x": 10,
+        "y": 12,
+        "face": "S"
+      }
+    ],
+    "sconce_capped": [
+      {
+        "x": 0,
+        "y": 9,
+        "face": "E"
+      }
+    ],
+    "bones": [
+      {
+        "x": 1,
+        "y": 2,
+        "note": "officers' quarters"
+      },
+      {
+        "x": 14,
+        "y": 13,
+        "note": "drill yard, half under water"
+      }
+    ],
+    "cobweb_ceiling_corner": [
+      {
+        "x": 3,
+        "y": 3
+      },
+      {
+        "x": 1,
+        "y": 13
+      },
+      {
+        "x": 12,
+        "y": 4
       }
     ]
   }

@@ -7,8 +7,8 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
   <link rel="manifest" href="%BASE_URL%proto3d/manifest.json" />
-  <link rel="apple-touch-icon" sizes="180x180" href="%BASE_URL%app_icon_180.png" />
-  <link rel="icon" href="%BASE_URL%app_icon_192.png" />
+  <link rel="apple-touch-icon" sizes="180x180" href="%BASE_URL%icon_drowning_180.png" />
+  <link rel="icon" href="%BASE_URL%icon_drowning_192.png" />
   <title>Sunken Keep 3D</title>
   <style>
     * {
@@ -149,6 +149,49 @@
       z-index: 200;
       display: none; /* Hidden by default, shown with ?debug=1 */
     }
+    #oil-readout {
+      position: fixed;
+      top: calc(10px + env(safe-area-inset-top, 0px));
+      right: 10px;
+      background: rgba(0, 0, 0, 0.65);
+      color: #e8c98a;
+      padding: 4px 8px;
+      font-family: monospace;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      z-index: 200;
+      pointer-events: none;
+    }
+    #note-overlay {
+      position: fixed;
+      left: 50%;
+      top: 18%;
+      transform: translate(-50%, 0);
+      width: min(88vw, 360px);
+      background: rgba(18, 14, 10, 0.92);
+      border: 1px solid #8a7348;
+      color: #e8e0d0;
+      font-family: monospace;
+      padding: 12px 14px 14px;
+      z-index: 280;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s;
+    }
+    #note-overlay.show { opacity: 1; }
+    #note-title {
+      font-size: 13px;
+      letter-spacing: 0.06em;
+      color: #d4b56a;
+      margin-bottom: 12px;
+    }
+    #note-text {
+      font-size: 14px;
+      line-height: 1.6;
+      letter-spacing: 0.02em;
+      word-spacing: 0.2em;
+      white-space: pre-wrap;
+    }
   </style>
 </head>
 <body>
@@ -167,6 +210,11 @@
     <button id="btn-right" class="control-btn">→</button>
   </div>
   <div id="message-toast"></div>
+  <div id="note-overlay">
+    <div id="note-title"></div>
+    <div id="note-text"></div>
+  </div>
+  <div id="oil-readout">Oil 2/4</div>
   <div id="fps-counter">FPS: --</div>
   <script type="module" src="/src/proto3d/main.ts"></script>
 </body>

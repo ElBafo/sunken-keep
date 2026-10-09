@@ -1,13 +1,5 @@
 import * as THREE from 'three';
-import {
-  CELL_SIZE,
-  CUTOUT_ALPHA_TEST,
-  FACE_INTO_ROOM,
-  SCONCE_HEIGHT_TILES,
-  SCONCE_WALL_OFFSET_TILES,
-  SCONCE_WIDTH_TILES,
-  tileBedY
-} from './constants';
+import { CELL_SIZE, FACE_INTO_ROOM, tileBedY } from './constants';
 import { faceHash } from './texture-variants';
 import { FloorData, Sconce, Tile } from './types';
 
@@ -67,10 +59,18 @@ const ATMO_FILES = [
   'splash_3',
   'tally_marks',
   'water_edge',
-  'water_line'
+  'water_line',
+  'lamp_hooks'
 ] as const;
 
-const SKIP_KINDS = new Set(['banner_sunken', 'wet_strip']);
+const SKIP_KINDS = new Set([
+  'banner_sunken',
+  'wet_strip',
+  'desk_note',
+  'jar_rack',
+  'lamp_capped',
+  'beams_fallen'
+]);
 const FOG_READABLE = new Set(['tally_marks', 'water_line', 'ash_bowl']);
 const DECAL_OFFSET = 0.02;
 const AGAINST_TO_WALL: Record<Face, { dx: number; dy: number; face: Face }> = {
@@ -197,6 +197,7 @@ export class Dressing {
           if (mark) this.marks.bones.push(mark);
         } else if (kind === 'water_line') this.placeWallNamed(floorData, item, 'water_line', true);
         else if (kind === 'rust_stain') this.placeWallNamed(floorData, item, 'rust_stain', false, 0.03);
+        else if (kind === 'lamp_hooks') this.placeWallNamed(floorData, item, 'lamp_hooks', false);
         else {
           // Any other name is the same as its file.
           if (!this.textures.has(kind)) return;
@@ -291,33 +292,9 @@ export class Dressing {
   }
 
   private placeSconceCapped(item: DressingItem) {
-    const face = asFace(item.face);
-    if (!face) return;
+    // Bracket + cap mesh comes from TorchSystem; only reserve the wall so scatter skips it.
     this.marks.cappedSconces.add(`${item.x},${item.y}`);
-    const map = this.tex('sconce_capped');
-    const w = SCONCE_WIDTH_TILES * CELL_SIZE;
-    const h = SCONCE_HEIGHT_TILES * CELL_SIZE;
-    const mesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(w, h),
-      new THREE.MeshBasicMaterial({
-        map,
-        transparent: true,
-        alphaTest: CUTOUT_ALPHA_TEST,
-        depthWrite: true,
-        fog: false,
-        side: THREE.FrontSide,
-        toneMapped: false
-      })
-    );
-    const { nx, nz, rotY } = FACE_INTO_ROOM[face];
-    const dist = CELL_SIZE / 2 + SCONCE_WALL_OFFSET_TILES * CELL_SIZE;
-    mesh.position.set(item.x * CELL_SIZE + nx * dist, CELL_SIZE / 2, item.y * CELL_SIZE + nz * dist);
-    mesh.rotation.y = rotY;
-    mesh.renderOrder = 2;
-    mesh.userData.skipVertexLighting = true;
-    mesh.userData.noPick = true;
-    mesh.userData.isSconce = true;
-    this.group.add(mesh);
+    this.reserved.add(`${item.x},${item.y}`);
   }
 
   private placeAgainstOrFace(

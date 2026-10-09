@@ -1,8 +1,9 @@
 import * as THREE from 'three';
 import {
   CELL_SIZE,
+  DARK_AMB_DUCK_DB,
   FACE_INTO_ROOM,
-  SCONCE_WALL_OFFSET_TILES,
+  SCONCE_FRONT_OFFSET_TILES,
   WATER_SURFACE_Y,
   isWaterTile
 } from './constants';
@@ -17,7 +18,7 @@ interface PositionalVoice {
   object: THREE.Object3D;
   loop: boolean;
   baseVolume: number;
-  kind: 'torch' | 'drip' | 'far' | 'door' | 'chain' | 'banner' | 'wind' | 'bones' | 'leech' | 'water';
+  kind: 'torch' | 'drip' | 'far' | 'door' | 'chain' | 'banner' | 'wind' | 'bones' | 'leech' | 'water' | 'presence';
 }
 
 export class AudioManager {
@@ -40,6 +41,15 @@ export class AudioManager {
   private heardBones = new Set<string>();
   private scratchDist: number[] = [];
   private loaded = false;
+  private uiPool: THREE.Audio[] = [];
+  private lanternSound: THREE.Audio | null = null;
+  private lanternMode: 'oil' | 'ember' | 'off' = 'off';
+  private scene: THREE.Scene | null = null;
+  private trueDark = false;
+  private namedLoops = new Map<string, PositionalVoice>();
+  private nextLoopId = 1;
+  private readonly ambVolume = 0.32;
+  private readonly musicVolume = 0.3;
 
   constructor(camera: THREE.Camera, quality: QualityLevel) {
     this.listener = new THREE.AudioListener();
@@ -70,7 +80,7 @@ export class AudioManager {
     const loader = new THREE.AudioLoader();
     const files: Array<[string, string]> = [
       ['ambience', 'audio/amb_flooded_halls_loop.mp3'],
-      ['torch', 'proto3d/sfx_torch_loop.mp3'],
+      ['torch', 'audio/sfx_torch_loop.mp3'],
       ['drip1', 'audio/sfx_drip_1.mp3'],
       ['drip2', 'audio/sfx_drip_2.mp3'],
       ['drip3', 'audio/sfx_drip_3.mp3'],
@@ -95,7 +105,16 @@ export class AudioManager {
       ['step', 'audio/sfx_step.mp3'],
       ['step_water_shallow', 'audio/sfx_step_water_shallow.mp3'],
       ['step_water_deep', 'audio/sfx_step_water_deep.mp3'],
-      ['water_lap', 'audio/sfx_water_lap_loop.mp3']
+      ['water_lap', 'audio/sfx_water_lap_loop.mp3'],
+      ['torch_ignite', 'audio/sfx_torch_ignite.mp3'],
+      ['oil_pickup', 'audio/sfx_oil_pickup.mp3'],
+      ['oil_empty', 'audio/sfx_oil_empty.mp3'],
+      ['lantern_refill', 'audio/sfx_lantern_refill.mp3'],
+      ['lantern_loop', 'audio/sfx_lantern_loop.mp3'],
+      ['lantern_ember_loop', 'audio/sfx_lantern_ember_loop.mp3'],
+      ['dark_presence', 'audio/sfx_dark_presence_loop.mp3'],
+      ['glint', 'audio/sfx_glint.mp3'],
+      ['lamp_hooks', 'audio/sfx_lamp_hooks_loop.mp3']
     ];
 
     const results = await Promise.all(
@@ -125,31 +144,14 @@ export class AudioManager {
     }
 
     this.uiSound = new THREE.Audio(this.listener);
+    this.uiPool.push(this.uiSound);
+    this.scene = scene;
 
     const torchBuf = this.buffers.get('torch');
     if (torchBuf) {
       for (const sconce of sconces) {
         if (!sconce.lit) continue;
-        const { nx, nz } = FACE_INTO_ROOM[sconce.face];
-        const dist = CELL_SIZE / 2 + SCONCE_WALL_OFFSET_TILES * CELL_SIZE;
-        const object = new THREE.Object3D();
-        object.position.set(
-          sconce.x * CELL_SIZE + nx * dist,
-          1.15,
-          sconce.y * CELL_SIZE + nz * dist
-        );
-        const audio = new THREE.PositionalAudio(this.listener);
-        audio.setBuffer(torchBuf);
-        audio.setRefDistance(2.2);
-        audio.setMaxDistance(10);
-        audio.setRolloffFactor(1.1);
-        audio.setLoop(true);
-        audio.setVolume(0.42);
-        audio.offset = Math.random() * Math.max(0.01, torchBuf.duration * 0.8);
-        object.add(audio);
-        scene.add(object);
-        audio.play();
-        this.voices.push({ audio, object, loop: true, baseVolume: 0.42, kind: 'torch' });
+        this.startTorchLoop(sconce);
       }
     }
 
@@ -283,13 +285,106 @@ export class AudioManager {
     }
   }
 
-  playUi(name: string, volume = 0.7) {
+  playUi(name: string, volume = 0.7, rate = 1) {
     const buf = this.buffers.get(name);
-    if (!buf || !this.uiSound) return;
-    if (this.uiSound.isPlaying) this.uiSound.stop();
-    this.uiSound.setBuffer(buf);
-    this.uiSound.setVolume(volume);
-    this.uiSound.play();
+    if (!buf) return;
+    let sound = this.uiPool.find((a) => !a.isPlaying);
+    if (!sound) {
+      sound = new THREE.Audio(this.listener);
+      this.uiPool.push(sound);
+    }
+    sound.setBuffer(buf);
+    sound.setPlaybackRate(rate);
+    sound.setVolume(Math.min(1, Math.max(0, volume)));
+    sound.play();
+  }
+
+  playStep(name: 'step' | 'step_water_shallow' | 'step_water_deep') {
+    const rate = 0.96 + Math.random() * 0.08;
+    const db = -2 + Math.random() * 4;
+    const volume = 10 ** (db / 20);
+    this.playUi(name, volume, rate);
+  }
+
+  setTrueDark(on: boolean) {
+    if (this.trueDark === on) return;
+    this.trueDark = on;
+    const duck = 10 ** (-DARK_AMB_DUCK_DB / 20);
+    if (this.ambientSound) this.ambientSound.setVolume(on ? this.ambVolume * duck : this.ambVolume);
+    if (this.musicSound) this.musicSound.setVolume(on ? 0.15 : this.musicVolume);
+  }
+
+  startNamedLoop(name: string, x: number, y: number, z: number, volume: number): string {
+    const id = `loop-${this.nextLoopId++}`;
+    const buf = this.buffers.get(name);
+    const scene = this.scene;
+    if (!buf || !scene) return id;
+    const object = new THREE.Object3D();
+    object.position.set(x, y, z);
+    const audio = new THREE.PositionalAudio(this.listener);
+    audio.setBuffer(buf);
+    audio.setRefDistance(2.2);
+    audio.setMaxDistance(10);
+    audio.setRolloffFactor(1);
+    audio.setLoop(true);
+    audio.setVolume(volume);
+    object.add(audio);
+    scene.add(object);
+    audio.play();
+    const voice: PositionalVoice = { audio, object, loop: true, baseVolume: volume, kind: 'presence' };
+    this.voices.push(voice);
+    this.namedLoops.set(id, voice);
+    return id;
+  }
+
+  stopNamedLoop(id: string) {
+    const voice = this.namedLoops.get(id);
+    if (!voice) return;
+    voice.audio.stop();
+    voice.object.parent?.remove(voice.object);
+    this.namedLoops.delete(id);
+    this.voices = this.voices.filter((v) => v !== voice);
+  }
+
+  startLanternLoop(hasOil: boolean) {
+    const key = hasOil ? 'lantern_loop' : 'lantern_ember_loop';
+    const mode = hasOil ? 'oil' : 'ember';
+    if (this.lanternMode === mode && this.lanternSound?.isPlaying) return;
+    const buf = this.buffers.get(key);
+    if (!buf) return;
+    if (!this.lanternSound) this.lanternSound = new THREE.Audio(this.listener);
+    if (this.lanternSound.isPlaying) this.lanternSound.stop();
+    this.lanternSound.setBuffer(buf);
+    this.lanternSound.setLoop(true);
+    this.lanternSound.setVolume(hasOil ? 0.35 : 0.3);
+    this.lanternSound.play();
+    this.lanternMode = mode;
+  }
+
+  startTorchLoop(sconce: Sconce) {
+    const buf = this.buffers.get('torch');
+    const scene = this.scene;
+    if (!buf || !scene) return;
+    const { nx, nz } = FACE_INTO_ROOM[sconce.face];
+    const dist = CELL_SIZE / 2 + SCONCE_FRONT_OFFSET_TILES * CELL_SIZE;
+    const object = new THREE.Object3D();
+    object.position.set(
+      sconce.x * CELL_SIZE + nx * dist,
+      CELL_SIZE / 2 + 0.1 * CELL_SIZE,
+      sconce.y * CELL_SIZE + nz * dist
+    );
+    const audio = new THREE.PositionalAudio(this.listener);
+    audio.setBuffer(buf);
+    audio.setRefDistance(2.2);
+    audio.setMaxDistance(10);
+    audio.setRolloffFactor(1.1);
+    audio.setLoop(true);
+    audio.setVolume(0.42);
+    audio.offset = Math.random() * Math.max(0.01, buf.duration * 0.8);
+    object.add(audio);
+    scene.add(object);
+    audio.play();
+    this.voices.push({ audio, object, loop: true, baseVolume: 0.42, kind: 'torch' });
   }
 
   playPositional(name: string, x: number, y: number, z: number, volume = 0.5) {
@@ -417,6 +512,9 @@ export class AudioManager {
   stopAll() {
     this.ambientSound?.stop();
     this.musicSound?.stop();
+    this.lanternSound?.stop();
+    for (const sound of this.uiPool) sound.stop();
     for (const v of this.voices) v.audio.stop();
+    this.namedLoops.clear();
   }
 }
