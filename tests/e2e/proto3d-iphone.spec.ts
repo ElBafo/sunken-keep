@@ -52,6 +52,22 @@ test('proto3d feedback: camera, doors, bump, fog, floors, no 404s', async ({ pag
   await shot(1, 7, 2, 'eye-wall.png');
   await shot(5, 2, 3, 'door-closed.png');
 
+  const twoAway = await page.evaluate(() => {
+    const api = window as unknown as {
+      __proto3d: {
+        setPosition: (x: number, y: number, dir: number) => void;
+        giveKey: () => void;
+        interact: () => void;
+        doorOpen: (x: number, y: number) => boolean;
+      };
+    };
+    api.__proto3d.setPosition(6, 2, 3);
+    api.__proto3d.giveKey();
+    api.__proto3d.interact();
+    return api.__proto3d.doorOpen(4, 2);
+  });
+  expect(twoAway, 'door must not open from two squares away').toBe(false);
+
   await page.evaluate(() => {
     const api = window as unknown as {
       __proto3d: { giveKey: () => void; openDoor: (x: number, y: number) => boolean };
@@ -97,6 +113,7 @@ test('proto3d feedback: camera, doors, bump, fog, floors, no 404s', async ({ pag
   );
 
   await shot(1, 4, 0, 'water-floor-fixed.png');
+  await shot(2, 2, 1, 'bog-leeches.png');
   await shot(1, 7, 0, 'fog-corridor.png');
 
   await page.evaluate(() => {

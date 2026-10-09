@@ -91,6 +91,12 @@
    "loop": true,
    "length_s": 32,
    "volume": 0.5
+  },
+  "music_act1": {
+   "file": "music_act1_loop",
+   "loop": true,
+   "length_s": 64,
+   "volume": 0.3
   }
  },
  "formats": [
@@ -107,6 +113,7 @@
   "leech_latch": "For a latched leech draining health, repeat bog_leeches_attack at low volume each drain tick.",
   "ui": "ui_button for any panel press (incl. attack before the hit sound), ui_button_denied for a hero who can't act yet, ui_turn on turning left/right, ui_log_line very quietly when a new log line appears.",
   "torch_loop": "One loop per lit sconce in view/nearby; volume ~0.6 at 1 square, 0.3 at 2, 0.12 at 3, silent beyond. Start each instance at a random offset so two torches don't phase. Dead sconces are silent.",
-  "torch_ignite": "For Wren relighting a dead sconce later; torch_extinguish for the Tide snuffing one."
+  "torch_ignite": "For Wren relighting a dead sconce later; torch_extinguish for the Tide snuffing one.",
+  "music_act1": "Act 1 theme. In proto3d, loop at 0.3 under amb_flooded_halls from the first audio unlock."
  }
 }

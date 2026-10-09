@@ -174,7 +174,7 @@ export class SceneBuilder {
         floor.position.set(wx, floorY, wz);
         floor.userData.lightX = x;
         floor.userData.lightY = y;
-        floor.userData.kind = 'floor';
+        floor.userData.kind = water ? 'water' : 'floor';
         group.add(floor);
 
         const ceilingGeo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE, FACE_SEGMENTS, FACE_SEGMENTS);

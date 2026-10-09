@@ -1,7 +1,6 @@
-import * as THREE from 'three';
 import { Atmosphere } from './atmosphere';
 import { AudioManager } from './audio';
-import { CELL_SIZE, DOOR_UNLOCK_LEAD_MS } from './constants';
+import { DOOR_UNLOCK_LEAD_MS } from './constants';
 import { Dressing } from './dressing';
 import { floor1, floor1Sconces } from './floor-data';
 import { InputManager } from './input';
@@ -31,8 +30,6 @@ class Game {
   fpsFrames = 0;
   fpsLastTime = 0;
   lastFps = 0;
-  private raycaster = new THREE.Raycaster();
-  private ndc = new THREE.Vector2();
   private doorUnlockTimer = 0;
   private pendingUnlock: { x: number; y: number } | null = null;
 
@@ -100,14 +97,9 @@ class Game {
   }
 
   doorAhead(): { x: number; y: number } | null {
-    const [dx, dy] = this.player.facingDelta();
-    for (let i = 1; i <= 2; i++) {
-      const x = this.player.x + dx * i;
-      const y = this.player.y + dy * i;
-      const tile = this.player.tileAt(x, y);
-      if (!tile || tile.wall || (tile.secret && !tile.secretOpen)) return null;
-      if (tile.door) return { x, y };
-    }
+    const { x, y } = this.player.facingPos(1);
+    const tile = this.player.tileAt(x, y);
+    if (tile?.door) return { x, y };
     return null;
   }
 
@@ -142,53 +134,13 @@ class Game {
     const facing = this.player.facingPos(1);
     if (this.pickupKeyAt(facing.x, facing.y)) return;
 
-    const canvas = this.renderer.canvas;
-    // Prefer a visible door under a tap, but never let decals steal the hit.
-    const doorHit = this.raycastDoor();
-    if (doorHit) {
-      this.handleDoor(doorHit.x, doorHit.y);
-      return;
-    }
-
     const ahead = this.doorAhead();
-    if (ahead) {
-      this.handleDoor(ahead.x, ahead.y);
-      return;
-    }
-
-    void canvas;
-  }
-
-  private raycastDoor(): { x: number; y: number } | null {
-    const canvas = this.renderer.canvas;
-    const rect = canvas.getBoundingClientRect();
-    // Use canvas centre as a fallback "tap the view" hit when Space is pressed.
-    this.ndc.set(0, 0.1);
-    this.raycaster.setFromCamera(this.ndc, this.renderer.camera);
-    const hits = this.raycaster.intersectObjects(this.renderer.scene.children, true);
-    for (const hit of hits) {
-      if (hit.object.userData.noPick) continue;
-      const kind = hit.object.userData.kind;
-      if (kind === 'door-panel' || kind === 'door-frame' || kind === 'door') {
-        const parent = hit.object.parent;
-        const wx = (parent ?? hit.object).position.x;
-        const wz = (parent ?? hit.object).position.z;
-        const x = Math.round(wx / CELL_SIZE);
-        const z = Math.round(wz / CELL_SIZE);
-        const visual = this.sceneBuilder.doors.get(x, z);
-        if (visual) return { x: visual.x, y: visual.y };
-      }
-      if (hit.object.userData.item === 'key') {
-        const sprite = this.spriteManager.sprites.find((s) => s.object === hit.object);
-        if (sprite) this.pickupKeyAt(sprite.x, sprite.y);
-        return null;
-      }
-    }
-    void rect;
-    return null;
+    if (ahead) this.handleDoor(ahead.x, ahead.y);
   }
 
   handleDoor(x: number, y: number) {
+    const ahead = this.doorAhead();
+    if (!ahead || ahead.x !== x || ahead.y !== y) return;
     const visual = this.sceneBuilder.doors.get(x, y);
     if (!visual || visual.busy || this.pendingUnlock) return;
     const tile = visual.tile;

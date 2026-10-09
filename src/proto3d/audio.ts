@@ -20,6 +20,7 @@ export class AudioManager {
   private buffers = new Map<string, AudioBuffer>();
   private uiSound: THREE.Audio | null = null;
   private ambientSound: THREE.Audio | null = null;
+  private musicSound: THREE.Audio | null = null;
   private voices: PositionalVoice[] = [];
   private dripPool: PositionalVoice[] = [];
   private farVoice: PositionalVoice | null = null;
@@ -82,7 +83,8 @@ export class AudioManager {
       ['chain2', 'audio/sfx_chain_sway_2.mp3'],
       ['crack_wind', 'audio/sfx_crack_wind_loop.mp3'],
       ['banner', 'audio/sfx_banner_flutter.mp3'],
-      ['bones', 'audio/sfx_bones_settle.mp3']
+      ['bones', 'audio/sfx_bones_settle.mp3'],
+      ['music_act1', 'audio/music_act1_loop.mp3']
     ];
 
     const results = await Promise.all(
@@ -100,6 +102,15 @@ export class AudioManager {
       this.ambientSound.setLoop(true);
       this.ambientSound.setVolume(0.32);
       this.ambientSound.play();
+    }
+
+    const music = this.buffers.get('music_act1');
+    if (music) {
+      this.musicSound = new THREE.Audio(this.listener);
+      this.musicSound.setBuffer(music);
+      this.musicSound.setLoop(true);
+      this.musicSound.setVolume(0.3);
+      this.musicSound.play();
     }
 
     this.uiSound = new THREE.Audio(this.listener);
@@ -316,6 +327,7 @@ export class AudioManager {
 
   stopAll() {
     this.ambientSound?.stop();
+    this.musicSound?.stop();
     for (const v of this.voices) v.audio.stop();
   }
 }
