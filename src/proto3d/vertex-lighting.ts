@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import {
+  AMBIENT_MIN,
   BRIGHT_MAX,
   BRIGHT_MIN,
   CELL_SIZE,
-  AMBIENT_MIN,
   EMBER_INTENSITY,
   EMBER_RADIUS_TILES,
   FACE_INTO_ROOM,
