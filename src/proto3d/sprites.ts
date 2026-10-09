@@ -15,7 +15,7 @@ import { FloorData, Sconce, Tile } from './types';
 /** World size of near idle billboards. Leeches sit low on the water. */
 const MONSTER_SPRITE: Record<string, { w: number; h: number }> = {
   slime: { w: 1.85, h: 1.7 },
-  bog_leeches: { w: 1.55, h: 0.78 },
+  bog_leeches: { w: 1.9, h: 0.7 },
   rust_crab: { w: 1.5, h: 1.1 },
   keep_rat: { w: 1.3, h: 1.2 }
 };

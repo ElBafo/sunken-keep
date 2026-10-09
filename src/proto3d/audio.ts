@@ -1,8 +1,8 @@
 import * as THREE from 'three';
-import { CELL_SIZE, FACE_INTO_ROOM, SCONCE_WALL_OFFSET_TILES } from './constants';
+import { CELL_SIZE, FACE_INTO_ROOM, SCONCE_WALL_OFFSET_TILES, WATER_Y } from './constants';
 import { QUALITY_PRESETS, QualityLevel } from './quality';
 import { DressingMarks } from './dressing';
-import { Sconce } from './types';
+import { FloorData, Sconce } from './types';
 
 const FAR_KEYS = ['far_draught', 'far_groan', 'far_pebbles', 'far_rumble'] as const;
 
@@ -11,7 +11,7 @@ interface PositionalVoice {
   object: THREE.Object3D;
   loop: boolean;
   baseVolume: number;
-  kind: 'torch' | 'drip' | 'far' | 'door' | 'chain' | 'banner' | 'wind' | 'bones';
+  kind: 'torch' | 'drip' | 'far' | 'door' | 'chain' | 'banner' | 'wind' | 'bones' | 'leech';
 }
 
 export class AudioManager {
@@ -84,7 +84,8 @@ export class AudioManager {
       ['crack_wind', 'audio/sfx_crack_wind_loop.mp3'],
       ['banner', 'audio/sfx_banner_flutter.mp3'],
       ['bones', 'audio/sfx_bones_settle.mp3'],
-      ['music_act1', 'audio/music_act1_loop.mp3']
+      ['music_act1', 'audio/music_act1_loop.mp3'],
+      ['leech_idle', 'audio/sfx_bog_leeches_idle_loop.mp3']
     ];
 
     const results = await Promise.all(
@@ -169,6 +170,33 @@ export class AudioManager {
     this.nextBannerAt = performance.now() + 10000 + Math.random() * 15000;
 
     this.loaded = true;
+  }
+
+  attachLeeches(scene: THREE.Scene, floorData: FloorData) {
+    const buf = this.buffers.get('leech_idle');
+    if (!buf) return;
+    const range = 2 * CELL_SIZE;
+    const { tiles, width, height } = floorData;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const tile = tiles[y][x];
+        if (tile.monster !== 'bog_leeches') continue;
+        const floorY = tile.deepWater || tile.shallowWater ? WATER_Y : 0;
+        const object = new THREE.Object3D();
+        object.position.set(x * CELL_SIZE, floorY + 0.2, y * CELL_SIZE);
+        const audio = new THREE.PositionalAudio(this.listener);
+        audio.setBuffer(buf);
+        audio.setRefDistance(CELL_SIZE);
+        audio.setMaxDistance(range);
+        audio.setRolloffFactor(1);
+        audio.setLoop(true);
+        audio.setVolume(0.4);
+        object.add(audio);
+        scene.add(object);
+        audio.play();
+        this.voices.push({ audio, object, loop: true, baseVolume: 0.4, kind: 'leech' });
+      }
+    }
   }
 
   attachDressing(scene: THREE.Scene, marks: DressingMarks) {

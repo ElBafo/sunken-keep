@@ -51,69 +51,92 @@ test('proto3d feedback: camera, doors, bump, fog, floors, no 404s', async ({ pag
   await shot(1, 7, 0, 'eye-corridor.png');
   await shot(1, 7, 2, 'eye-wall.png');
   await shot(5, 2, 3, 'door-closed.png');
+  // Leeches sit in the water hall at (3,3); (3,2) in front of the door is free.
+  await shot(3, 2, 2, 'bog-leeches.png');
 
   const twoAway = await page.evaluate(() => {
     const api = window as unknown as {
       __proto3d: {
         setPosition: (x: number, y: number, dir: number) => void;
-        giveKey: () => void;
         interact: () => void;
         doorOpen: (x: number, y: number) => boolean;
       };
     };
     api.__proto3d.setPosition(6, 2, 3);
-    api.__proto3d.giveKey();
     api.__proto3d.interact();
     return api.__proto3d.doorOpen(4, 2);
   });
   expect(twoAway, 'door must not open from two squares away').toBe(false);
 
-  await page.evaluate(() => {
+  const picked = await page.evaluate(() => {
     const api = window as unknown as {
-      __proto3d: { giveKey: () => void; openDoor: (x: number, y: number) => boolean };
+      __proto3d: {
+        setPosition: (x: number, y: number, dir: number) => void;
+        interact: () => void;
+        hasKey: () => boolean;
+      };
     };
-    api.__proto3d.giveKey();
-    api.__proto3d.openDoor(4, 2);
+    api.__proto3d.setPosition(2, 5, 0);
+    api.__proto3d.interact();
+    return api.__proto3d.hasKey();
   });
-  await page.waitForTimeout(1600);
-  await page.evaluate(() => {
-    (window as unknown as { __proto3d: { setPosition: (a: number, b: number, c: number) => void } }).__proto3d.setPosition(
-      5,
-      2,
-      3
-    );
-  });
-  await page.waitForTimeout(200);
-  await shot(5, 2, 3, 'door-open.png');
+  expect(picked, 'picked up the key on (2,5)').toBe(true);
 
   await page.evaluate(() => {
-    (window as unknown as { __proto3d: { setPosition: (a: number, b: number, c: number) => void } }).__proto3d.setPosition(
-      6,
-      2,
-      1
-    );
+    const api = window as unknown as {
+      __proto3d: {
+        setPosition: (x: number, y: number, dir: number) => void;
+        interact: () => void;
+      };
+    };
+    api.__proto3d.setPosition(3, 2, 1);
+    api.__proto3d.interact();
   });
-  const bump = await page.evaluate(() => {
-    return (
-      window as unknown as {
-        __proto3d: {
-          tryMoveForward: () => { result: string; after: { x: number; y: number } };
-        };
-      }
-    ).__proto3d.tryMoveForward();
-  });
-  console.log('BUMP', bump);
-  expect(bump.result).toBe('monster');
-  expect(bump.after.x).toBe(6);
-  expect(bump.after.y).toBe(2);
-  await page.waitForTimeout(250);
+  await page.waitForTimeout(2000);
+  const opened = await page.evaluate(
+    () =>
+      (window as unknown as { __proto3d: { doorOpen: (x: number, y: number) => boolean } }).__proto3d.doorOpen(
+        4,
+        2
+      )
+  );
+  expect(opened, 'door opens from (3,2) facing east').toBe(true);
+  await shot(3, 2, 1, 'door-open.png');
+
+  const walk: Array<{ result: string; after: { x: number; y: number } }> = [];
+  for (let i = 0; i < 4; i++) {
+    const step = await page.evaluate(() => {
+      return (
+        window as unknown as {
+          __proto3d: {
+            tryMoveForward: () => { result: string; after: { x: number; y: number } };
+          };
+        }
+      ).__proto3d.tryMoveForward();
+    });
+    walk.push(step);
+    await page.waitForTimeout(250);
+  }
+  console.log('WALK', walk);
+  expect(walk[0].result).toBe('ok');
+  expect(walk[0].after.x).toBe(4);
+  expect(walk[0].after.y).toBe(2);
+  expect(walk[1].result).toBe('ok');
+  expect(walk[1].after.x).toBe(5);
+  expect(walk[1].after.y).toBe(2);
+  expect(walk[2].result).toBe('ok');
+  expect(walk[2].after.x).toBe(6);
+  expect(walk[2].after.y).toBe(2);
+  expect(walk[3].result).toBe('monster');
+  expect(walk[3].after.x).toBe(6);
+  expect(walk[3].after.y).toBe(2);
+  await page.waitForTimeout(200);
   await page.screenshot({ path: `${OUT}/slime-bump.png`, fullPage: false });
   console.log(
     'SHOT slime-bump.png md5=' + createHash('md5').update(readFileSync(`${OUT}/slime-bump.png`)).digest('hex')
   );
 
   await shot(1, 4, 0, 'water-floor-fixed.png');
-  await shot(2, 2, 1, 'bog-leeches.png');
   await shot(1, 7, 0, 'fog-corridor.png');
 
   await page.evaluate(() => {

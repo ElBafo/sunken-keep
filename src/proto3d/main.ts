@@ -251,6 +251,7 @@ class Game {
       this.audioManager.unlock();
       await this.audioManager.loadSounds(this.renderer.scene, floor1Sconces);
       this.audioManager.attachDressing(this.renderer.scene, this.dressing.marks);
+      this.audioManager.attachLeeches(this.renderer.scene, floor1);
       this.lastTime = performance.now();
       this.fpsLastTime = this.lastTime;
       requestAnimationFrame(() => this.gameLoop());
