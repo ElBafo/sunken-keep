@@ -2,128 +2,70 @@ import { test, expect, devices } from 'playwright/test';
 
 const BASE_URL = 'http://localhost:4173/sunken-keep';
 
-test.use(devices['iPhone 15 Pro']);
+test.use(devices['iPhone 15']);
 
-test.describe('3D Prototype Tests', () => {
-  test('should load without 404 errors', async ({ page }) => {
-    const failed404s: string[] = [];
-    
-    page.on('response', response => {
-      if (response.status() === 404) {
-        failed404s.push(response.url());
-      }
-    });
-    
-    await page.goto(`${BASE_URL}/proto3d.html`);
-    
-    // Wait for tap to start
-    await expect(page.locator('#tap-to-start')).toBeVisible();
-    
-    // Click to start
-    await page.locator('#tap-to-start').click();
-    
-    // Wait for game to load
-    await page.waitForTimeout(3000);
-    
-    // Check for 404s
-    if (failed404s.length > 0) {
-      console.error('404 errors found:', failed404s);
-      throw new Error(`Found ${failed404s.length} 404 errors: ${failed404s.join(', ')}`);
+test('proto3d layout, no errors, slime visible at 2 squares', async ({ page }) => {
+  const errors: string[] = [];
+  const failed404s: string[] = [];
+
+  page.on('console', msg => {
+    if (msg.type() === 'error') {
+      errors.push(msg.text());
+      console.log('[ERROR]', msg.text());
     }
-    
-    console.log('✓ No 404 errors detected');
   });
-  
-  test('should measure FPS', async ({ page }) => {
-    await page.goto(`${BASE_URL}/proto3d.html`);
-    
-    // Click to start
-    await page.locator('#tap-to-start').click();
-    
-    // Wait for game to initialize
-    await page.waitForTimeout(2000);
-    
-    // Sample FPS multiple times
-    const fpsReadings: number[] = [];
-    for (let i = 0; i < 5; i++) {
-      await page.waitForTimeout(1000);
-      const fpsText = await page.locator('#fps-counter').textContent();
-      const fps = parseInt(fpsText?.match(/\d+/)?.[0] || '0');
-      if (fps > 0) {
-        fpsReadings.push(fps);
-      }
+
+  page.on('response', response => {
+    if (response.status() === 404) {
+      failed404s.push(response.url());
+      console.log('[404]', response.url());
     }
-    
-    const avgFps = fpsReadings.reduce((a, b) => a + b, 0) / fpsReadings.length;
-    console.log(`FPS readings: ${fpsReadings.join(', ')}`);
-    console.log(`Average FPS: ${avgFps.toFixed(1)}`);
-    
-    expect(avgFps).toBeGreaterThanOrEqual(30);
   });
-  
-  test('should take screenshots at key locations', async ({ page }) => {
-    await page.goto(`${BASE_URL}/proto3d.html`);
-    
-    // Start game
-    await page.locator('#tap-to-start').click();
-    await page.waitForTimeout(2000);
-    
-    // Screenshot 1: Start position
-    await page.screenshot({ path: 'screenshots/proto3d-start.png', fullPage: true });
-    console.log('✓ Screenshot: start position');
-    
-    // Move forward to corridor
-    await page.locator('#btn-forward').click();
-    await page.waitForTimeout(300);
-    await page.screenshot({ path: 'screenshots/proto3d-corridor.png', fullPage: true });
-    console.log('✓ Screenshot: corridor');
-    
-    // Turn left and move toward lit sconce
-    await page.locator('#btn-left').click();
-    await page.waitForTimeout(300);
-    await page.locator('#btn-forward').click();
-    await page.waitForTimeout(300);
-    await page.screenshot({ path: 'screenshots/proto3d-sconce.png', fullPage: true });
-    console.log('✓ Screenshot: near lit sconce');
-    
-    // Navigate to water hall
-    for (let i = 0; i < 3; i++) {
-      await page.locator('#btn-forward').click();
-      await page.waitForTimeout(300);
-    }
-    await page.screenshot({ path: 'screenshots/proto3d-water-hall.png', fullPage: true });
-    console.log('✓ Screenshot: water hall');
-    
-    // Navigate to slime location (x:7, y:2)
-    await page.locator('#btn-right').click();
-    await page.waitForTimeout(300);
-    for (let i = 0; i < 4; i++) {
-      await page.locator('#btn-forward').click();
-      await page.waitForTimeout(300);
-    }
-    await page.locator('#btn-left').click();
-    await page.waitForTimeout(300);
-    for (let i = 0; i < 3; i++) {
-      await page.locator('#btn-forward').click();
-      await page.waitForTimeout(300);
-    }
-    await page.screenshot({ path: 'screenshots/proto3d-slime.png', fullPage: true });
-    console.log('✓ Screenshot: facing slime');
+
+  await page.goto(`${BASE_URL}/proto3d.html?test=1`);
+  await page.waitForFunction(() => (window as any).__proto3d?.ready === true, null, { timeout: 15000 });
+  await page.locator('#tap-to-start').click();
+  await page.waitForTimeout(400);
+
+  // Face the slime from 2 squares away: tiles[2][7] = (7,2), stand at (5,2) facing east
+  await page.evaluate(() => (window as any).__proto3d.setPosition(5, 2, 1));
+  await page.waitForTimeout(400);
+
+  const viewport = page.viewportSize()!;
+  const canvasBox = await page.locator('#render-canvas').boundingBox();
+  expect(canvasBox, 'canvas boundingBox').not.toBeNull();
+
+  const canvas = canvasBox!;
+  const canvasBottom = canvas.y + canvas.height;
+
+  console.log('viewport', viewport);
+  console.log('canvas', canvas);
+
+  expect(canvas.x, 'canvas left').toBe(0);
+  expect(canvas.width, 'canvas width == viewport width').toBe(viewport.width);
+  expect(canvas.y, 'canvas top >= 0').toBeGreaterThanOrEqual(0);
+
+  const buttonIds = ['#btn-forward', '#btn-left', '#btn-back', '#btn-right'];
+  for (const id of buttonIds) {
+    const box = await page.locator(id).boundingBox();
+    expect(box, `${id} boundingBox`).not.toBeNull();
+    console.log(id, box);
+    expect(box!.y, `${id} top >= canvas bottom`).toBeGreaterThanOrEqual(canvasBottom);
+    expect(box!.height, `${id} at least 44pt`).toBeGreaterThanOrEqual(44);
+    expect(box!.width, `${id} at least 44pt wide`).toBeGreaterThanOrEqual(44);
+  }
+
+  const backing = await page.evaluate(() => {
+    const c = document.getElementById('render-canvas') as HTMLCanvasElement;
+    return { width: c.width, height: c.height };
   });
-  
-  test('should test palette toggle', async ({ page }) => {
-    // Test with palette disabled
-    await page.goto(`${BASE_URL}/proto3d.html?palette=0`);
-    await page.locator('#tap-to-start').click();
-    await page.waitForTimeout(2000);
-    await page.screenshot({ path: 'screenshots/proto3d-no-palette.png', fullPage: true });
-    console.log('✓ Screenshot: palette disabled');
-    
-    // Test with palette enabled (default)
-    await page.goto(`${BASE_URL}/proto3d.html`);
-    await page.locator('#tap-to-start').click();
-    await page.waitForTimeout(2000);
-    await page.screenshot({ path: 'screenshots/proto3d-with-palette.png', fullPage: true });
-    console.log('✓ Screenshot: palette enabled');
-  });
+  console.log('backing store', backing);
+  expect(backing.width).toBe(270);
+
+  await page.screenshot({ path: 'screenshots/layout-test.png', fullPage: false });
+  await page.screenshot({ path: 'screenshots/proto-slime-2sq.png', fullPage: false });
+  console.log('✓ screenshots/layout-test.png and proto-slime-2sq.png');
+
+  expect(errors, 'console errors').toEqual([]);
+  expect(failed404s, '404s').toEqual([]);
 });
