@@ -1,15 +1,17 @@
 import './style.css';
-import { Game } from './game';
+// import { Game } from './game';  // Disabled for new system
 import { GameController } from './game-controller';
+import { UIRenderer585 } from './ui-renderer-585';
 import { InputHandler } from './input';
 import { loadFont } from './font';
 import { loadPortraits } from './characters';
 import { loadBarks } from './barks';
 import { generateCutscenePlaceholders } from './cutscene-placeholders';
 import { assets, sound } from './assets';
+import { CANVAS_WIDTH, CANVAS_HEIGHT, VIEW_HEIGHT } from './constants';
 
-const BASE_WIDTH = 270;
-const BASE_HEIGHT = 480;
+const BASE_WIDTH = CANVAS_WIDTH;  // 270
+const BASE_HEIGHT = CANVAS_HEIGHT;  // 585
 
 // Check if we should use new game controller (for testing)
 const USE_NEW_CONTROLLER = true;
@@ -111,14 +113,18 @@ async function main() {
   }
   
   // Initialize game
-  const game = new Game();
-  await game.init();
+  // const game = USE_NEW_CONTROLLER ? null : new Game();
+  // if (game) {
+  //   await game.init();
+  // }
   
   // Initialize new game controller for testing
   let gameController: GameController | null = null;
+  let uiRenderer585: UIRenderer585 | null = null;
   if (USE_NEW_CONTROLLER) {
     gameController = new GameController();
     await gameController.init();
+    uiRenderer585 = new UIRenderer585();
     console.log('New game controller initialized');
   }
   
@@ -222,7 +228,9 @@ async function main() {
       }
     }
     
-    game.handleKey(e.key);
+    // if (game && !USE_NEW_CONTROLLER) {
+    //   game.handleKey(e.key);
+    // }
     
     // Prevent default for game keys
     if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'w', 'a', 's', 'd', 'q', 'e'].includes(e.key)) {
@@ -234,12 +242,20 @@ async function main() {
   function gameLoop() {
     const now = Date.now();
     if (gameStarted) {
-      game.update(now);
-      game.render(ctx, now);
+      // Render existing game (if not using new controller)
+      // if (game && !USE_NEW_CONTROLLER) {
+      //   game.update(now);
+      //   game.render(ctx, now);
+      // }
       
-      // Display floor number if using new controller
-      if (gameController && USE_NEW_CONTROLLER) {
+      // Render new UI overlay if using new controller
+      if (gameController && uiRenderer585 && USE_NEW_CONTROLLER) {
         const state = gameController.getState();
+        
+        // Render 585 UI
+        uiRenderer585.render(ctx, state, now);
+        
+        // Debug info
         ctx.save();
         ctx.fillStyle = '#ffffff';
         ctx.font = '12px monospace';
