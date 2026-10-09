@@ -48,6 +48,13 @@
   "ui_inventory_move": "sfx_ui_inventory_move",
   "ui_log_line": "sfx_ui_log_line",
   "torch_loop": "sfx_torch_loop",
+  "act_ready": "sfx_act_ready",
+  "act_miss": "sfx_act_miss",
+  "attack_miss": "sfx_act_miss",
+  "attack_hit": "sfx_hit",
+  "no": "sfx_ui_button_denied",
+  "no_mana": "sfx_ui_button_denied",
+  "spell_cast": "sfx_act_scroll",
   "torch_ignite": "sfx_torch_ignite",
   "torch_extinguish": "sfx_torch_extinguish"
  },

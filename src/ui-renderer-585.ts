@@ -228,6 +228,10 @@ export class UIRenderer585 {
       const recoveryEnd = hero.recovery[hand];
       const recovering = recoveryEnd > now;
 
+      // Check if back row melee (greyed out)
+      const actionDef = this.getActionDef(hero, hand);
+      const isBackRowMelee = actionDef?.range === 'melee' && hero.formation === 'back';
+
       if (recovering) {
         // Dim the icon
         ctx.save();
@@ -238,10 +242,37 @@ export class UIRenderer585 {
         // Dark overlay
         ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
         ctx.fillRect(x, y, w, h);
+      } else if (isBackRowMelee) {
+        // Grey out back row melee
+        ctx.save();
+        ctx.globalAlpha = 0.3;
+        ctx.drawImage(icon, iconX, iconY, 24, 24);
+        ctx.restore();
+
+        // Draw red X
+        ctx.strokeStyle = '#8a3a3a';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x + 4, y + 4);
+        ctx.lineTo(x + w - 4, y + h - 4);
+        ctx.moveTo(x + w - 4, y + 4);
+        ctx.lineTo(x + 4, y + h - 4);
+        ctx.stroke();
       } else {
         ctx.drawImage(icon, iconX, iconY, 24, 24);
       }
     }
+  }
+
+  // Helper to get action def for hero (needed for range check)
+  private getActionDef(hero: Hero, hand: 'main' | 'off'): { range?: string } | null {
+    // Simple check: melee items
+    const item = hero.equipment[hand];
+    const meleeItems = ['axe', 'shield', 'mace', 'dagger', 'empty_hand'];
+    if (meleeItems.includes(item)) {
+      return { range: 'melee' };
+    }
+    return { range: 'ranged' };
   }
 
   private drawLog(_ctx: CanvasRenderingContext2D): void {

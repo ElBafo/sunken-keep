@@ -43,6 +43,21 @@ export class GameController {
     // Setup auto-save on page leave
     SaveSystem.setupAutoSaveOnLeave(() => this.state);
 
+    // TEST: Create a test monster encounter on floor 1
+    // This will be removed when proper encounter triggering is added
+    const floor1 = floors.get(1);
+    if (floor1 && this.state.party.floor === 1) {
+      // Place a test slime at (2, 6) - near the start
+      floor1.tiles[6][2] = {
+        monster: 'slime',
+        monsterHp: 20,
+        monsterMaxHp: 20,
+        monsterState: 'idle',
+        monsterAnimTime: 0,
+      };
+      console.log('TEST: Placed slime at (2, 6) for combat testing');
+    }
+
     console.log('GameController initialized');
   }
 

@@ -199,6 +199,13 @@ export class ActionSystem {
     return { success: true, effect };
   }
 
+  // Get action definition for hero (public)
+  getActionDefPublic(heroId: HeroId, hand: 'main' | 'off'): ActionDef | null {
+    const heroActions = this.actionData[heroId];
+    if (!heroActions) return null;
+    return heroActions[hand];
+  }
+
   // Get action definition for hero
   private getActionDef(heroId: HeroId, hand: 'main' | 'off'): ActionDef | null {
     const heroActions = this.actionData[heroId];

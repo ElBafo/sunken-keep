@@ -2,6 +2,8 @@ import './style.css';
 // import { Game } from './game';  // Disabled for new system
 import { GameController } from './game-controller';
 import { UIRenderer585 } from './ui-renderer-585';
+import { combatController } from './combat-controller';
+import { inputManager } from './input-manager';
 import { InputHandler } from './input';
 import { loadFont } from './font';
 import { loadPortraits } from './characters';
@@ -170,6 +172,55 @@ async function main() {
     tapToStart.classList.add('hidden');
     muteToggle.classList.remove('hidden');
   });
+
+  // Canvas click/tap handler (for new controller)
+  canvas.addEventListener('click', (e) => {
+    if (!gameStarted || !gameController || !USE_NEW_CONTROLLER) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    const x = (e.clientX - rect.left) * scaleX;
+    const y = (e.clientY - rect.top) * scaleY;
+
+    // Check hand buttons (combat)
+    const handButton = inputManager.checkHandButton(x, y);
+    if (handButton) {
+      const state = gameController.getState();
+      combatController.handleHandButton(state, handButton.heroId, handButton.hand);
+      return;
+    }
+
+    // Check potion buttons
+    const potion = inputManager.checkPotionButton(x, y);
+    if (potion) {
+      console.log(`Potion ${potion} clicked`);
+      // TODO: Use potion
+      return;
+    }
+
+    // Check menu button
+    if (inputManager.checkMenuButton(x, y)) {
+      console.log('Menu clicked');
+      // TODO: Open menu
+      return;
+    }
+
+    // Check save button
+    if (inputManager.checkSaveButton(x, y)) {
+      console.log('Save clicked');
+      // TODO: Manual save
+      return;
+    }
+
+    // Check portrait (character sheet)
+    const portrait = inputManager.checkPortrait(x, y);
+    if (portrait) {
+      console.log(`Portrait ${portrait} clicked`);
+      // TODO: Open character sheet
+      return;
+    }
+  });
   
   // Mute toggle
   muteToggle.addEventListener('click', () => {
@@ -218,6 +269,36 @@ async function main() {
       return;
     }
     
+    // TEST: Start combat with 'C' key (for Milestone 3 testing)
+    if ((e.key === 'c' || e.key === 'C') && gameController && USE_NEW_CONTROLLER) {
+      const state = gameController.getState();
+      const floor = state.floors.get(state.party.floor);
+      if (floor) {
+        // Find a monster on current floor
+        for (let y = 0; y < floor.height; y++) {
+          for (let x = 0; x < floor.width; x++) {
+            const tile = floor.tiles[y][x];
+            if (tile.monster && tile.monsterHp) {
+              combatController.startCombat(
+                state,
+                tile.monster,
+                10,  // AC placeholder
+                tile.monsterHp,
+                x,
+                y
+              );
+              console.log(`Combat started with ${tile.monster}`);
+              e.preventDefault();
+              return;
+            }
+          }
+        }
+      }
+      console.log('No monster found on current floor');
+      e.preventDefault();
+      return;
+    }
+    
     // Handle stairs with space bar (new controller only)
     if (e.key === ' ' && gameController && USE_NEW_CONTROLLER) {
       const stairs = gameController.checkStairs();
@@ -233,7 +314,7 @@ async function main() {
     // }
     
     // Prevent default for game keys
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'w', 'a', 's', 'd', 'q', 'e'].includes(e.key)) {
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'w', 'a', 's', 'd', 'q', 'e', 'c', 'C'].includes(e.key)) {
       e.preventDefault();
     }
   });
