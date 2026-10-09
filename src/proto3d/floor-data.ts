@@ -28,6 +28,28 @@ export const floor1: FloorData = {
   ]
 };
 
+/**
+ * Proto3d only — do not copy this into shared floor1. Until combat is ported,
+ * the locked door at (4,2) must have a free square in front at (3,2).
+ * Move the leeches onto (3,3) in the water hall (same shallow-water floor height).
+ */
+function relocateLeechesOffDoor(floor: FloorData) {
+  const front = floor.tiles[2][3];
+  const dest = floor.tiles[3][3];
+  if (front.monster !== 'bog_leeches' || dest.monster) return;
+  dest.monster = front.monster;
+  dest.monsterHp = front.monsterHp;
+  dest.monsterMaxHp = front.monsterMaxHp;
+  dest.monsterState = front.monsterState;
+  dest.monsterAnimTime = front.monsterAnimTime;
+  delete front.monster;
+  delete front.monsterHp;
+  delete front.monsterMaxHp;
+  delete front.monsterState;
+  delete front.monsterAnimTime;
+}
+relocateLeechesOffDoor(floor1);
+
 export const floor1Sconces: readonly Sconce[] = [
   { x: 0, y: 6, face: 'E', lit: true },
   { x: 4, y: 1, face: 'W', lit: true },

@@ -4,13 +4,31 @@ import { Sconce } from './types';
 export const CELL_SIZE = 2;
 
 /** Tiles behind cell centre along the facing direction (EOB-style floor strip). */
-export const CAMERA_BACK_OFFSET_TILES = 0.4;
-export const CAMERA_EYE_HEIGHT = 1.1;
-/** Negative = look down, so the current-square floor stays in frame. */
-export const CAMERA_PITCH = (-10 * Math.PI) / 180;
-export const CAMERA_FOV = 78;
+export const CAMERA_BACK_OFFSET_TILES = 0.5;
+/** ~0.47 of wall height (walls are CELL_SIZE). */
+export const CAMERA_EYE_HEIGHT = 0.94;
+/** Slight look-down only — floor strip comes mostly from back-offset + FOV. */
+export const CAMERA_PITCH = (-3.5 * Math.PI) / 180;
+export const CAMERA_FOV = 80;
 export const CAMERA_NEAR = 0.08;
 export const CAMERA_FAR = 32;
+export const STEP_BOB_AMPLITUDE = 0.038;
+
+/** Recessed water; walls and stone skirts drop to this so the step isn't a black gap. */
+export const WATER_Y = -0.15;
+export const WALL_BOTTOM = WATER_Y;
+export const WALL_TOP = CELL_SIZE;
+
+export const FOG_COLOR = 0x060504;
+export const FOG_NEAR = 3.2;
+export const FOG_FAR = 12.0;
+
+/** Panel slides up this far (texture door is ~1.33 tall); thud at 1.45s / slam at 0.6s. */
+export const DOOR_SLIDE = 1.42;
+export const DOOR_OPEN_MS = 1450;
+export const DOOR_CLOSE_MS = 600;
+export const DOOR_PANEL_INSET = 0.05;
+export const DOOR_UNLOCK_LEAD_MS = 350;
 
 /**
  * Old sconce art leaned right; flip UVs on faces where that lean goes into the wall.
@@ -23,8 +41,8 @@ export const SCONCE_WIDTH_TILES = 0.25;
 export const SCONCE_HEIGHT_TILES = 0.5;
 export const SCONCE_WALL_OFFSET_TILES = 0.015;
 export const SCONCE_ANIM_FPS = 8;
-/** Flame-frame multipliers for the sconce warm term (subtle wall flicker). */
-export const SCONCE_FLICKER = [0.85, 0.7, 1.0] as const;
+/** Flame-frame multipliers for the sconce warm term (keep flicker readable). */
+export const SCONCE_FLICKER = [0.78, 0.58, 1.08] as const;
 export const SCONCE_RADIUS_TILES = 1.5;
 export const FACE_SEGMENTS = 4;
 export const CUTOUT_ALPHA_TEST = 0.5;

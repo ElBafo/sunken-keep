@@ -7,9 +7,22 @@ import {
   SCONCE_HEIGHT_TILES,
   SCONCE_WALL_OFFSET_TILES,
   SCONCE_WIDTH_TILES,
+  WATER_Y,
   sconceNeedsMirror
 } from './constants';
-import { FloorData, Sconce } from './types';
+import { FloorData, Sconce, Tile } from './types';
+
+/** World size of near idle billboards. Leeches sit low on the water. */
+const MONSTER_SPRITE: Record<string, { w: number; h: number }> = {
+  slime: { w: 1.85, h: 1.7 },
+  bog_leeches: { w: 1.9, h: 0.7 },
+  rust_crab: { w: 1.5, h: 1.1 },
+  keep_rat: { w: 1.3, h: 1.2 }
+};
+
+function tileFloorY(tile: Tile): number {
+  return tile.deepWater || tile.shallowWater ? WATER_Y : 0;
+}
 
 interface SpriteInfo {
   object: THREE.Object3D;
@@ -53,7 +66,8 @@ function makeBillboard(
   y: number,
   z: number,
   width: number,
-  height: number
+  height: number,
+  renderOrder = 10
 ): THREE.Sprite {
   const sprite = new THREE.Sprite(material);
   // Anchor at the feet so scale changes don't sink into the floor
@@ -61,7 +75,7 @@ function makeBillboard(
   sprite.position.set(x, y, z);
   sprite.scale.set(width, height, 1);
   sprite.frustumCulled = false;
-  sprite.renderOrder = 10;
+  sprite.renderOrder = renderOrder;
   sprite.userData.isSprite = true;
   sprite.matrixAutoUpdate = true;
   return sprite;
@@ -97,7 +111,20 @@ export class SpriteManager {
     this.camera = camera;
   }
 
-  async loadSprites(scene: THREE.Scene, floorData: FloorData, sconces: readonly Sconce[]) {
+  hideItemAt(x: number, y: number) {
+    for (const sprite of this.sprites) {
+      if (sprite.x === x && sprite.y === y && !sprite.frames) {
+        sprite.object.visible = false;
+      }
+    }
+  }
+
+  async loadSprites(
+    scene: THREE.Scene,
+    floorData: FloorData,
+    sconces: readonly Sconce[],
+    cappedSconces: Set<string> = new Set()
+  ) {
     const loader = new THREE.TextureLoader();
     const baseUrl = import.meta.env.BASE_URL;
 
@@ -120,18 +147,36 @@ export class SpriteManager {
       for (let x = 0; x < width; x++) {
         const tile = tiles[y][x];
 
-        // tiles[row][col] === tiles[y][x]. Slime is at tiles[2][7] → x=7, y=2.
-        if (tile.monster === 'slime') {
+        if (tile.monster) {
+          const kind = tile.monster;
           const frames = await Promise.all([
-            loadTex('art/dungeon/slime_idle_1_near.png'),
-            loadTex('art/dungeon/slime_idle_2_near.png'),
-            loadTex('art/dungeon/slime_idle_3_near.png'),
-            loadTex('art/dungeon/slime_idle_4_near.png')
+            loadTex(`art/dungeon/${kind}_idle_1_near.png`),
+            loadTex(`art/dungeon/${kind}_idle_2_near.png`),
+            loadTex(`art/dungeon/${kind}_idle_3_near.png`),
+            loadTex(`art/dungeon/${kind}_idle_4_near.png`)
           ]);
-
+          const size = MONSTER_SPRITE[kind] ?? { w: 1.6, h: 1.3 };
+          const onWater = !!(tile.deepWater || tile.shallowWater);
           const mat = makeSpriteMaterial(frames[0]);
-          // ~wall-height billboard, feet on the floor, centered in the cell
-          const sprite = makeBillboard(mat, x * CELL_SIZE, 0.02, y * CELL_SIZE, 1.85, 1.7);
+          // Sit on this square's floor (water is WATER_Y). Draw after the water
+          // surface so the sprite is neither floating nor buried in it.
+          const sprite = makeBillboard(
+            mat,
+            x * CELL_SIZE,
+            tileFloorY(tile) + 0.02,
+            y * CELL_SIZE,
+            size.w,
+            size.h,
+            onWater ? 20 : 10
+          );
+          if (onWater) {
+            mat.depthTest = true;
+            mat.depthWrite = false;
+            mat.polygonOffset = true;
+            mat.polygonOffsetFactor = -4;
+            mat.polygonOffsetUnits = -4;
+            sprite.renderOrder = 20;
+          }
           scene.add(sprite);
 
           this.sprites.push({
@@ -150,6 +195,7 @@ export class SpriteManager {
           const tex = await loadTex('art/dungeon/item_key_near.png');
           const mat = makeSpriteMaterial(tex);
           const sprite = makeBillboard(mat, x * CELL_SIZE, 0.15, y * CELL_SIZE, 0.9, 0.9);
+          sprite.userData.item = 'key';
           scene.add(sprite);
 
           this.sprites.push({
@@ -178,6 +224,7 @@ export class SpriteManager {
     const frameMs = 1000 / SCONCE_ANIM_FPS;
 
     for (const sconce of sconces) {
+      if (!sconce.lit && cappedSconces.has(`${sconce.x},${sconce.y}`)) continue;
       const map = sconce.lit ? litFrames[0] : sconceDead;
       const geo = new THREE.PlaneGeometry(sconceW, sconceH);
       if (sconceNeedsMirror(sconce.face)) flipUVs(geo);

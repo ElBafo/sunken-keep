@@ -1,0 +1,254 @@
+{
+  "_note": "Levie: hand-placed wall dressing so it tells the story instead of random scatter. Wall pieces: {x,y} is the wall square, face is the side that shows (N/E/S/W, pointing into the room). Floor/ceiling pieces: {x,y} is the open square. Moss, cracks and drip stains can still be random on top, but keep them off squares listed here.",
+  "floor1": {
+    "sunbeam": [
+      {
+        "x": 2,
+        "y": 2,
+        "note": "ceiling crack over the water hall, light on the deep water"
+      },
+      {
+        "x": 2,
+        "y": 6,
+        "note": "soft beam near the start so the first view isn't flat"
+      }
+    ],
+    "water_line": [
+      {
+        "x": 0,
+        "y": 1,
+        "face": "E"
+      },
+      {
+        "x": 0,
+        "y": 2,
+        "face": "E"
+      },
+      {
+        "x": 0,
+        "y": 3,
+        "face": "E"
+      },
+      {
+        "x": 0,
+        "y": 4,
+        "face": "E"
+      },
+      {
+        "x": 4,
+        "y": 1,
+        "face": "W"
+      },
+      {
+        "x": 4,
+        "y": 3,
+        "face": "W"
+      },
+      {
+        "x": 1,
+        "y": 0,
+        "face": "S"
+      },
+      {
+        "x": 2,
+        "y": 0,
+        "face": "S"
+      },
+      {
+        "x": 3,
+        "y": 0,
+        "face": "S"
+      }
+    ],
+    "tally": [
+      {
+        "x": 4,
+        "y": 3,
+        "face": "W",
+        "note": "guard's count beside the locked door (4,2), seen from the water hall"
+      }
+    ],
+    "ash_bowl": [
+      {
+        "x": 1,
+        "y": 6,
+        "against": "W",
+        "note": "under the first carving"
+      },
+      {
+        "x": 6,
+        "y": 1,
+        "against": "N",
+        "note": "by the secret carving and the journal"
+      }
+    ],
+    "sconce_capped": [
+      {
+        "x": 0,
+        "y": 3,
+        "face": "E"
+      },
+      {
+        "x": 8,
+        "y": 6,
+        "face": "W"
+      }
+    ],
+    "chains": [
+      {
+        "x": 8,
+        "y": 2,
+        "face": "W"
+      },
+      {
+        "x": 8,
+        "y": 3,
+        "face": "W"
+      }
+    ],
+    "rust_stain": [
+      {
+        "x": 8,
+        "y": 3,
+        "face": "W",
+        "note": "below the chains"
+      }
+    ],
+    "banner_torn": [
+      {
+        "x": 6,
+        "y": 0,
+        "face": "S",
+        "note": "Stonevow banner above the way to the stairs (7,1)"
+      }
+    ],
+    "bones": [
+      {
+        "x": 7,
+        "y": 6,
+        "note": "rat's nest in the pantry"
+      },
+      {
+        "x": 6,
+        "y": 2,
+        "note": "what the slime left"
+      }
+    ],
+    "cobweb_ceiling_corner": [
+      {
+        "x": 3,
+        "y": 7
+      },
+      {
+        "x": 7,
+        "y": 7
+      },
+      {
+        "x": 5,
+        "y": 1
+      }
+    ],
+    "wet_strip": "every edge between a stone floor square and a water square (auto)"
+  },
+  "floor2": {
+    "sunbeam": [
+      {
+        "x": 7,
+        "y": 1,
+        "note": "arrival, last daylight"
+      },
+      {
+        "x": 10,
+        "y": 10,
+        "note": "daylight shaft at the stairs down"
+      }
+    ],
+    "water_line": [
+      {
+        "x": 7,
+        "y": 5,
+        "face": "E"
+      },
+      {
+        "x": 7,
+        "y": 6,
+        "face": "E"
+      },
+      {
+        "x": 7,
+        "y": 7,
+        "face": "E"
+      },
+      {
+        "x": 11,
+        "y": 5,
+        "face": "W"
+      },
+      {
+        "x": 11,
+        "y": 6,
+        "face": "W"
+      },
+      {
+        "x": 11,
+        "y": 7,
+        "face": "W"
+      }
+    ],
+    "tally": [
+      {
+        "x": 5,
+        "y": 3,
+        "face": "W",
+        "note": "storeroom inventory scratches next to the hidden lever"
+      }
+    ],
+    "sconce_capped": [
+      {
+        "x": 0,
+        "y": 5,
+        "face": "E"
+      },
+      {
+        "x": 7,
+        "y": 7,
+        "face": "W"
+      }
+    ],
+    "chains": [
+      {
+        "x": 0,
+        "y": 7,
+        "face": "E"
+      }
+    ],
+    "bones": [
+      {
+        "x": 2,
+        "y": 10,
+        "note": "spider's larder in the journal nook"
+      }
+    ],
+    "cobweb_ceiling_corner": [
+      {
+        "x": 1,
+        "y": 9
+      },
+      {
+        "x": 4,
+        "y": 10
+      },
+      {
+        "x": 1,
+        "y": 1
+      }
+    ],
+    "banner_sunken": [
+      {
+        "x": 7,
+        "y": 9,
+        "note": "floor piece in the flooded room, drifting under water, seen through the glass-water doorway (6,8)"
+      }
+    ]
+  }
+}

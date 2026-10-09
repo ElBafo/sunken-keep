@@ -3,12 +3,14 @@ export interface Tile {
   wall?: boolean;
   door?: boolean;
   doorLocked?: boolean;
+  doorOpen?: boolean;
   deepWater?: boolean;
   shallowWater?: boolean;
   monster?: string;
   monsterHp?: number;
   item?: string;
   secret?: boolean;
+  secretOpen?: boolean;
   [key: string]: any;
 }
 

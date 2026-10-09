@@ -6,7 +6,10 @@
   <meta name="theme-color" content="#000000" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-  <title>Sunken Keep 3D Prototype</title>
+  <link rel="manifest" href="/sunken-keep/proto3d/manifest.json" />
+  <link rel="apple-touch-icon" href="/sunken-keep/icon-192.png" />
+  <link rel="icon" href="/sunken-keep/icon-192.png" />
+  <title>Sunken Keep 3D</title>
   <style>
     * {
       margin: 0;
@@ -81,9 +84,32 @@
       border-color: #888;
     }
     #btn-forward { grid-column: 2; grid-row: 1; }
+    #btn-door {
+      grid-column: 3;
+      grid-row: 1;
+      display: none;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+    }
+    #btn-door.visible { display: flex; }
     #btn-left { grid-column: 1; grid-row: 2; }
     #btn-back { grid-column: 2; grid-row: 2; }
     #btn-right { grid-column: 3; grid-row: 2; }
+    #message-toast {
+      position: fixed;
+      top: 28%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #e8e0d0;
+      font-family: monospace;
+      font-size: 18px;
+      text-shadow: 0 1px 3px #000;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+      z-index: 300;
+    }
+    #message-toast.show { opacity: 1; }
     #tap-to-start {
       position: fixed;
       top: 0;
@@ -135,10 +161,12 @@
   </div>
   <div id="controls">
     <button id="btn-forward" class="control-btn">↑</button>
+    <button id="btn-door" class="control-btn" type="button">DOOR</button>
     <button id="btn-left" class="control-btn">←</button>
     <button id="btn-back" class="control-btn">↓</button>
     <button id="btn-right" class="control-btn">→</button>
   </div>
+  <div id="message-toast"></div>
   <div id="fps-counter">FPS: --</div>
   <script type="module" src="/src/proto3d/main.ts"></script>
 </body>

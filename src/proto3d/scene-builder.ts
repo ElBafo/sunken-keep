@@ -1,5 +1,13 @@
 import * as THREE from 'three';
-import { CELL_SIZE, CUTOUT_ALPHA_TEST, FACE_SEGMENTS } from './constants';
+import {
+  CELL_SIZE,
+  CUTOUT_ALPHA_TEST,
+  FACE_SEGMENTS,
+  WALL_BOTTOM,
+  WALL_TOP,
+  WATER_Y
+} from './constants';
+import { DoorSystem } from './doors';
 import {
   flipUVsX,
   floorFlipX,
@@ -19,12 +27,22 @@ type TexOpts = {
   mipmaps: boolean;
 };
 
+function isSolid(tile: Tile | undefined): boolean {
+  if (!tile) return true;
+  return !!tile.wall || (!!tile.secret && !tile.secretOpen) || !!tile.door;
+}
+
+function isWater(tile: Tile): boolean {
+  return !!(tile.deepWater || tile.shallowWater);
+}
+
 export class SceneBuilder {
   private variants = new Map<VariantSurface, THREE.Texture[]>();
-  private doorLocked: THREE.Texture | null = null;
   private doorOpen: THREE.Texture | null = null;
+  private doorPanel: THREE.Texture | null = null;
   private secretClosed: THREE.Texture | null = null;
   private secretOpen: THREE.Texture | null = null;
+  doors = new DoorSystem();
 
   async loadTextures(): Promise<void> {
     const loader = new THREE.TextureLoader();
@@ -83,14 +101,14 @@ export class SceneBuilder {
       })
     );
 
-    const [doorLocked, doorOpen, secretClosed, secretOpen] = await Promise.all([
-      loadTex('proto3d/tex3d/door_locked.png', wall),
+    const [doorOpen, doorPanel, secretClosed, secretOpen] = await Promise.all([
       loadTex('proto3d/tex3d/door_open.png', cutout),
+      loadTex('proto3d/tex3d/door_panel.png', cutout),
       loadTex('proto3d/tex3d/secret_closed.png', wall),
       loadTex('proto3d/tex3d/secret_open.png', cutout)
     ]);
-    this.doorLocked = doorLocked;
     this.doorOpen = doorOpen;
+    this.doorPanel = doorPanel;
     this.secretClosed = secretClosed;
     this.secretOpen = secretOpen;
 
@@ -113,20 +131,35 @@ export class SceneBuilder {
     return group;
   }
 
+  private makeWallGeometry(): THREE.PlaneGeometry {
+    const height = WALL_TOP - WALL_BOTTOM;
+    const geo = new THREE.PlaneGeometry(CELL_SIZE, height, FACE_SEGMENTS, FACE_SEGMENTS);
+    const uv = geo.attributes.uv;
+    for (let i = 0; i < uv.count; i++) {
+      const v = uv.getY(i);
+      const worldY = WALL_BOTTOM + v * height;
+      uv.setY(i, worldY / CELL_SIZE);
+    }
+    uv.needsUpdate = true;
+    return geo;
+  }
+
   buildFloorAndCeiling(group: THREE.Group, floorData: FloorData) {
     const { tiles, width, height } = floorData;
 
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const tile = tiles[y][x];
-        if (tile.wall || tile.secret) continue;
+        // Walls stay solid blocks. Secret and door cells need a floor/ceiling so
+        // an opened secret (5,1) or a doorway isn't a black pit.
+        if (tile.wall) continue;
 
         const wx = x * CELL_SIZE;
         const wz = y * CELL_SIZE;
 
-        const isWater = tile.deepWater || tile.shallowWater;
-        const floorTex = this.pick(isWater ? 'floor_water' : 'floor_stone', x, y, 'F');
-        const floorY = isWater ? -0.15 : 0;
+        const water = isWater(tile);
+        const floorTex = this.pick(water ? 'floor_water' : 'floor_stone', x, y, 'F');
+        const floorY = water ? WATER_Y : 0;
 
         const floorGeo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE, FACE_SEGMENTS, FACE_SEGMENTS);
         rotateUVs(floorGeo, floorQuarterTurns(x, y, 'F'));
@@ -141,6 +174,7 @@ export class SceneBuilder {
         floor.position.set(wx, floorY, wz);
         floor.userData.lightX = x;
         floor.userData.lightY = y;
+        floor.userData.kind = water ? 'water' : 'floor';
         group.add(floor);
 
         const ceilingGeo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE, FACE_SEGMENTS, FACE_SEGMENTS);
@@ -156,6 +190,7 @@ export class SceneBuilder {
         ceiling.position.set(wx, CELL_SIZE, wz);
         ceiling.userData.lightX = x;
         ceiling.userData.lightY = y;
+        ceiling.userData.kind = 'ceiling';
         group.add(ceiling);
       }
     }
@@ -191,7 +226,7 @@ export class SceneBuilder {
     wz: number,
     dx: number,
     dz: number,
-    face: string,
+    face: 'N' | 'E' | 'S' | 'W',
     tile: Tile
   ) {
     const nx = x + dx;
@@ -199,19 +234,28 @@ export class SceneBuilder {
 
     if (nx < 0 || nx >= width || nz < 0 || nz >= height) return;
     const neighbor = tiles[nz][nx];
-    if (neighbor.wall || neighbor.door || neighbor.secret) return;
+    if (isSolid(neighbor) && !tile.door) return;
+    if (tile.door && (neighbor.wall || neighbor.door || neighbor.secret)) return;
+
+    if (tile.door) {
+      this.doors.attachFace(
+        group,
+        x,
+        y,
+        face,
+        tile,
+        this.doorOpen!,
+        this.doorPanel!,
+        nx,
+        nz
+      );
+      return;
+    }
 
     let texture: THREE.Texture = this.pick('wall_plain', x, y, face);
     let cutout = false;
 
-    if (tile.door) {
-      if (tile.doorLocked) {
-        texture = this.doorLocked!;
-      } else {
-        texture = this.doorOpen!;
-        cutout = true;
-      }
-    } else if (tile.secret) {
+    if (tile.secret) {
       if (tile.secretOpen) {
         texture = this.secretOpen!;
         cutout = true;
@@ -220,9 +264,7 @@ export class SceneBuilder {
       }
     }
 
-    // Walls are never flipped or rotated — knot band and brick rows must line up.
-    const geo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE, FACE_SEGMENTS, FACE_SEGMENTS);
-
+    const geo = this.makeWallGeometry();
     const mat = new THREE.MeshBasicMaterial({
       map: texture,
       vertexColors: true,
@@ -231,24 +273,25 @@ export class SceneBuilder {
       alphaTest: cutout ? CUTOUT_ALPHA_TEST : 0
     });
     const wall = new THREE.Mesh(geo, mat);
+    const midY = (WALL_TOP + WALL_BOTTOM) / 2;
 
     if (face === 'N') {
-      wall.position.set(wx, CELL_SIZE / 2, wz - CELL_SIZE / 2);
+      wall.position.set(wx, midY, wz - CELL_SIZE / 2);
       wall.rotation.y = 0;
     } else if (face === 'E') {
-      wall.position.set(wx + CELL_SIZE / 2, CELL_SIZE / 2, wz);
+      wall.position.set(wx + CELL_SIZE / 2, midY, wz);
       wall.rotation.y = Math.PI / 2;
     } else if (face === 'S') {
-      wall.position.set(wx, CELL_SIZE / 2, wz + CELL_SIZE / 2);
+      wall.position.set(wx, midY, wz + CELL_SIZE / 2);
       wall.rotation.y = Math.PI;
-    } else if (face === 'W') {
-      wall.position.set(wx - CELL_SIZE / 2, CELL_SIZE / 2, wz);
+    } else {
+      wall.position.set(wx - CELL_SIZE / 2, midY, wz);
       wall.rotation.y = -Math.PI / 2;
     }
 
-    // Light from the walkable side of the face
     wall.userData.lightX = nx;
     wall.userData.lightY = nz;
+    wall.userData.kind = tile.secret ? 'secret' : 'wall';
     group.add(wall);
   }
 }
