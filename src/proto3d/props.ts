@@ -74,7 +74,7 @@ export class PropBuilder {
   private woodMat(map: THREE.Texture | null, color = WOOD_COLOR) {
     return new THREE.MeshBasicMaterial({
       map: map ?? undefined,
-      color: map ? 0xffffff : color,
+      color: map ? 0x6b4428 : color,
       vertexColors: true,
       toneMapped: false
     });
