@@ -37,9 +37,12 @@ export function isWaterTile(tile: Pick<Tile, 'deepWater' | 'shallowWater'>): boo
   return !!(tile.deepWater || tile.shallowWater);
 }
 
-export const FOG_COLOR = 0x060504;
-export const FOG_NEAR = 3.2;
-export const FOG_FAR = 12.0;
+/** Near-black — distant stone must be able to reach this, not a brown lift. */
+export const FOG_COLOR = 0x010101;
+/** Start well past a torch pool so distance does not dim torch light. */
+export const FOG_NEAR = 10.0;
+/** Slow fade only; CAMERA_FAR is 32. */
+export const FOG_FAR = 28.0;
 
 /** Panel slides up this far (texture door is ~1.33 tall); thud at 1.45s / slam at 0.6s. */
 export const DOOR_SLIDE = 1.42;
@@ -67,25 +70,27 @@ export const SCONCE_FLICKER = [0.78, 0.58, 1.08] as const;
 /** Lit torch pool — warm, smooth falloff. */
 export const SCONCE_RADIUS_TILES = 2.5;
 export const TORCH_INTENSITY = 1.0;
-/** Wren's lantern with oil — ~1.5–2 squares; own square + next stay readable. */
-export const LANTERN_RADIUS_TILES = 1.85;
-export const LANTERN_INTENSITY = 0.72;
-/** Ember-only lantern — smaller, cooler, still readable 1 square ahead. */
-export const EMBER_RADIUS_TILES = 1.35;
-export const EMBER_INTENSITY = 0.42;
-/** Own + next square stay in the lantern's readable core (ember included). */
-export const LANTERN_CORE_TILES = 1.05;
+/** Wren's lantern with oil — full on the party square, near-ambient by 1.5. */
+export const LANTERN_RADIUS_TILES = 1.5;
+export const LANTERN_INTENSITY = 0.78;
+/** Ember-only lantern — dies just past the next square's near edge. */
+export const EMBER_RADIUS_TILES = 1.1;
+export const EMBER_INTENSITY = 0.4;
+/** Own-square floor stays full; falloff starts at the tile edge. */
+export const LANTERN_CORE_TILES = 0.38;
+/** Held-lantern height (world Y) so ceilings use 3D falloff. */
+export const LANTERN_HEIGHT = 0.88;
 /** Cold sunbeam from a ceiling crack. */
 export const SUNBEAM_RADIUS_TILES = 2.0;
 export const SUNBEAM_INTENSITY = 0.38;
 /**
  * Per-floor ambient as a fraction of full white (never 0).
- * Floors 1–2: low fill so unlit stone 1–2 squares ahead stays faintly readable.
- * Floors 3+: near-black (about 3–5%) beyond torch and lantern light.
+ * Floors 1–2: faint fill so unlit stone beyond the lantern is barely readable.
+ * Floors 3+: near-black (~2%) beyond torch and lantern light.
  * Override the lookup with ?ambientFloor=N (floor 1 is the only playable map).
  */
-export const FLOOR_AMBIENT: readonly number[] = [0, 0.14, 0.12, 0.05, 0.045, 0.042, 0.04, 0.038, 0.035];
-export const AMBIENT_MIN = 0.03;
+export const FLOOR_AMBIENT: readonly number[] = [0, 0.072, 0.06, 0.026, 0.024, 0.022, 0.02, 0.02, 0.018];
+export const AMBIENT_MIN = 0.016;
 /** Torch/lantern weight below this counts as unlit for eye/item glints. */
 export const DARK_LIGHT_THRESHOLD = 0.08;
 export const EYE_ANIM_FPS = 8;

@@ -106,6 +106,10 @@ export class PixelRenderer {
           );
         }
         
+        float luma(vec3 c) {
+          return dot(c, vec3(0.2126, 0.7152, 0.0722));
+        }
+
         vec3 quantizeColor(vec3 linearColor) {
           if (paletteSize == 0 || paletteEnabled < 0.5) {
             return linearToSRGB(linearColor);
@@ -116,6 +120,7 @@ export class PixelRenderer {
           
           // Convert to OKLab for perceptual distance
           vec3 lab = linearToOKLab(linearColor);
+          float pixL = luma(srgb);
           
           float minDist = 999999.0;
           vec3 nearest = srgb;
@@ -131,9 +136,15 @@ export class PixelRenderer {
               palColor.b <= 0.04045 ? palColor.b / 12.92 : pow((palColor.b + 0.055) / 1.055, 2.4)
             );
             vec3 palLab = linearToOKLab(palLinear);
-            
-            // Euclidean distance in OKLab space
-            float dist = distance(lab, palLab);
+            float palL = luma(palColor);
+
+            // OKLab nearest-neighbour lifts dim stone onto mid-dark swatches
+            // (#282828). Penalise brighter picks so near-black can stay near-black.
+            float lift = max(0.0, palL - pixL);
+            float dist = distance(lab, palLab) + lift * 8.0 + lift * lift * 18.0;
+            if (pixL < 0.06 && palL > pixL + 0.05) {
+              dist += 4.0;
+            }
             if (dist < minDist) {
               minDist = dist;
               nearest = palColor;

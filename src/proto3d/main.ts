@@ -48,6 +48,7 @@ class Game {
   oilPickupText = 'Oil flask. Wren\'s lantern drinks it.';
   lastMessage = '';
   lampNote = { title: "Lamp-keeper's note", text: '' };
+  noteOpen = false;
   messageTimer = 0;
 
   lastTime = 0;
@@ -252,11 +253,13 @@ class Game {
     if (textEl) textEl.textContent = text.replace(/\. /g, '.\n');
     if (overlay) overlay.classList.add('show');
     document.getElementById('message-toast')?.classList.remove('show');
+    this.noteOpen = true;
     this.messageTimer = performance.now() + 6000;
   }
 
   hideNote() {
     document.getElementById('note-overlay')?.classList.remove('show');
+    this.noteOpen = false;
   }
 
   readFacingDesk(): boolean {
@@ -264,6 +267,11 @@ class Game {
     const tile = this.player.tileAt(x, y);
     if (!tile) return false;
     if (tile.prop !== 'desk' && !tile.readNote) return false;
+    if (this.noteOpen) {
+      this.hideNote();
+      this.messageTimer = 0;
+      return true;
+    }
     this.showNote();
     return true;
   }
@@ -489,6 +497,7 @@ class Game {
       hasKey: () => this.player.hasKey,
       lastMessage: () => this.lastMessage,
       lastNote: () => this.lampNote,
+      noteOpen: () => this.noteOpen,
       getOil: () => this.oil,
       setOil: (n: number) => this.setOil(n),
       getBright: () => this.bright,

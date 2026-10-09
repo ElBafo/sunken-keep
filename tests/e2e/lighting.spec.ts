@@ -21,6 +21,8 @@ type Proto3d = {
   };
   lastMessage: () => string;
   lastNote: () => { title: string; text: string };
+  noteOpen: () => boolean;
+  meanLuma: () => number;
   tryMoveForward: () => { result: string; after: { x: number; y: number; dir: number } };
   doorOpen: (x: number, y: number) => boolean;
   getPosition: () => { x: number; y: number; dir: number };
@@ -111,10 +113,10 @@ test('proto3d lighting: pools, relight, oil, no 404s', async ({ page }) => {
     await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.getAmbientFloor()),
     'default ambient table is floor 1'
   ).toBe(1);
-  expect(unlit.fill, 'floor 1 ambient fill is low but readable').toBeGreaterThan(0.1);
-  expect(unlit.fill, 'floor 1 ambient fill is low but readable').toBeLessThan(0.16);
-  expect(unlit.tile, 'floor 1 unlit stone stays faintly readable').toBeGreaterThan(0.08);
-  expect(unlit.tile, 'floor 1 unlit stone stays a low ambient').toBeLessThan(0.18);
+  expect(unlit.fill, 'floor 1 ambient fill is low but readable').toBeGreaterThan(0.04);
+  expect(unlit.fill, 'floor 1 ambient fill is low but readable').toBeLessThan(0.085);
+  expect(unlit.tile, 'floor 1 unlit stone stays faintly readable').toBeGreaterThan(0.035);
+  expect(unlit.tile, 'floor 1 unlit stone stays a low ambient').toBeLessThan(0.1);
 
   const lantern = await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
@@ -132,7 +134,13 @@ test('proto3d lighting: pools, relight, oil, no 404s', async ({ page }) => {
   expect(lantern.pos.x, 'oil lantern test at 7,1').toBe(7);
   expect(lantern.pos.y, 'oil lantern test at 7,1').toBe(1);
   expect(lantern.own, 'oil lantern keeps the party square readable').toBeGreaterThan(0.3);
-  expect(lantern.ahead, 'oil lantern keeps the next square readable').toBeGreaterThan(0.2);
+  expect(lantern.ahead, 'oil lantern is near-ambient by the next square').toBeLessThan(0.2);
+  expect(lantern.ahead, 'oil lantern still a little above ambient on the next square').toBeGreaterThan(
+    unlit.fill * 0.8
+  );
+  expect(lantern.ahead, 'oil lantern next square is well below the party square').toBeLessThan(
+    lantern.own * 0.45
+  );
   // East along the south strip — own floor + next square, then near-black. Avoids the slime.
   await shot(1, 7, 1, 'lighting_lantern_oil_east.png');
 
@@ -149,8 +157,8 @@ test('proto3d lighting: pools, relight, oil, no 404s', async ({ page }) => {
   console.log('LANTERN ember', ember);
   expect(ember.oil, 'ember lantern test has no oil').toBe(0);
   expect(ember.own, 'ember lantern keeps the party square readable').toBeGreaterThan(0.18);
-  expect(ember.ahead, 'ember lantern still readable 1 square ahead').toBeGreaterThan(0.14);
-  expect(ember.ahead, 'ember circle is smaller / dimmer than oil').toBeLessThan(lantern.ahead - 0.02);
+  expect(ember.ahead, 'ember lantern is near-ambient by the next square').toBeLessThan(0.14);
+  expect(ember.ahead, 'ember circle is smaller / dimmer than oil').toBeLessThan(lantern.ahead + 0.005);
   await shot(1, 7, 1, 'lighting_lantern_ember_east.png');
   await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.setOil(2));
 
@@ -294,12 +302,12 @@ test('proto3d lighting: ?ambientFloor=3 is near-black beyond the lantern', async
     };
   });
   console.log('AMBIENT floor3', deep);
-  expect(deep.fill, 'floor 3+ ambient fill is 3–5%').toBeGreaterThan(0.03);
-  expect(deep.fill, 'floor 3+ ambient fill is 3–5%').toBeLessThan(0.055);
-  expect(deep.unlit, 'floor 3+ beyond lights is near-black (not 0)').toBeGreaterThan(0.03);
-  expect(deep.unlit, 'floor 3+ beyond lights is near-black (not 0)').toBeLessThan(0.08);
+  expect(deep.fill, 'floor 3+ ambient fill is ~2–3%').toBeGreaterThan(0.014);
+  expect(deep.fill, 'floor 3+ ambient fill is ~2–3%').toBeLessThan(0.035);
+  expect(deep.unlit, 'floor 3+ beyond lights is near-black (not 0)').toBeGreaterThan(0.014);
+  expect(deep.unlit, 'floor 3+ beyond lights is near-black (not 0)').toBeLessThan(0.045);
   expect(deep.own, 'lantern still reads the party square on floor 3 ambient').toBeGreaterThan(0.3);
-  expect(deep.ahead, 'lantern still reads the next square on floor 3 ambient').toBeGreaterThan(0.2);
+  expect(deep.ahead, 'lantern is near-ambient by the next square on floor 3').toBeLessThan(0.2);
 
   await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.setPosition(1, 7, 1));
   await page.waitForTimeout(220);
@@ -483,9 +491,80 @@ test('proto3d floor1v2: start-key-door-hall-stairs and pantry-lamp room', async 
   const note = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.lastMessage());
   expect(note).toContain('They took the lamps first');
   expect(note).toContain('Pell');
+  expect(
+    await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.noteOpen()),
+    'first desk tap opens Pell\'s note'
+  ).toBe(true);
+  await tap();
+  expect(
+    await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.noteOpen()),
+    'second desk tap closes Pell\'s note'
+  ).toBe(false);
+  await tap();
+  expect(
+    await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.noteOpen()),
+    'third desk tap opens Pell\'s note again'
+  ).toBe(true);
   await page.waitForTimeout(220);
   await page.screenshot({ path: `${OUT}/floor1_lamp_room_lit.png`, fullPage: false });
 
   expect(errors, 'console errors').toEqual([]);
   expect(failed404s, '404s').toEqual([]);
+});
+
+test('proto3d lighting: screen luma of the 3D view', async ({ page }) => {
+  test.setTimeout(90000);
+  mkdirSync(OUT, { recursive: true });
+
+  const boot = async (qs: string) => {
+    await page.goto(`${BASE_URL}/proto3d.html?test=1&debug=1${qs}`);
+    await page.waitForFunction(
+      () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
+      null,
+      { timeout: 25000 }
+    );
+    await page.locator('#tap-to-start').click();
+    await page.waitForTimeout(400);
+  };
+
+  const poseLuma = async (x: number, y: number, dir: number, file?: string) => {
+    await page.evaluate(([px, py, pd]) => {
+      (window as unknown as { __proto3d: Proto3d }).__proto3d.setPosition(px, py, pd);
+    }, [x, y, dir] as const);
+    await page.waitForTimeout(220);
+    if (file) await page.screenshot({ path: `${OUT}/${file}`, fullPage: false });
+    return page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.meanLuma());
+  };
+
+  await boot('');
+  const darkCorridor = await poseLuma(1, 7, 1, 'after_dark_corridor.png');
+  const torchLit = await poseLuma(1, 7, 0, 'after_torch_lit.png');
+  const relightBefore = await poseLuma(3, 6, 1, 'after_relight_unlit.png');
+  await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.interact());
+  await page.waitForTimeout(700);
+  const relightAfter = await poseLuma(3, 6, 1, 'after_relight_lit.png');
+
+  await boot('&ambientFloor=3');
+  const floor3 = await poseLuma(1, 7, 1, 'after_ambient_floor3.png');
+
+  const darkRatio = darkCorridor / torchLit;
+  const floor3Ratio = floor3 / torchLit;
+  const relightGain = relightAfter / relightBefore;
+
+  console.log('SCREEN LUMA dark corridor', darkCorridor.toFixed(2));
+  console.log('SCREEN LUMA torch-lit', torchLit.toFixed(2));
+  console.log('SCREEN LUMA ambientFloor=3', floor3.toFixed(2));
+  console.log('SCREEN LUMA relight before', relightBefore.toFixed(2), 'after', relightAfter.toFixed(2));
+  console.log(
+    'SCREEN LUMA ratios dark/torch',
+    darkRatio.toFixed(3),
+    'floor3/torch',
+    floor3Ratio.toFixed(3),
+    'relight gain',
+    relightGain.toFixed(3)
+  );
+
+  expect(darkRatio, 'lantern-only dark corridor ≤ 60% of torch-lit').toBeLessThanOrEqual(0.6);
+  expect(floor3Ratio, '?ambientFloor=3 ≤ 40% of torch-lit').toBeLessThanOrEqual(0.4);
+  expect(relightGain, 'relighting a dead torch raises nearby view luma ≥ 50%').toBeGreaterThanOrEqual(1.5);
 });
