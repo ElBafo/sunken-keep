@@ -3,10 +3,12 @@ import {
   BRIGHT_MAX,
   BRIGHT_MIN,
   CELL_SIZE,
+  AMBIENT_MIN,
   EMBER_INTENSITY,
   EMBER_RADIUS_TILES,
   FACE_INTO_ROOM,
   FLOOR_AMBIENT,
+  LANTERN_CORE_TILES,
   LANTERN_INTENSITY,
   LANTERN_RADIUS_TILES,
   SCONCE_FLICKER,
@@ -57,6 +59,22 @@ function smoothFalloff(distTiles: number, radius: number): number {
   if (radius <= 0 || distTiles >= radius) return 0;
   const t = 1 - distTiles / radius;
   return t * t * (3 - 2 * t);
+}
+
+/**
+ * Lantern / ember: keep the party's own square and the next square ahead in a
+ * strong core, then ease to 0 at radius so the pool stays ~1.5–2 tiles (oil)
+ * or a smaller ember circle.
+ */
+function partyFalloff(distTiles: number, radius: number, coreTiles = LANTERN_CORE_TILES): number {
+  if (radius <= 0 || distTiles >= radius) return 0;
+  const core = Math.min(coreTiles, radius * 0.85);
+  if (distTiles <= core) {
+    return 1 - distTiles * 0.26;
+  }
+  const edge = 1 - core * 0.26;
+  const t = 1 - (distTiles - core) / (radius - core);
+  return edge * t * t * (3 - 2 * t);
 }
 
 function parseBright(value: number): number {
@@ -202,7 +220,7 @@ export class VertexLightingManager {
 
   private floorAmbient(): number {
     const v = FLOOR_AMBIENT[this.floor] ?? FLOOR_AMBIENT[FLOOR_AMBIENT.length - 1];
-    return Math.max(0.04, v);
+    return Math.max(AMBIENT_MIN, v);
   }
 
   private lanternSpec(): { radius: number; intensity: number; rgb: [number, number, number] } {
@@ -248,7 +266,7 @@ export class VertexLightingManager {
     const pdx = wx / CELL_SIZE - this.partyX;
     const pdz = wz / CELL_SIZE - this.partyY;
     const partyDist = Math.sqrt(pdx * pdx + pdz * pdz);
-    this.accum(rgb, lantern.intensity * smoothFalloff(partyDist, lantern.radius), lantern.rgb);
+    this.accum(rgb, lantern.intensity * partyFalloff(partyDist, lantern.radius), lantern.rgb);
 
     if (!isDark) {
       const radius = SCONCE_RADIUS_TILES * CELL_SIZE;

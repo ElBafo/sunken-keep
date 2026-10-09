@@ -76,7 +76,41 @@ test('proto3d lighting: pools, relight, oil, no 404s', async ({ page }) => {
   );
   console.log('BRIGHTNESS before relight pool', poolBefore.toFixed(3), 'dark', darkBefore.toFixed(3));
   expect(poolBefore, 'lit pool brighter than dark stretch').toBeGreaterThan(darkBefore + 0.12);
-  expect(darkBefore, 'dark stretch stays readable').toBeGreaterThan(0.1);
+  expect(darkBefore, 'unlit stretch is near-black (3–6% ambient, not 0)').toBeGreaterThan(0.02);
+  expect(darkBefore, 'unlit stretch is near-black (3–6% ambient, not 0)').toBeLessThan(0.08);
+
+  await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    p.setPosition(7, 1, 3);
+  });
+  const lanternOwn = await page.evaluate(() =>
+    (window as unknown as { __proto3d: Proto3d }).__proto3d.tileBrightness(7, 1)
+  );
+  const lanternAhead = await page.evaluate(() =>
+    (window as unknown as { __proto3d: Proto3d }).__proto3d.tileBrightness(6, 1)
+  );
+  console.log('LANTERN oil own', lanternOwn.toFixed(3), 'ahead', lanternAhead.toFixed(3));
+  expect(lanternOwn, 'oil lantern keeps the party square readable').toBeGreaterThan(0.28);
+  expect(lanternAhead, 'oil lantern keeps the next square readable').toBeGreaterThan(0.22);
+  await shot(7, 1, 3, 'lantern-oil-circle.png');
+
+  await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    p.setOil(0);
+    p.setPosition(7, 1, 3);
+  });
+  const emberOwn = await page.evaluate(() =>
+    (window as unknown as { __proto3d: Proto3d }).__proto3d.tileBrightness(7, 1)
+  );
+  const emberAhead = await page.evaluate(() =>
+    (window as unknown as { __proto3d: Proto3d }).__proto3d.tileBrightness(6, 1)
+  );
+  console.log('LANTERN ember own', emberOwn.toFixed(3), 'ahead', emberAhead.toFixed(3));
+  expect(emberOwn, 'ember lantern keeps the party square readable').toBeGreaterThan(0.18);
+  expect(emberAhead, 'ember lantern still readable 1 square ahead').toBeGreaterThan(0.14);
+  expect(emberAhead, 'ember circle is smaller / dimmer than oil').toBeLessThan(lanternAhead - 0.02);
+  await shot(7, 1, 3, 'lantern-ember-circle.png');
+  await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.setOil(2));
 
   await shot(1, 7, 0, 'torch-side-profile.png');
   await shot(6, 7, 0, 'oil-flask.png');
@@ -115,7 +149,7 @@ test('proto3d lighting: pools, relight, oil, no 404s', async ({ page }) => {
   const dark = await page.evaluate(() =>
     (window as unknown as { __proto3d: Proto3d }).__proto3d.tileBrightness(2, 6)
   );
-  console.log('BRIGHTNESS lit pool', pool.toFixed(3), 'dark stretch', dark.toFixed(3));
+  console.log('BRIGHTNESS lit pool', pool.toFixed(3), 'mid-corridor', dark.toFixed(3));
   expect(pool, 'lit pool stays brighter than the mid-corridor').toBeGreaterThan(dark);
 
   await page.evaluate(() => {

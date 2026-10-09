@@ -67,17 +67,24 @@ export const SCONCE_FLICKER = [0.78, 0.58, 1.08] as const;
 /** Lit torch pool — warm, smooth falloff. */
 export const SCONCE_RADIUS_TILES = 2.5;
 export const TORCH_INTENSITY = 1.0;
-/** Wren's lantern with oil — smaller, dimmer, cooler than a torch. */
-export const LANTERN_RADIUS_TILES = 1.5;
-export const LANTERN_INTENSITY = 0.55;
-/** Ember-only lantern — smaller blue-white glow. */
-export const EMBER_RADIUS_TILES = 0.85;
-export const EMBER_INTENSITY = 0.3;
+/** Wren's lantern with oil — ~1.5–2 squares; own square + next stay readable. */
+export const LANTERN_RADIUS_TILES = 1.85;
+export const LANTERN_INTENSITY = 0.58;
+/** Ember-only lantern — smaller, cooler, still readable 1 square ahead. */
+export const EMBER_RADIUS_TILES = 1.35;
+export const EMBER_INTENSITY = 0.36;
+/** Own + next square stay in the lantern's readable core (ember included). */
+export const LANTERN_CORE_TILES = 1.05;
 /** Cold sunbeam from a ceiling crack. */
 export const SUNBEAM_RADIUS_TILES = 2.0;
 export const SUNBEAM_INTENSITY = 0.38;
-/** Per-floor ambient (never 0). Floors 1–2 stay brighter; deeper floors go darker. */
-export const FLOOR_AMBIENT: readonly number[] = [0, 0.28, 0.24, 0.16, 0.13, 0.1, 0.08, 0.07, 0.06];
+/**
+ * Per-floor ambient as a fraction of full white (never 0). Unlit stone sits
+ * around 3–6%; every floor is dark, and deeper floors tick slightly darker.
+ * Readability comes from the lantern and lit torches, not this fill.
+ */
+export const FLOOR_AMBIENT: readonly number[] = [0, 0.058, 0.052, 0.048, 0.044, 0.04, 0.038, 0.036, 0.035];
+export const AMBIENT_MIN = 0.03;
 export const BRIGHT_MIN = 0.6;
 export const BRIGHT_MAX = 1.6;
 export const OIL_START = 2;
