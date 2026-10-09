@@ -1,0 +1,14 @@
+{
+  "buttons": {"new_game": "New Game", "continue": "Continue", "load": "Load", "settings": "Settings", "back": "Back"},
+  "slot": {
+    "line1": "Floor {n}: {area}",
+    "line2": "{time} played",
+    "empty": "Empty slot",
+    "empty_sub": "The keep is waiting."
+  },
+  "overwrite": {"title": "Overwrite this save?", "body": "The old run sinks for good.", "yes": "Overwrite", "no": "Keep it"},
+  "areas": {"1":"Upper Halls","2":"Lower Halls","3":"Barracks","4":"Barracks Deep","5":"Homes","6":"Sunken Garden","7":"Pact Grotto","8":"Cold Forges","9":"Great Engine","10":"Thane's Vault","11":"Drowned Throne","12":"Heartforge"},
+  "saved": "Game saved.",
+  "save_blocked": "No time to save! Run!",
+  "tagline": "Something holds the water back."
+}

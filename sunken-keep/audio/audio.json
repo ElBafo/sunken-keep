@@ -1,0 +1,95 @@
+{
+ "sfx": {
+  "step": "sfx_step",
+  "bump": "sfx_bump",
+  "door": "sfx_door",
+  "key": "sfx_key",
+  "hit": "sfx_hit",
+  "hurt": "sfx_hurt",
+  "secret_wall": "sfx_secret_wall",
+  "bark": "sfx_bark",
+  "tide_sigh": "sfx_tide_sigh",
+  "slime_alert": "sfx_slime_alert",
+  "slime_attack": "sfx_slime_attack",
+  "slime_death": "sfx_slime_death",
+  "drowned_dwarf_alert": "sfx_drowned_dwarf_alert",
+  "drowned_dwarf_attack": "sfx_drowned_dwarf_attack",
+  "drowned_dwarf_death": "sfx_drowned_dwarf_death",
+  "tide_spawn_alert": "sfx_tide_spawn_alert",
+  "tide_spawn_attack": "sfx_tide_spawn_attack",
+  "tide_spawn_death": "sfx_tide_spawn_death",
+  "step_water_shallow": "sfx_step_water_shallow",
+  "step_water_deep": "sfx_step_water_deep",
+  "pickup": "sfx_pickup",
+  "potion": "sfx_potion",
+  "chest": "sfx_chest",
+  "scroll": "sfx_scroll",
+  "slime_hurt": "sfx_slime_hurt",
+  "drowned_dwarf_hurt": "sfx_drowned_dwarf_hurt",
+  "tide_spawn_hurt": "sfx_tide_spawn_hurt",
+  "tide_spawn_song_loop": "sfx_tide_spawn_song_loop",
+  "keep_rat_alert": "sfx_keep_rat_alert",
+  "keep_rat_attack": "sfx_keep_rat_attack",
+  "keep_rat_hurt": "sfx_keep_rat_hurt",
+  "keep_rat_death": "sfx_keep_rat_death",
+  "rust_crab_alert": "sfx_rust_crab_alert",
+  "rust_crab_attack": "sfx_rust_crab_attack",
+  "rust_crab_hurt": "sfx_rust_crab_hurt",
+  "rust_crab_death": "sfx_rust_crab_death",
+  "bog_leeches_alert": "sfx_bog_leeches_alert",
+  "bog_leeches_attack": "sfx_bog_leeches_attack",
+  "bog_leeches_hurt": "sfx_bog_leeches_hurt",
+  "bog_leeches_death": "sfx_bog_leeches_death",
+  "ui_button": "sfx_ui_button",
+  "ui_button_denied": "sfx_ui_button_denied",
+  "ui_menu_open": "sfx_ui_menu_open",
+  "ui_menu_close": "sfx_ui_menu_close",
+  "ui_turn": "sfx_ui_turn",
+  "ui_inventory_move": "sfx_ui_inventory_move",
+  "ui_log_line": "sfx_ui_log_line"
+ },
+ "music": {
+  "intro": {
+   "file": "music_intro",
+   "loop": false,
+   "length_s": 37.5,
+   "cues_s": {
+    "shot1": 0,
+    "shot2": 6,
+    "thunder": 6.2,
+    "tide_sigh": 10.3,
+    "shot3": 12,
+    "shot4": 18,
+    "shot5": 24,
+    "shot6": 29,
+    "title_hit": 33.0
+   }
+  },
+  "amb_swamp": {
+   "file": "amb_swamp_loop",
+   "loop": true,
+   "length_s": 24,
+   "volume": 0.5
+  },
+  "amb_flooded_halls": {
+   "file": "amb_flooded_halls_loop",
+   "loop": true,
+   "length_s": 32,
+   "volume": 0.5
+  }
+ },
+ "formats": [
+  "ogg",
+  "mp3"
+ ],
+ "notes": {
+  "tide_sigh": "Scale volume with depth: ~0.25 floor 1, up to 1.0 deep. Play on tapping the glowing carving.",
+  "bark": "Very short blip; play once per bubble, not per letter.",
+  "hurt": "Party member taking damage; 'hit' is the party striking an enemy.",
+  "monsters": "{monster}_alert when it notices the party, _attack when it strikes, _death on kill. Names match Pixelartie's sprite prefixes.",
+  "tide_spawn_song_loop": "Loop quietly while a tide spawn is within ~3 squares, louder when closer. Goes with Ilsevar's 'It's singing' line.",
+  "ambience": "amb_flooded_halls for all indoor floors; amb_swamp only for outdoor scenes (intro shot 5).",
+  "leech_latch": "For a latched leech draining health, repeat bog_leeches_attack at low volume each drain tick.",
+  "ui": "ui_button for any panel press (incl. attack before the hit sound), ui_button_denied for a hero who can't act yet, ui_turn on turning left/right, ui_log_line very quietly when a new log line appears."
+ }
+}

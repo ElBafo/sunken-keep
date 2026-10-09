@@ -10,7 +10,16 @@ export class AssetLoader {
 
     const img = new Image();
     const promise = new Promise<void>((resolve) => {
-      img.onload = () => resolve();
+      img.onload = async () => {
+        try {
+          // Decode the image to ensure it's ready
+          await img.decode();
+          resolve();
+        } catch (error) {
+          console.warn(`Failed to decode image: ${path}`, error);
+          resolve(); // Don't fail, just warn
+        }
+      };
       img.onerror = () => {
         console.warn(`Failed to load image: ${path}`);
         resolve(); // Don't fail, just warn
@@ -26,9 +35,33 @@ export class AssetLoader {
   getImage(path: string): HTMLImageElement | undefined {
     return this.images.get(path);
   }
+  
+  isImageReady(img: HTMLImageElement | undefined): boolean {
+    if (!img) return false;
+    if (!img.complete) return false;
+    if (img.naturalWidth === 0) return false;
+    return true;
+  }
 
   async waitForAll(): Promise<void> {
-    await Promise.all(this.loadPromises);
+    // Keep draining until a pass adds no new loads (preload can chain).
+    let previous = -1;
+    while (this.loadPromises.length !== previous) {
+      previous = this.loadPromises.length;
+      await Promise.all(this.loadPromises);
+    }
+
+    const decodes: Promise<void>[] = [];
+    for (const img of this.images.values()) {
+      if (typeof img.decode === 'function') {
+        decodes.push(img.decode().then(() => undefined, () => undefined));
+      }
+    }
+    await Promise.all(decodes);
+
+    if (this.loadPromises.length !== previous) {
+      await this.waitForAll();
+    }
   }
 }
 
@@ -39,45 +72,31 @@ export class SoundManager {
   private music: HTMLAudioElement | null = null;
   private muted = false;
   private audioContext: AudioContext | null = null;
+  private sfxFiles: Record<string, string> = {};
+  private musicFiles: Record<string, { file: string; loop?: boolean; volume?: number }> = {};
+  private preferredFormat = 'mp3';
+  private fallbackFormat = 'ogg';
+  private audioAvailable = true;
 
   async init() {
-    // Create AudioContext for iOS Safari unlock
+    // Create AudioContext for iOS Safari unlock. Do not construct dozens of
+    // Audio() elements here — WebKit (iPhone Safari / Playwright) crashes if
+    // every clip starts fetching at once.
     try {
       this.audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
     } catch (e) {
       console.warn('AudioContext not available:', e);
     }
 
-    // Load audio config
     const response = await fetch('/sunken-keep/audio/audio.json');
     const config = await response.json();
-    
-    // Detect iOS Safari - prefer MP3
+
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    const preferredFormat = isIOS ? 'mp3' : 'ogg';
-    const fallbackFormat = isIOS ? 'ogg' : 'mp3';
-    
-    // Load SFX
-    for (const [key, file] of Object.entries(config.sfx)) {
-      this.loadSound(key, `/sunken-keep/audio/${file}`, preferredFormat, fallbackFormat);
-    }
-    
-    // Load music
-    for (const [key, data] of Object.entries(config.music)) {
-      const musicData = data as any;
-      const audio = new Audio();
-      audio.preload = 'auto';
-      audio.loop = musicData.loop || false;
-      audio.volume = musicData.volume || 1.0;
-      
-      // Prefer MP3 on iOS, OGG on other platforms
-      audio.src = `/sunken-keep/audio/${musicData.file}.${preferredFormat}`;
-      audio.onerror = () => {
-        audio.src = `/sunken-keep/audio/${musicData.file}.${fallbackFormat}`;
-      };
-      
-      this.sounds.set(`music_${key}`, audio);
-    }
+    this.preferredFormat = isIOS ? 'mp3' : 'ogg';
+    this.fallbackFormat = isIOS ? 'ogg' : 'mp3';
+
+    this.sfxFiles = config.sfx || {};
+    this.musicFiles = config.music || {};
   }
 
   async unlock() {
@@ -88,20 +107,20 @@ export class SoundManager {
       try {
         await this.audioContext.resume();
       } catch (e) {
-        console.warn('Failed to resume AudioContext:', e);
+        this.audioAvailable = false;
       }
     }
-    
-    // Play a silent buffer to unlock audio on iOS
-    for (const sound of this.sounds.values()) {
-      const playPromise = sound.play();
-      if (playPromise) {
-        playPromise.then(() => {
-          sound.pause();
-          sound.currentTime = 0;
-        }).catch(() => {});
+
+    if (this.audioAvailable && this.audioContext) {
+      try {
+        const buf = this.audioContext.createBuffer(1, 1, 22050);
+        const src = this.audioContext.createBufferSource();
+        src.buffer = buf;
+        src.connect(this.audioContext.destination);
+        src.start(0);
+      } catch {
+        this.audioAvailable = false;
       }
-      break; // Only need to do this once
     }
     
     this.unlocked = true;
@@ -120,24 +139,38 @@ export class SoundManager {
   }
 
   play(event: string, volume: number = 1.0) {
-    if (!this.unlocked || this.muted) return;
+    if (!this.unlocked || this.muted || !this.audioAvailable) return;
     
-    const sound = this.sounds.get(event);
+    const sound = this.ensureSfx(event);
     if (sound) {
       sound.volume = volume;
       sound.currentTime = 0;
       sound.play().catch(() => {});
     }
   }
+  
+  playLoop(event: string, volume: number = 1.0): HTMLAudioElement | null {
+    if (!this.unlocked || !this.audioAvailable) return null;
+    
+    const soundKey = event.startsWith('sfx_') ? event : `sfx_${event}`;
+    const sound = this.ensureSfx(soundKey) || this.ensureSfx(event);
+    if (sound) {
+      sound.volume = this.muted ? 0 : volume;
+      sound.loop = true;
+      sound.play().catch(() => {});
+      return sound;
+    }
+    return null;
+  }
 
   playMusic(name: string) {
-    if (!this.unlocked) return;
+    if (!this.unlocked || !this.audioAvailable) return;
     
     if (this.music) {
       this.music.pause();
     }
     
-    this.music = this.sounds.get(`music_${name}`) || null;
+    this.music = this.ensureMusic(name);
     if (this.music) {
       const originalVolume = this.music.volume;
       this.music.dataset.originalVolume = originalVolume.toString();
@@ -156,6 +189,31 @@ export class SoundManager {
 
   getMusicTime(): number {
     return this.music?.currentTime || 0;
+  }
+
+  private ensureSfx(event: string): HTMLAudioElement | undefined {
+    if (this.sounds.has(event)) return this.sounds.get(event);
+    const file = this.sfxFiles[event] || this.sfxFiles[event.replace(/^sfx_/, '')];
+    if (!file) return undefined;
+    this.loadSound(event, `/sunken-keep/audio/${file}`, this.preferredFormat, this.fallbackFormat);
+    return this.sounds.get(event);
+  }
+
+  private ensureMusic(name: string): HTMLAudioElement | null {
+    const key = `music_${name}`;
+    if (this.sounds.has(key)) return this.sounds.get(key) || null;
+    const musicData = this.musicFiles[name];
+    if (!musicData) return null;
+    const audio = new Audio();
+    audio.preload = 'auto';
+    audio.loop = musicData.loop || false;
+    audio.volume = musicData.volume || 1.0;
+    audio.src = `/sunken-keep/audio/${musicData.file}.${this.preferredFormat}`;
+    audio.onerror = () => {
+      audio.src = `/sunken-keep/audio/${musicData.file}.${this.fallbackFormat}`;
+    };
+    this.sounds.set(key, audio);
+    return audio;
   }
 
   private loadSound(event: string, basePath: string, preferredFormat: string, fallbackFormat: string) {

@@ -51,10 +51,15 @@ export function drawPortrait(
   const path = getPortraitPath(char, state);
   const img = assets.getImage(path);
   
-  if (!img || !img.complete) return;
+  if (!img || !img.complete || !assets.isImageReady(img)) return;
 
   // Draw base portrait
-  ctx.drawImage(img, x, y);
+  try {
+    ctx.drawImage(img, x, y);
+  } catch (e) {
+    console.error(`Failed to draw portrait ${path}:`, e);
+    return;
+  }
 
   // Apply subtle tint/darkening for wounded states if variant doesn't exist
   if (state !== 'healthy' && !assets.getImage(`/sunken-keep/art/portraits/${char.id}_${state}.png`)) {
@@ -79,8 +84,12 @@ export function drawPortrait(
     const flashFrame = Math.floor((now - (char.hitFlashUntil - 120)) / 60);
     const flashPath = `/sunken-keep/art/overlays/hit_flash_${flashFrame + 1}.png`;
     const flash = assets.getImage(flashPath);
-    if (flash && flash.complete) {
-      ctx.drawImage(flash, x, y);
+    if (flash && flash.complete && assets.isImageReady(flash)) {
+      try {
+        ctx.drawImage(flash, x, y);
+      } catch (e) {
+        console.error(`Failed to draw hit flash ${flashPath}:`, e);
+      }
     }
   }
 }
@@ -91,6 +100,14 @@ export function damageCharacter(char: Character, amount: number) {
   char.expression = 'wince';
   setTimeout(() => {
     if (char.expression === 'wince') char.expression = 'neutral';
+  }, 500);
+}
+
+export function healCharacter(char: Character, amount: number) {
+  char.hp = Math.min(char.maxHp, char.hp + amount);
+  char.expression = 'smirk';
+  setTimeout(() => {
+    if (char.expression === 'smirk') char.expression = 'neutral';
   }, 500);
 }
 

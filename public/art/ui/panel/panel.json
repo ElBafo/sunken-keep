@@ -1,0 +1,151 @@
+{
+ "size": [
+  270,
+  216
+ ],
+ "place": "directly under the portraits, left edge 0; if the panel ends up shorter/taller, scale nothing: crop/extend from the bottom (stone blocks tile)",
+ "wells": {
+  "log": [
+   6,
+   10,
+   264,
+   58
+  ],
+  "compass": [
+   124,
+   92,
+   166,
+   134
+  ],
+  "inv_0": [
+   176,
+   96,
+   204,
+   124
+  ],
+  "inv_1": [
+   206,
+   96,
+   234,
+   124
+  ],
+  "inv_2": [
+   236,
+   96,
+   264,
+   124
+  ],
+  "inv_3": [
+   176,
+   126,
+   204,
+   154
+  ],
+  "inv_4": [
+   206,
+   126,
+   234,
+   154
+  ],
+  "inv_5": [
+   236,
+   126,
+   264,
+   154
+  ],
+  "inv_6": [
+   176,
+   156,
+   204,
+   184
+  ],
+  "inv_7": [
+   206,
+   156,
+   234,
+   184
+  ],
+  "inv_8": [
+   236,
+   156,
+   264,
+   184
+  ]
+ },
+ "buttons": {
+  "attack_0": [
+   5,
+   62,
+   63,
+   84
+  ],
+  "attack_1": [
+   72,
+   62,
+   130,
+   84
+  ],
+  "attack_2": [
+   139,
+   62,
+   197,
+   84
+  ],
+  "attack_3": [
+   206,
+   62,
+   264,
+   84
+  ],
+  "pad_turn_left": [
+   8,
+   96,
+   43,
+   131
+  ],
+  "pad_forward": [
+   45,
+   96,
+   80,
+   131
+  ],
+  "pad_turn_right": [
+   82,
+   96,
+   117,
+   131
+  ],
+  "pad_strafe_left": [
+   8,
+   133,
+   43,
+   168
+  ],
+  "pad_back": [
+   45,
+   133,
+   80,
+   168
+  ],
+  "pad_strafe_right": [
+   82,
+   133,
+   117,
+   168
+  ],
+  "menu": [
+   124,
+   142,
+   166,
+   166
+  ]
+ },
+ "buttonSprites": {
+  "normal": "button_9slice.png",
+  "pressed": "button_pressed_9slice.png",
+  "sliceMargin": 4
+ },
+ "icons": "icon_{forward,back,turn_left,turn_right,strafe_left,strafe_right,attack,menu}.png, centre them on the button, shift 1px down when pressed",
+ "compass": "compass_{N,E,S,W}.png (42x42), place at compass well top-left",
+ "logText": "font_5x7, colour #d8ccb0, 6px padding, 4 lines of 10px"
+}

@@ -1,14 +1,24 @@
 import './style.css';
-import { Game } from './game';
+// import { Game } from './game';  // Disabled for new system
+import { GameController } from './game-controller';
+import { UIRenderer585 } from './ui-renderer-585';
+import { TitleScreen } from './title-screen';
+import { combatController } from './combat-controller';
+import { inputManager } from './input-manager';
+import { SaveSystem } from './save-system';
 import { InputHandler } from './input';
 import { loadFont } from './font';
 import { loadPortraits } from './characters';
 import { loadBarks } from './barks';
 import { generateCutscenePlaceholders } from './cutscene-placeholders';
 import { assets, sound } from './assets';
+import { CANVAS_WIDTH, CANVAS_HEIGHT } from './constants';
 
-const BASE_WIDTH = 270;
-const BASE_HEIGHT = 480;
+const BASE_WIDTH = CANVAS_WIDTH;  // 270
+const BASE_HEIGHT = CANVAS_HEIGHT;  // 585
+
+// Check if we should use new game controller (for testing)
+const USE_NEW_CONTROLLER = true;
 
 async function main() {
   const canvas = document.getElementById('game') as HTMLCanvasElement;
@@ -21,14 +31,32 @@ async function main() {
   canvas.width = BASE_WIDTH;
   canvas.height = BASE_HEIGHT;
   
-  // Calculate scale with better portrait support
+  // Calculate scale with better portrait support and iOS Safari toolbar handling
   function updateScale() {
-    // Try to fill the screen as much as possible
-    const scaleX = window.innerWidth / BASE_WIDTH;
-    const scaleY = window.innerHeight / BASE_HEIGHT;
-    const scale = Math.max(1, Math.min(scaleX, scaleY));
+    // Use visualViewport when available (iOS Safari) for accurate dimensions after toolbar movement
+    let viewportWidth = window.visualViewport?.width ?? window.innerWidth;
+    let viewportHeight = window.visualViewport?.height ?? window.innerHeight;
     
-    // Use the calculated scale (non-integer allowed)
+    // Account for safe area insets (iPhone notch and home bar)
+    // In standalone (Home Screen) mode, visualViewport already excludes safe areas
+    // In Safari tab mode, we need to manually account for them
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                         (window.navigator as any).standalone === true;
+    
+    if (!isStandalone && window.visualViewport) {
+      // In Safari tab, manually subtract safe areas from available space
+      const style = getComputedStyle(document.documentElement);
+      const safeTop = parseInt(style.getPropertyValue('--safe-area-inset-top') || '0');
+      const safeBottom = parseInt(style.getPropertyValue('--safe-area-inset-bottom') || '0');
+      viewportHeight -= (safeTop + safeBottom);
+    }
+    
+    // Calculate scale to fit letterboxed (maintain aspect ratio)
+    const scaleX = viewportWidth / BASE_WIDTH;
+    const scaleY = viewportHeight / BASE_HEIGHT;
+    const scale = Math.min(scaleX, scaleY);
+    
+    // Use the calculated scale
     const displayWidth = BASE_WIDTH * scale;
     const displayHeight = BASE_HEIGHT * scale;
     
@@ -39,10 +67,42 @@ async function main() {
   }
   
   let scale = updateScale();
-  window.addEventListener('resize', () => {
+  
+  // Expose safe area insets as CSS variables for calculations
+  function updateSafeAreaInsets() {
+    const style = getComputedStyle(document.documentElement);
+    const safeTop = style.getPropertyValue('padding-top') || '0px';
+    const safeBottom = style.getPropertyValue('padding-bottom') || '0px';
+    document.documentElement.style.setProperty('--safe-area-inset-top', safeTop);
+    document.documentElement.style.setProperty('--safe-area-inset-bottom', safeBottom);
+  }
+  
+  updateSafeAreaInsets();
+
+  // Declare early-accessed variables before event listeners (WebKit-safe)
+  let inputHandler: InputHandler | null = null;
+  
+  // Re-run resize on all viewport changes
+  function handleResize() {
     scale = updateScale();
-    inputHandler.setScale(scale);
+    if (inputHandler) {
+      inputHandler.setScale(scale);
+    }
+    if (!installHint.classList.contains('hidden')) {
+      positionInstallHint();
+    }
+  }
+  
+  window.addEventListener('resize', handleResize);
+  window.addEventListener('orientationchange', () => {
+    // iOS Safari needs a delay after orientation change for toolbar to settle
+    setTimeout(handleResize, 100);
+    setTimeout(handleResize, 300);
   });
+  
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', handleResize);
+  }
   
   // Disable image smoothing (keep pixels crisp even with non-integer scaling)
   ctx.imageSmoothingEnabled = false;
@@ -63,51 +123,85 @@ async function main() {
   }
   
   // Initialize game
-  const game = new Game();
-  await game.init();
+  // const game = USE_NEW_CONTROLLER ? null : new Game();
+  // if (game) {
+  //   await game.init();
+  // }
   
-  // Check if running as PWA (standalone mode)
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
-                       (window.navigator as any).standalone === true;
+  // Initialize new game controller for testing
+  let gameController: GameController | null = null;
+  let uiRenderer585: UIRenderer585 | null = null;
+  let titleScreen: TitleScreen | null = null;
+  let inTitleScreen = true; // Start in title screen
   
-  // Show install hint on iOS Safari when not standalone (one-time)
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-  const installHintShown = localStorage.getItem('installHintShown');
-  
-  if (isIOS && isSafari && !isStandalone && !installHintShown) {
-    setTimeout(() => {
-      installHint.classList.remove('hidden');
-      setTimeout(() => {
-        installHint.classList.add('hidden');
-        localStorage.setItem('installHintShown', 'true');
-      }, 8000);
-    }, 3000);
+  if (USE_NEW_CONTROLLER) {
+    gameController = new GameController();
+    await gameController.init();
+    uiRenderer585 = new UIRenderer585();
+    titleScreen = new TitleScreen();
+    await titleScreen.loadAssets();
+    if (gameController.shouldSkipTitle()) {
+      uiRenderer585.preloadAssets();
+      inTitleScreen = false;
+      console.log('Skipping title screen (URL override)');
+    }
+    console.log('New game controller initialized');
   }
   
-  let gameStarted = false;
-  
-  // Tap to start handler
-  tapToStart.addEventListener('click', async () => {
-    if (gameStarted) return;
-    gameStarted = true;
-    
-    // Unlock audio on first user gesture
-    await sound.unlock();
-    
-    // Try to request fullscreen on Android Chrome
-    if (document.documentElement.requestFullscreen && !isStandalone) {
-      try {
-        await document.documentElement.requestFullscreen();
-      } catch (e) {
-        // Fullscreen denied or not supported
-        console.log('Fullscreen not available:', e);
-      }
+  function isStandaloneMode(): boolean {
+    try {
+      return window.matchMedia('(display-mode: standalone)').matches ||
+             (window.navigator as any).standalone === true;
+    } catch {
+      return false;
     }
-    
-    tapToStart.classList.add('hidden');
-    muteToggle.classList.remove('hidden');
+  }
+
+  function positionInstallHint(): void {
+    const rect = canvas.getBoundingClientRect();
+    const scaleY = rect.height / BASE_HEIGHT;
+    // Sit in the empty band between the tagline (~102) and Continue (404)
+    // so the hint never covers title buttons or in-game controls.
+    const canvasY = 300;
+    installHint.style.left = `${rect.left + rect.width / 2}px`;
+    installHint.style.top = `${rect.top + canvasY * scaleY}px`;
+    installHint.style.transform = 'translate(-50%, -50%)';
+    installHint.style.bottom = 'auto';
+  }
+
+  function updateInstallHint(): void {
+    try {
+      const standalone = isStandaloneMode();
+      const dismissed = localStorage.getItem('installHintDismissed');
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isSafari = /Safari/i.test(navigator.userAgent) && !/CriOS|FxiOS|Chrome|Android/i.test(navigator.userAgent);
+      const show = inTitleScreen && !standalone && !dismissed && isIOS && isSafari;
+      if (show) {
+        positionInstallHint();
+        installHint.classList.remove('hidden');
+      } else {
+        installHint.classList.add('hidden');
+      }
+    } catch (error) {
+      installHint.classList.add('hidden');
+      console.error('PWA check error:', error);
+    }
+  }
+
+  installHint.addEventListener('click', () => {
+    installHint.classList.add('hidden');
+    localStorage.setItem('installHintDismissed', 'true');
   });
+
+  updateInstallHint();
+  
+  let gameStarted = false;
+  let audioUnlocked = false;
+  
+  // Hide tap-to-start immediately and start game
+  tapToStart.classList.add('hidden');
+  muteToggle.classList.remove('hidden');
+  gameStarted = true;
   
   // Mute toggle
   muteToggle.addEventListener('click', () => {
@@ -116,23 +210,154 @@ async function main() {
     muteToggle.textContent = muted ? '🔊' : '🔇';
   });
   
-  // Input handling
-  const inputHandler = new InputHandler(
+  // Input handling for swipes and taps (unified for touch and mouse)
+  inputHandler = new InputHandler(
     canvas,
     (direction) => {
-      if (!gameStarted) return;
-      game.handleSwipe(direction);
+      // Swipe handler: left = turn left, right = turn right
+      if (!gameStarted || !gameController || !USE_NEW_CONTROLLER) return;
+      if (inTitleScreen) return;
+      
+      if (direction === 'left') {
+        gameController.turnLeft();
+      } else if (direction === 'right') {
+        gameController.turnRight();
+      }
     },
     (x, y) => {
-      if (!gameStarted) return;
-      game.handleTap(x, y);
+      // Unified tap handler for both touch and mouse
+      if (!gameStarted || !gameController || !USE_NEW_CONTROLLER) return;
+
+      // Unlock audio on first interaction
+      if (!audioUnlocked) {
+        sound.unlock();
+        audioUnlocked = true;
+      }
+
+      // Handle title screen taps
+      if (inTitleScreen && titleScreen) {
+        const result = titleScreen.handleClick(x, y);
+        
+        if (result === 'new_game') {
+          // Start new game after dungeon art is ready so the first frame is complete
+          uiRenderer585?.preloadAssets();
+          const newController = new GameController();
+          Promise.all([newController.init(), assets.waitForAll()]).then(() => {
+            gameController = newController;
+            inTitleScreen = false;
+            updateInstallHint();
+            console.log('New game started');
+          });
+          return;
+        } else if (result === 'continue') {
+          // Load most recent save
+          const slot = SaveSystem.getMostRecentSlot();
+          if (slot) {
+            const save = SaveSystem.load(slot);
+            if (save) {
+              uiRenderer585?.preloadAssets();
+              const newController = new GameController();
+              newController.init().then(async () => {
+                SaveSystem.restoreState(save, newController.getState());
+                await assets.waitForAll();
+                gameController = newController;
+                inTitleScreen = false;
+                updateInstallHint();
+                console.log(`Continued from slot ${slot}`);
+              });
+            }
+          }
+          return;
+        } else if (typeof result === 'number') {
+          // Load specific slot
+          const save = SaveSystem.load(result);
+          if (save) {
+            uiRenderer585?.preloadAssets();
+            const newController = new GameController();
+            newController.init().then(async () => {
+              SaveSystem.restoreState(save, newController.getState());
+              await assets.waitForAll();
+              gameController = newController;
+              inTitleScreen = false;
+              updateInstallHint();
+              console.log(`Loaded slot ${result}`);
+            });
+          }
+          return;
+        } else if (result === 'load' || result === 'back' || result === 'settings') {
+          // These are handled internally by titleScreen
+          return;
+        }
+        return;
+      }
+
+      // In-game UI handling
+      const handButton = inputManager.checkHandButton(x, y);
+      if (handButton) {
+        console.log(`Hand button: hero ${handButton.heroId}, hand ${handButton.hand}`);
+        
+        const hero = gameController.getState().heroes[handButton.heroId];
+        const item = hero.equipment[handButton.hand];
+        
+        // Check recovery
+        const recoveryEnd = hero.recovery[handButton.hand];
+        const now = Date.now();
+        if (recoveryEnd > now) {
+          sound.play('sfx_ui_button_denied');
+          return;
+        }
+        
+        // Check if back row melee (greyed out)
+        const meleeItems = ['axe', 'shield', 'mace', 'dagger', 'empty_hand'];
+        if (meleeItems.includes(item) && hero.formation === 'back') {
+          sound.play('sfx_ui_button_denied');
+          return;
+        }
+        
+        if (combatController.isInCombat()) {
+          const state = gameController.getState();
+          combatController.handleHandButton(state, handButton.heroId, handButton.hand);
+        }
+        return;
+      }
+
+      // Check movement pad
+      const direction = inputManager.checkMovementPad(x, y);
+      if (direction) {
+        if (direction === 'forward') {
+          gameController.moveForward();
+        } else if (direction === 'back') {
+          gameController.moveBackward();
+        } else if (direction === 'strafe_left') {
+          gameController.strafeLeft();
+        } else if (direction === 'strafe_right') {
+          gameController.strafeRight();
+        } else if (direction === 'turn_left') {
+          gameController.turnLeft();
+        } else if (direction === 'turn_right') {
+          gameController.turnRight();
+        }
+        return;
+      }
+
+      // Check save button (x: 202, y: 545, w: 30, h: 30)
+      if (x >= 202 && x < 232 && y >= 545 && y < 575) {
+        const state = gameController.getState();
+        const slot = 1; // Auto-save slot
+        SaveSystem.save(state, slot, true);
+        console.log('Game saved');
+        return;
+      }
     },
     (direction) => {
-      if (!gameStarted) return;
+      // Two-finger swipe: left/right turn
+      if (!gameStarted || !gameController || !USE_NEW_CONTROLLER) return;
+      if (inTitleScreen) return;
+      
       if (direction === 'left') {
-        game.handleKey('q');
+        gameController.turnLeft();
       } else {
-        game.handleKey('e');
+        gameController.turnRight();
       }
     }
   );
@@ -141,12 +366,6 @@ async function main() {
   
   // Keyboard input
   window.addEventListener('keydown', (e) => {
-    if (!gameStarted && (e.key === ' ' || e.key === 'Enter')) {
-      tapToStart.click();
-      e.preventDefault();
-      return;
-    }
-    
     if (!gameStarted) return;
     
     // Mute toggle with 'M' key
@@ -156,11 +375,75 @@ async function main() {
       return;
     }
     
-    game.handleKey(e.key);
+    if (!gameController || !USE_NEW_CONTROLLER) return;
+
+    // Check for debug mode
+    const urlParams = new URLSearchParams(window.location.search);
+    const debugMode = urlParams.get('debug') === '1';
     
-    // Prevent default for game keys
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'w', 'a', 's', 'd', 'q', 'e'].includes(e.key)) {
+    // TEST: Start combat with 'C' key (debug only)
+    if ((e.key === 'c' || e.key === 'C') && debugMode) {
+      const state = gameController.getState();
+      const floor = state.floors.get(state.party.floor);
+      if (floor) {
+        // Find a monster on current floor
+        for (let y = 0; y < floor.height; y++) {
+          for (let x = 0; x < floor.width; x++) {
+            const tile = floor.tiles[y][x];
+            if (tile.monster && tile.monsterHp) {
+              combatController.startCombat(state, tile.monster, x, y);
+              console.log(`Combat started with ${tile.monster}`);
+              e.preventDefault();
+              return;
+            }
+          }
+        }
+      }
+      console.log('No monster found on current floor');
       e.preventDefault();
+      return;
+    }
+    
+    // Movement keys
+    if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+      gameController.moveForward();
+      e.preventDefault();
+      return;
+    }
+    if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+      gameController.moveBackward();
+      e.preventDefault();
+      return;
+    }
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+      gameController.strafeLeft();
+      e.preventDefault();
+      return;
+    }
+    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+      gameController.strafeRight();
+      e.preventDefault();
+      return;
+    }
+    if (e.key === 'q' || e.key === 'Q') {
+      gameController.turnLeft();
+      e.preventDefault();
+      return;
+    }
+    if (e.key === 'e' || e.key === 'E') {
+      gameController.turnRight();
+      e.preventDefault();
+      return;
+    }
+    
+    // Handle stairs with space bar
+    if (e.key === ' ') {
+      const stairs = gameController.checkStairs();
+      if (stairs) {
+        gameController.handleStairs(stairs);
+        e.preventDefault();
+        return;
+      }
     }
   });
   
@@ -168,11 +451,53 @@ async function main() {
   function gameLoop() {
     const now = Date.now();
     if (gameStarted) {
-      game.update(now);
-      game.render(ctx, now);
+      // Render title screen if active
+      if (inTitleScreen && titleScreen && USE_NEW_CONTROLLER) {
+        titleScreen.render(ctx, CANVAS_WIDTH, CANVAS_HEIGHT, now);
+      }
+      // Render game UI if past title screen
+      else if (gameController && uiRenderer585 && USE_NEW_CONTROLLER && !inTitleScreen) {
+        const state = gameController.getState();
+        combatController.update(state, now);
+        
+        // Render 585 UI
+        uiRenderer585.render(ctx, state, now);
+        
+        // Debug info (only if ?debug=1)
+        const urlParams = new URLSearchParams(window.location.search);
+        const debugMode = urlParams.get('debug') === '1';
+        
+        if (debugMode) {
+          ctx.save();
+          ctx.fillStyle = '#ffffff';
+          ctx.font = '12px monospace';
+          ctx.fillText(`Floor ${state.party.floor}`, 10, 20);
+          ctx.fillText(`Pos: (${state.party.x}, ${state.party.y})`, 10, 35);
+          
+          // Check for stairs
+          const stairs = gameController.checkStairs();
+          if (stairs) {
+            ctx.fillText(`Stairs ${stairs} - Press Space`, 10, 50);
+          }
+          
+          // Show combat status
+          if (combatController.isInCombat()) {
+            const info = combatController.getCombatInfo();
+            if (info) {
+              ctx.fillText(`Combat: ${info.monster} ${info.monsterHp}/${info.monsterMaxHp}`, 10, 65);
+            }
+          }
+          ctx.restore();
+        }
+      }
     }
     requestAnimationFrame(gameLoop);
   }
+  
+  // Wait for all assets to load before starting
+  console.log('Waiting for assets to load...');
+  await assets.waitForAll();
+  console.log('All assets loaded');
   
   gameLoop();
 }

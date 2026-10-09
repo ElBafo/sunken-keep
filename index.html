@@ -19,7 +19,11 @@
       width: 100%;
       height: 100dvh;
       overflow: hidden;
-      background: #000;
+      background-color: #1a1612;
+      background-image: url('/sunken-keep/art/ui/layout585/stone_strip_tile.png');
+      background-repeat: repeat;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
       touch-action: none;
       position: fixed;
       overscroll-behavior: none;
@@ -28,6 +32,7 @@
       display: flex;
       align-items: center;
       justify-content: center;
+      /* Safe area insets for iPhone notch and home bar */
       padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
     }
     #game {
@@ -63,19 +68,21 @@
     }
     #install-hint {
       position: fixed;
-      bottom: 20px;
       left: 50%;
-      transform: translateX(-50%);
+      top: 0;
+      transform: translate(-50%, -50%);
       background: rgba(0, 0, 0, 0.9);
       color: #fff;
-      padding: 15px 20px;
+      padding: 8px 12px;
       border-radius: 8px;
       font-family: monospace;
-      font-size: 12px;
+      font-size: 10px;
       text-align: center;
-      max-width: 80%;
+      max-width: 220px;
       z-index: 999;
       border: 1px solid #555;
+      cursor: pointer;
+      pointer-events: auto;
     }
     #install-hint.hidden {
       display: none;

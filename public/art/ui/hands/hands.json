@@ -1,0 +1,39 @@
+{
+ "size": [
+  24,
+  24
+ ],
+ "note": "centre in the 31x28 hand button; dim in code (e.g. 50% dark overlay) while the hero recovers. Empty hand shows that hero's fist (punch 1-2 dmg).",
+ "defaults": {
+  "brannoc": [
+   "axe",
+   "shield"
+  ],
+  "wren": [
+   "mace",
+   "prayer_lantern"
+  ],
+  "ilsevar": [
+   "wand",
+   "scroll"
+  ],
+  "mags": [
+   "dagger",
+   "tricks_pouch"
+  ]
+ },
+ "icons": {
+  "fist_brannoc": "hand_fist_brannoc.png",
+  "fist_wren": "hand_fist_wren.png",
+  "fist_ilsevar": "hand_fist_ilsevar.png",
+  "fist_mags": "hand_fist_mags.png",
+  "axe": "hand_axe.png",
+  "shield": "hand_shield.png",
+  "mace": "hand_mace.png",
+  "prayer_lantern": "hand_prayer_lantern.png",
+  "wand": "hand_wand.png",
+  "scroll": "hand_scroll.png",
+  "dagger": "hand_dagger.png",
+  "tricks_pouch": "hand_tricks_pouch.png"
+ }
+}

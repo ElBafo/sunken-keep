@@ -1,0 +1,587 @@
+import { assets } from './assets';
+import type { GameState, Hero, FloorData } from './types';
+import type { HeroId } from './constants';
+import { Renderer, distKeyFor } from './renderer';
+import { createPartyAdapter } from './render-adapter';
+import { gameLog } from './game-log';
+import {
+  CANVAS_WIDTH,
+  CANVAS_HEIGHT,
+  VIEW_WIDTH,
+  VIEW_HEIGHT,
+  HORIZON_Y,
+  PANEL_Y,
+  HERO_LAYOUT,
+  CONTROLS_LAYOUT,
+} from './constants';
+
+const DUNGEON_BLIT_Y = 90;
+const V380_PATH = '/sunken-keep/art/dungeon_v2/v380';
+
+export class UIRenderer585 {
+  private stoneStripTile: HTMLImageElement | null = null;
+  private dungeonRenderer: Renderer | null = null;
+  private offscreenCanvas: HTMLCanvasElement | null = null;
+  private offscreenCtx: CanvasRenderingContext2D | null = null;
+
+  constructor() {
+    // Defer offscreen canvas creation to first render (WebKit-safe).
+    // Image preloading is started via preloadAssets() before the game loop.
+  }
+
+  preloadAssets(monsters: string[] = ['keep_rat']): void {
+    this.ensureRendererInit();
+    for (const monster of monsters) {
+      Renderer.preloadMonster(monster);
+    }
+    const baseUrl = '/sunken-keep/';
+    assets.loadImage(`${baseUrl}art/ui/layout585/panel_585.png`);
+    assets.loadImage(`${baseUrl}art/ui/layout585/stone_strip_tile.png`);
+    this.stoneStripTile = assets.loadImage(`${baseUrl}art/ui/layout585/stone_strip_tile.png`);
+    for (const name of ['stone', 'shallow', 'deep']) {
+      assets.loadImage(`${V380_PATH}/backdrop_${name}.png`);
+    }
+    for (const type of ['shallow', 'deep']) {
+      for (const dist of ['near', 'mid', 'far']) {
+        assets.loadImage(`${V380_PATH}/floor_water_${type}_${dist}.png`);
+      }
+    }
+    const hands = [
+      'axe', 'shield', 'mace', 'prayer_lantern', 'wand', 'scroll',
+      'dagger', 'tricks_pouch', 'fist_brannoc', 'fist_wren', 'fist_ilsevar', 'fist_mags',
+    ];
+    for (const hand of hands) {
+      assets.loadImage(`${baseUrl}art/ui/hands/hand_${hand}.png`);
+    }
+    const padKeys = ['turn_left', 'forward', 'turn_right', 'strafe_left', 'back', 'strafe_right', 'menu'];
+    for (const key of padKeys) {
+      assets.loadImage(`${baseUrl}art/ui/panel/icon_${key}.png`);
+    }
+    for (const dir of ['N', 'E', 'S', 'W']) {
+      assets.loadImage(`${baseUrl}art/ui/panel/compass_${dir}.png`);
+    }
+  }
+
+  private ensureCanvasInit(): void {
+    if (!this.offscreenCanvas) {
+      this.offscreenCanvas = document.createElement('canvas');
+      this.offscreenCanvas.width = 270;
+      this.offscreenCanvas.height = 200;
+      this.offscreenCtx = this.offscreenCanvas.getContext('2d');
+    }
+  }
+
+  private ensureRendererInit(): void {
+    if (!this.dungeonRenderer) {
+      this.dungeonRenderer = new Renderer();
+    }
+  }
+
+  // Render full UI
+  render(ctx: CanvasRenderingContext2D, state: GameState, now: number): void {
+    this.ensureCanvasInit();
+    this.ensureRendererInit();
+
+    // Clear canvas
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
+
+    // Draw the 270×380 backdrop at y=0 (no stretching), then 200-tall walls at y=90.
+    try {
+      const party = createPartyAdapter(state);
+      const floor = state.floors.get(state.party.floor);
+      if (floor && party && this.dungeonRenderer && this.offscreenCanvas && this.offscreenCtx) {
+        ctx.imageSmoothingEnabled = false;
+        this.drawV380Backdrop(ctx, floor, state.party.x, state.party.y);
+        this.drawV380Water(ctx, party, floor, now);
+
+        this.offscreenCtx.clearRect(0, 0, 270, 200);
+        const oldFloor = {
+          width: floor.width,
+          height: floor.height,
+          startX: floor.startX,
+          startY: floor.startY,
+          startDir: floor.startDir,
+          tiles: floor.tiles,
+          sconces: floor.sconces,
+        };
+        this.dungeonRenderer.drawViewport(this.offscreenCtx, party, oldFloor as any, now, { geometryOnly: true });
+        ctx.drawImage(this.offscreenCanvas, 0, DUNGEON_BLIT_Y);
+        this.drawViewOverlays(ctx, party, floor);
+        ctx.imageSmoothingEnabled = true;
+      }
+    } catch (error) {
+      console.error('Renderer error:', error);
+      // Fallback
+      ctx.fillStyle = '#2a2420';
+      ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+      ctx.strokeStyle = '#4a4440';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, HORIZON_Y);
+      ctx.lineTo(VIEW_WIDTH, HORIZON_Y);
+      ctx.stroke();
+    }
+
+    // Fill any extra height below panel with stone strip tile
+    this.fillExtraHeight(ctx);
+
+    // Draw panel background at y=380
+    this.drawPanel(ctx);
+
+    // Draw hero row (portraits, HP/mana bars, hand buttons)
+    this.drawHeroRow(ctx, state, now);
+
+    // Draw log (3 lines)
+    this.drawLog(ctx);
+
+    // Draw movement pad
+    this.drawMovementPad(ctx);
+
+    // Draw compass
+    this.drawCompass(ctx, state.party.dir);
+
+    // Draw potion buttons
+    this.drawPotionButtons(ctx, state);
+
+    // Draw menu and save buttons
+    this.drawMenuSaveButtons(ctx);
+  }
+
+  private drawV380Backdrop(
+    ctx: CanvasRenderingContext2D,
+    floor: FloorData,
+    x: number,
+    y: number
+  ): void {
+    const tile = floor.tiles[y]?.[x];
+    let name = 'stone';
+    if (tile?.deepWater) name = 'deep';
+    else if (tile?.shallowWater) name = 'shallow';
+    const path = `${V380_PATH}/backdrop_${name}.png`;
+    const img = assets.getImage(path);
+    if (img && img.complete && assets.isImageReady(img)) {
+      ctx.drawImage(img, 0, 0);
+    } else {
+      ctx.fillStyle = '#0a1612';
+      ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    }
+  }
+
+  private drawV380Water(
+    ctx: CanvasRenderingContext2D,
+    party: { getPosition: (distance: number, side: number) => { x: number; y: number } },
+    floor: FloorData,
+    now: number
+  ): void {
+    const shimmer = (now * 0.001) % 10;
+    for (let dist = 1; dist <= 3; dist++) {
+      const pos = party.getPosition(dist, 0);
+      if (pos.x < 0 || pos.y < 0 || pos.x >= floor.width || pos.y >= floor.height) continue;
+      const tile = floor.tiles[pos.y][pos.x];
+      if (!tile.shallowWater && !tile.deepWater) continue;
+      const type = tile.deepWater ? 'deep' : 'shallow';
+      const distKey = distKeyFor(dist as 1 | 2 | 3);
+      const path = `${V380_PATH}/floor_water_${type}_${distKey}.png`;
+      const img = assets.getImage(path);
+      if (!img || !img.complete || !assets.isImageReady(img)) continue;
+      ctx.save();
+      const shimmerOffset = Math.sin(shimmer * Math.PI * 0.4 + dist) * 0.5;
+      ctx.globalAlpha = 0.95 + Math.sin(shimmer * Math.PI * 0.3) * 0.05;
+      ctx.drawImage(img, shimmerOffset, 0);
+      ctx.restore();
+    }
+  }
+
+  private drawViewOverlays(
+    ctx: CanvasRenderingContext2D,
+    party: { x: number; y: number; dir: number },
+    floor: FloorData
+  ): void {
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = '#3a4a38';
+    ctx.globalAlpha = 0.4;
+    ctx.fillRect(0, DUNGEON_BLIT_Y + 65, VIEW_WIDTH, 70);
+    ctx.fillStyle = '#5a6a58';
+    ctx.globalAlpha = 0.25;
+    ctx.fillRect(0, DUNGEON_BLIT_Y + 50, VIEW_WIDTH, 65);
+    ctx.restore();
+
+    if (!floor.sconces) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const sconce of floor.sconces) {
+      if (!sconce.lit) continue;
+      const dx = sconce.x - party.x;
+      const dy = sconce.y - party.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > 3) continue;
+      let intensity = 0;
+      if (dist <= 1) intensity = 0.3;
+      else if (dist <= 2) intensity = 0.15;
+      else intensity = 0.05;
+      const horizon = DUNGEON_BLIT_Y + 100;
+      const gradient = ctx.createRadialGradient(
+        VIEW_WIDTH / 2, horizon, 10,
+        VIEW_WIDTH / 2, horizon, 150
+      );
+      gradient.addColorStop(0, `rgba(255, 136, 68, ${intensity})`);
+      gradient.addColorStop(0.5, `rgba(255, 136, 68, ${intensity * 0.5})`);
+      gradient.addColorStop(1, 'rgba(255, 136, 68, 0)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    }
+    ctx.restore();
+  }
+
+  private fillExtraHeight(ctx: CanvasRenderingContext2D): void {
+    // If canvas is taller than 585, fill extra space with stone strip
+    if (CANVAS_HEIGHT > 585 && this.stoneStripTile && this.stoneStripTile.complete) {
+      const tileHeight = this.stoneStripTile.height;
+      const startY = 585;
+      let y = startY;
+      
+      while (y < CANVAS_HEIGHT) {
+        ctx.drawImage(this.stoneStripTile, 0, y);
+        y += tileHeight;
+      }
+    }
+  }
+
+  private drawPanel(ctx: CanvasRenderingContext2D): void {
+    const baseUrl = '/sunken-keep/';
+    const panelBg = assets.getImage(`${baseUrl}art/ui/layout585/panel_585.png`);
+    
+    if (panelBg && panelBg.complete) {
+      ctx.drawImage(panelBg, 0, PANEL_Y);
+    } else {
+      // Fallback: dark panel
+      ctx.fillStyle = '#1a1612';
+      ctx.fillRect(0, PANEL_Y, CANVAS_WIDTH, CANVAS_HEIGHT - PANEL_Y);
+    }
+  }
+
+  private drawHeroRow(ctx: CanvasRenderingContext2D, state: GameState, now: number): void {
+    const baseUrl = '/sunken-keep/';
+    const heroIds: HeroId[] = ['brannoc', 'wren', 'ilsevar', 'mags'];
+
+    heroIds.forEach(heroId => {
+      const hero = state.heroes[heroId];
+      const layout = HERO_LAYOUT[heroId];
+
+      // Draw portrait
+      this.drawPortrait(ctx, hero, layout.portrait, now);
+
+      // Draw HP bar
+      this.drawHPBar(ctx, hero, layout.hpBar);
+
+      // Draw mana bar (if hero has mana)
+      if (layout.manaBar && hero.maxMana > 0) {
+        this.drawManaBar(ctx, hero, layout.manaBar);
+      }
+
+      // Draw hand buttons
+      this.drawHandButton(ctx, hero, 'main', layout.handMain, now, baseUrl);
+      this.drawHandButton(ctx, hero, 'off', layout.handOff, now, baseUrl);
+    });
+  }
+
+  private drawPortrait(
+    ctx: CanvasRenderingContext2D,
+    hero: Hero,
+    rect: [number, number, number, number],
+    now: number
+  ): void {
+    const [x, y, w, h] = rect;
+    const baseUrl = '/sunken-keep/';
+
+    // Determine health state
+    const hpPercent = hero.hp / hero.maxHp;
+    let state = 'healthy';
+    if (hpPercent < 0.25) state = 'near_death';
+    else if (hpPercent < 0.6) state = 'wounded';
+
+    // Load portrait
+    const portraitPath = `${baseUrl}art/portraits/${hero.id}_${state}.png`;
+    const portrait = assets.getImage(portraitPath);
+
+    if (portrait && portrait.complete) {
+      ctx.drawImage(portrait, x, y, w, h);
+    } else {
+      // Fallback: solid color
+      ctx.fillStyle = hero.id === 'brannoc' ? '#8a4a2a' : hero.id === 'wren' ? '#4a6a8a' : hero.id === 'ilsevar' ? '#6a4a8a' : '#4a8a4a';
+      ctx.fillRect(x, y, w, h);
+    }
+
+    if (hero.hitFlashUntil && now < hero.hitFlashUntil) {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, (hero.hitFlashUntil - now) / 300) * 0.5;
+      ctx.fillStyle = '#ff0000';
+      ctx.fillRect(x, y, w, h);
+      ctx.restore();
+    }
+
+    // Draw frame indicator for formation
+    if (hero.formation === 'front') {
+      // Bronze frame for front row
+      ctx.strokeStyle = '#cd7f32';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(x, y, w, h);
+    } else {
+      // Iron frame for back row
+      ctx.strokeStyle = '#8a8a8a';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x, y, w, h);
+    }
+  }
+
+  private drawHPBar(ctx: CanvasRenderingContext2D, hero: Hero, rect: [number, number, number, number]): void {
+    const [x, y, w, h] = rect;
+    const percent = Math.max(0, hero.hp / hero.maxHp);
+    const barWidth = w * percent;
+
+    // Background
+    ctx.fillStyle = '#2a1a1a';
+    ctx.fillRect(x, y, w, h);
+
+    // HP bar
+    const color = hero.hp > hero.maxHp * 0.3 ? '#4a8a3a' : '#8a3a3a';
+    ctx.fillStyle = color;
+    ctx.fillRect(x, y, barWidth, h);
+  }
+
+  private drawManaBar(ctx: CanvasRenderingContext2D, hero: Hero, rect: [number, number, number, number]): void {
+    const [x, y, w, h] = rect;
+    const percent = Math.max(0, hero.mana / hero.maxMana);
+    const barWidth = w * percent;
+
+    // Background
+    ctx.fillStyle = '#1a1a2a';
+    ctx.fillRect(x, y, w, h);
+
+    // Mana bar
+    ctx.fillStyle = '#3a5a8a';
+    ctx.fillRect(x, y, barWidth, h);
+  }
+
+  private drawHandButton(
+    ctx: CanvasRenderingContext2D,
+    hero: Hero,
+    hand: 'main' | 'off',
+    rect: [number, number, number, number],
+    now: number,
+    baseUrl: string
+  ): void {
+    const [x, y, w, h] = rect;
+    const item = hero.equipment[hand];
+
+    // Background
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillRect(x, y, w, h);
+
+    // Border
+    ctx.strokeStyle = '#4a4a4a';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, w, h);
+
+    // Load hand icon
+    let iconName = '';
+    if (item === 'empty_hand') {
+      iconName = `fist_${hero.id}`;
+    } else {
+      iconName = item;
+    }
+
+    const iconPath = `${baseUrl}art/ui/hands/hand_${iconName}.png`;
+    const icon = assets.loadImage(iconPath); // Use loadImage to ensure it starts loading
+
+    if (assets.isImageReady(icon)) {
+      // Center 24x24 icon in 31x28 button
+      const iconX = x + (w - 24) / 2;
+      const iconY = y + (h - 24) / 2;
+
+      // Check if recovering
+      const recoveryEnd = hero.recovery[hand];
+      const recovering = recoveryEnd > now;
+
+      // Check if back row melee (greyed out)
+      const item = hero.equipment[hand];
+      const meleeItems = ['axe', 'shield', 'mace', 'dagger', 'empty_hand'];
+      const isBackRowMelee = meleeItems.includes(item) && hero.formation === 'back';
+
+      if (recovering) {
+        // Dim the icon
+        ctx.save();
+        ctx.globalAlpha = 0.4;
+        ctx.drawImage(icon, iconX, iconY, 24, 24);
+        ctx.restore();
+
+        // Dark overlay
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
+        ctx.fillRect(x, y, w, h);
+      } else if (isBackRowMelee) {
+        // Grey out back row melee
+        ctx.save();
+        ctx.globalAlpha = 0.3;
+        ctx.drawImage(icon, iconX, iconY, 24, 24);
+        ctx.restore();
+
+        // Draw red X
+        ctx.strokeStyle = '#8a3a3a';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(x + 4, y + 4);
+        ctx.lineTo(x + w - 4, y + h - 4);
+        ctx.moveTo(x + w - 4, y + 4);
+        ctx.lineTo(x + 4, y + h - 4);
+        ctx.stroke();
+      } else {
+        ctx.drawImage(icon, iconX, iconY, 24, 24);
+      }
+    }
+  }
+
+  private drawLog(ctx: CanvasRenderingContext2D): void {
+    const [x, y, w] = CONTROLS_LAYOUT.log;
+    const messages = gameLog.getRecent(3);
+    if (messages.length === 0) return;
+
+    ctx.save();
+    ctx.fillStyle = '#d8ccb0';
+    ctx.font = '8px monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    const lineHeight = 9;
+    const padding = 2;
+    messages.forEach((msg, i) => {
+      const maxChars = Math.floor((w - padding * 2) / 5);
+      const text = msg.text.length > maxChars ? msg.text.slice(0, maxChars - 1) + '…' : msg.text;
+      ctx.fillText(text, x + padding, y + padding + i * lineHeight);
+    });
+    ctx.restore();
+  }
+
+  private drawMovementPad(ctx: CanvasRenderingContext2D): void {
+    const baseUrl = '/sunken-keep/';
+    const pad = CONTROLS_LAYOUT.pad;
+
+    // Draw each button
+    Object.entries(pad).forEach(([key, rect]) => {
+      const [x, y, w, h] = rect;
+
+      // Background
+      ctx.fillStyle = '#3a3a3a';
+      ctx.fillRect(x, y, w, h);
+
+      // Border
+      ctx.strokeStyle = '#5a5a5a';
+      ctx.lineWidth = 1;
+      ctx.strokeRect(x, y, w, h);
+
+      // Icon (if available)
+      const iconPath = `${baseUrl}art/ui/panel/icon_${key}.png`;
+      const icon = assets.getImage(iconPath);
+      if (icon && icon.complete) {
+        const iconX = x + (w - icon.width) / 2;
+        const iconY = y + (h - icon.height) / 2;
+        ctx.drawImage(icon, iconX, iconY);
+      }
+    });
+  }
+
+  private drawCompass(ctx: CanvasRenderingContext2D, dir: number): void {
+    const [x, y, w, h] = CONTROLS_LAYOUT.compass;
+    const baseUrl = '/sunken-keep/';
+
+    // Background
+    ctx.fillStyle = '#2a2a2a';
+    ctx.fillRect(x, y, w, h);
+
+    // Border
+    ctx.strokeStyle = '#4a4a4a';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(x, y, w, h);
+
+    // Compass sprite
+    const directions = ['N', 'E', 'S', 'W'];
+    const compassPath = `${baseUrl}art/ui/panel/compass_${directions[dir]}.png`;
+    const compass = assets.getImage(compassPath);
+
+    if (compass && compass.complete) {
+      ctx.drawImage(compass, x, y);
+    } else {
+      // Fallback: draw letter
+      ctx.fillStyle = '#8a6a4a';
+      ctx.font = '24px monospace';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(directions[dir], x + w / 2, y + h / 2);
+    }
+  }
+
+  private drawPotionButtons(ctx: CanvasRenderingContext2D, state: GameState): void {
+    // Health potion
+    const [hx, hy, hw, hh] = CONTROLS_LAYOUT.potion_health;
+    ctx.fillStyle = state.inventory.potions.health > 0 ? '#8a3a3a' : '#2a2a2a';
+    ctx.fillRect(hx, hy, hw, hh);
+    ctx.strokeStyle = '#4a4a4a';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(hx, hy, hw, hh);
+
+    // Count
+    if (state.inventory.potions.health > 0) {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '10px monospace';
+      ctx.fillText(String(state.inventory.potions.health), hx + 2, hy + 10);
+    }
+
+    // Mana potion
+    const [mx, my, mw, mh] = CONTROLS_LAYOUT.potion_mana;
+    ctx.fillStyle = state.inventory.potions.mana > 0 ? '#3a5a8a' : '#2a2a2a';
+    ctx.fillRect(mx, my, mw, mh);
+    ctx.strokeStyle = '#4a4a4a';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(mx, my, mw, mh);
+
+    if (state.inventory.potions.mana > 0) {
+      ctx.fillStyle = '#ffffff';
+      ctx.font = '10px monospace';
+      ctx.fillText(String(state.inventory.potions.mana), mx + 2, my + 10);
+    }
+  }
+
+  private drawMenuSaveButtons(ctx: CanvasRenderingContext2D): void {
+    const baseUrl = '/sunken-keep/';
+
+    // Menu button
+    const [mx, my, mw, mh] = CONTROLS_LAYOUT.menu;
+    ctx.fillStyle = '#3a3a3a';
+    ctx.fillRect(mx, my, mw, mh);
+    ctx.strokeStyle = '#5a5a5a';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(mx, my, mw, mh);
+
+    const menuIcon = assets.getImage(`${baseUrl}art/ui/panel/icon_menu.png`);
+    if (menuIcon && menuIcon.complete) {
+      const iconX = mx + (mw - menuIcon.width) / 2;
+      const iconY = my + (mh - menuIcon.height) / 2;
+      ctx.drawImage(menuIcon, iconX, iconY);
+    }
+
+    // Save button  
+    const [sx, sy, sw, sh] = CONTROLS_LAYOUT.save;
+    ctx.fillStyle = '#3a3a3a';
+    ctx.fillRect(sx, sy, sw, sh);
+    ctx.strokeStyle = '#5a5a5a';
+    ctx.lineWidth = 1;
+    ctx.strokeRect(sx, sy, sw, sh);
+
+    // Draw "S" for save
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '16px monospace';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('S', sx + sw / 2, sy + sh / 2);
+  }
+}

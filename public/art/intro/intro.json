@@ -90,7 +90,20 @@
    "direction": "hold; boat sprite glides up from the bottom, fog layers drift in code",
    "boat": {
     "sprite": "boat.png",
-    "path": "from (x 427, y 500) to (x 427, y 330), centre of sprite, over ~5 s, ease out"
+    "anchor": "bottom-centre of the sprite (the hull waterline), in shot-image pixels (854x480)",
+    "from": {
+     "x": 427,
+     "y": 560,
+     "scale": 1.0
+    },
+    "to": {
+     "x": 427,
+     "y": 345,
+     "scale": 0.5
+    },
+    "duration": "~5 s, ease out",
+    "scaleNote": "scale down with NEAREST in step with y so the boat shrinks as it moves away; the shoreline is at y~290, so the hull never goes above y 345",
+    "note": "the old path used the sprite centre at full size, so the boat top reached y 279 against the ruins and looked like it was climbing"
    }
   },
   "6": {

@@ -1,0 +1,8 @@
+{
+ "view": "270x200, draw order: backdrop, then walls far->near, then floor items/monsters far->near",
+ "backdrop": {"files": ["backdrop_stone.png", "backdrop_shallow.png", "backdrop_deep.png"], "place": [0, 0], "note": "full floor + ceiling; horizon y 100, symmetric. Pick per floor or per tile row."},
+ "floorWater": {"files": "floor_water_{shallow|deep}_{near|mid|far}.png", "place": [0, 0], "note": "270x200 transparent overlays covering only one distance band, for water on a single tile row over backdrop_stone"},
+ "floorBands": {"near": {"y": [170, 200]}, "mid": {"y": [150, 170]}, "far": {"y": [135, 150]}},
+ "spriteFeet": {"note": "sprites are bottom-anchored in their box; put the box bottom on the band's floor line so things stand on the floor, not on the wall", "near": 192, "mid": 165, "far": 147},
+ "walls": {"front": {"near": [55, 30], "mid": [75, 50], "far": [95, 65]}, "left": {"near": [15, 30], "mid": [45, 50], "far": [75, 65]}, "right": {"near": [215, 30], "mid": [195, 50], "far": [175, 65]}}
+}

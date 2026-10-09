@@ -5,7 +5,12 @@ export interface Position {
   y: number;
 }
 
-export type MonsterState = 'idle' | 'attack' | 'hurt' | 'death';
+export type MonsterState = 'idle' | 'alert' | 'attack' | 'hurt' | 'death';
+
+export interface LatchState {
+  turns: number;
+  drainPerTurn: number;
+}
 
 export interface Tile {
   wall?: boolean;
@@ -23,18 +28,50 @@ export interface Tile {
   monsterHp?: number;
   monsterMaxHp?: number;
   monsterAlerted?: boolean;
+  monsterArmor?: number;
+  monsterLatch?: LatchState;
   carving?: string;
   chest?: boolean;
   chestOpen?: boolean;
+  firstSightFired?: boolean; // Track if first sight bark has fired
+  
+  // Act 1 additions from floors 2-4
+  stairs?: 'up' | 'down';
+  dialogue?: string;
+  then?: string;
+  bark?: string;
+  npc?: string;
+  prop?: 'table' | 'bunk' | 'weapon_rack' | 'statue' | 'vent' | 'grate' | 'bars' | 'glassWater';
+  glassWater?: boolean;
+  lever?: { face: 'N'|'E'|'S'|'W'; opens: { x: number; y: number } };
+  openedBy?: 'lever';
+  grate?: { face: 'N'|'E'|'S'|'W' };
+  vent?: { face: 'N'|'E'|'S'|'W' };
+  bars?: { face: 'N'|'E'|'S'|'W' };
+  gateOpensOn?: string;
+  patrol?: { x: number; y: number }[];
+  checkpoint?: boolean;
+  daylight?: boolean;
+  journalPage?: number;
+  actEnd?: number;
 }
 
 export interface FloorData {
+  id: number;
   width: number;
   height: number;
   tiles: Tile[][];
   startX: number;
   startY: number;
   startDir: Direction;
+  sconces?: Sconce[];
+}
+
+export interface Sconce {
+  x: number;  // Wall block x
+  y: number;  // Wall block y
+  face: 'N' | 'E' | 'S' | 'W';  // Which side of the wall block
+  lit: boolean;
 }
 
 export class Party {
@@ -72,8 +109,9 @@ export class Party {
     }
 
     if (side !== 0) {
-      x += dx[side < 0 ? 0 : 2];
-      y += dy[side < 0 ? 0 : 2];
+      // FIX: side < 0 (left) should use index 2 (-right), side > 0 (right) should use index 0 (right)
+      x += dx[side < 0 ? 2 : 0];
+      y += dy[side < 0 ? 2 : 0];
     }
 
     return { x, y };
