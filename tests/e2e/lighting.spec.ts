@@ -114,7 +114,7 @@ test('proto3d lighting: pools, relight, oil, no 404s', async ({ page }) => {
   expect(lantern.own, 'oil lantern keeps the party square readable').toBeGreaterThan(0.3);
   expect(lantern.ahead, 'oil lantern keeps the next square readable').toBeGreaterThan(0.2);
   // East along the south strip — own floor + next square, then near-black. Avoids the slime.
-  await shot(1, 7, 1, 'lantern-oil-circle.png');
+  await shot(1, 7, 1, 'lighting_lantern_oil_east.png');
 
   const ember = await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
@@ -131,7 +131,7 @@ test('proto3d lighting: pools, relight, oil, no 404s', async ({ page }) => {
   expect(ember.own, 'ember lantern keeps the party square readable').toBeGreaterThan(0.18);
   expect(ember.ahead, 'ember lantern still readable 1 square ahead').toBeGreaterThan(0.14);
   expect(ember.ahead, 'ember circle is smaller / dimmer than oil').toBeLessThan(lantern.ahead - 0.02);
-  await shot(1, 7, 1, 'lantern-ember-circle.png');
+  await shot(1, 7, 1, 'lighting_lantern_ember_east.png');
   await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.setOil(2));
 
   await shot(1, 7, 0, 'torch-side-profile.png');
