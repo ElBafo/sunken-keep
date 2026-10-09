@@ -35,11 +35,14 @@ export class IntroPlayer {
   private eyesSprite: HTMLImageElement | null = null;
   private eyePositions: EyePos[] = [];
   
-  // Shot 5 boat
+  // Shot 5 boat (from intro.json)
   private boatSprite: HTMLImageElement | null = null;
-  private boatStartY = 500;
-  private boatEndY = 330;
-  private boatX = 427;
+  private boatFromX = 427;
+  private boatFromY = 560;
+  private boatFromScale = 1.0;
+  private boatToX = 427;
+  private boatToY = 345;
+  private boatToScale = 0.5;
   
   // Title
   private titleSprite: HTMLImageElement | null = null;
@@ -266,13 +269,45 @@ export class IntroPlayer {
   private renderBoat(ctx: CanvasRenderingContext2D, shotTime: number) {
     if (!this.boatSprite || !this.boatSprite.complete) return;
     
+    // Interpolate position and scale with ease-out
     const progress = Math.min(shotTime / 5, 1);
-    const eased = 1 - Math.pow(1 - progress, 3);
-    const y = this.boatStartY - (this.boatStartY - this.boatEndY) * eased;
+    const eased = 1 - Math.pow(1 - progress, 3); // cubic ease-out
     
-    if (y < this.height) {
-      const x = this.boatX - 292 - this.boatSprite.width / 2;
-      ctx.drawImage(this.boatSprite, x, y - this.boatSprite.height);
+    // Boat position in shot space (854x480)
+    const shotX = this.boatFromX + (this.boatToX - this.boatFromX) * eased;
+    const shotY = this.boatFromY + (this.boatToY - this.boatFromY) * eased;
+    const scale = this.boatFromScale + (this.boatToScale - this.boatFromScale) * eased;
+    
+    // Shot 5 panX is 292 (static), so viewport shows from x=292 to x=562 of the shot
+    // Convert shot position to viewport position
+    const viewportX = shotX - 292;
+    const viewportY = shotY;
+    
+    // Calculate scaled sprite dimensions
+    const scaledWidth = this.boatSprite.width * scale;
+    const scaledHeight = this.boatSprite.height * scale;
+    
+    // Boat anchor is at bottom-centre of sprite
+    const drawX = viewportX - scaledWidth / 2;
+    const drawY = viewportY - scaledHeight;
+    
+    // Only draw if in viewport
+    if (drawY < this.height) {
+      ctx.save();
+      
+      // Use nearest-neighbor scaling for crisp pixels
+      ctx.imageSmoothingEnabled = false;
+      
+      // Draw scaled boat
+      ctx.drawImage(
+        this.boatSprite,
+        drawX,
+        drawY,
+        scaledWidth,
+        scaledHeight
+      );
+      
+      ctx.restore();
     }
   }
 

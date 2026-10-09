@@ -40,7 +40,7 @@ export class Game {
       if (this.intro.isFinished()) {
         this.state = 'playing';
         this.lastInputTime = now;
-        sound.playMusic('amb_swamp');
+        sound.playMusic('amb_flooded_halls');
       }
       return;
     }
@@ -55,6 +55,10 @@ export class Game {
       this.intro.render(ctx);
       return;
     }
+
+    // Clear the entire canvas (270x480) to prevent intro remnants
+    ctx.fillStyle = '#000000';
+    ctx.fillRect(0, 0, 270, 480);
 
     this.renderer.drawViewport(ctx, this.party, this.floor, now);
     this.renderer.drawPortraits(ctx, now);

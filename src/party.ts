@@ -5,6 +5,8 @@ export interface Position {
   y: number;
 }
 
+export type MonsterState = 'idle' | 'attack' | 'hurt' | 'death';
+
 export interface Tile {
   wall?: boolean;
   door?: boolean;
@@ -12,10 +14,18 @@ export interface Tile {
   doorOpen?: boolean;
   secret?: boolean;
   secretOpen?: boolean;
+  shallowWater?: boolean;
   deepWater?: boolean;
   item?: string;
   monster?: string;
+  monsterState?: MonsterState;
+  monsterAnimTime?: number;
+  monsterHp?: number;
+  monsterMaxHp?: number;
+  monsterAlerted?: boolean;
   carving?: string;
+  chest?: boolean;
+  chestOpen?: boolean;
 }
 
 export interface FloorData {
