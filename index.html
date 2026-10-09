@@ -17,24 +17,102 @@
     }
     html, body {
       width: 100%;
-      height: 100%;
+      height: 100dvh;
       overflow: hidden;
       background: #000;
       touch-action: none;
+      position: fixed;
+      overscroll-behavior: none;
     }
     body {
       display: flex;
       align-items: center;
       justify-content: center;
+      padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
     }
     #game {
       image-rendering: pixelated;
       image-rendering: crisp-edges;
     }
+    #tap-to-start {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100dvh;
+      background: #000;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+      font-family: monospace;
+      color: #fff;
+    }
+    #tap-to-start.hidden {
+      display: none;
+    }
+    #tap-to-start-text {
+      font-size: 24px;
+      margin-bottom: 20px;
+      animation: pulse 2s infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    #install-hint {
+      position: fixed;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(0, 0, 0, 0.9);
+      color: #fff;
+      padding: 15px 20px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 12px;
+      text-align: center;
+      max-width: 80%;
+      z-index: 999;
+      border: 1px solid #555;
+    }
+    #install-hint.hidden {
+      display: none;
+    }
+    #mute-toggle {
+      position: fixed;
+      top: 10px;
+      right: 10px;
+      width: 40px;
+      height: 40px;
+      background: rgba(0, 0, 0, 0.7);
+      border: 2px solid #888;
+      border-radius: 4px;
+      color: #fff;
+      font-size: 20px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 500;
+      cursor: pointer;
+      user-select: none;
+    }
+    #mute-toggle:active {
+      background: rgba(0, 0, 0, 0.9);
+    }
   </style>
 </head>
 <body>
+  <div id="tap-to-start">
+    <div id="tap-to-start-text">TAP TO START</div>
+    <div style="font-size: 12px; color: #888;">The Sunken Keep</div>
+  </div>
   <canvas id="game"></canvas>
+  <button id="mute-toggle" class="hidden">🔊</button>
+  <div id="install-hint" class="hidden">
+    For full screen, tap Share<br>then Add to Home Screen
+  </div>
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
