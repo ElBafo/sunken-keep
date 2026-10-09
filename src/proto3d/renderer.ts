@@ -85,6 +85,13 @@ export class PixelRenderer {
           return mix(a, b, c);
         }
         
+        // Perceptual distance using weighted RGB (human eye more sensitive to green)
+        float perceptualDistance(vec3 c1, vec3 c2) {
+          vec3 d = c1 - c2;
+          // Weight: red=2, green=4, blue=3 (roughly approximates perception)
+          return sqrt(2.0*d.r*d.r + 4.0*d.g*d.g + 3.0*d.b*d.b);
+        }
+        
         vec3 quantizeColor(vec3 linearColor) {
           if (paletteSize == 0 || paletteEnabled < 0.5) {
             return linearToSRGB(linearColor);
@@ -101,7 +108,7 @@ export class PixelRenderer {
           for (int i = 0; i < 64; i++) {
             if (i >= paletteSize) break;
             vec3 palColor = palette[i];
-            float dist = distance(srgb, palColor);
+            float dist = perceptualDistance(srgb, palColor);
             if (dist < minDist) {
               minDist = dist;
               nearest = palColor;

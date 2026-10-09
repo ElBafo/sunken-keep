@@ -52,36 +52,48 @@ test('3D prototype - complete visual test', async ({ page }) => {
   await page.screenshot({ path: 'screenshots/proto-water.png' });
   console.log('✓ Screenshot: proto-water.png (water hall)');
   
-  // Navigate to locked door - stop 3 squares away for clear side walls
-  await page.locator('#btn-right').click();
+  // From (3,2) facing west, go to door at (4,2)
+  // Turn around and go east
+  await page.locator('#btn-right').click(); // face north from west
   await page.waitForTimeout(250);
-  // Now at (1,5) facing east, door is at (4,2)
-  // Don't move forward - stay back to show side walls
+  await page.locator('#btn-right').click(); // face east
+  await page.waitForTimeout(250);
+  // Now at (3,2) facing east, move to (5,2) to view door at (4,2) from 1 square away
+  await page.locator('#btn-forward').click(); // to (4,2) - at the door
+  await page.waitForTimeout(250);
+  await page.locator('#btn-forward').click(); // to (5,2) - 1 square past door
+  await page.waitForTimeout(250);
+  await page.locator('#btn-back').click(); // back to (4,2)
+  await page.waitForTimeout(250);
+  await page.locator('#btn-back').click(); // to (3,2)
+  await page.waitForTimeout(250);
+  await page.locator('#btn-back').click(); // to (2,2)
+  await page.waitForTimeout(250);
   
-  // Screenshot 4: Door from distance showing side walls
+  // Screenshot 4: Door from 2 squares away (from 2,2 facing east toward 4,2)
   await page.screenshot({ path: 'screenshots/proto-door.png' });
-  console.log('✓ Screenshot: proto-door.png (door with side walls visible)');
+  console.log('✓ Screenshot: proto-door.png (door from 2 squares away)');
   
-  // Navigate toward slime - go around, stop further back
-  await page.locator('#btn-forward').click();
+  // Navigate to slime at (6,4) - from (2,2) facing east
+  await page.locator('#btn-forward').click(); // to (3,2)
   await page.waitForTimeout(250);
-  await page.locator('#btn-forward').click();
+  await page.locator('#btn-forward').click(); // to (4,2)
   await page.waitForTimeout(250);
-  await page.locator('#btn-right').click();
+  await page.locator('#btn-forward').click(); // to (5,2)
   await page.waitForTimeout(250);
-  for (let i = 0; i < 4; i++) {
-    await page.locator('#btn-forward').click();
-    await page.waitForTimeout(250);
-  }
-  await page.locator('#btn-left').click();
+  await page.locator('#btn-left').click(); // face north
   await page.waitForTimeout(250);
-  // Stop here - 3 squares from slime
-  await page.locator('#btn-forward').click();
+  await page.locator('#btn-forward').click(); // to (5,3)
   await page.waitForTimeout(250);
+  await page.locator('#btn-forward').click(); // to (5,4)
+  await page.waitForTimeout(250);
+  await page.locator('#btn-right').click(); // face east toward slime
+  await page.waitForTimeout(250);
+  // Now at (5,4) facing east, slime is at (6,4), 1 square ahead
   
-  // Screenshot 5: Slime from distance
+  // Screenshot 5: Slime from 1 square away
   await page.screenshot({ path: 'screenshots/proto-slime.png' });
-  console.log('✓ Screenshot: proto-slime.png (slime with corridor visible)');
+  console.log('✓ Screenshot: proto-slime.png (slime from 1 square away)');
   
   // Screenshot 6: Without palette
   await page.goto(`${BASE_URL}/proto3d.html?palette=0&test=1`);

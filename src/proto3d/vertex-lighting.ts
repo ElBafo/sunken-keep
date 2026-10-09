@@ -28,11 +28,11 @@ export class VertexLightingManager {
   
   private getBandedFalloff(distance: number): number {
     // Party/lantern: 1.0 at 0-1 distance, ×0.65 per further square
-    // Sconce: similar pool around its square
-    if (distance <= 1.0) return 1.0;
+    // Make banding more obvious with stricter cutoffs
+    const distSquares = Math.floor(distance);
+    if (distSquares === 0) return 1.0;
     
-    const extraSquares = Math.floor(distance) - 1;
-    return Math.pow(0.65, extraSquares);
+    return Math.pow(0.65, distSquares);
   }
   
   private calculateBrightness(tileX: number, tileY: number, isDark: boolean): number {
@@ -69,9 +69,9 @@ export class VertexLightingManager {
       if (isDark && source.type === 'sconce') continue;
       
       // User spec: 1.0 at 0-1 distance, ×0.65 per further square
-      // Boost significantly to compensate for color space and palette conversion
+      // More moderate boost to show depth falloff clearly
       const falloff = this.getBandedFalloff(distance);
-      const brightness = source.intensity * falloff * 5.0; // Strong brightness boost
+      const brightness = source.intensity * falloff * 3.8; // Moderate boost for depth
       
       maxBrightness = Math.max(maxBrightness, brightness);
     }
@@ -87,7 +87,7 @@ export class VertexLightingManager {
       }
     }
     
-    return Math.min(maxBrightness, 5.0); // Allow strong overbrightening
+    return Math.min(maxBrightness, 3.8); // Moderate cap for visible falloff
   }
   
   private getWarmTint(tileX: number, tileY: number): THREE.Color {
@@ -107,11 +107,12 @@ export class VertexLightingManager {
       }
     }
     
-    // Neutral to warm: (1.0, 1.0, 1.0) → (1.0, 0.95, 0.85)
+    // Subtle warm tint: (1.0, 1.0, 1.0) → (1.0, 0.98, 0.92)
+    // Less tinting to preserve neutral stone colors
     return new THREE.Color(
       1.0,
-      1.0 - warmth * 0.05,
-      1.0 - warmth * 0.15
+      1.0 - warmth * 0.02,
+      1.0 - warmth * 0.08
     );
   }
   
