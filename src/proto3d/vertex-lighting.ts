@@ -246,6 +246,13 @@ export class VertexLightingManager {
     return (r + g + b) / 3;
   }
 
+  /** Table fill only (no torch, lantern, or sunbeam) after ?bright=. */
+  ambientBrightness(): number {
+    const a = this.floorAmbient();
+    const avg = (AMBIENT_RGB[0] + AMBIENT_RGB[1] + AMBIENT_RGB[2]) / 3;
+    return Math.min(1, a * avg * this.bright);
+  }
+
   private accum(
     rgb: [number, number, number],
     weight: number,

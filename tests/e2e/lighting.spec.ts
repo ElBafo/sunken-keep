@@ -12,6 +12,7 @@ type Proto3d = {
   setOil: (n: number) => void;
   getBright: () => number;
   getAmbientFloor: () => number;
+  getAmbient: () => number;
   lastMessage: () => string;
   getPosition: () => { x: number; y: number; dir: number };
   torchStates: () => Array<{ x: number; y: number; face: string; lit: boolean; capped: boolean }>;
@@ -81,25 +82,30 @@ test('proto3d lighting: pools, relight, oil, no 404s', async ({ page }) => {
   const darkBefore = await page.evaluate(() =>
     (window as unknown as { __proto3d: Proto3d }).__proto3d.tileBrightness(3, 6)
   );
-  // (3,7) sits outside every lit torch and the lantern at (5,7).
-  const unlitAmbient = await page.evaluate(() =>
-    (window as unknown as { __proto3d: Proto3d }).__proto3d.tileBrightness(3, 7)
-  );
+  // (7,7) is outside lit torches, the lantern at (5,7), and the (2,6) sunbeam.
+  const unlit = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    return { tile: p.tileBrightness(7, 7), fill: p.getAmbient() };
+  });
   console.log(
     'BRIGHTNESS before relight pool',
     poolBefore.toFixed(3),
     'dark',
     darkBefore.toFixed(3),
-    'unlit ambient',
-    unlitAmbient.toFixed(3)
+    'unlit tile',
+    unlit.tile.toFixed(3),
+    'ambient fill',
+    unlit.fill.toFixed(3)
   );
   expect(poolBefore, 'lit pool brighter than dark stretch').toBeGreaterThan(darkBefore + 0.12);
   expect(
     await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.getAmbientFloor()),
     'default ambient table is floor 1'
   ).toBe(1);
-  expect(unlitAmbient, 'floor 1 unlit stone stays faintly readable').toBeGreaterThan(0.08);
-  expect(unlitAmbient, 'floor 1 unlit stone stays a low ambient').toBeLessThan(0.18);
+  expect(unlit.fill, 'floor 1 ambient fill is low but readable').toBeGreaterThan(0.1);
+  expect(unlit.fill, 'floor 1 ambient fill is low but readable').toBeLessThan(0.16);
+  expect(unlit.tile, 'floor 1 unlit stone stays faintly readable').toBeGreaterThan(0.08);
+  expect(unlit.tile, 'floor 1 unlit stone stays a low ambient').toBeLessThan(0.18);
 
   const lantern = await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
@@ -268,17 +274,21 @@ test('proto3d lighting: ?ambientFloor=3 is near-black beyond the lantern', async
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
     p.setOil(2);
     p.setPosition(5, 7, 0);
-    const unlit = p.tileBrightness(3, 7);
+    const unlit = p.tileBrightness(7, 7);
+    const fill = p.getAmbient();
     p.setPosition(7, 1, 3);
     return {
       unlit,
+      fill,
       own: p.tileBrightness(7, 1),
       ahead: p.tileBrightness(6, 1)
     };
   });
   console.log('AMBIENT floor3', deep);
-  expect(deep.unlit, 'floor 3+ unlit is near-black (3–5%, not 0)').toBeGreaterThan(0.02);
-  expect(deep.unlit, 'floor 3+ unlit is near-black (3–5%, not 0)').toBeLessThan(0.08);
+  expect(deep.fill, 'floor 3+ ambient fill is 3–5%').toBeGreaterThan(0.03);
+  expect(deep.fill, 'floor 3+ ambient fill is 3–5%').toBeLessThan(0.055);
+  expect(deep.unlit, 'floor 3+ beyond lights is near-black (not 0)').toBeGreaterThan(0.03);
+  expect(deep.unlit, 'floor 3+ beyond lights is near-black (not 0)').toBeLessThan(0.08);
   expect(deep.own, 'lantern still reads the party square on floor 3 ambient').toBeGreaterThan(0.3);
   expect(deep.ahead, 'lantern still reads the next square on floor 3 ambient').toBeGreaterThan(0.2);
 

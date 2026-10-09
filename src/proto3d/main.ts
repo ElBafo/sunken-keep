@@ -433,6 +433,7 @@ class Game {
       setOil: (n: number) => this.setOil(n),
       getBright: () => this.bright,
       getAmbientFloor: () => this.vertexLighting.getAmbientFloor(),
+      getAmbient: () => this.vertexLighting.ambientBrightness(),
       setBright: (n: number) => {
         this.bright = Math.min(BRIGHT_MAX, Math.max(BRIGHT_MIN, n));
         this.vertexLighting.setBright(this.bright);
