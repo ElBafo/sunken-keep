@@ -27,6 +27,8 @@ export class SpriteManager {
     
     const loadTex = (path: string) => {
       const tex = loader.load(`${baseUrl}${path}`);
+      tex.colorSpace = THREE.SRGBColorSpace; // Sprite textures are sRGB
+      (tex as any).encoding = 3001; // sRGBEncoding fallback
       tex.magFilter = THREE.NearestFilter;
       tex.minFilter = THREE.NearestFilter;
       tex.generateMipmaps = false;
@@ -58,6 +60,7 @@ export class SpriteManager {
           const geo = new THREE.PlaneGeometry(1.5, 1.5);
           const mesh = new THREE.Mesh(geo, mat);
           mesh.position.set(x * CELL_SIZE, 0.75, y * CELL_SIZE);
+          mesh.userData.isSprite = true;
           scene.add(mesh);
           
           this.sprites.push({
@@ -84,6 +87,7 @@ export class SpriteManager {
           const geo = new THREE.PlaneGeometry(0.8, 0.8);
           const mesh = new THREE.Mesh(geo, mat);
           mesh.position.set(x * CELL_SIZE, 0.4, y * CELL_SIZE);
+          mesh.userData.isSprite = true;
           scene.add(mesh);
           
           this.sprites.push({
@@ -117,6 +121,7 @@ export class SpriteManager {
       
       const geo = new THREE.PlaneGeometry(0.6, 0.8);
       const mesh = new THREE.Mesh(geo, mat);
+      mesh.userData.isSprite = true;
       
       // Position close to wall face
       const wx = sconce.x * CELL_SIZE;

@@ -25,6 +25,8 @@ export class SceneBuilder {
         loader.load(
           `${baseUrl}${path}`,
           (tex) => {
+            tex.colorSpace = THREE.SRGBColorSpace; // Textures are sRGB
+            (tex as any).encoding = 3001; // sRGBEncoding fallback
             tex.magFilter = THREE.NearestFilter;
             tex.minFilter = THREE.NearestFilter;
             tex.generateMipmaps = false;
@@ -94,10 +96,9 @@ export class SceneBuilder {
         const floorY = isWater ? -0.15 : 0;
         
         const floorGeo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE);
-        const floorMat = new THREE.MeshStandardMaterial({ 
+        const floorMat = new THREE.MeshBasicMaterial({ 
           map: floorTex,
-          roughness: 0.9,
-          metalness: 0.1,
+          vertexColors: true,
           side: THREE.DoubleSide
         });
         const floor = new THREE.Mesh(floorGeo, floorMat);
@@ -107,10 +108,9 @@ export class SceneBuilder {
         
         // Ceiling
         const ceilingGeo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE);
-        const ceilingMat = new THREE.MeshStandardMaterial({ 
+        const ceilingMat = new THREE.MeshBasicMaterial({ 
           map: this.textures!.ceiling,
-          roughness: 0.9,
-          metalness: 0.1,
+          vertexColors: true,
           side: THREE.DoubleSide
         });
         const ceiling = new THREE.Mesh(ceilingGeo, ceilingMat);
@@ -170,10 +170,9 @@ export class SceneBuilder {
         }
         
         const geo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE);
-        const mat = new THREE.MeshStandardMaterial({ 
+        const mat = new THREE.MeshBasicMaterial({ 
           map: texture,
-          roughness: 0.9,
-          metalness: 0.1,
+          vertexColors: true,
           side: THREE.DoubleSide
         });
         const wall = new THREE.Mesh(geo, mat);

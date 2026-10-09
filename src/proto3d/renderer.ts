@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 
+// Enable Three.js color management for proper sRGB handling
+THREE.ColorManagement.enabled = true;
+
 const RENDER_WIDTH = 270;
 
 export class PixelRenderer {
@@ -36,8 +39,9 @@ export class PixelRenderer {
       preserveDrawingBuffer: preserveBuffer
     });
     this.renderer.setPixelRatio(1);
+    this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace; // No conversion on final quad
     
-    // Low-res render target
+    // Low-res render target - renders in linear space
     const aspect = window.innerHeight / window.innerWidth;
     const renderHeight = Math.round(RENDER_WIDTH * aspect);
     this.renderTarget = new THREE.WebGLRenderTarget(RENDER_WIDTH, renderHeight, {
@@ -45,6 +49,7 @@ export class PixelRenderer {
       magFilter: THREE.NearestFilter,
       format: THREE.RGBAFormat,
       type: THREE.UnsignedByteType
+      // Renders in linear, textures auto-converted from sRGB
     });
     
     // Final fullscreen quad for upscaling + quantization
@@ -72,16 +77,31 @@ export class PixelRenderer {
         uniform float paletteEnabled;
         varying vec2 vUv;
         
-        vec3 quantizeColor(vec3 color) {
-          if (paletteSize == 0 || paletteEnabled < 0.5) return color;
+        // Linear to sRGB conversion
+        vec3 linearToSRGB(vec3 linear) {
+          vec3 a = 12.92 * linear;
+          vec3 b = 1.055 * pow(linear, vec3(1.0 / 2.4)) - 0.055;
+          vec3 c = step(vec3(0.0031308), linear);
+          return mix(a, b, c);
+        }
+        
+        vec3 quantizeColor(vec3 linearColor) {
+          if (paletteSize == 0 || paletteEnabled < 0.5) {
+            return linearToSRGB(linearColor);
+          }
+          
+          // Convert linear working space to sRGB for palette matching
+          // Textures are sRGB -> converted to linear on read -> rendered in linear
+          // -> now convert back to sRGB to match palette.json colors
+          vec3 srgb = linearToSRGB(linearColor);
           
           float minDist = 999999.0;
-          vec3 nearest = color;
+          vec3 nearest = srgb;
           
           for (int i = 0; i < 64; i++) {
             if (i >= paletteSize) break;
             vec3 palColor = palette[i];
-            float dist = distance(color, palColor);
+            float dist = distance(srgb, palColor);
             if (dist < minDist) {
               minDist = dist;
               nearest = palColor;

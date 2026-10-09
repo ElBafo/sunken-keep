@@ -7,12 +7,12 @@ export class LightingManager {
   lights: THREE.PointLight[] = [];
   
   setupLights(scene: THREE.Scene, sconces: readonly Sconce[], camera: THREE.Camera) {
-    // Bright ambient to match target mock - walls clearly readable within 3 squares
-    const ambient = new THREE.AmbientLight(0x8a9e94, 2.5);
+    // Moderate ambient - textures should show their color
+    const ambient = new THREE.AmbientLight(0x505a54, 0.8);
     scene.add(ambient);
     
-    // Strong party light following camera
-    const partyLight = new THREE.PointLight(0xccdddd, 4.0, 8);
+    // Party light (Wren's lantern) - ~2 squares, then black
+    const partyLight = new THREE.PointLight(0xbbcccc, 1.8, 5, 1.5);
     partyLight.position.copy(camera.position);
     scene.add(partyLight);
     this.lights.push(partyLight);
@@ -31,8 +31,8 @@ export class LightingManager {
       else if (sconce.face === 'S') lz += offset;
       else if (sconce.face === 'W') lx -= offset;
       
-      // Warm flickering torch light - strong pools of light like the mock
-      const light = new THREE.PointLight(0xff9944, 5.0, 10);
+      // Warm sconce light - wall one step ahead shows close to full texture color
+      const light = new THREE.PointLight(0xff9944, 2.5, 7, 1.2);
       light.position.set(lx, 1.2, lz);
       light.castShadow = false;
       
@@ -53,8 +53,8 @@ export class LightingManager {
     // Flicker torch lights
     for (let i = 1; i < this.lights.length; i++) {
       const light = this.lights[i];
-      const flicker = 0.2 + Math.sin(time * 0.003 + i * 1.7) * 0.15 + Math.sin(time * 0.007 + i) * 0.1;
-      light.intensity = 5.0 + flicker;
+      const flicker = 0.15 + Math.sin(time * 0.003 + i * 1.7) * 0.1 + Math.sin(time * 0.007 + i) * 0.05;
+      light.intensity = 2.5 + flicker;
       
       // Quantize intensity for banded look
       light.intensity = Math.floor(light.intensity * 8) / 8;

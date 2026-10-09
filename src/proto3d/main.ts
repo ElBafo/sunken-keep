@@ -3,8 +3,8 @@ import { SceneBuilder } from './scene-builder';
 import { Player } from './player';
 import { InputManager } from './input';
 import { SpriteManager } from './sprites';
-import { LightingManager } from './lighting';
 import { AudioManager } from './audio';
+import { VertexLightingManager } from './vertex-lighting';
 import { floor1, floor1Sconces } from './floor-data';
 import * as THREE from 'three';
 
@@ -14,7 +14,7 @@ class Game {
   player!: Player;
   inputManager!: InputManager;
   spriteManager!: SpriteManager;
-  lightingManager!: LightingManager;
+  vertexLighting!: VertexLightingManager;
   audioManager!: AudioManager;
   
   lastTime = 0;
@@ -65,9 +65,20 @@ class Game {
     console.log('Camera rotation:', this.renderer.camera.rotation.toArray().slice(0, 3));
     
     // Setup lighting
-    this.lightingManager = new LightingManager();
-    this.lightingManager.setupLights(this.renderer.scene, floor1Sconces, this.renderer.camera);
-    console.log('Lights added:', this.lightingManager.lights.length);
+    // Setup vertex lighting manager
+    this.vertexLighting = new VertexLightingManager(floor1, floor1Sconces);
+    this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
+    
+    // Log a few sample brightness calculations
+    console.log('Sample brightness at party (1,7):', 
+      (this.vertexLighting as any).calculateBrightness(1, 7, false));
+    console.log('Sample brightness at (1,6) one square ahead:', 
+      (this.vertexLighting as any).calculateBrightness(1, 6, false));
+    console.log('Sample brightness at (1,5) two squares ahead:', 
+      (this.vertexLighting as any).calculateBrightness(1, 5, false));
+    
+    this.vertexLighting.updateAllMeshes(this.renderer.scene);
+    console.log('Vertex lighting initialized');
     
     // Setup sprites
     this.spriteManager = new SpriteManager(this.renderer.camera);
@@ -111,8 +122,12 @@ class Game {
     
     // Update
     this.player.update(deltaTime);
+    
+    // Update vertex lighting when player moves
+    this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
+    this.vertexLighting.updateAllMeshes(this.renderer.scene);
+    
     this.spriteManager.update(now);
-    this.lightingManager.update(now, this.renderer.camera);
     
     // Render
     this.renderer.render();
