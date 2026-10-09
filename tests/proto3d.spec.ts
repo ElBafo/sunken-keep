@@ -34,20 +34,26 @@ test('proto3d camera offset, wall sconces, no errors', async ({ page }) => {
     console.log('✓ screenshots/' + file);
   };
 
-  // Start view (two wall torches in the west corridor)
-  await pose(1, 7, 0, 'proto3d-start.png');
-  const startLuma = await page.evaluate(() => (window as any).__proto3d.meanLuma());
+  const captureCompareViews = async (suffix: string) => {
+    await pose(1, 7, 0, `proto3d-start${suffix}.png`);
+    await pose(1, 5, 0, `proto3d-corridor${suffix}.png`);
+    await pose(1, 7, 2, `proto3d-wall-1sq${suffix}.png`);
+    await pose(5, 2, 3, `proto3d-door-1sq${suffix}.png`);
+    await pose(1, 4, 0, `proto3d-water-hall${suffix}.png`);
+    await pose(5, 2, 1, `proto3d-slime${suffix}.png`);
+    await pose(2, 6, 0, `proto3d-key${suffix}.png`);
+  };
+
+  // Palette on (default)
+  await captureCompareViews('');
+  const startLuma = await page.evaluate(() => {
+    (window as any).__proto3d.setPosition(1, 7, 0);
+    return (window as any).__proto3d.meanLuma();
+  });
   console.log('start view mean luma', startLuma.toFixed(1));
 
-  // Long corridor — a step north looking into the flooded hall
-  await pose(1, 5, 0, 'proto3d-corridor.png');
-  // (a) facing a plain wall from 1 square
-  await pose(1, 7, 2, 'proto3d-wall-1sq.png');
-  // (b) facing the locked door from 1 square
-  await pose(5, 2, 3, 'proto3d-door-1sq.png');
-  // (c) walking past a sconce on a side wall
+  // Sconce extras (palette on)
   await pose(1, 5, 2, 'proto3d-sconce-side.png');
-  // (d) sconce on the far wall
   await pose(3, 6, 3, 'proto3d-sconce-far.png');
   await pose(1, 7, 0, 'proto3d-sconce-left.png');
   await pose(3, 2, 0, 'proto3d-sconce-right.png');
@@ -92,6 +98,13 @@ test('proto3d camera offset, wall sconces, no errors', async ({ page }) => {
 
   await page.screenshot({ path: 'screenshots/layout-test.png', fullPage: false });
   await page.screenshot({ path: 'screenshots/proto-slime-2sq.png', fullPage: false });
+
+  // Palette off via ?palette=0
+  await page.goto(`${BASE_URL}/proto3d.html?test=1&palette=0`);
+  await page.waitForFunction(() => (window as any).__proto3d?.ready === true, null, { timeout: 15000 });
+  await page.locator('#tap-to-start').click();
+  await page.waitForTimeout(400);
+  await captureCompareViews('-nopalette');
 
   expect(startLuma, 'start view mean luma').toBeGreaterThanOrEqual(30);
   expect(startLuma, 'start view mean luma').toBeLessThanOrEqual(70);
