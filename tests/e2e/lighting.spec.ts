@@ -445,7 +445,7 @@ test('proto3d floor1v2: start-key-door-hall-stairs and pantry-lamp room', async 
   expect((await step()).after).toMatchObject({ x: 5, y: 5 });
   await pose(5, 5, 1);
   expect((await step()).after).toMatchObject({ x: 6, y: 5 });
-  await pose(6, 5, 0);
+  await pose(6, 5, 2);
   expect((await step()).after).toMatchObject({ x: 6, y: 6 });
   await pose(6, 6, 1);
   expect((await step()).after).toMatchObject({ x: 7, y: 6 });
