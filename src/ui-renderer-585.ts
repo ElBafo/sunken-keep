@@ -16,16 +16,23 @@ import {
 
 export class UIRenderer585 {
   private stoneStripTile: HTMLImageElement | null = null;
-  private dungeonRenderer: Renderer;
+  private dungeonRenderer: Renderer | null = null;
 
   constructor() {
-    // Preload stone strip tile - deferred to avoid WebKit crash
-    // Will be loaded on first render if needed
-    this.dungeonRenderer = new Renderer();
+    // Deferred initialization to avoid potential timing issues
+  }
+
+  private ensureRendererInit(): void {
+    if (!this.dungeonRenderer) {
+      this.dungeonRenderer = new Renderer();
+    }
   }
 
   // Render full UI (called after dungeon view is rendered)
   render(ctx: CanvasRenderingContext2D, state: GameState, now: number): void {
+    // Ensure renderer is initialized
+    this.ensureRendererInit();
+
     // Clear canvas
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
@@ -34,7 +41,7 @@ export class UIRenderer585 {
     try {
       const party = createPartyAdapter(state);
       const floor = state.floors.get(state.party.floor);
-      if (floor && party) {
+      if (floor && party && this.dungeonRenderer) {
         // Convert floor to old format for renderer
         const oldFloor = {
           width: floor.width,

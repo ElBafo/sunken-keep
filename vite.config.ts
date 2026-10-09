@@ -6,6 +6,6 @@ export default defineConfig({
     target: 'es2020',
     assetsInlineLimit: 0,
     minify: 'esbuild',
-    sourcemap: false,
+    sourcemap: true,
   }
 });
