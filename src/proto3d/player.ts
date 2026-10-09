@@ -79,6 +79,16 @@ export class Player {
     // Camera at proper eye height
     this.camera.position.set(wx, 1.1, wz);
     this.camera.rotation.y = rot;
+    this.camera.updateMatrixWorld();
+  }
+
+  // Instant teleport for tests / query-string start poses.
+  setPosition(x: number, y: number, dir: number) {
+    this.isMoving = false;
+    this.x = x;
+    this.y = y;
+    this.dir = dir;
+    this.updateCameraPosition(1);
   }
   
   canMove(dx: number, dy: number): boolean {
@@ -89,7 +99,9 @@ export class Player {
     if (newY < 0 || newY >= this.floorData.height) return false;
     
     const tile = this.floorData.tiles[newY][newX];
-    return !tile.wall && !(tile.door && tile.doorLocked);
+    // Prototype has no key-use interaction; locked doors are walk-through
+    // so the vault (and slime at tiles[2][7] = x=7,y=2) is reachable.
+    return !tile.wall && !tile.secret;
   }
   
   moveForward() {

@@ -158,29 +158,18 @@ export class VertexLightingManager {
   }
   
   updateAllMeshes(scene: THREE.Scene) {
-    let meshCount = 0;
-    
     scene.traverse((obj) => {
-      if (obj instanceof THREE.Mesh && obj.geometry.attributes.position) {
-        // Skip sprite billboards - they should remain unlit/full brightness
-        if (obj.userData.isSprite) {
-          console.log(`Skipping sprite at (${obj.position.x}, ${obj.position.y}, ${obj.position.z})`);
-          return;
-        }
-        
-        // Extract tile position from mesh world position
-        const tileX = Math.round(obj.position.x / CELL_SIZE);
-        const tileY = Math.round(obj.position.z / CELL_SIZE);
-        
-        // Check if this is a dark tile
-        const tile = this.floorData.tiles[tileY]?.[tileX];
-        const isDark = tile?.floorNDark || false;
-        
-        this.updateMeshLighting(obj, tileX, tileY, isDark);
-        meshCount++;
-      }
+      if (!(obj instanceof THREE.Mesh) || !obj.geometry.attributes.position) return;
+      // Skip sprite billboards (THREE.Sprite is not a Mesh; keep this for any plane leftover)
+      if (obj.userData.isSprite || obj instanceof THREE.Sprite) return;
+
+      const tileX = Math.round(obj.position.x / CELL_SIZE);
+      const tileY = Math.round(obj.position.z / CELL_SIZE);
+
+      const tile = this.floorData.tiles[tileY]?.[tileX];
+      const isDark = tile?.floorNDark || false;
+
+      this.updateMeshLighting(obj, tileX, tileY, isDark);
     });
-    
-    console.log(`VertexLightingManager: Updated ${meshCount} meshes (sprites skipped)`);
   }
 }

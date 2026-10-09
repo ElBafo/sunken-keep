@@ -4,7 +4,7 @@ import { FloorData, Sconce } from './types';
 const CELL_SIZE = 2;
 
 interface SpriteInfo {
-  mesh: THREE.Mesh;
+  sprite: THREE.Sprite;
   x: number;
   y: number;
   frames?: THREE.Texture[];
@@ -13,60 +13,96 @@ interface SpriteInfo {
   lastFrameTime: number;
 }
 
+function configureSpriteTexture(tex: THREE.Texture) {
+  tex.colorSpace = THREE.SRGBColorSpace;
+  (tex as any).encoding = 3001; // sRGBEncoding fallback
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.generateMipmaps = false;
+  tex.needsUpdate = true;
+}
+
+function makeSpriteMaterial(map: THREE.Texture) {
+  return new THREE.SpriteMaterial({
+    map,
+    color: 0xffffff,
+    transparent: true,
+    alphaTest: 0.15,
+    depthTest: true,
+    depthWrite: false,
+    sizeAttenuation: true,
+    fog: false,
+    toneMapped: false
+  });
+}
+
+function makeBillboard(
+  material: THREE.SpriteMaterial,
+  x: number,
+  y: number,
+  z: number,
+  width: number,
+  height: number
+): THREE.Sprite {
+  const sprite = new THREE.Sprite(material);
+  // Anchor at the feet so scale changes don't sink into the floor
+  sprite.center.set(0.5, 0);
+  sprite.position.set(x, y, z);
+  sprite.scale.set(width, height, 1);
+  sprite.frustumCulled = false;
+  sprite.renderOrder = 10;
+  sprite.userData.isSprite = true;
+  sprite.matrixAutoUpdate = true;
+  return sprite;
+}
+
 export class SpriteManager {
   sprites: SpriteInfo[] = [];
   camera: THREE.Camera;
-  
+
   constructor(camera: THREE.Camera) {
     this.camera = camera;
   }
-  
+
   async loadSprites(scene: THREE.Scene, floorData: FloorData, sconces: readonly Sconce[]) {
     const loader = new THREE.TextureLoader();
     const baseUrl = import.meta.env.BASE_URL;
-    
-    const loadTex = (path: string) => {
-      const tex = loader.load(`${baseUrl}${path}`);
-      tex.colorSpace = THREE.SRGBColorSpace; // Sprite textures are sRGB
-      (tex as any).encoding = 3001; // sRGBEncoding fallback
-      tex.magFilter = THREE.NearestFilter;
-      tex.minFilter = THREE.NearestFilter;
-      tex.generateMipmaps = false;
-      return tex;
+
+    const loadTex = (path: string): Promise<THREE.Texture> => {
+      return new Promise((resolve, reject) => {
+        loader.load(
+          `${baseUrl}${path}`,
+          (tex) => {
+            configureSpriteTexture(tex);
+            resolve(tex);
+          },
+          undefined,
+          (err) => reject(new Error(`Failed to load sprite texture ${path}: ${String(err)}`))
+        );
+      });
     };
-    
-    // Add monsters and items
+
     const { tiles, width, height } = floorData;
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const tile = tiles[y][x];
-        
-        // Monster
+
+        // tiles[row][col] === tiles[y][x]. Slime is at tiles[2][7] → x=7, y=2.
         if (tile.monster === 'slime') {
-          const frames = [
+          const frames = await Promise.all([
             loadTex('art/dungeon/slime_idle_1_near.png'),
             loadTex('art/dungeon/slime_idle_2_near.png'),
             loadTex('art/dungeon/slime_idle_3_near.png'),
             loadTex('art/dungeon/slime_idle_4_near.png')
-          ];
-          
-          const mat = new THREE.MeshBasicMaterial({ 
-            map: frames[0],
-            transparent: true,
-            alphaTest: 0.5,
-            side: THREE.DoubleSide
-          });
-          
-          const geo = new THREE.PlaneGeometry(1.5, 1.5);
-          const mesh = new THREE.Mesh(geo, mat);
-          mesh.position.set(x * CELL_SIZE, 0.75, y * CELL_SIZE);
-          mesh.userData.isSprite = true;
-          scene.add(mesh);
-          
-          console.log(`Added slime sprite at world (${x * CELL_SIZE}, 0.75, ${y * CELL_SIZE}) from tile (${x}, ${y})`);
-          
+          ]);
+
+          const mat = makeSpriteMaterial(frames[0]);
+          // ~wall-height billboard, feet on the floor, centered in the cell
+          const sprite = makeBillboard(mat, x * CELL_SIZE, 0.02, y * CELL_SIZE, 1.85, 1.7);
+          scene.add(sprite);
+
           this.sprites.push({
-            mesh,
+            sprite,
             x,
             y,
             frames,
@@ -75,25 +111,15 @@ export class SpriteManager {
             lastFrameTime: 0
           });
         }
-        
-        // Item
+
         if (tile.item === 'key') {
-          const tex = loadTex('art/dungeon/item_key_near.png');
-          const mat = new THREE.MeshBasicMaterial({ 
-            map: tex,
-            transparent: true,
-            alphaTest: 0.5,
-            side: THREE.DoubleSide
-          });
-          
-          const geo = new THREE.PlaneGeometry(0.8, 0.8);
-          const mesh = new THREE.Mesh(geo, mat);
-          mesh.position.set(x * CELL_SIZE, 0.4, y * CELL_SIZE);
-          mesh.userData.isSprite = true;
-          scene.add(mesh);
-          
+          const tex = await loadTex('art/dungeon/item_key_near.png');
+          const mat = makeSpriteMaterial(tex);
+          const sprite = makeBillboard(mat, x * CELL_SIZE, 0.15, y * CELL_SIZE, 0.9, 0.9);
+          scene.add(sprite);
+
           this.sprites.push({
-            mesh,
+            sprite,
             x,
             y,
             currentFrame: 0,
@@ -103,47 +129,34 @@ export class SpriteManager {
         }
       }
     }
-    
-    // Add sconce sprites
+
     for (const sconce of sconces) {
       if (!sconce.lit) continue;
-      
-      const frames = [
+
+      const frames = await Promise.all([
         loadTex('art/dungeon/sconce_lit_1_near.png'),
         loadTex('art/dungeon/sconce_lit_2_near.png'),
         loadTex('art/dungeon/sconce_lit_3_near.png')
-      ];
-      
-      const mat = new THREE.MeshBasicMaterial({ 
-        map: frames[0],
-        transparent: true,
-        alphaTest: 0.5,
-        side: THREE.DoubleSide
-      });
-      
-      const geo = new THREE.PlaneGeometry(0.6, 0.8);
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.userData.isSprite = true;
-      
-      // Position close to wall face
+      ]);
+
+      const mat = makeSpriteMaterial(frames[0]);
+
       const wx = sconce.x * CELL_SIZE;
       const wz = sconce.y * CELL_SIZE;
-      const offset = 0.88; // Very close to wall
-      
-      if (sconce.face === 'N') {
-        mesh.position.set(wx, 1.2, wz - offset);
-      } else if (sconce.face === 'E') {
-        mesh.position.set(wx + offset, 1.2, wz);
-      } else if (sconce.face === 'S') {
-        mesh.position.set(wx, 1.2, wz + offset);
-      } else if (sconce.face === 'W') {
-        mesh.position.set(wx - offset, 1.2, wz);
-      }
-      
-      scene.add(mesh);
-      
+      const offset = 0.88;
+
+      let x = wx;
+      let z = wz;
+      if (sconce.face === 'N') z = wz - offset;
+      else if (sconce.face === 'E') x = wx + offset;
+      else if (sconce.face === 'S') z = wz + offset;
+      else if (sconce.face === 'W') x = wx - offset;
+
+      const sprite = makeBillboard(mat, x, 0.85, z, 0.55, 0.75);
+      scene.add(sprite);
+
       this.sprites.push({
-        mesh,
+        sprite,
         x: sconce.x,
         y: sconce.y,
         frames,
@@ -153,17 +166,15 @@ export class SpriteManager {
       });
     }
   }
-  
+
   update(time: number) {
-    // Update billboard rotation
     for (const sprite of this.sprites) {
-      sprite.mesh.lookAt(this.camera.position);
-      
-      // Animate
       if (sprite.frames && sprite.frames.length > 1) {
         if (time - sprite.lastFrameTime > sprite.animSpeed) {
           sprite.currentFrame = (sprite.currentFrame + 1) % sprite.frames.length;
-          (sprite.mesh.material as THREE.MeshBasicMaterial).map = sprite.frames[sprite.currentFrame];
+          const mat = sprite.sprite.material;
+          mat.map = sprite.frames[sprite.currentFrame];
+          mat.needsUpdate = true;
           sprite.lastFrameTime = time;
         }
       }

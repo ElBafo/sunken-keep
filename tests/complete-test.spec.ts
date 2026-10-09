@@ -24,11 +24,11 @@ test('3D prototype - complete visual test', async ({ page }) => {
   
   // Go to prototype with test flag for preserveDrawingBuffer
   await page.goto(`${BASE_URL}/proto3d.html?test=1`);
-  await page.waitForTimeout(1000);
+  await page.waitForFunction(() => (window as any).__proto3d?.ready === true, null, { timeout: 15000 });
   
   // Click to start
   await page.locator('#tap-to-start').click();
-  await page.waitForTimeout(3000);
+  await page.waitForTimeout(1000);
   
   // Screenshot 1: Start position (1, 7) facing north - wall on LEFT
   await page.screenshot({ path: 'screenshots/proto-start.png', fullPage: false });
@@ -74,21 +74,20 @@ test('3D prototype - complete visual test', async ({ page }) => {
   await page.screenshot({ path: 'screenshots/proto-door.png' });
   console.log('✓ Screenshot: proto-door.png (door from 2 squares away)');
   
-  // Navigate to slime at (7,2) - from (2,2) facing east
-  // First go to (7,2) area
-  await page.locator('#btn-forward').click(); // to (3,2)
-  await page.waitForTimeout(250);
-  await page.locator('#btn-forward').click(); // to (4,2)
-  await page.waitForTimeout(250);
-  await page.locator('#btn-forward').click(); // to (5,2)
-  await page.waitForTimeout(250);
-  await page.locator('#btn-forward').click(); // to (6,2)
-  await page.waitForTimeout(250);
-  // Now at (6,2) facing east, slime is at (7,2), 1 square ahead
-  
-  // Screenshot 5: Slime from 1 square away
+  // Slime is at tiles[2][7] = (x=7, y=2), behind the locked door at (4,2).
+  // Teleport so the shot is actually facing the monster (button nav previously
+  // used swapped coordinates and stopped at the door).
+  await page.waitForFunction(() => (window as any).__proto3d?.ready === true);
+  await page.evaluate(() => (window as any).__proto3d.setPosition(5, 2, 1));
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: 'screenshots/proto-slime-2sq.png' });
+  console.log('✓ Screenshot: proto-slime-2sq.png (slime from 2 squares away at 5,2 facing east)');
+
+  await page.evaluate(() => (window as any).__proto3d.setPosition(6, 2, 1));
+  await page.waitForTimeout(400);
   await page.screenshot({ path: 'screenshots/proto-slime.png' });
-  console.log('✓ Screenshot: proto-slime.png (slime from 1 square away)');
+  await page.screenshot({ path: 'screenshots/proto-slime-1sq.png' });
+  console.log('✓ Screenshot: proto-slime.png (slime from 1 square away at 6,2 facing east)');
   
   // Screenshot 6: Without palette
   await page.goto(`${BASE_URL}/proto3d.html?palette=0&test=1`);

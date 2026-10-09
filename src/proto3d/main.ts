@@ -58,8 +58,14 @@ class Game {
     
     console.log('Scene total objects:', this.renderer.scene.children.length);
     
-    // Setup player
+    // Setup player (optional ?x=&y=&dir= start pose for tests)
     this.player = new Player(this.renderer.camera, floor1);
+    const startX = params.has('x') ? Number(params.get('x')) : floor1.startX;
+    const startY = params.has('y') ? Number(params.get('y')) : floor1.startY;
+    const startDir = params.has('dir') ? Number(params.get('dir')) : floor1.startDir;
+    if (Number.isFinite(startX) && Number.isFinite(startY) && Number.isFinite(startDir)) {
+      this.player.setPosition(startX, startY, startDir);
+    }
     console.log('Player position:', this.player.x, this.player.y, 'dir:', this.player.dir);
     console.log('Camera position:', this.renderer.camera.position.toArray());
     console.log('Camera rotation:', this.renderer.camera.rotation.toArray().slice(0, 3));
@@ -83,8 +89,10 @@ class Game {
     console.log('Loading sprites...');
     this.spriteManager = new SpriteManager(this.renderer.camera);
     await this.spriteManager.loadSprites(this.renderer.scene, floor1, floor1Sconces);
+    const slime = this.spriteManager.sprites.find(s => s.frames && s.frames.length === 4 && s.x === 7 && s.y === 2);
     console.log('Sprites added:', this.spriteManager.sprites.length);
     console.log('Sprite positions:', this.spriteManager.sprites.map(s => `(${s.x},${s.y})`));
+    console.log('Slime sprite:', slime ? `world (${slime.sprite.position.x}, ${slime.sprite.position.y}, ${slime.sprite.position.z})` : 'MISSING');
     
     // Setup audio
     this.audioManager = new AudioManager(this.renderer.camera);
@@ -95,6 +103,29 @@ class Game {
     
     // Setup tap to start
     this.setupTapToStart();
+
+    this.exposeDebugApi();
+  }
+
+  exposeDebugApi() {
+    (window as unknown as { __proto3d: unknown }).__proto3d = {
+      ready: true,
+      setPosition: (x: number, y: number, dir: number) => {
+        this.player.setPosition(x, y, dir);
+        this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
+        this.vertexLighting.updateAllMeshes(this.renderer.scene);
+        this.spriteManager.update(performance.now());
+        this.renderer.render();
+      },
+      getPosition: () => ({ x: this.player.x, y: this.player.y, dir: this.player.dir }),
+      sprites: () => this.spriteManager.sprites.map(s => ({
+        x: s.x,
+        y: s.y,
+        world: s.sprite.position.toArray(),
+        frames: s.frames?.length ?? 0,
+        currentFrame: s.currentFrame
+      }))
+    };
   }
   
   setupTapToStart() {
@@ -122,12 +153,16 @@ class Game {
     this.lastTime = now;
     
     // Update
+    const prevX = this.player.x;
+    const prevY = this.player.y;
     this.player.update(deltaTime);
-    
-    // Update vertex lighting when player moves
-    this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
-    this.vertexLighting.updateAllMeshes(this.renderer.scene);
-    
+
+    // Rebake vertex lighting when the party tile changes
+    if (this.player.x !== prevX || this.player.y !== prevY) {
+      this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
+      this.vertexLighting.updateAllMeshes(this.renderer.scene);
+    }
+
     this.spriteManager.update(now);
     
     // Render
