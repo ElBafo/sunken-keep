@@ -219,5 +219,10 @@
   "key": "oil_pickup",
   "text": "Oil flask. Wren's lantern drinks it.",
   "when": "on picking up an oil flask"
+ },
+ {
+  "key": "torch_snuffed",
+  "text": "{hero} snuffs the torch. It hisses.",
+  "when": "on snuffing a lit torch"
  }
 ]

@@ -20,6 +20,19 @@
   "tide_spawn_death": "sfx_tide_spawn_death",
   "step_water_shallow": "sfx_step_water_shallow",
   "step_water_deep": "sfx_step_water_deep",
+  "step_variants": ["sfx_step_1", "sfx_step_2", "sfx_step_3", "sfx_step_4"],
+  "step_water_shallow_variants": [
+    "sfx_step_water_shallow_1",
+    "sfx_step_water_shallow_2",
+    "sfx_step_water_shallow_3",
+    "sfx_step_water_shallow_4"
+  ],
+  "step_water_deep_variants": [
+    "sfx_step_water_deep_1",
+    "sfx_step_water_deep_2",
+    "sfx_step_water_deep_3",
+    "sfx_step_water_deep_4"
+  ],
   "pickup": "sfx_pickup",
   "potion": "sfx_potion",
   "chest": "sfx_chest",
@@ -124,7 +137,7 @@
   "torch_loop": "One loop per lit sconce in view/nearby; volume ~0.6 at 1 square, 0.3 at 2, 0.12 at 3, silent beyond. Start each instance at a random offset so two torches don't phase. Dead sconces are silent.",
   "torch_ignite": "For Wren relighting a dead sconce later; torch_extinguish for the Tide snuffing one.",
   "music_act1": "Act 1 theme. In proto3d, loop at 0.3 under amb_flooded_halls from the first audio unlock.",
-  "steps": "Steps are 9 dB quieter in the files. Play at volume 1.0 with pitch ±4% and volume ±2 dB.",
+  "steps": "Pick a random variant _1.._4 each step, never the same twice in a row, playbackRate 0.95-1.05. Proto3d plays them at STEP_VOLUME (0.4).",
   "oil": "Flask pickup: sfx_oil_pickup then sfx_lantern_refill. Lighting a dead torch: sfx_torch_ignite then that torch's sfx_torch_loop. Tapping a capped torch: sfx_door_locked. Oil hits zero: sfx_oil_empty, then swap sfx_lantern_loop for sfx_lantern_ember_loop.",
   "true_dark": "Floor 3+ (and ?ambientFloor=3). Loop sfx_dark_presence_loop from a monster square while its eye glints show; stop when torch or lantern light reaches it. sfx_glint once the first time a key/lever glint comes into view. Duck Act 1 music to ~0.15 and halls ambience by ~3 dB."
  }

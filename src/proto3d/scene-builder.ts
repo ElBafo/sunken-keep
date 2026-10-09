@@ -303,6 +303,7 @@ export class SceneBuilder {
 
     wall.userData.lightX = nx;
     wall.userData.lightY = nz;
+    wall.userData.face = face;
     wall.userData.kind = tile.secret ? 'secret' : 'wall';
     group.add(wall);
   }

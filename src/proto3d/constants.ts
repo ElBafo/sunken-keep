@@ -63,10 +63,21 @@ export const SCONCE_HEIGHT_TILES = 0.5;
 export const SCONCE_WALL_OFFSET_TILES = 0.015;
 /** Front bracket / flame sit this far off the wall (artist spec). */
 export const SCONCE_FRONT_OFFSET_TILES = 0.14;
-export const SCONCE_ANIM_FPS = 8;
+/** Calm flame sprites (flame_calm_1..4). */
+export const SCONCE_ANIM_FPS = 5;
 export const FLARE_ANIM_FPS = 12;
-/** Flame-frame multipliers for the torch warm term (keep flicker readable). */
+export const TORCH_SNUFF_FPS = 10;
+/** Ignore retaps while the ignite flare plays. */
+export const TORCH_IGNITE_FLARE_MS = (1000 / FLARE_ANIM_FPS) * 6;
+/** Extra lock after a flare or snuff finishes so a double tap cannot reverse it. */
+export const TORCH_TAP_GUARD_MS = 1000;
+/** Flame-frame multipliers used only when e2e pins flicker for measurement. */
 export const SCONCE_FLICKER = [0.78, 0.58, 1.08] as const;
+/** Live warmth: ±3% sine over 3.5 s. Sunbeams and water glints stay static. */
+export const LIGHT_FLICKER_AMPLITUDE = 0.03;
+export const LIGHT_FLICKER_PERIOD_MS = 3500;
+/** Master footstep gain; variants add a little pitch / volume jitter. */
+export const STEP_VOLUME = 0.4;
 /** Lit torch pool — warm, smooth falloff. */
 export const SCONCE_RADIUS_TILES = 2.5;
 export const TORCH_INTENSITY = 1.45;
@@ -126,6 +137,45 @@ export const FACE_INTO_ROOM: Record<
   S: { nx: 0, nz: 1, rotY: 0 },
   W: { nx: -1, nz: 0, rotY: -Math.PI / 2 }
 };
+
+export const DIR_DELTA = [
+  [0, -1],
+  [1, 0],
+  [0, 1],
+  [-1, 0]
+] as const;
+
+export function cellInFront(x: number, y: number, dir: number): { x: number; y: number } {
+  const [dx, dy] = DIR_DELTA[dir & 3];
+  return { x: x + dx, y: y + dy };
+}
+
+export function wallPropRoom(
+  wallX: number,
+  wallY: number,
+  face: Sconce['face']
+): { x: number; y: number } {
+  const { nx, nz } = FACE_INTO_ROOM[face];
+  return { x: wallX + Math.round(nx), y: wallY + Math.round(nz) };
+}
+
+/**
+ * Hide wall props in the party's own square that are not on the facing wall
+ * (back wall + left/right). The facing-wall torch stays visible.
+ */
+export function hideWallProp(
+  wallX: number,
+  wallY: number,
+  face: Sconce['face'],
+  partyX: number,
+  partyY: number,
+  dir: number
+): boolean {
+  const room = wallPropRoom(wallX, wallY, face);
+  if (room.x !== partyX || room.y !== partyY) return false;
+  const front = cellInFront(partyX, partyY, dir);
+  return wallX !== front.x || wallY !== front.y;
+}
 
 export function cameraOffsetXZ(rotY: number): [number, number] {
   const back = CAMERA_BACK_OFFSET_TILES * CELL_SIZE;

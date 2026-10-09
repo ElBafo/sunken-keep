@@ -10,7 +10,9 @@ import {
   OIL_MAX,
   OIL_START,
   OIL_TORCH_COST,
-  parseAmbientFloor
+  parseAmbientFloor,
+  STEP_VOLUME,
+  TORCH_IGNITE_FLARE_MS
 } from './constants';
 import { Dressing } from './dressing';
 import { floor1, floor1Sconces } from './floor-data';
@@ -22,6 +24,7 @@ import { PixelRenderer } from './renderer';
 import { SceneBuilder } from './scene-builder';
 import { SpriteManager } from './sprites';
 import { TorchSystem, torchWorldPos } from './torches';
+import { Sconce } from './types';
 import { VertexLightingManager } from './vertex-lighting';
 import { WaterSystem } from './water';
 import { DarkFx } from './dark-fx';
@@ -46,6 +49,7 @@ class Game {
   oil = OIL_START;
   persist = true;
   oilPickupText = 'Oil flask. Wren\'s lantern drinks it.';
+  private logLines = new Map<string, string>();
   lastMessage = '';
   lampNote = { title: "Lamp-keeper's note", text: '' };
   noteOpen = false;
@@ -114,6 +118,7 @@ class Game {
 
     this.torches = new TorchSystem(this.renderer.camera);
     await this.torches.load(this.renderer.scene, floor1Sconces);
+    this.torches.setParty(this.player.x, this.player.y, this.player.dir);
 
     this.vertexLighting.registerScene(this.renderer.scene);
     this.vertexLighting.updateAllMeshes(this.renderer.scene);
@@ -224,11 +229,23 @@ class Game {
       const baseUrl = import.meta.env.BASE_URL;
       const res = await fetch(`${baseUrl}log.json`);
       const lines = (await res.json()) as Array<{ key: string; text: string }>;
-      const line = lines.find((l) => l.key === 'oil_pickup');
-      if (line?.text) this.oilPickupText = line.text;
+      for (const line of lines) this.logLines.set(line.key, line.text);
+      const oil = this.logLines.get('oil_pickup');
+      if (oil) this.oilPickupText = oil;
     } catch {
       // keep fallback
     }
+  }
+
+  private logLine(key: string, replacements?: Record<string, string>): string {
+    let text = this.logLines.get(key) ?? '';
+    if (!text && key === 'torch_snuffed') text = '{hero} snuffs the torch. It hisses.';
+    if (replacements) {
+      for (const [k, v] of Object.entries(replacements)) {
+        text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), v);
+      }
+    }
+    return text;
   }
 
   async loadLampNote() {
@@ -292,7 +309,7 @@ class Game {
     this.vertexLighting.updateAllMeshes(this.renderer.scene);
   }
 
-  lightFacingTorch(): boolean {
+  handleFacingTorch(): boolean {
     const sconce = this.torches.facingTorch(this.player.x, this.player.y, this.player.dir);
     if (!sconce) return false;
     if (sconce.capped) {
@@ -300,20 +317,45 @@ class Game {
       this.showMessage('Sealed.');
       return true;
     }
-    if (sconce.lit) return false;
+    if (this.torches.isTapLocked(sconce)) return true;
+    if (sconce.lit) {
+      this.snuffTorch(sconce);
+      return true;
+    }
+    this.relightTorch(sconce);
+    return true;
+  }
+
+  lightFacingTorch(): boolean {
+    return this.handleFacingTorch();
+  }
+
+  private snuffTorch(sconce: Sconce) {
+    if (!sconce.lit) return;
+    const now = performance.now();
+    this.torches.snuff(sconce, now);
+    this.vertexLighting.relight();
+    const pos = torchWorldPos(sconce);
+    this.audioManager.playPositional('torch_extinguish', pos.x, pos.y, pos.z, 0.7);
+    this.audioManager.stopTorchLoop(sconce);
+    saveProgress(floor1Sconces, this.oil, this.persist);
+    this.showMessage(this.logLine('torch_snuffed', { hero: 'Wren' }));
+  }
+
+  private relightTorch(sconce: Sconce) {
+    if (sconce.lit) return;
     if (this.oil < OIL_TORCH_COST) {
       this.showMessage('No oil to spare.');
-      return true;
+      return;
     }
     const now = performance.now();
     this.torches.ignite(sconce, now);
     this.vertexLighting.relight();
     const pos = torchWorldPos(sconce);
     this.audioManager.playPositional('torch_ignite', pos.x, pos.y, pos.z, 0.8);
-    window.setTimeout(() => this.audioManager.startTorchLoop(sconce), (1000 / 12) * 6);
+    window.setTimeout(() => this.audioManager.startTorchLoop(sconce), TORCH_IGNITE_FLARE_MS);
     this.setOil(this.oil - OIL_TORCH_COST);
     this.water.addSconceGlint(sconce);
-    return true;
   }
 
   interact() {
@@ -323,7 +365,7 @@ class Game {
     const facing = this.player.facingPos(1);
     if (this.pickupKeyAt(facing.x, facing.y)) return;
     if (this.pickupOilAt(facing.x, facing.y)) return;
-    if (this.lightFacingTorch()) return;
+    if (this.handleFacingTorch()) return;
     if (this.readFacingDesk()) return;
 
     const ahead = this.doorAhead();
@@ -353,6 +395,7 @@ class Game {
     const opening = !tile.doorOpen;
     this.sceneBuilder.doors.startSlide(visual, opening, performance.now());
     this.audioManager.playDoor(opening ? 'door_open' : 'door_close', x, y);
+    this.vertexLighting.relight();
   }
 
   exposeDebugApi() {
@@ -362,6 +405,9 @@ class Game {
         this.player.setPosition(x, y, dir);
         this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
         this.vertexLighting.updateAllMeshes(this.renderer.scene);
+        this.torches.setParty(this.player.x, this.player.y, this.player.dir);
+        this.torches.update(performance.now(), this.player.x, this.player.y, this.player.dir);
+        this.dressing.update(performance.now(), this.player.x, this.player.y, this.player.dir);
         this.spriteManager.update(performance.now(), this.player.x, this.player.y, this.player.dir);
         this.darkFx.update(
           performance.now(),
@@ -416,14 +462,15 @@ class Game {
         return { luma: n ? sum / n : 0, fogRatio: n ? fog / n : 0, n };
       },
       faceKinds: () => {
-        const out: Array<{ kind: string; lightX: number; lightY: number }> = [];
+        const out: Array<{ kind: string; lightX: number; lightY: number; face?: string }> = [];
         this.renderer.scene.traverse((obj) => {
           if (!(obj instanceof THREE.Mesh)) return;
           if (typeof obj.userData.kind !== 'string') return;
           out.push({
             kind: obj.userData.kind,
             lightX: obj.userData.lightX,
-            lightY: obj.userData.lightY
+            lightY: obj.userData.lightY,
+            face: obj.userData.face
           });
         });
         return out;
@@ -434,6 +481,7 @@ class Game {
           kind: string;
           lightX: number;
           lightY: number;
+          face?: string;
           worldX: number;
           worldZ: number;
           avgR: number;
@@ -460,6 +508,7 @@ class Game {
             kind: obj.userData.kind,
             lightX: obj.userData.lightX,
             lightY: obj.userData.lightY,
+            face: obj.userData.face,
             worldX: sx / n,
             worldZ: sz / n,
             avgR: sr / n
@@ -514,15 +563,25 @@ class Game {
       },
       torchStates: () =>
         floor1Sconces.map((s) => ({ x: s.x, y: s.y, face: s.face, lit: s.lit, capped: !!s.capped })),
+      torches: () => this.torches.snapshot(),
+      torchLit: (x: number, y: number) => !!floor1Sconces.find((s) => s.x === x && s.y === y)?.lit,
       tileBrightness: (x: number, y: number) =>
         this.vertexLighting.calculateBrightness(x, y, !!floor1.tiles[y]?.[x]?.floorNDark),
+      tileLight: (x: number, y: number) =>
+        this.vertexLighting.calculateBrightness(x, y, !!floor1.tiles[y]?.[x]?.floorNDark),
+      sourceLight: (x: number, y: number) => this.vertexLighting.sourceLight(x, y),
       isSquareLit: (x: number, y: number) => this.vertexLighting.isSquareLit(x, y),
+      stepVolume: () => STEP_VOLUME,
+      lastStep: () => this.audioManager.lastStep(),
+      oil: () => this.oil,
+      giveOil: (n = 1) => this.setOil(this.oil + n),
       setFlickerFrame: (frame: number) => {
         this.vertexLighting.setFlickerFrame(frame);
         this.renderer.render();
       },
       darkFx: () => this.darkFx.snapshot(),
-      lightFacingTorch: () => this.lightFacingTorch(),
+      lightFacingTorch: () => this.handleFacingTorch(),
+      snuffFacing: () => this.handleFacingTorch(),
       tryMoveForward: () => {
         const before = { x: this.player.x, y: this.player.y };
         const result = this.player.moveForward();
@@ -541,6 +600,7 @@ class Game {
         visual.tile.doorLocked = false;
         this.sceneBuilder.doors.startSlide(visual, true, performance.now());
         this.audioManager.playDoor('door_open', x, y);
+        this.vertexLighting.relight();
         return true;
       },
       closeDoor: (x: number, y: number) => {
@@ -548,12 +608,14 @@ class Game {
         if (!visual) return false;
         this.sceneBuilder.doors.startSlide(visual, false, performance.now());
         this.audioManager.playDoor('door_close', x, y);
+        this.vertexLighting.relight();
         return true;
       },
       snapDoor: (x: number, y: number, open: boolean) => {
         const visual = this.sceneBuilder.doors.get(x, y);
         if (!visual) return;
         this.sceneBuilder.doors.snapOpen(visual, open);
+        this.vertexLighting.relight();
         this.renderer.render();
       }
     };
@@ -564,21 +626,25 @@ class Game {
     const start = async () => {
       tapToStart.classList.add('hidden');
       this.audioManager.unlock();
-      await this.audioManager.loadSounds(this.renderer.scene, floor1Sconces);
-      this.audioManager.startLanternLoop(this.oil > 0);
-      this.audioManager.attachDressing(this.renderer.scene, this.dressing.marks);
-      this.audioManager.attachLeeches(this.renderer.scene, floor1);
-      this.audioManager.attachWaterPools(this.renderer.scene, floor1);
-      this.audioManager.startNamedLoop(
-        'lamp_hooks',
-        11 * CELL_SIZE,
-        0.55,
-        9 * CELL_SIZE,
-        0.38
-      );
       this.lastTime = performance.now();
       this.fpsLastTime = this.lastTime;
       requestAnimationFrame(() => this.gameLoop());
+      try {
+        await this.audioManager.loadSounds(this.renderer.scene, floor1Sconces);
+        this.audioManager.startLanternLoop(this.oil > 0);
+        this.audioManager.attachDressing(this.renderer.scene, this.dressing.marks);
+        this.audioManager.attachLeeches(this.renderer.scene, floor1);
+        this.audioManager.attachWaterPools(this.renderer.scene, floor1);
+        this.audioManager.startNamedLoop(
+          'lamp_hooks',
+          11 * CELL_SIZE,
+          0.55,
+          9 * CELL_SIZE,
+          0.38
+        );
+      } catch (err) {
+        console.warn('Audio init failed', err);
+      }
     };
     tapToStart.addEventListener('click', start);
   }
@@ -607,21 +673,20 @@ class Game {
       if (visual) {
         this.sceneBuilder.doors.startSlide(visual, true, now);
         this.audioManager.playDoor('door_open', x, y);
+        this.vertexLighting.relight();
       }
     }
 
     this.sceneBuilder.doors.update(now);
-    this.dressing.update(now);
+    this.dressing.update(now, this.player.x, this.player.y, this.player.dir);
     this.water.update(now);
     this.atmosphere.update(dtSec, now, this.renderer.camera);
     this.audioManager.update(now, this.renderer.camera.position.x, this.renderer.camera.position.z);
 
-    const prevFrame = this.torches.flameFrame();
-    this.torches.update(now);
+    this.torches.update(now, this.player.x, this.player.y, this.player.dir);
     this.spriteManager.update(now, this.player.x, this.player.y, this.player.dir);
     this.darkFx.update(now, this.vertexLighting, this.spriteManager, this.audioManager, this.player.x, this.player.y);
-    const nextFrame = this.torches.flameFrame();
-    if (nextFrame !== prevFrame) this.vertexLighting.setFlickerFrame(nextFrame);
+    this.vertexLighting.setFlickerTime(now);
 
     if (this.messageTimer && now >= this.messageTimer) {
       this.messageTimer = 0;

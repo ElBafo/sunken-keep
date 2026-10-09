@@ -324,7 +324,7 @@ test('proto3d lighting: ?ambientFloor=3 is near-black beyond the lantern', async
     };
   });
   console.log('DARK FX', fx);
-  expect(fx.slimeLit, 'slime at (7,3) sits in the (6,4) torch pool').toBe(true);
+  expect(fx.slimeLit, 'slime at (7,3) is behind the (6,4) torch wall').toBe(false);
   expect(fx.ratLit, 'beam-hall rat is outside torch and lantern').toBe(false);
   const ratEyes = fx.fx.eyes.find((e) => e.x === 10 && e.y === 1);
   expect(ratEyes, 'dark rat has eye glints').toBeTruthy();
