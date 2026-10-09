@@ -9,12 +9,19 @@ function isUiTarget(el: EventTarget | null): boolean {
   return el instanceof HTMLElement && !!el.closest('.control-btn, #tap-to-start');
 }
 
+function isCanvasTarget(el: EventTarget | null): boolean {
+  return el instanceof HTMLElement && !!el.closest('#render-canvas, #canvas-container');
+}
+
 export class InputManager {
   player: Player;
   hooks: InputHooks;
-  private touchStartX = 0;
-  private touchStartY = 0;
-  private touchOnUi = false;
+  private pointerStartX = 0;
+  private pointerStartY = 0;
+  private pointerDown = false;
+  private swipeStartX = 0;
+  private swipeStartY = 0;
+  private swipeArmed = false;
   private swipeThreshold = 50;
 
   constructor(player: Player, hooks: InputHooks) {
@@ -45,35 +52,65 @@ export class InputManager {
       this.hooks.onInteract();
     });
 
-    document.addEventListener('touchstart', (e) => {
-      const touch = e.touches[0];
-      this.touchStartX = touch.clientX;
-      this.touchStartY = touch.clientY;
-      this.touchOnUi = isUiTarget(e.target);
-    });
-
-    document.addEventListener('touchend', (e) => {
-      if (this.touchOnUi || e.changedTouches.length === 0) return;
-      const touch = e.changedTouches[0];
-      const dx = touch.clientX - this.touchStartX;
-      const dy = touch.clientY - this.touchStartY;
-      if (Math.abs(dx) < 18 && Math.abs(dy) < 18) {
-        if ((e.target as HTMLElement | null)?.id === 'render-canvas' ||
-            (e.target as HTMLElement | null)?.id === 'canvas-container') {
-          this.hooks.onInteract();
+    const canvas = document.getElementById('render-canvas');
+    if (canvas) {
+      canvas.addEventListener('pointerdown', (e) => {
+        if (!e.isPrimary) return;
+        this.pointerDown = true;
+        this.pointerStartX = e.clientX;
+        this.pointerStartY = e.clientY;
+        try {
+          canvas.setPointerCapture(e.pointerId);
+        } catch {
+          // capture is optional — pointerup on the canvas still works for a tap
         }
+      });
+      canvas.addEventListener('pointerup', (e) => {
+        if (!e.isPrimary || !this.pointerDown) return;
+        this.pointerDown = false;
+        const dx = e.clientX - this.pointerStartX;
+        const dy = e.clientY - this.pointerStartY;
+        if (Math.abs(dx) < 18 && Math.abs(dy) < 18) {
+          this.hooks.onInteract();
+          return;
+        }
+        if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > this.swipeThreshold) {
+          this.emitMove(dx > 0 ? this.player.turnRight() : this.player.turnLeft());
+        } else if (Math.abs(dy) > this.swipeThreshold) {
+          this.emitMove(dy > 0 ? this.player.moveBackward() : this.player.moveForward());
+        }
+      });
+      canvas.addEventListener('pointercancel', () => {
+        this.pointerDown = false;
+      });
+    }
+
+    document.addEventListener('touchstart', (e) => {
+      if (isUiTarget(e.target) || isCanvasTarget(e.target)) {
+        this.swipeArmed = false;
         return;
       }
+      const touch = e.touches[0];
+      this.swipeStartX = touch.clientX;
+      this.swipeStartY = touch.clientY;
+      this.swipeArmed = true;
+    });
+
+    // Swipes that miss the canvas (rare). Never interact here — iPhone also
+    // synthesizes a click after touchend, and canvas taps are pointerup-only.
+    document.addEventListener('touchend', (e) => {
+      if (isUiTarget(e.target) || isCanvasTarget(e.target)) return;
+      if (!this.swipeArmed || e.changedTouches.length === 0) return;
+      this.swipeArmed = false;
+      const touch = e.changedTouches[0];
+      const dx = touch.clientX - this.swipeStartX;
+      const dy = touch.clientY - this.swipeStartY;
+      if (Math.abs(dx) < 18 && Math.abs(dy) < 18) return;
       if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > this.swipeThreshold) {
         this.emitMove(dx > 0 ? this.player.turnRight() : this.player.turnLeft());
       } else if (Math.abs(dy) > this.swipeThreshold) {
         this.emitMove(dy > 0 ? this.player.moveBackward() : this.player.moveForward());
       }
-    });
-
-    document.getElementById('render-canvas')?.addEventListener('click', (e) => {
-      if (e.detail === 0) return;
-      this.hooks.onInteract();
     });
 
     document.addEventListener('keydown', (e) => {

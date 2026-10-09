@@ -49,6 +49,7 @@ class Game {
   lastMessage = '';
   lampNote = { title: "Lamp-keeper's note", text: '' };
   noteOpen = false;
+  interactCount = 0;
   messageTimer = 0;
 
   lastTime = 0;
@@ -316,6 +317,7 @@ class Game {
   }
 
   interact() {
+    this.interactCount += 1;
     if (this.pickupKeyAt(this.player.x, this.player.y)) return;
     if (this.pickupOilAt(this.player.x, this.player.y)) return;
     const facing = this.player.facingPos(1);
@@ -491,6 +493,7 @@ class Game {
         this.audioManager.setQuality(q);
       },
       interact: () => this.interact(),
+      interactCount: () => this.interactCount,
       giveKey: () => {
         this.player.hasKey = true;
       },
