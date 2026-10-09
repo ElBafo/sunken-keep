@@ -174,7 +174,7 @@ test('proto3d iPhone fixes: sorting, items, walls, water, doors, no 404s', async
   await shot(1, 2, 1, '04-water-hall-looking-east.png');
   await shot(3, 4, 0, '04-water-hall-deep-lane.png');
   await shot(2, 4, 0, '04-water-hall-on-shallow-facing-deep.png');
-  await shot(3, 3, 3, '04-water-hall-leeches.png');
+  await shot(3, 4, 0, '04-water-hall-leeches.png');
   const waterFaces = faces.filter((f) => f.kind === 'water-surface' || f.kind === 'water-shallow' || f.kind === 'water-deep');
   expect(waterFaces.some((f) => f.kind === 'water-surface'), 'translucent water surfaces').toBe(true);
   expect(waterFaces.some((f) => f.kind === 'water-deep'), 'deep water beds').toBe(true);
