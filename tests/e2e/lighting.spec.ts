@@ -405,7 +405,7 @@ test('proto3d floor1v2: start-key-door-hall-stairs and pantry-lamp room', async 
     expect((await step()).after).toMatchObject({ x: x + 1, y: 2 });
   }
   await pose(11, 2, 1);
-  expect((await step()).result).toBe('wall');
+  await step('wall');
   await page.waitForTimeout(220);
   await page.screenshot({ path: `${OUT}/floor1_guard_hall_beams_sunbeam.png`, fullPage: false });
 
