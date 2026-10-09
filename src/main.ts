@@ -138,10 +138,10 @@ async function main() {
     gameController = new GameController();
     await gameController.init();
     uiRenderer585 = new UIRenderer585();
-    uiRenderer585.preloadAssets();
     titleScreen = new TitleScreen();
     await titleScreen.loadAssets();
     if (gameController.shouldSkipTitle()) {
+      uiRenderer585.preloadAssets();
       inTitleScreen = false;
       console.log('Skipping title screen (URL override)');
     }
@@ -239,12 +239,13 @@ async function main() {
         const result = titleScreen.handleClick(x, y);
         
         if (result === 'new_game') {
-          // Start new game
-          inTitleScreen = false;
-          updateInstallHint();
+          // Start new game after dungeon art is ready so the first frame is complete
+          uiRenderer585?.preloadAssets();
           const newController = new GameController();
-          newController.init().then(() => {
+          Promise.all([newController.init(), assets.waitForAll()]).then(() => {
             gameController = newController;
+            inTitleScreen = false;
+            updateInstallHint();
             console.log('New game started');
           });
           return;
@@ -254,12 +255,14 @@ async function main() {
           if (slot) {
             const save = SaveSystem.load(slot);
             if (save) {
-              inTitleScreen = false;
-              updateInstallHint();
+              uiRenderer585?.preloadAssets();
               const newController = new GameController();
-              newController.init().then(() => {
+              newController.init().then(async () => {
                 SaveSystem.restoreState(save, newController.getState());
+                await assets.waitForAll();
                 gameController = newController;
+                inTitleScreen = false;
+                updateInstallHint();
                 console.log(`Continued from slot ${slot}`);
               });
             }
@@ -269,12 +272,14 @@ async function main() {
           // Load specific slot
           const save = SaveSystem.load(result);
           if (save) {
-            inTitleScreen = false;
-            updateInstallHint();
+            uiRenderer585?.preloadAssets();
             const newController = new GameController();
-            newController.init().then(() => {
+            newController.init().then(async () => {
               SaveSystem.restoreState(save, newController.getState());
+              await assets.waitForAll();
               gameController = newController;
+              inTitleScreen = false;
+              updateInstallHint();
               console.log(`Loaded slot ${result}`);
             });
           }

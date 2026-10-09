@@ -26,8 +26,11 @@ export class UIRenderer585 {
     // Image preloading is started via preloadAssets() before the game loop.
   }
 
-  preloadAssets(): void {
+  preloadAssets(monsters: string[] = ['keep_rat']): void {
     this.ensureRendererInit();
+    for (const monster of monsters) {
+      Renderer.preloadMonster(monster);
+    }
     const baseUrl = '/sunken-keep/';
     assets.loadImage(`${baseUrl}art/ui/layout585/panel_585.png`);
     assets.loadImage(`${baseUrl}art/ui/layout585/stone_strip_tile.png`);

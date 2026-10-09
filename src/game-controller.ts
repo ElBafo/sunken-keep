@@ -42,7 +42,6 @@ export class GameController {
     // Load combat / exploration log strings
     await loadLogMessages();
 
-    // Initialize audio
     await sound.init();
 
     // Parse URL parameters for testing

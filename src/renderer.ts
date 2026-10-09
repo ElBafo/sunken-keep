@@ -108,10 +108,7 @@ export class Renderer {
     const walls = ['wall_front', 'wall_left', 'wall_right'];
     const doors = ['door_locked', 'door_open'];
     const secrets = ['secret_closed', 'secret_open'];
-    const monsters = ['slime', 'drowned_dwarf', 'tide_spawn', 'bog_leeches', 'keep_rat', 'rust_crab'];
     const items = ['item_key', 'item_chest', 'item_potion_red', 'item_potion_blue', 'item_potion_green', 'item_scroll'];
-    const states = ['idle', 'attack', 'hurt', 'death'];
-    const frameCounts = { idle: 4, attack: 3, hurt: 1, death: 4 };
     
     // Use dungeon_v2 for repainted assets
     const dungeonPath = '/sunken-keep/art/dungeon_v2';
@@ -140,20 +137,24 @@ export class Renderer {
       walls.forEach(wall => assets.loadImage(`${dungeonPath}/${wall}_${dist}.png`));
       doors.forEach(door => assets.loadImage(`${dungeonPath}/${door}_${dist}.png`));
       secrets.forEach(secret => assets.loadImage(`${dungeonPath}/${secret}_${dist}.png`));
-      items.forEach(item => assets.loadImage(`/sunken-keep/art/dungeon/${item}_${dist}.png`)); // Items still in old folder
+      items.forEach(item => assets.loadImage(`/sunken-keep/art/dungeon/${item}_${dist}.png`));
       ['carving_start', 'carving_door', 'carving_secret'].forEach(carving => {
         assets.loadImage(`/sunken-keep/art/decals/${carving}_${dist}.png`);
       });
-      
-      // Load monster animation frames
-      monsters.forEach(monster => {
-        states.forEach(state => {
-          const count = frameCounts[state as keyof typeof frameCounts];
-          for (let i = 1; i <= count; i++) {
-            assets.loadImage(`/sunken-keep/art/dungeon/${monster}_${state}_${i}_${dist}.png`);
-          }
-        });
+    });
+  }
+
+  static preloadMonster(monsterType: string): void {
+    const distances = ['near', 'mid', 'far'];
+    const frameCounts = { idle: 4, attack: 3, hurt: 1, death: 4 };
+    distances.forEach(dist => {
+      (Object.keys(frameCounts) as Array<keyof typeof frameCounts>).forEach(state => {
+        const count = frameCounts[state];
+        for (let i = 1; i <= count; i++) {
+          assets.loadImage(`/sunken-keep/art/dungeon/${monsterType}_${state}_${i}_${dist}.png`);
+        }
       });
+      assets.loadImage(`/sunken-keep/art/dungeon/${monsterType}_${dist}.png`);
     });
   }
 
@@ -719,10 +720,11 @@ export class Renderer {
     animTime: number
   ) {
     const distKey = distance === 1 ? 'near' : distance === 2 ? 'mid' : 'far';
+    const drawState = state === 'alert' ? 'idle' : state;
     
     // Frame counts for each state
-    const frameCounts = { idle: 4, alert: 4, attack: 3, hurt: 1, death: 4 };
-    const frameCount = frameCounts[state];
+    const frameCounts = { idle: 4, attack: 3, hurt: 1, death: 4 };
+    const frameCount = frameCounts[drawState as keyof typeof frameCounts] || 4;
     
     // Calculate frame based on animation time
     let frameIndex = 1;
@@ -732,11 +734,11 @@ export class Renderer {
     }
     
     // Try to load the specific animation frame
-    const framePath = `/sunken-keep/art/dungeon/${monsterType}_${state}_${frameIndex}_${distKey}.png`;
-    const frameImg = assets.getImage(framePath);
+    const framePath = `/sunken-keep/art/dungeon/${monsterType}_${drawState}_${frameIndex}_${distKey}.png`;
+    const frameImg = assets.loadImage(framePath);
     
     // Fall back to static sprite if frame not available
-    const hasFrames = frameImg && frameImg.complete;
+    const hasFrames = assets.isImageReady(frameImg);
     const img = hasFrames ? frameImg : assets.getImage(`/sunken-keep/art/dungeon/${monsterType}_${distKey}.png`);
 
     if (!img || !img.complete) {
