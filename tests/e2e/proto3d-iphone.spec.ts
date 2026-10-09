@@ -103,33 +103,38 @@ test('proto3d feedback: camera, doors, bump, fog, floors, no 404s', async ({ pag
   expect(opened, 'door opens from (3,2) facing east').toBe(true);
   await shot(3, 2, 1, 'door-open.png');
 
-  const walk: Array<{ result: string; after: { x: number; y: number } }> = [];
+  const walk: Array<{ result: string; at: { x: number; y: number } }> = [];
   for (let i = 0; i < 4; i++) {
     const step = await page.evaluate(() => {
-      return (
-        window as unknown as {
-          __proto3d: {
-            tryMoveForward: () => { result: string; after: { x: number; y: number } };
-          };
-        }
-      ).__proto3d.tryMoveForward();
+      const api = window as unknown as {
+        __proto3d: {
+          tryMoveForward: () => { result: string };
+          getPosition: () => { x: number; y: number };
+        };
+      };
+      const { result } = api.__proto3d.tryMoveForward();
+      return { result };
     });
-    walk.push(step);
     await page.waitForTimeout(250);
+    const at = await page.evaluate(
+      () =>
+        (window as unknown as { __proto3d: { getPosition: () => { x: number; y: number } } }).__proto3d.getPosition()
+    );
+    walk.push({ result: step.result, at });
   }
   console.log('WALK', walk);
   expect(walk[0].result).toBe('ok');
-  expect(walk[0].after.x).toBe(4);
-  expect(walk[0].after.y).toBe(2);
+  expect(walk[0].at.x).toBe(4);
+  expect(walk[0].at.y).toBe(2);
   expect(walk[1].result).toBe('ok');
-  expect(walk[1].after.x).toBe(5);
-  expect(walk[1].after.y).toBe(2);
+  expect(walk[1].at.x).toBe(5);
+  expect(walk[1].at.y).toBe(2);
   expect(walk[2].result).toBe('ok');
-  expect(walk[2].after.x).toBe(6);
-  expect(walk[2].after.y).toBe(2);
+  expect(walk[2].at.x).toBe(6);
+  expect(walk[2].at.y).toBe(2);
   expect(walk[3].result).toBe('monster');
-  expect(walk[3].after.x).toBe(6);
-  expect(walk[3].after.y).toBe(2);
+  expect(walk[3].at.x).toBe(6);
+  expect(walk[3].at.y).toBe(2);
   await page.waitForTimeout(200);
   await page.screenshot({ path: `${OUT}/slime-bump.png`, fullPage: false });
   console.log(
