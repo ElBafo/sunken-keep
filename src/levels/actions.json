@@ -1,0 +1,122 @@
+{
+  "_rules": "Light D&D. Attack: d20 + toHit >= target AC hits. Recovery is seconds before that hand button lights up again. Mana regenerates 1 per 10 steps walked, never in combat. Values are for hero level 1; +1 toHit every 2 levels, +10% damage per level. Only the front two heroes can use melee; back-row melee hands are greyed out. Monsters attack only the front two, unless a flank or ranged monster says otherwise.",
+  "brannoc": {
+    "hp": 45,
+    "ac": 15,
+    "main": {
+      "item": "axe",
+      "toHit": 4,
+      "damage": [
+        4,
+        9
+      ],
+      "recovery": 3.0
+    },
+    "off": {
+      "item": "shield",
+      "effect": "block: +4 AC for Brannoc and the next hit on anyone is halved",
+      "duration": 4,
+      "recovery": 6.0
+    }
+  },
+  "wren": {
+    "hp": 32,
+    "ac": 13,
+    "mana": 12,
+    "main": {
+      "item": "mace",
+      "toHit": 3,
+      "damage": [
+        3,
+        7
+      ],
+      "recovery": 3.0
+    },
+    "off": {
+      "item": "prayer_lantern",
+      "effect": "heal the most hurt hero for 6-10",
+      "mana": 4,
+      "recovery": 5.0
+    }
+  },
+  "ilsevar": {
+    "hp": 24,
+    "ac": 11,
+    "mana": 16,
+    "main": {
+      "item": "wand",
+      "toHit": 5,
+      "damage": [
+        3,
+        6
+      ],
+      "recovery": 3.0,
+      "note": "ranged, works from the back row"
+    },
+    "off": {
+      "item": "scroll",
+      "effect": "frost bolt 8-14, ignores armour",
+      "mana": 5,
+      "recovery": 6.0
+    }
+  },
+  "mags": {
+    "hp": 28,
+    "ac": 14,
+    "main": {
+      "item": "dagger",
+      "toHit": 5,
+      "damage": [
+        2,
+        6
+      ],
+      "recovery": 2.0
+    },
+    "off": {
+      "item": "tricks_pouch",
+      "effect": "pocket sand: monster misses its next attack; picks the chest/lock if aimed at one",
+      "recovery": 8.0
+    }
+  },
+  "empty_hand": {
+    "toHit": 2,
+    "damage": [
+      1,
+      2
+    ],
+    "recovery": 1.5
+  },
+  "monsters_floor1_ac": {
+    "bog_leeches": 8,
+    "keep_rat": 10,
+    "rust_crab": 15,
+    "slime": 11
+  },
+  "monster_attack": {
+    "toHit": 4,
+    "note": "monsters roll d20+toHit vs a front-row hero's AC; interval is per monster in monsters.json"
+  },
+  "potions": {
+    "health": "restores 15 HP",
+    "mana": "restores 8 mana",
+    "floor1_supply": "1 red, 1 blue, 1 green"
+  },
+  "formation": {
+    "front": [
+      "brannoc",
+      "mags"
+    ],
+    "back": [
+      "wren",
+      "ilsevar"
+    ],
+    "melee_items": [
+      "axe",
+      "shield",
+      "mace",
+      "dagger",
+      "empty_hand"
+    ]
+  },
+  "_expected_floor1": "With the front-two rule: leeches ~3s, rat ~3s, crab ~8s, slime ~10s. About 24 HP lost across the floor before potions."
+}

@@ -1,0 +1,140 @@
+{
+  "_format": "Each dialogue is a list of nodes. Node: id, speaker (hero id | npc id | 'tide' | 'narrator'), face, text, optional next, optional choices [{text, next, set:{flag:value}, requires:{flag:value}, cost:{...}}]. Tile hooks: put dialogue:'<id>' on a tile. 'tide' text renders cold blue-green, lowercase, no portrait.",
+  "dialogues": {
+    "f2_singing": [
+      {"id":"a","speaker":"narrator","text":"Faint singing rises from below. No words.","next":"b"},
+      {"id":"b","speaker":"mags","face":"shocked","text":"Tell me that's one of you humming.","next":"c"},
+      {"id":"c","speaker":"ilsevar","face":"neutral","text":"It's the water. It's... pleased with us."}
+    ],
+    "f2_glass_door": [
+      {"id":"a","speaker":"narrator","text":"Water stands upright in the doorway, still as glass.","next":"b"},
+      {"id":"b","speaker":"brannoc","face":"shocked","text":"Water doesn't stand. It's not allowed.","next":"c"},
+      {"id":"c","speaker":"wren","face":"neutral","text":"Something's holding it. Let's not ask what."}
+    ],
+    "f3_grate_tam": [
+      {"id":"a","speaker":"tam","text":"Mags? Maggie, is that you?","next":"b"},
+      {"id":"b","speaker":"mags","face":"shocked","text":"Tam?! Tam, where are you?","next":"c"},
+      {"id":"c","speaker":"tam","text":"Down where it's wet. It's nice. Is it supper?","next":"d"},
+      {"id":"d","speaker":"mags","face":"wince","text":"That's my brother. He came for the frogs.","next":"e"},
+      {"id":"e","speaker":"brannoc","face":"neutral","text":"Then we go down. Quickly."}
+    ],
+    "f4_captain": [
+      {"id":"a","speaker":"captain","text":"Halt. State your clan.","choices":[
+        {"text":"Brannoc: \"Stonevow.\"","next":"stonevow"},
+        {"text":"Mags: \"Clan Mind-Your-Business.\"","next":"rude"},
+        {"text":"Attack.","next":"fight"}
+      ]},
+      {"id":"stonevow","speaker":"captain","text":"Stonevow. The Thane's blood. ...Pass, then.","next":"oath"},
+      {"id":"oath","speaker":"captain","text":"But the boy stays. My oath is to the cells.","choices":[
+        {"text":"\"Your Thane is gone. Your oath is done.\"","next":"spare","set":{"captain_spared":true}},
+        {"text":"\"Then your oath ends here.\"","next":"fight"}
+      ]},
+      {"id":"spare","speaker":"captain","text":"...Sixty years. I'll go and see for myself.","next":"spare2"},
+      {"id":"spare2","speaker":"captain","text":"If he lives, tell him Dural kept the watch."},
+      {"id":"rude","speaker":"captain","text":"A comedian. We drowned those first.","next":"fight"},
+      {"id":"fight","speaker":"narrator","text":"The captain draws a blade that drips.","action":"start_fight:captain"}
+    ],
+    "f4_tam_cell": [
+      {"id":"a","speaker":"narrator","text":"Tam hangs in chains, chin-deep in black water.","next":"b"},
+      {"id":"b","speaker":"tam","text":"Hey Maggie. The water says I can stay.","next":"c"},
+      {"id":"c","speaker":"tide","text":"warm ones. he is ours. leave him, or pay.","next":"d"},
+      {"id":"d","speaker":"mags","face":"wince","text":"Nobody's paying for nothing. Get him out.","choices":[
+        {"text":"Wren burns lantern oil to drive the water back.","next":"save_oil","set":{"saved_tam":true},"cost":{"lantern":"guttering_for_floor"}},
+        {"text":"Brannoc dives and breaks the chain.","next":"save_dive","set":{"saved_tam":true},"cost":{"hero":"brannoc","hp_pct":50}},
+        {"text":"Leave him. The water's rising.","next":"leave","set":{"saved_tam":false}}
+      ]},
+      {"id":"save_oil","speaker":"wren","face":"wince","text":"There. Take it. Choke on it.","next":"saved"},
+      {"id":"save_dive","speaker":"brannoc","face":"wince","text":"Hold my beard. Not literally.","next":"saved"},
+      {"id":"saved","speaker":"tam","text":"Maggie... it's cold. Why's it cold?","next":"saved2"},
+      {"id":"saved2","speaker":"mags","face":"smirk","text":"Because you're an idiot. Walk. I've got you."},
+      {"id":"leave","speaker":"mags","face":"wince","text":"...I'll come back for you, Tam. I swear.","next":"leave2"},
+      {"id":"leave2","speaker":"tam","text":"Okay Maggie. I'll be here. Always."}
+    ],
+    "f4_tide_wakes": [
+      {"id":"a","speaker":"tide","text":"you brought light. how kind.","next":"b"},
+      {"id":"b","speaker":"tide","text":"but you take what is ours. so we take back.","next":"c"},
+      {"id":"c","speaker":"narrator","text":"The floor groans. The water starts to rise.","next":"d"},
+      {"id":"d","speaker":"brannoc","face":"shocked","text":"Stairs! Now! Run!","action":"start_escape"}
+    ],
+    "f5_elda_letter": [
+      {"id":"a","speaker":"narrator","text":"A letter, in a careful hand:","next":"b"},
+      {"id":"b","speaker":"narrator","text":"\"Let the water come, love. We'll go up.\"","next":"c"},
+      {"id":"c","speaker":"narrator","text":"\"I'd rather be cold with you than safe alone.\"","next":"d"},
+      {"id":"d","speaker":"narrator","text":"\"- E.\"","next":"e"},
+      {"id":"e","speaker":"wren","face":"neutral","text":"She didn't want the pact."}
+    ],
+    "f6_elda_grave": [
+      {"id":"a","speaker":"narrator","text":"A grave under the glass dome. ELDA, it reads.","next":"b"},
+      {"id":"b","speaker":"narrator","text":"A plain silver ring rests on the stone.","choices":[
+        {"text":"Take the ring.","next":"take","set":{"elda_ring":true}},
+        {"text":"Leave it be.","next":"leave"}
+      ]},
+      {"id":"take","speaker":"mags","face":"smirk","text":"For safekeeping. Not stealing. Mostly.","next":"take2"},
+      {"id":"take2","speaker":"wren","face":"neutral","text":"Someone down here will want it back."},
+      {"id":"leave","speaker":"brannoc","face":"neutral","text":"Rest easy, grandmother. Or whatever you are."}
+    ],
+    "f7_grotto": [
+      {"id":"a","speaker":"tide","text":"swamp-child. you have always heard us.","next":"b"},
+      {"id":"b","speaker":"ilsevar","face":"neutral","text":"I have. I never answered.","next":"c"},
+      {"id":"c","speaker":"tide","text":"answer now. we will show you where the fire hides.","choices":[
+        {"text":"Ilsevar listens.","next":"listen","set":{"ilsevar_listened":true}},
+        {"text":"Ilsevar refuses.","next":"refuse","set":{"ilsevar_listened":false}}
+      ]},
+      {"id":"listen","speaker":"ilsevar","face":"smirk","text":"...Oh. It's so much bigger than I thought.","next":"listen2"},
+      {"id":"listen2","speaker":"wren","face":"wince","text":"Ilsevar? Your eyes are doing a thing."},
+      {"id":"refuse","speaker":"ilsevar","face":"neutral","text":"No. I've met you. You're just hungry.","next":"refuse2"},
+      {"id":"refuse2","speaker":"tide","text":"we can wait. we are very good at waiting."}
+    ],
+    "f8_hessa": [
+      {"id":"a","speaker":"hessa","text":"Live ones! And a dwarf. Shame about the beard.","next":"b"},
+      {"id":"b","speaker":"brannoc","face":"shocked","text":"What's wrong with my beard?","next":"c"},
+      {"id":"c","speaker":"hessa","text":"Mine's better. Sit. You want to know how we breathe.","next":"d"},
+      {"id":"d","speaker":"hessa","text":"The Heartforge drives the engine. The engine drives the air.","next":"e"},
+      {"id":"e","speaker":"hessa","text":"The Tide keeps the water off the forge. For a price.","next":"f"},
+      {"id":"f","speaker":"hessa","text":"Lend me a spark, priestess? My anvil's cold.","choices":[
+        {"text":"Wren lights the anvil.","next":"give","set":{"hessa_trusted":true},"cost":{"lantern":"guttering_for_floor"}},
+        {"text":"\"We need every bit of this flame.\"","next":"keep"}
+      ]},
+      {"id":"give","speaker":"hessa","text":"Ahh. Sixty years. Give me an hour.","next":"reveal"},
+      {"id":"keep","speaker":"hessa","text":"Fair. I'd hoard it too.","next":"reveal"},
+      {"id":"reveal","speaker":"hessa","text":"One more thing. Orrun's not dead.","next":"reveal2"},
+      {"id":"reveal2","speaker":"hessa","text":"And the Heartforge is almost out.","next":"reveal3"},
+      {"id":"reveal3","speaker":"mags","face":"shocked","text":"You could've led with that."}
+    ],
+    "f10_seal": [
+      {"id":"a","speaker":"narrator","text":"The Thane's seal lies on a cushion of black silk.","next":"b"},
+      {"id":"b","speaker":"brannoc","face":"neutral","text":"Orrun's seal. My blood, in a way.","choices":[
+        {"text":"Brannoc claims it.","next":"claim","set":{"brannoc_claimed":true}},
+        {"text":"Brannoc leaves it.","next":"leave","set":{"brannoc_claimed":false}}
+      ]},
+      {"id":"claim","speaker":"brannoc","face":"smirk","text":"Somebody has to clean up after him.","next":"claim2"},
+      {"id":"claim2","speaker":"mags","face":"smirk","text":"Does this mean I curtsy now?"},
+      {"id":"leave","speaker":"brannoc","face":"neutral","text":"No. That crown sank a keep once already."}
+    ],
+    "f11_throne": [
+      {"id":"a","speaker":"orrun","text":"One flame given. One floor spared.","next":"b"},
+      {"id":"b","speaker":"orrun","text":"Who comes? Elda? Is that you?","choices":[
+        {"text":"Show him Elda's ring.","requires":{"elda_ring":true},"next":"ring"},
+        {"text":"Dural speaks.","requires":{"captain_spared":true},"next":"dural"},
+        {"text":"\"Your clan is dead, Orrun.\"","next":"rage"}
+      ]},
+      {"id":"ring","speaker":"orrun","text":"...Her ring. She said we'd go up.","next":"flashback"},
+      {"id":"dural","speaker":"captain","text":"My Thane. It is over. I kept the watch.","next":"flashback"},
+      {"id":"rage","speaker":"orrun","text":"LIAR. They breathe. I made them breathe!","next":"flashback"},
+      {"id":"flashback","speaker":"narrator","text":"The water swirls. You remember a night that isn't yours.","action":"start_flashback"}
+    ],
+    "f12_final": [
+      {"id":"a","speaker":"tide","text":"the last flame. give it, and we are full.","next":"b"},
+      {"id":"b","speaker":"wren","face":"neutral","text":"Everyone. Choose. I'll follow.","choices":[
+        {"text":"Relight the Heartforge.","next":"ending_A"},
+        {"text":"Make a new pact.","requires":{"saved_tam":true,"brannoc_claimed":true},"next":"ending_A_plus"},
+        {"text":"Let the forge die.","next":"ending_B"},
+        {"text":"Make an offering.","next":"ending_C"}
+      ]},
+      {"id":"ending_A","action":"ending:rekindled"},
+      {"id":"ending_A_plus","action":"ending:keepers_peace"},
+      {"id":"ending_B","action":"ending:let_it_drown"},
+      {"id":"ending_C","action":"ending:offering","note":"If ilsevar_listened, Ilsevar steps forward first -> ending:hollow_king"}
+    ]
+  }
+}

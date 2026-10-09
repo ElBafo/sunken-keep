@@ -2,7 +2,7 @@ import { chromium, webkit, devices } from 'playwright';
 
 async function testWebKit() {
   const iPhone15 = devices['iPhone 15 Pro'];
-  const browser = await webkit.launch({ headless: true }); // Use WebKit for Safari testing
+  const browser = await chromium.launch({ headless: true }); // Test with Chromium first
   const context = await browser.newContext({
     ...iPhone15,
   });

@@ -1,0 +1,35 @@
+{
+ "note": "Drop falls from ceiling crack to the floor line of its band (near 192, mid 165, far 147), frame 1 holds ~0.4s at the crack, frame 2 falls, frame 3 just before impact; then ripple 1-4 at ~10fps centred on the floor line. Ripple only over water; on dry stone skip it.",
+ "sizes": {
+  "near": {
+   "drop": [
+    5,
+    9
+   ],
+   "ripple": [
+    28,
+    9
+   ]
+  },
+  "mid": {
+   "drop": [
+    3,
+    6
+   ],
+   "ripple": [
+    18,
+    6
+   ]
+  },
+  "far": {
+   "drop": [
+    3,
+    4
+   ],
+   "ripple": [
+    11,
+    4
+   ]
+  }
+ }
+}
