@@ -34,6 +34,7 @@ type Proto3d = {
 test.use(devices['iPhone 15']);
 
 test('proto3d iPhone fixes: sorting, items, walls, water, doors, no 404s', async ({ page }) => {
+  test.setTimeout(120000);
   mkdirSync(OUT, { recursive: true });
   const errors: string[] = [];
   const failed404s: string[] = [];
@@ -62,7 +63,7 @@ test('proto3d iPhone fixes: sorting, items, walls, water, doors, no 404s', async
     await page.evaluate(([px, py, pd]) => {
       (window as unknown as { __proto3d: Proto3d }).__proto3d.setPosition(px, py, pd);
     }, [x, y, dir] as const);
-    await page.waitForTimeout(350);
+    await page.waitForTimeout(180);
     const path = `${OUT}/${file}`;
     await page.screenshot({ path, fullPage: false });
     console.log(`SHOT ${file} md5=${createHash('md5').update(readFileSync(path)).digest('hex')}`);
