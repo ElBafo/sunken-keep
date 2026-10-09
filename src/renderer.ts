@@ -698,18 +698,18 @@ export class Renderer {
     ctx: CanvasRenderingContext2D, 
     monsterType: string, 
     distance: 1 | 2 | 3, 
-    state: 'idle' | 'attack' | 'hurt' | 'death',
+    state: 'idle' | 'alert' | 'attack' | 'hurt' | 'death',
     animTime: number
   ) {
     const distKey = distance === 1 ? 'near' : distance === 2 ? 'mid' : 'far';
     
     // Frame counts for each state
-    const frameCounts = { idle: 4, attack: 3, hurt: 1, death: 4 };
+    const frameCounts = { idle: 4, alert: 4, attack: 3, hurt: 1, death: 4 };
     const frameCount = frameCounts[state];
     
     // Calculate frame based on animation time
     let frameIndex = 1;
-    const fps = state === 'idle' ? 4 : state === 'attack' ? 12 : state === 'hurt' ? 1 : 8;
+    const fps = state === 'idle' || state === 'alert' ? 4 : state === 'attack' ? 12 : state === 'hurt' ? 1 : 8;
     if (state !== 'hurt') {
       frameIndex = Math.floor(animTime * fps) % frameCount + 1;
     }

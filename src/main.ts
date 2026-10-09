@@ -78,9 +78,13 @@ async function main() {
   }
   
   updateSafeAreaInsets();
+
+  // Declare early-accessed variables before event listeners (WebKit-safe)
+  let inputHandler: InputHandler | null = null;
   
   // Re-run resize on all viewport changes
   function handleResize() {
+    console.log('handleResize called');
     scale = updateScale();
     if (inputHandler) {
       inputHandler.setScale(scale);
@@ -132,35 +136,44 @@ async function main() {
     gameController = new GameController();
     await gameController.init();
     uiRenderer585 = new UIRenderer585();
-    titleScreen = new TitleScreen();
+    // titleScreen = new TitleScreen(); // Temporarily disabled for WebKit testing
     console.log('New game controller initialized');
   }
   
   // Check if running as PWA (standalone mode)
   let isStandalone = false;
   try {
+    console.log('Starting PWA check');
     isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
                    (window.navigator as any).standalone === true;
+    console.log('PWA check 1');
     
     // Show install hint on iOS Safari when not standalone (one-time)
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    console.log('PWA check 2');
     const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    console.log('PWA check 3');
     const installHintDismissed = localStorage.getItem('installHintDismissed');
+    console.log('PWA check 4');
     
     // Dismiss hint on tap
     installHint.addEventListener('click', () => {
       installHint.classList.add('hidden');
       localStorage.setItem('installHintDismissed', 'true');
     });
+    console.log('PWA check 5');
     
     if (isIOS && isSafari && !isStandalone && !installHintDismissed) {
       setTimeout(() => {
         installHint.classList.remove('hidden');
       }, 3000);
     }
+    console.log('PWA check 6');
   } catch (error) {
     console.error('PWA check error:', error);
   }
+  
+  console.log('PWA check complete');
   
   let gameStarted = false;
   
@@ -362,7 +375,7 @@ async function main() {
   });
   
   // Input handling for swipes (turn left/right on phone)
-  const inputHandler = new InputHandler(
+  inputHandler = new InputHandler(
     canvas,
     (direction) => {
       // Swipe handler: left = turn left, right = turn right

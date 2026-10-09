@@ -12,6 +12,7 @@ export function createPartyAdapter(state: GameState): Party {
 
   // Convert new FloorData to old FloorData format
   const oldFloorData: FloorData = {
+    id: floor.id,
     width: floor.width,
     height: floor.height,
     startX: floor.startX,
@@ -61,6 +62,26 @@ function convertTile(newTile: any): Tile {
     tile.monsterState = newTile.monsterState || 'idle';
     tile.monsterAnimTime = newTile.monsterAnimTime || 0;
   }
+
+  // Act 1 fields
+  if (newTile.stairs) tile.stairs = newTile.stairs;
+  if (newTile.dialogue) tile.dialogue = newTile.dialogue;
+  if (newTile.then) tile.then = newTile.then;
+  if (newTile.bark) tile.bark = newTile.bark;
+  if (newTile.npc) tile.npc = newTile.npc;
+  if (newTile.prop) tile.prop = newTile.prop;
+  if (newTile.glassWater) tile.glassWater = true;
+  if (newTile.lever) tile.lever = newTile.lever;
+  if (newTile.openedBy) tile.openedBy = newTile.openedBy;
+  if (newTile.grate) tile.grate = newTile.grate;
+  if (newTile.vent) tile.vent = newTile.vent;
+  if (newTile.bars) tile.bars = newTile.bars;
+  if (newTile.gateOpensOn) tile.gateOpensOn = newTile.gateOpensOn;
+  if (newTile.patrol) tile.patrol = newTile.patrol;
+  if (newTile.checkpoint) tile.checkpoint = true;
+  if (newTile.daylight) tile.daylight = true;
+  if (newTile.journalPage) tile.journalPage = newTile.journalPage;
+  if (newTile.actEnd) tile.actEnd = newTile.actEnd;
 
   return tile;
 }

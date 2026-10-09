@@ -5,7 +5,7 @@ export interface Position {
   y: number;
 }
 
-export type MonsterState = 'idle' | 'attack' | 'hurt' | 'death';
+export type MonsterState = 'idle' | 'alert' | 'attack' | 'hurt' | 'death';
 
 export interface LatchState {
   turns: number;
@@ -34,9 +34,30 @@ export interface Tile {
   chest?: boolean;
   chestOpen?: boolean;
   firstSightFired?: boolean; // Track if first sight bark has fired
+  
+  // Act 1 additions from floors 2-4
+  stairs?: 'up' | 'down';
+  dialogue?: string;
+  then?: string;
+  bark?: string;
+  npc?: string;
+  prop?: 'table' | 'bunk' | 'weapon_rack' | 'statue' | 'vent' | 'grate' | 'bars' | 'glassWater';
+  glassWater?: boolean;
+  lever?: { face: 'N'|'E'|'S'|'W'; opens: { x: number; y: number } };
+  openedBy?: 'lever';
+  grate?: { face: 'N'|'E'|'S'|'W' };
+  vent?: { face: 'N'|'E'|'S'|'W' };
+  bars?: { face: 'N'|'E'|'S'|'W' };
+  gateOpensOn?: string;
+  patrol?: { x: number; y: number }[];
+  checkpoint?: boolean;
+  daylight?: boolean;
+  journalPage?: number;
+  actEnd?: number;
 }
 
 export interface FloorData {
+  id: number;
   width: number;
   height: number;
   tiles: Tile[][];

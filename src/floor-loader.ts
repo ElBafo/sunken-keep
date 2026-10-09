@@ -1,30 +1,33 @@
-import type { FloorData, TileState } from './types';
+import type { FloorData, Tile } from './party';
+import type { FloorData as FloorDataTypes } from './types';
+import { floor2 } from './floor2';
+import { floor3 } from './floor3';
+import { floor4 } from './floor4';
 
-// Floor loader that converts level data to FloorData format
+// Monster stats from public/data/monsters.json
+const monsterStats: Record<string, { hp: number }> = {
+  bog_leeches: { hp: 12 },
+  keep_rat: { hp: 14 },
+  rust_crab: { hp: 24 },
+  slime: { hp: 40 },
+  cellar_spider: { hp: 20 },
+  drowned_dwarf: { hp: 35 },
+  captain_dural: { hp: 60 },
+};
 
 // Load all floors
-export async function loadAllFloors(): Promise<Map<number, FloorData>> {
-  const floors = new Map<number, FloorData>();
+export async function loadAllFloors(): Promise<Map<number, FloorDataTypes>> {
+  const floors = new Map<number, FloorDataTypes>();
   
   try {
-    // Create floors manually based on floor data files
-    // For now, using hardcoded data; will load from files later
-    
-    // Floor 1: 9x9
+    // Floor 1: 9x9 (keep original, but load monster stats from monsters.json)
     const floor1 = createFloor1();
-    floors.set(1, floor1);
+    floors.set(1, floor1 as any);
     
-    // Floor 2: 12x12  
-    const floor2 = createFloor2();
-    floors.set(2, floor2);
-    
-    // Floor 3: 14x14
-    const floor3 = createFloor3();
-    floors.set(3, floor3);
-    
-    // Floor 4: 14x16
-    const floor4 = createFloor4();
-    floors.set(4, floor4);
+    // Floor 2-4: use real floor data
+    floors.set(2, floor2 as any);
+    floors.set(3, floor3 as any);
+    floors.set(4, floor4 as any);
     
     console.log('Loaded floors 1-4');
     return floors;
@@ -35,15 +38,18 @@ export async function loadAllFloors(): Promise<Map<number, FloorData>> {
   }
 }
 
-// Create Floor 1 data
+// Create Floor 1 data with monster stats from monsters.json
 function createFloor1(): FloorData {
-  const m = (monster: string, hp: number): TileState => ({
-    monster,
-    monsterState: 'idle',
-    monsterAnimTime: 0,
-    monsterHp: hp,
-    monsterMaxHp: hp,
-  });
+  const m = (monster: string): Tile => {
+    const stats = monsterStats[monster] || { hp: 10 };
+    return {
+      monster,
+      monsterState: 'idle',
+      monsterAnimTime: 0,
+      monsterHp: stats.hp,
+      monsterMaxHp: stats.hp,
+    };
+  };
   
   return {
     id: 1,
@@ -65,14 +71,14 @@ function createFloor1(): FloorData {
       [ { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true } ],
       // Row 1: stairs down at (7,1)
       [ { wall: true }, { shallowWater: true }, { deepWater: true }, { shallowWater: true }, { wall: true }, { secret: true, carving: 'carving_secret', item: 'scroll' }, {}, { stairs: 'down' }, { wall: true } ],
-      // Row 2: leeches 10 HP (nerfed from 12), slime 22 HP (nerfed from 40)
-      [ { wall: true }, { shallowWater: true }, { deepWater: true }, { ...m('bog_leeches', 10), shallowWater: true }, { door: true, doorLocked: true, carving: 'carving_door' }, {}, {}, m('slime', 22), { wall: true } ],
-      // Row 3: rust crab 18 HP (nerfed from 24)
-      [ { wall: true }, { shallowWater: true }, { deepWater: true }, { shallowWater: true }, { wall: true }, m('rust_crab', 18), { item: 'potion_red' }, {}, { wall: true } ],
+      // Row 2: leeches 12 HP, slime 40 HP (from monsters.json)
+      [ { wall: true }, { shallowWater: true }, { deepWater: true }, { ...m('bog_leeches'), shallowWater: true }, { door: true, doorLocked: true, carving: 'carving_door' }, {}, {}, m('slime'), { wall: true } ],
+      // Row 3: rust crab 24 HP (from monsters.json)
+      [ { wall: true }, { shallowWater: true }, { deepWater: true }, { shallowWater: true }, { wall: true }, m('rust_crab'), { item: 'potion_red' }, {}, { wall: true } ],
       // Row 4
       [ { wall: true }, { shallowWater: true }, { shallowWater: true }, { shallowWater: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true } ],
-      // Row 5: keep rat 12 HP (nerfed from 14)
-      [ { wall: true }, {}, { item: 'key' }, {}, {}, { item: 'potion_blue' }, { chest: true }, m('keep_rat', 12), { wall: true } ],
+      // Row 5: keep rat 14 HP (from monsters.json)
+      [ { wall: true }, {}, { item: 'key' }, {}, {}, { item: 'potion_blue' }, { chest: true }, m('keep_rat'), { wall: true } ],
       // Row 6
       [ { wall: true }, { carving: 'carving_start' }, {}, {}, { wall: true }, {}, {}, {}, { wall: true } ],
       // Row 7
@@ -83,107 +89,8 @@ function createFloor1(): FloorData {
   };
 }
 
-// Placeholder for Floor 2 (12x12)
-function createFloor2(): FloorData {
-  const tiles: TileState[][] = [];
-  for (let y = 0; y < 12; y++) {
-    const row: TileState[] = [];
-    for (let x = 0; x < 12; x++) {
-      // Walls around perimeter
-      if (x === 0 || x === 11 || y === 0 || y === 11) {
-        row.push({ wall: true });
-      } else if (x === 10 && y === 10) {
-        // Stairs down at (10, 10)
-        row.push({ stairs: 'down' });
-      } else {
-        row.push({});
-      }
-    }
-    tiles.push(row);
-  }
-  
-  // Stairs up at start position (7, 1)
-  tiles[1][7] = { stairs: 'up' };
-  
-  return {
-    id: 2,
-    width: 12,
-    height: 12,
-    startX: 7,
-    startY: 1,
-    startDir: 0,
-    tiles,
-    sconces: [],
-  };
-}
-
-// Placeholder for Floor 3 (14x14)
-function createFloor3(): FloorData {
-  const tiles: TileState[][] = [];
-  for (let y = 0; y < 14; y++) {
-    const row: TileState[] = [];
-    for (let x = 0; x < 14; x++) {
-      if (x === 0 || x === 13 || y === 0 || y === 13) {
-        row.push({ wall: true });
-      } else if (x === 3 && y === 11) {
-        row.push({ stairs: 'down' });
-      } else {
-        row.push({});
-      }
-    }
-    tiles.push(row);
-  }
-  
-  // Stairs up at (10, 10)
-  tiles[10][10] = { stairs: 'up' };
-  
-  return {
-    id: 3,
-    width: 14,
-    height: 14,
-    startX: 10,
-    startY: 10,
-    startDir: 0,
-    tiles,
-    sconces: [],
-  };
-}
-
-// Placeholder for Floor 4 (14x16)
-function createFloor4(): FloorData {
-  const tiles: TileState[][] = [];
-  for (let y = 0; y < 14; y++) {
-    const row: TileState[] = [];
-    for (let x = 0; x < 16; x++) {
-      if (x === 0 || x === 15 || y === 0 || y === 13) {
-        row.push({ wall: true });
-      } else if (x === 5 && y === 9) {
-        // Escape stairs
-        row.push({ stairs: 'up' });
-      } else {
-        row.push({});
-      }
-    }
-    tiles.push(row);
-  }
-  
-  // Stairs up at (3, 11)
-  tiles[11][3] = { stairs: 'up' };
-  
-  return {
-    id: 4,
-    width: 16,
-    height: 14,
-    startX: 3,
-    startY: 11,
-    startDir: 0,
-    tiles,
-    sconces: [],
-  };
-}
-
 // Get starting position for a floor
-export function getFloorStart(floorId: number, floors: Map<number, FloorData>): { x: number; y: number; dir: number } {
+export function getFloorStart(floorId: number, floors: Map<number, FloorDataTypes>): { x: number; y: number; dir: number} {
   const floor = floors.get(floorId);
   if (!floor) {
     return { x: 1, y: 7, dir: 0 }; // Default fallback

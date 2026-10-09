@@ -8,6 +8,7 @@ import { FloorData } from './party';
 const m = (monster: string, hp: number) => ({ monster, monsterState: 'idle' as const, monsterAnimTime: 0, monsterHp: hp, monsterMaxHp: hp });
 
 export const floor1: FloorData = {
+  id: 1,
   width: 9,
   height: 9,
   startX: 1,

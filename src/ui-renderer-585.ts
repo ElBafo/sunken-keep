@@ -17,9 +17,20 @@ import {
 export class UIRenderer585 {
   private stoneStripTile: HTMLImageElement | null = null;
   private dungeonRenderer: Renderer | null = null;
+  private offscreenCanvas: HTMLCanvasElement | null = null;
+  private offscreenCtx: CanvasRenderingContext2D | null = null;
 
   constructor() {
-    // Minimal initialization
+    // Defer canvas creation to first render (WebKit-safe)
+  }
+
+  private ensureCanvasInit(): void {
+    if (!this.offscreenCanvas) {
+      this.offscreenCanvas = document.createElement('canvas');
+      this.offscreenCanvas.width = 270;
+      this.offscreenCanvas.height = 200;
+      this.offscreenCtx = this.offscreenCanvas.getContext('2d');
+    }
   }
 
   private ensureRendererInit(): void {
@@ -30,17 +41,23 @@ export class UIRenderer585 {
 
   // Render full UI
   render(ctx: CanvasRenderingContext2D, state: GameState, now: number): void {
+    this.ensureCanvasInit();
     this.ensureRendererInit();
 
     // Clear canvas
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    // Render dungeon view using old renderer (270×380)
+    // Render dungeon view using old renderer (270×200), then extend with ceiling/floor
     try {
       const party = createPartyAdapter(state);
       const floor = state.floors.get(state.party.floor);
-      if (floor && party && this.dungeonRenderer) {
+      if (floor && party && this.dungeonRenderer && this.offscreenCanvas && this.offscreenCtx) {
+        // Clear offscreen canvas
+        this.offscreenCtx.fillStyle = '#000000';
+        this.offscreenCtx.fillRect(0, 0, 270, 200);
+        
+        // Render to offscreen canvas
         const oldFloor = {
           width: floor.width,
           height: floor.height,
@@ -50,7 +67,19 @@ export class UIRenderer585 {
           tiles: floor.tiles,
           sconces: floor.sconces,
         };
-        this.dungeonRenderer.drawViewport(ctx, party, oldFloor as any, now);
+        this.dungeonRenderer.drawViewport(this.offscreenCtx, party, oldFloor as any, now);
+        
+        // Draw ceiling (top 20px of rendered view, stretched to 90px tall)
+        ctx.imageSmoothingEnabled = false;
+        ctx.drawImage(this.offscreenCanvas, 0, 0, 270, 20, 0, 0, 270, 90);
+        
+        // Draw main view at y=90 (horizon at y=100 in source → y=190 in dest)
+        ctx.drawImage(this.offscreenCanvas, 0, 0, 270, 200, 0, 90, 270, 200);
+        
+        // Draw floor (bottom 20px of rendered view, stretched to 90px tall)
+        ctx.drawImage(this.offscreenCanvas, 0, 180, 270, 20, 0, 290, 270, 90);
+        
+        ctx.imageSmoothingEnabled = true;
       }
     } catch (error) {
       console.error('Renderer error:', error);
