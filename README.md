@@ -1,5 +1,7 @@
 # The Sunken Keep
 
+**[▶️ Play it now](https://elbafo.github.io/sunken-keep/)**
+
 A mobile-first web-based dungeon crawler in the spirit of Eye of the Beholder and Lands of Lore.
 
 ## Development
