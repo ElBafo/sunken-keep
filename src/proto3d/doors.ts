@@ -7,6 +7,7 @@ import {
   DOOR_PANEL_INSET,
   DOOR_SLIDE,
   FACE_INTO_ROOM,
+  FOG_COLOR,
   WALL_TOP
 } from './constants';
 import { Tile } from './types';
@@ -22,7 +23,8 @@ export interface DoorVisual {
   x: number;
   y: number;
   tile: Tile;
-  panels: THREE.Mesh[];
+  /** Slider groups (dark backing + panel) that travel up into the lintel. */
+  panels: THREE.Object3D[];
   meshes: THREE.Object3D[];
   animStart: number;
   animFrom: number;
@@ -77,6 +79,28 @@ export class DoorSystem {
     holder.userData.lightX = lightX;
     holder.userData.lightY = lightY;
 
+    const slider = new THREE.Group();
+    slider.userData.kind = 'door-slider';
+
+    // Opaque dark fill behind the cutout panel so water cannot show through
+    // the PNG's transparent margin. Slides up with the panel.
+    const backing = new THREE.Mesh(
+      new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE),
+      new THREE.MeshBasicMaterial({
+        color: FOG_COLOR,
+        side: THREE.FrontSide,
+        fog: true,
+        toneMapped: false
+      })
+    );
+    backing.position.z = -DOOR_PANEL_INSET - 0.012;
+    backing.userData.kind = 'door-backing';
+    backing.userData.noPick = true;
+    backing.userData.skipVertexLighting = true;
+    backing.userData.lightX = lightX;
+    backing.userData.lightY = lightY;
+    slider.add(backing);
+
     const panelMat = new THREE.MeshBasicMaterial({
       map: panelTex,
       vertexColors: true,
@@ -91,7 +115,8 @@ export class DoorSystem {
     panel.userData.lightX = lightX;
     panel.userData.lightY = lightY;
     panel.userData.kind = 'door-panel';
-    holder.add(panel);
+    slider.add(panel);
+    holder.add(slider);
 
     const frameMat = new THREE.MeshBasicMaterial({
       map: frameTex,
@@ -128,7 +153,7 @@ export class DoorSystem {
       };
       this.doors.set(k, visual);
     }
-    visual.panels.push(panel);
+    visual.panels.push(slider);
     visual.meshes.push(holder);
     if (tile.doorOpen) {
       for (const p of visual.panels) p.position.y = DOOR_SLIDE;

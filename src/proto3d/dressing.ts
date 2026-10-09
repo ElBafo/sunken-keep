@@ -215,40 +215,62 @@ export class Dressing {
     const shaftTex = this.tex(index % 2 === 0 ? 'shaft_1' : 'shaft_2');
     const wx = item.x * CELL_SIZE;
     const wz = item.y * CELL_SIZE;
+    const crackY = CELL_SIZE - 0.008;
 
-    const crackMesh = new THREE.Mesh(
-      new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE),
-      this.decalMat(crack, { unlit: false, alphaTest: 0.02 })
-    );
+    // Pale crack art is a light stain; multiply-style blend uses its alpha to
+    // darken the ceiling so it reads as a split, not a bone on the stone.
+    const crackMat = new THREE.MeshBasicMaterial({
+      map: crack,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.CustomBlending,
+      blendEquation: THREE.AddEquation,
+      blendSrc: THREE.ZeroFactor,
+      blendDst: THREE.OneMinusSrcAlphaFactor,
+      fog: true,
+      side: THREE.DoubleSide,
+      toneMapped: false,
+      polygonOffset: true,
+      polygonOffsetFactor: -2,
+      polygonOffsetUnits: -2
+    });
+    const crackMesh = new THREE.Mesh(new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE), crackMat);
     crackMesh.rotation.x = Math.PI / 2;
-    crackMesh.position.set(wx, CELL_SIZE - 0.01, wz);
+    crackMesh.position.set(wx, crackY, wz);
     this.tagDecal(crackMesh, item.x, item.y);
+    crackMesh.userData.skipVertexLighting = true;
     this.group.add(crackMesh);
 
-    const width = 0.42 * CELL_SIZE;
-    const height = CELL_SIZE + 0.05;
-    const shaft = new THREE.Mesh(
-      new THREE.PlaneGeometry(width, height),
-      new THREE.MeshBasicMaterial({
-        map: shaftTex,
-        transparent: true,
-        depthWrite: false,
-        blending: THREE.AdditiveBlending,
-        side: THREE.DoubleSide,
-        fog: true,
-        opacity: 0.95,
-        toneMapped: false
-      })
-    );
+    const width = 0.4 * CELL_SIZE;
+    const height = CELL_SIZE - 0.04;
+    const midY = crackY - height / 2;
     const slant = ((12 + (index % 3) * 5) * Math.PI) / 180;
-    shaft.position.set(wx + 0.15, CELL_SIZE / 2 - 0.02, wz);
-    shaft.rotation.z = slant * (index % 2 === 0 ? 1 : -1);
-    shaft.renderOrder = 6;
-    shaft.userData.skipVertexLighting = true;
-    shaft.userData.noPick = true;
-    this.group.add(shaft);
-    this.shafts.push(shaft);
-    this.marks.sunbeams.push({ x: item.x, y: item.y, wx, wy: CELL_SIZE - 0.2, wz });
+    const sign = index % 2 === 0 ? 1 : -1;
+    const shaftMat = new THREE.MeshBasicMaterial({
+      map: shaftTex,
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+      fog: true,
+      opacity: 0.88,
+      toneMapped: false
+    });
+    // Crossed quads so the beam is visible from the corridor, not only face-on.
+    for (const rotY of [Math.PI / 4, (Math.PI * 3) / 4]) {
+      const holder = new THREE.Group();
+      holder.position.set(wx, midY, wz);
+      holder.rotation.y = rotY;
+      const shaft = new THREE.Mesh(new THREE.PlaneGeometry(width, height), shaftMat);
+      shaft.rotation.z = slant * sign;
+      shaft.renderOrder = 6;
+      shaft.userData.skipVertexLighting = true;
+      shaft.userData.noPick = true;
+      holder.add(shaft);
+      this.group.add(holder);
+      this.shafts.push(shaft);
+    }
+    this.marks.sunbeams.push({ x: item.x, y: item.y, wx, wy: crackY, wz });
   }
 
   private placeCobweb(floorData: FloorData, item: DressingItem, index: number) {
