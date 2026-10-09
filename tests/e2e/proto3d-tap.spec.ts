@@ -26,8 +26,6 @@ test('proto3d iPhone tap: canvas interact once; HTML buttons still work', async 
   await page.locator('#tap-to-start').tap();
   await page.waitForTimeout(400);
 
-  const api = () => (window as unknown as { __proto3d: Proto3d }).__proto3d;
-
   const pose = async (x: number, y: number, dir: number) => {
     await page.evaluate(([px, py, pd]) => {
       (window as unknown as { __proto3d: Proto3d }).__proto3d.setPosition(px, py, pd);
