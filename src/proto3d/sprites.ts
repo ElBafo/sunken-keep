@@ -4,10 +4,6 @@ import {
   CUTOUT_ALPHA_TEST,
   FACE_INTO_ROOM,
   SCONCE_ANIM_FPS,
-  SCONCE_GLOW_ABOVE_TILES,
-  SCONCE_GLOW_OPACITY,
-  SCONCE_GLOW_SIZE_TILES,
-  SCONCE_GLOW_WALL_OFFSET_TILES,
   SCONCE_HEIGHT_TILES,
   SCONCE_WALL_OFFSET_TILES,
   SCONCE_WIDTH_TILES,
@@ -18,7 +14,6 @@ import { FloorData, Sconce } from './types';
 interface SpriteInfo {
   object: THREE.Object3D;
   material: THREE.SpriteMaterial | THREE.MeshBasicMaterial;
-  glowMaterial?: THREE.MeshBasicMaterial;
   x: number;
   y: number;
   frames?: THREE.Texture[];
@@ -170,17 +165,15 @@ export class SpriteManager {
       }
     }
 
-    const [sconceDead, sconceLit1, sconceLit2, sconceLit3, sconceGlow] = await Promise.all([
+    const [sconceDead, sconceLit1, sconceLit2, sconceLit3] = await Promise.all([
       loadTex('proto3d/tex3d/sconce_dead.png'),
       loadTex('proto3d/tex3d/sconce_lit_1.png'),
       loadTex('proto3d/tex3d/sconce_lit_2.png'),
-      loadTex('proto3d/tex3d/sconce_lit_3.png'),
-      loadTex('proto3d/tex3d/sconce_glow.png')
+      loadTex('proto3d/tex3d/sconce_lit_3.png')
     ]);
     const litFrames = [sconceLit1, sconceLit2, sconceLit3];
     const sconceW = SCONCE_WIDTH_TILES * CELL_SIZE;
     const sconceH = SCONCE_HEIGHT_TILES * CELL_SIZE;
-    const glowSize = SCONCE_GLOW_SIZE_TILES * CELL_SIZE;
     const midHeight = CELL_SIZE / 2;
     const frameMs = 1000 / SCONCE_ANIM_FPS;
 
@@ -208,40 +201,9 @@ export class SpriteManager {
       mesh.userData.isSconce = true;
       scene.add(mesh);
 
-      let glowMaterial: THREE.MeshBasicMaterial | undefined;
-      if (sconce.lit) {
-        const glowGeo = new THREE.PlaneGeometry(glowSize, glowSize);
-        glowMaterial = new THREE.MeshBasicMaterial({
-          map: sconceGlow,
-          color: 0xffffff,
-          transparent: true,
-          blending: THREE.AdditiveBlending,
-          depthWrite: false,
-          depthTest: true,
-          fog: false,
-          toneMapped: false,
-          opacity: SCONCE_GLOW_OPACITY[0],
-          side: THREE.FrontSide
-        });
-        const glow = new THREE.Mesh(glowGeo, glowMaterial);
-        placeOnWall(
-          glow,
-          sconce.x,
-          sconce.y,
-          sconce.face,
-          midHeight + SCONCE_GLOW_ABOVE_TILES * CELL_SIZE,
-          SCONCE_GLOW_WALL_OFFSET_TILES
-        );
-        glow.renderOrder = 2;
-        glow.userData.skipVertexLighting = true;
-        glow.userData.isSconceGlow = true;
-        scene.add(glow);
-      }
-
       this.sprites.push({
         object: mesh,
         material: mat,
-        glowMaterial,
         x: sconce.x,
         y: sconce.y,
         frames: sconce.lit ? litFrames : undefined,
@@ -252,6 +214,11 @@ export class SpriteManager {
     }
   }
 
+  sconceFrame(): number {
+    const lit = this.sprites.find((s) => s.frames && s.frames.length === 3 && s.animSpeed > 0);
+    return lit?.currentFrame ?? 0;
+  }
+
   update(time: number) {
     for (const sprite of this.sprites) {
       if (sprite.frames && sprite.frames.length > 1 && sprite.animSpeed > 0) {
@@ -259,10 +226,6 @@ export class SpriteManager {
           sprite.currentFrame = (sprite.currentFrame + 1) % sprite.frames.length;
           sprite.material.map = sprite.frames[sprite.currentFrame];
           sprite.material.needsUpdate = true;
-          if (sprite.glowMaterial) {
-            const opacity = SCONCE_GLOW_OPACITY[sprite.currentFrame % SCONCE_GLOW_OPACITY.length];
-            sprite.glowMaterial.opacity = opacity;
-          }
           sprite.lastFrameTime = time;
         }
       }

@@ -22,11 +22,11 @@ export const MIRROR_BAKED_SCONCE_LEAN = false;
 export const SCONCE_WIDTH_TILES = 0.25;
 export const SCONCE_HEIGHT_TILES = 0.5;
 export const SCONCE_WALL_OFFSET_TILES = 0.015;
-export const SCONCE_GLOW_SIZE_TILES = 0.6;
-export const SCONCE_GLOW_ABOVE_TILES = 0.12;
-export const SCONCE_GLOW_WALL_OFFSET_TILES = 0.03;
 export const SCONCE_ANIM_FPS = 8;
-export const SCONCE_GLOW_OPACITY = [0.85, 0.7, 1.0] as const;
+/** Flame-frame multipliers for the sconce warm term (subtle wall flicker). */
+export const SCONCE_FLICKER = [0.85, 0.7, 1.0] as const;
+export const SCONCE_RADIUS_TILES = 1.5;
+export const FACE_SEGMENTS = 4;
 export const CUTOUT_ALPHA_TEST = 0.5;
 
 /** Unit normal into the room and Y-rotation so a PlaneGeometry faces that way. */

@@ -25,7 +25,7 @@ export class PixelRenderer {
     
     // Main scene
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0x1a2e1a, 0.015); // Reduced - darkness only at far end
+    this.scene.fog = new THREE.FogExp2(0x161514, 0.02);
     
     // Vertical FOV is wide enough that an adjacent wall sits in frame with a floor strip
     this.camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, CAMERA_NEAR, CAMERA_FAR);

@@ -1,19 +1,17 @@
 import * as THREE from 'three';
-import { CELL_SIZE, CUTOUT_ALPHA_TEST } from './constants';
+import { CELL_SIZE, CUTOUT_ALPHA_TEST, FACE_SEGMENTS } from './constants';
+import {
+  flipUVsX,
+  listedTex3dFiles,
+  pickVariantIndex,
+  rotateUVs,
+  VARIANT_SURFACES,
+  variantFilenames,
+  VariantSurface,
+  wallMirror,
+  floorQuarterTurns
+} from './texture-variants';
 import { FloorData, Tile } from './types';
-
-interface Textures {
-  wallPlain: THREE.Texture;
-  wallPilaster: THREE.Texture;
-  wallKnot: THREE.Texture;
-  doorLocked: THREE.Texture;
-  doorOpen: THREE.Texture;
-  secretClosed: THREE.Texture;
-  secretOpen: THREE.Texture;
-  floorStone: THREE.Texture;
-  floorWater: THREE.Texture;
-  ceiling: THREE.Texture;
-}
 
 type TexOpts = {
   wrapS: THREE.Wrapping;
@@ -22,11 +20,16 @@ type TexOpts = {
 };
 
 export class SceneBuilder {
-  textures: Textures | null = null;
+  private variants = new Map<VariantSurface, THREE.Texture[]>();
+  private doorLocked: THREE.Texture | null = null;
+  private doorOpen: THREE.Texture | null = null;
+  private secretClosed: THREE.Texture | null = null;
+  private secretOpen: THREE.Texture | null = null;
 
-  async loadTextures(): Promise<Textures> {
+  async loadTextures(): Promise<void> {
     const loader = new THREE.TextureLoader();
     const baseUrl = import.meta.env.BASE_URL;
+    const files = listedTex3dFiles();
 
     const loadTex = (path: string, opts: TexOpts): Promise<THREE.Texture> => {
       return new Promise((resolve, reject) => {
@@ -34,7 +37,7 @@ export class SceneBuilder {
           `${baseUrl}${path}`,
           (tex) => {
             tex.colorSpace = THREE.SRGBColorSpace;
-            (tex as any).encoding = 3001; // sRGBEncoding fallback
+            (tex as any).encoding = 3001;
             tex.magFilter = THREE.NearestFilter;
             tex.generateMipmaps = opts.mipmaps;
             tex.minFilter = opts.mipmaps
@@ -67,55 +70,45 @@ export class SceneBuilder {
       mipmaps: false
     };
 
-    const [
-      wallPlain,
-      wallPilaster,
-      wallKnot,
-      doorLocked,
-      doorOpen,
-      secretClosed,
-      secretOpen,
-      floorStone,
-      floorWater,
-      ceiling
-    ] = await Promise.all([
-      loadTex('proto3d/tex3d/wall_plain.png', wall),
-      loadTex('proto3d/tex3d/wall_pilaster.png', wall),
-      loadTex('proto3d/tex3d/wall_knot.png', wall),
+    const optsFor = (surface: VariantSurface): TexOpts =>
+      surface.startsWith('wall') ? wall : floor;
+
+    await Promise.all(
+      VARIANT_SURFACES.map(async (surface) => {
+        const names = variantFilenames(surface, files);
+        const loaded = await Promise.all(
+          names.map((n) => loadTex(`proto3d/tex3d/${n}`, optsFor(surface)))
+        );
+        this.variants.set(surface, loaded);
+      })
+    );
+
+    const [doorLocked, doorOpen, secretClosed, secretOpen] = await Promise.all([
       loadTex('proto3d/tex3d/door_locked.png', wall),
       loadTex('proto3d/tex3d/door_open.png', cutout),
       loadTex('proto3d/tex3d/secret_closed.png', wall),
-      loadTex('proto3d/tex3d/secret_open.png', cutout),
-      loadTex('proto3d/tex3d/floor_stone.png', floor),
-      loadTex('proto3d/tex3d/floor_water.png', floor),
-      loadTex('proto3d/tex3d/ceiling.png', floor)
+      loadTex('proto3d/tex3d/secret_open.png', cutout)
     ]);
-
-    this.textures = {
-      wallPlain,
-      wallPilaster,
-      wallKnot,
-      doorLocked,
-      doorOpen,
-      secretClosed,
-      secretOpen,
-      floorStone,
-      floorWater,
-      ceiling
-    };
+    this.doorLocked = doorLocked;
+    this.doorOpen = doorOpen;
+    this.secretClosed = secretClosed;
+    this.secretOpen = secretOpen;
 
     console.log('All textures loaded successfully');
-    return this.textures;
+  }
+
+  private pick(surface: VariantSurface, x: number, y: number, face: string): THREE.Texture {
+    const list = this.variants.get(surface);
+    if (!list || list.length === 0) {
+      throw new Error(`No textures loaded for ${surface}`);
+    }
+    return list[pickVariantIndex(list.length, x, y, face)];
   }
 
   buildScene(scene: THREE.Scene, floorData: FloorData) {
-    if (!this.textures) throw new Error('Textures not loaded');
-
     const group = new THREE.Group();
-
     this.buildFloorAndCeiling(group, floorData);
     this.buildWalls(group, floorData);
-
     scene.add(group);
     return group;
   }
@@ -132,10 +125,11 @@ export class SceneBuilder {
         const wz = y * CELL_SIZE;
 
         const isWater = tile.deepWater || tile.shallowWater;
-        const floorTex = isWater ? this.textures!.floorWater : this.textures!.floorStone;
+        const floorTex = this.pick(isWater ? 'floor_water' : 'floor_stone', x, y, 'F');
         const floorY = isWater ? -0.15 : 0;
 
-        const floorGeo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE);
+        const floorGeo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE, FACE_SEGMENTS, FACE_SEGMENTS);
+        rotateUVs(floorGeo, floorQuarterTurns(x, y, 'F'));
         const floorMat = new THREE.MeshBasicMaterial({
           map: floorTex,
           vertexColors: true,
@@ -144,17 +138,22 @@ export class SceneBuilder {
         const floor = new THREE.Mesh(floorGeo, floorMat);
         floor.rotation.x = -Math.PI / 2;
         floor.position.set(wx, floorY, wz);
+        floor.userData.lightX = x;
+        floor.userData.lightY = y;
         group.add(floor);
 
-        const ceilingGeo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE);
+        const ceilingGeo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE, FACE_SEGMENTS, FACE_SEGMENTS);
+        rotateUVs(ceilingGeo, floorQuarterTurns(x, y, 'C'));
         const ceilingMat = new THREE.MeshBasicMaterial({
-          map: this.textures!.ceiling,
+          map: this.pick('ceiling', x, y, 'C'),
           vertexColors: true,
           side: THREE.DoubleSide
         });
         const ceiling = new THREE.Mesh(ceilingGeo, ceilingMat);
         ceiling.rotation.x = Math.PI / 2;
         ceiling.position.set(wx, CELL_SIZE, wz);
+        ceiling.userData.lightX = x;
+        ceiling.userData.lightY = y;
         group.add(ceiling);
       }
     }
@@ -196,54 +195,63 @@ export class SceneBuilder {
     const nx = x + dx;
     const nz = y + dz;
 
-    if (nx >= 0 && nx < width && nz >= 0 && nz < height) {
-      const neighbor = tiles[nz][nx];
-      if (!neighbor.wall && !neighbor.door && !neighbor.secret) {
-        let texture = this.textures!.wallPlain;
-        let cutout = false;
+    if (nx < 0 || nx >= width || nz < 0 || nz >= height) return;
+    const neighbor = tiles[nz][nx];
+    if (neighbor.wall || neighbor.door || neighbor.secret) return;
 
-        if (tile.door) {
-          if (tile.doorLocked) {
-            texture = this.textures!.doorLocked;
-          } else {
-            texture = this.textures!.doorOpen;
-            cutout = true;
-          }
-        } else if (tile.secret) {
-          if (tile.secretOpen) {
-            texture = this.textures!.secretOpen;
-            cutout = true;
-          } else {
-            texture = this.textures!.secretClosed;
-          }
-        }
+    let texture: THREE.Texture = this.pick('wall_plain', x, y, face);
+    let cutout = false;
+    let masonry = true;
 
-        const geo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE);
-        const mat = new THREE.MeshBasicMaterial({
-          map: texture,
-          vertexColors: true,
-          side: THREE.DoubleSide,
-          transparent: cutout,
-          alphaTest: cutout ? CUTOUT_ALPHA_TEST : 0
-        });
-        const wall = new THREE.Mesh(geo, mat);
-
-        if (face === 'N') {
-          wall.position.set(wx, CELL_SIZE / 2, wz - CELL_SIZE / 2);
-          wall.rotation.y = 0;
-        } else if (face === 'E') {
-          wall.position.set(wx + CELL_SIZE / 2, CELL_SIZE / 2, wz);
-          wall.rotation.y = Math.PI / 2;
-        } else if (face === 'S') {
-          wall.position.set(wx, CELL_SIZE / 2, wz + CELL_SIZE / 2);
-          wall.rotation.y = Math.PI;
-        } else if (face === 'W') {
-          wall.position.set(wx - CELL_SIZE / 2, CELL_SIZE / 2, wz);
-          wall.rotation.y = -Math.PI / 2;
-        }
-
-        group.add(wall);
+    if (tile.door) {
+      masonry = false;
+      if (tile.doorLocked) {
+        texture = this.doorLocked!;
+      } else {
+        texture = this.doorOpen!;
+        cutout = true;
+      }
+    } else if (tile.secret) {
+      masonry = false;
+      if (tile.secretOpen) {
+        texture = this.secretOpen!;
+        cutout = true;
+      } else {
+        texture = this.secretClosed!;
       }
     }
+
+    const geo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE, FACE_SEGMENTS, FACE_SEGMENTS);
+    if (masonry && wallMirror(x, y, face)) {
+      flipUVsX(geo);
+    }
+
+    const mat = new THREE.MeshBasicMaterial({
+      map: texture,
+      vertexColors: true,
+      side: THREE.DoubleSide,
+      transparent: cutout,
+      alphaTest: cutout ? CUTOUT_ALPHA_TEST : 0
+    });
+    const wall = new THREE.Mesh(geo, mat);
+
+    if (face === 'N') {
+      wall.position.set(wx, CELL_SIZE / 2, wz - CELL_SIZE / 2);
+      wall.rotation.y = 0;
+    } else if (face === 'E') {
+      wall.position.set(wx + CELL_SIZE / 2, CELL_SIZE / 2, wz);
+      wall.rotation.y = Math.PI / 2;
+    } else if (face === 'S') {
+      wall.position.set(wx, CELL_SIZE / 2, wz + CELL_SIZE / 2);
+      wall.rotation.y = Math.PI;
+    } else if (face === 'W') {
+      wall.position.set(wx - CELL_SIZE / 2, CELL_SIZE / 2, wz);
+      wall.rotation.y = -Math.PI / 2;
+    }
+
+    // Light from the walkable side of the face
+    wall.userData.lightX = nx;
+    wall.userData.lightY = nz;
+    group.add(wall);
   }
 }

@@ -34,24 +34,33 @@ test('proto3d camera offset, wall sconces, no errors', async ({ page }) => {
     console.log('✓ screenshots/' + file);
   };
 
-  // (a) facing a plain wall from 1 square — start cell looking south
+  // Start view (two wall torches in the west corridor)
+  await pose(1, 7, 0, 'proto3d-start.png');
+  const startLuma = await page.evaluate(() => (window as any).__proto3d.meanLuma());
+  console.log('start view mean luma', startLuma.toFixed(1));
+
+  // Long corridor — a step north looking into the flooded hall
+  await pose(1, 5, 0, 'proto3d-corridor.png');
+  // (a) facing a plain wall from 1 square
   await pose(1, 7, 2, 'proto3d-wall-1sq.png');
   // (b) facing the locked door from 1 square
   await pose(5, 2, 3, 'proto3d-door-1sq.png');
-  // (c) walking past a sconce on a side wall (flat on the wall)
+  // (c) walking past a sconce on a side wall
   await pose(1, 5, 2, 'proto3d-sconce-side.png');
   // (d) sconce on the far wall
   await pose(3, 6, 3, 'proto3d-sconce-far.png');
-  // left-wall sconce, looking north from the start corridor
   await pose(1, 7, 0, 'proto3d-sconce-left.png');
-  // right-wall sconce: one square south of the water-hall torch, facing north
   await pose(3, 2, 0, 'proto3d-sconce-right.png');
-  // face-on sconce
   await pose(1, 6, 3, 'proto3d-sconce-face.png');
-  // palette snap at start pose
   await pose(1, 7, 0, 'proto3d-palette.png');
 
-  // Face the slime from 2 squares away: tiles[2][7] = (7,2), stand at (5,2) facing east
+  // FPS in the two-torch corridor
+  await page.evaluate(() => (window as any).__proto3d.setPosition(1, 7, 0));
+  await page.waitForTimeout(3500);
+  const fps = await page.evaluate(() => (window as any).__proto3d.fps());
+  console.log('two-torch corridor fps', fps);
+
+  // Face the slime from 2 squares away
   await page.evaluate(() => (window as any).__proto3d.setPosition(5, 2, 1));
   await page.waitForTimeout(400);
 
@@ -83,6 +92,10 @@ test('proto3d camera offset, wall sconces, no errors', async ({ page }) => {
 
   await page.screenshot({ path: 'screenshots/layout-test.png', fullPage: false });
   await page.screenshot({ path: 'screenshots/proto-slime-2sq.png', fullPage: false });
+
+  expect(startLuma, 'start view mean luma').toBeGreaterThanOrEqual(30);
+  expect(startLuma, 'start view mean luma').toBeLessThanOrEqual(70);
+  expect(fps, 'two-torch corridor fps').toBeGreaterThan(20);
 
   expect(errors, 'console errors').toEqual([]);
   expect(failed404s, '404s').toEqual([]);
