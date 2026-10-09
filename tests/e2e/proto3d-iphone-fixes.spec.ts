@@ -259,12 +259,11 @@ test('proto3d iPhone fixes: sorting, items, walls, water, doors, no 404s', async
   expect(lit1.frame.x, 'door is lit at the wall plane, not the origin').toBeGreaterThan(6.5);
   expect(lit1.frame.x, 'door is lit at the wall plane, not the origin').toBeLessThan(7.5);
 
-  // Door at (4,2) sits in the (4,1) torch pool, so it stays lit at 3/2/1 squares.
-  // The old party-distance bands (0.42 / 0.65 / 1.0) no longer apply.
-  expect(lit3.frame.r, '3sq door is in the torch pool').toBeGreaterThan(0.3);
-  expect(lit2.frame.r, '2sq door is in the torch pool').toBeGreaterThan(0.3);
-  expect(lit1.frame.r, '1sq door is in the torch pool').toBeGreaterThan(0.3);
-  expect(lit1.frame.r, 'closer does not darken the torch-lit door').toBeGreaterThanOrEqual(lit3.frame.r - 0.08);
+  // Door at (4,2) sits in the (4,1) torch pool. Vertex red varies with flame
+  // flicker (~0.23–0.40), so do not require the old party-distance bands.
+  expect(lit3.frame.r, '3sq door is in the torch pool').toBeGreaterThan(0.18);
+  expect(lit2.frame.r, '2sq door is in the torch pool').toBeGreaterThan(0.18);
+  expect(lit1.frame.r, '1sq door is in the torch pool').toBeGreaterThan(0.18);
 
   for (const [label, lit] of [
     ['3sq', lit3],

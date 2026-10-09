@@ -137,23 +137,25 @@ export class TorchSystem {
       const group = new THREE.Group();
       group.position.set(0, 0, 0);
 
-      const sideMat = cutoutMat(this.brackets[state].side!, false);
+      const sideMat = cutoutMat(this.brackets[state].side!, true);
       const side = new THREE.Mesh(new THREE.PlaneGeometry(w, h), sideMat);
       side.position.set(wallX + nx * (w / 2), midY, wallZ + nz * (w / 2));
       side.rotation.y = rotY - Math.PI / 2;
       side.renderOrder = 2;
       side.userData.isSconce = true;
+      side.userData.skipVertexLighting = true;
       side.userData.kind = 'torch-bracket';
       side.userData.lightX = sconce.x;
       side.userData.lightY = sconce.y;
       group.add(side);
 
-      const frontMat = cutoutMat(this.brackets[state].front!, false);
+      const frontMat = cutoutMat(this.brackets[state].front!, true);
       const front = new THREE.Mesh(new THREE.PlaneGeometry(w, h), frontMat);
       front.position.set(wallX + nx * frontOff, midY, wallZ + nz * frontOff);
       front.rotation.y = rotY;
       front.renderOrder = 2;
       front.userData.isSconce = true;
+      front.userData.skipVertexLighting = true;
       front.userData.kind = 'torch-bracket';
       front.userData.lightX = sconce.x;
       front.userData.lightY = sconce.y;
@@ -233,8 +235,12 @@ export class TorchSystem {
   update(now: number) {
     const cam = this.camera.position;
     for (const visual of this.visuals) {
+      const dx = cam.x - visual.flame.position.x;
+      const dz = cam.z - visual.flame.position.z;
+      const nearCam = Math.hypot(dx, dz) < 0.8;
+      visual.flame.visible = (visual.sconce.lit || visual.lighting) && !nearCam;
       if (!visual.flame.visible) continue;
-      this.look.set(cam.x - visual.flame.position.x, 0, cam.z - visual.flame.position.z);
+      this.look.set(dx, 0, dz);
       visual.flame.rotation.y = Math.atan2(this.look.x, this.look.z);
 
       const frames = visual.lighting ? this.flareFrames : this.flameFrames;

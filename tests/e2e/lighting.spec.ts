@@ -78,8 +78,8 @@ test('proto3d lighting: pools, relight, oil, no 404s', async ({ page }) => {
   expect(poolBefore, 'lit pool brighter than dark stretch').toBeGreaterThan(darkBefore + 0.12);
   expect(darkBefore, 'dark stretch stays readable').toBeGreaterThan(0.1);
 
-  await shot(1, 5, 0, 'torch-side-profile.png');
-  await shot(6, 5, 2, 'oil-flask.png');
+  await shot(1, 7, 0, 'torch-side-profile.png');
+  await shot(6, 7, 0, 'oil-flask.png');
   const oilSprite = await page.evaluate(() =>
     (window as unknown as { __proto3d: Proto3d }).__proto3d.sprites().find((s) => s.item === 'oil')
   );
@@ -106,7 +106,7 @@ test('proto3d lighting: pools, relight, oil, no 404s', async ({ page }) => {
   expect(oilAfterLight).toBe(1);
   await expect(oilHud).toHaveText('Oil 1/4');
 
-  await shot(1, 6, 1, 'corridor-two-torch-pools.png');
+  await shot(2, 6, 1, 'corridor-two-torch-pools.png');
 
   await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.setPosition(5, 7, 0));
   const pool = await page.evaluate(() =>
