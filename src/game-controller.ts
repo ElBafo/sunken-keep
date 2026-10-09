@@ -7,11 +7,14 @@ import { dialogueSystem } from './dialogue-system';
 import { SaveSystem } from './save-system';
 import { sound } from './assets';
 import { processMonsterTurn } from './monster-ai';
+import { loadLogMessages } from './log-messages';
+import type { FloorData, TileState } from './types';
 
 export class GameController {
   private state: GameState;
   private baseUrl: string;
   private walkStepCounter = 0;
+  private skipTitle = false;
 
   constructor() {
     this.state = createNewGameState();
@@ -36,6 +39,9 @@ export class GameController {
     // Load dialogue data
     await dialogueSystem.loadDialogues(this.baseUrl);
 
+    // Load combat / exploration log strings
+    await loadLogMessages();
+
     // Initialize audio
     await sound.init();
 
@@ -56,7 +62,7 @@ export class GameController {
     console.log('GameController initialized');
   }
 
-  // Parse URL parameters: ?floor=N&flags=a,b,c
+  // Parse URL parameters: ?floor=N&flags=a,b,c&fight=monsterId
   private parseURLParams(): void {
     const params = new URLSearchParams(window.location.search);
     
@@ -71,6 +77,7 @@ export class GameController {
         this.state.party.y = start.y;
         this.state.party.dir = start.dir;
         this.state.screen = 'playing';
+        this.skipTitle = true;
         console.log(`URL override: Starting on floor ${floorNum}`);
       }
     }
@@ -82,6 +89,123 @@ export class GameController {
       flags.forEach(flag => this.state.flags.add(flag.trim()));
       console.log(`URL override: Set flags: ${flags.join(', ')}`);
     }
+
+    // Combat test: start on the current floor with that monster adjacent, in front, already fighting
+    const fightParam = params.get('fight');
+    if (fightParam) {
+      this.setupFight(fightParam);
+    }
+  }
+
+  shouldSkipTitle(): boolean {
+    return this.skipTitle;
+  }
+
+  private tileBlocks(tile: TileState | undefined): boolean {
+    if (!tile) return true;
+    if (tile.wall) return true;
+    if (tile.secret && !tile.secretOpen) return true;
+    if (tile.door && tile.doorLocked && !tile.doorOpen) return true;
+    return false;
+  }
+
+  private findMonster(floor: FloorData, monsterId: string): { x: number; y: number } | null {
+    for (let y = 0; y < floor.height; y++) {
+      for (let x = 0; x < floor.width; x++) {
+        if (floor.tiles[y][x].monster === monsterId) {
+          return { x, y };
+        }
+      }
+    }
+    return null;
+  }
+
+  private spawnMonsterInFront(floor: FloorData, monsterId: string): { x: number; y: number } | null {
+    const stats = combatController.getMonsterStats(monsterId);
+    const hp = stats?.hp ?? 10;
+    const dirs: Array<[number, number, number]> = [
+      [0, -1, 0],
+      [1, 0, 1],
+      [0, 1, 2],
+      [-1, 0, 3],
+    ];
+
+    const tryPlace = (x: number, y: number, faceDir: number): { x: number; y: number } | null => {
+      if (x < 0 || y < 0 || x >= floor.width || y >= floor.height) return null;
+      const tile = floor.tiles[y][x];
+      if (this.tileBlocks(tile)) return null;
+      tile.monster = monsterId;
+      tile.monsterHp = hp;
+      tile.monsterMaxHp = hp;
+      tile.monsterState = 'idle';
+      tile.monsterAnimTime = 0;
+      this.state.party.dir = faceDir;
+      return { x, y };
+    };
+
+    // Prefer the square already in front of the party
+    const facing = this.state.party.dir;
+    const fdx = [0, 1, 0, -1][facing];
+    const fdy = [-1, 0, 1, 0][facing];
+    const ahead = tryPlace(this.state.party.x + fdx, this.state.party.y + fdy, facing);
+    if (ahead) return ahead;
+
+    for (const [dx, dy, dir] of dirs) {
+      const placed = tryPlace(this.state.party.x + dx, this.state.party.y + dy, dir);
+      if (placed) return placed;
+    }
+    return null;
+  }
+
+  private placePartyFacingMonster(floor: FloorData, mx: number, my: number): boolean {
+    // Prefer standing south of the monster (facing north) so it fills the view
+    const neighbors: Array<[number, number, number]> = [
+      [0, 1, 0],   // party south, face north
+      [-1, 0, 1],  // party west, face east
+      [1, 0, 3],   // party east, face west
+      [0, -1, 2],  // party north, face south
+    ];
+    for (const [dx, dy, dir] of neighbors) {
+      const x = mx + dx;
+      const y = my + dy;
+      if (x < 0 || y < 0 || x >= floor.width || y >= floor.height) continue;
+      const tile = floor.tiles[y][x];
+      if (this.tileBlocks(tile)) continue;
+      if (tile.monster) continue;
+      this.state.party.x = x;
+      this.state.party.y = y;
+      this.state.party.dir = dir;
+      return true;
+    }
+    return false;
+  }
+
+  private setupFight(monsterId: string): void {
+    const floor = this.state.floors.get(this.state.party.floor);
+    if (!floor) {
+      console.error(`Fight setup failed: no floor ${this.state.party.floor}`);
+      return;
+    }
+
+    let pos = this.findMonster(floor, monsterId);
+    if (pos) {
+      if (!this.placePartyFacingMonster(floor, pos.x, pos.y)) {
+        console.warn(`Fight setup: no adjacent tile for ${monsterId}, spawning in front instead`);
+        pos = this.spawnMonsterInFront(floor, monsterId);
+      }
+    } else {
+      pos = this.spawnMonsterInFront(floor, monsterId);
+    }
+
+    if (!pos) {
+      console.error(`Fight setup failed: could not place ${monsterId}`);
+      return;
+    }
+
+    this.state.screen = 'playing';
+    this.skipTitle = true;
+    combatController.startCombat(this.state, monsterId, pos.x, pos.y);
+    console.log(`URL override: fight=${monsterId} at (${pos.x},${pos.y}) party at (${this.state.party.x},${this.state.party.y}) dir ${this.state.party.dir}`);
   }
 
   getState(): GameState {

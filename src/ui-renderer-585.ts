@@ -3,6 +3,7 @@ import type { GameState, Hero } from './types';
 import type { HeroId } from './constants';
 import { Renderer } from './renderer';
 import { createPartyAdapter } from './render-adapter';
+import { gameLog } from './game-log';
 import {
   CANVAS_WIDTH,
   CANVAS_HEIGHT,
@@ -318,9 +319,24 @@ export class UIRenderer585 {
     }
   }
 
-  private drawLog(_ctx: CanvasRenderingContext2D): void {
-    // TODO: Draw 3-line log from message log
-    // For now, skip to keep milestone focused
+  private drawLog(ctx: CanvasRenderingContext2D): void {
+    const [x, y, w] = CONTROLS_LAYOUT.log;
+    const messages = gameLog.getRecent(3);
+    if (messages.length === 0) return;
+
+    ctx.save();
+    ctx.fillStyle = '#d8ccb0';
+    ctx.font = '8px monospace';
+    ctx.textAlign = 'left';
+    ctx.textBaseline = 'top';
+    const lineHeight = 9;
+    const padding = 2;
+    messages.forEach((msg, i) => {
+      const maxChars = Math.floor((w - padding * 2) / 5);
+      const text = msg.text.length > maxChars ? msg.text.slice(0, maxChars - 1) + '…' : msg.text;
+      ctx.fillText(text, x + padding, y + padding + i * lineHeight);
+    });
+    ctx.restore();
   }
 
   private drawMovementPad(ctx: CanvasRenderingContext2D): void {

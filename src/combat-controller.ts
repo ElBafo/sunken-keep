@@ -1,7 +1,14 @@
 import type { GameState, MonsterDef } from './types';
 import type { HeroId } from './constants';
+import { MELEE_ITEMS } from './constants';
 import { actionSystem } from './action-system';
 import { sound } from './assets';
+import { getLogMessage } from './log-messages';
+import { gameLog } from './game-log';
+
+function monsterName(id: string): string {
+  return id.replace(/_/g, ' ');
+}
 
 export class CombatController {
   private monsterData: Record<string, MonsterDef> = {};
@@ -31,29 +38,50 @@ export class CombatController {
   }
 
   // Start combat with a monster
-  startCombat(_state: GameState, monster: string, x: number, y: number): void {
+  startCombat(state: GameState, monster: string, x: number, y: number): void {
+    if (this.activeEncounter) return;
+
     const stats = this.getMonsterStats(monster);
     if (!stats) {
       console.error(`Monster not found: ${monster}`);
       return;
     }
 
+    const floor = state.floors.get(state.party.floor);
+    const tile = floor?.tiles[y]?.[x];
+    const hp = tile?.monsterHp ?? stats.hp;
+    const maxHp = tile?.monsterMaxHp ?? stats.hp;
+
     this.activeEncounter = {
       monster,
       monsterAc: stats.ac,
-      monsterHp: stats.hp,
-      monsterMaxHp: stats.hp,
+      monsterHp: hp,
+      monsterMaxHp: maxHp,
       tile: { x, y },
     };
-    console.log(`Combat started: ${monster} (AC ${stats.ac}, HP ${stats.hp})`);
+    state.combat = {
+      active: true,
+      monster,
+      monsterHp: hp,
+      monsterMaxHp: maxHp,
+      monsterAc: stats.ac,
+      tile: tile ?? null,
+      turn: 'player',
+      startTime: Date.now(),
+      lastActionTime: Date.now(),
+    };
+    console.log(`Combat started: ${monster} (AC ${stats.ac}, HP ${hp})`);
   }
 
   // End combat (monster defeated or fled)
-  endCombat(): void {
+  endCombat(state?: GameState): void {
     if (this.activeEncounter) {
       console.log(`Combat ended: ${this.activeEncounter.monster}`);
     }
     this.activeEncounter = null;
+    if (state) {
+      state.combat = null;
+    }
   }
 
   // Check if in combat
@@ -66,6 +94,27 @@ export class CombatController {
     return this.activeEncounter;
   }
 
+  private removeMonsterFromFloor(state: GameState, x: number, y: number): void {
+    const floor = state.floors.get(state.party.floor);
+    if (!floor) return;
+    if (x < 0 || x >= floor.width || y < 0 || y >= floor.height) return;
+    floor.tiles[y][x].monster = undefined;
+    floor.tiles[y][x].monsterHp = undefined;
+    floor.tiles[y][x].monsterMaxHp = undefined;
+    floor.tiles[y][x].monsterState = undefined;
+  }
+
+  private syncTileHp(state: GameState): void {
+    if (!this.activeEncounter) return;
+    const floor = state.floors.get(state.party.floor);
+    const { x, y } = this.activeEncounter.tile;
+    if (!floor || !floor.tiles[y] || !floor.tiles[y][x]) return;
+    floor.tiles[y][x].monsterHp = this.activeEncounter.monsterHp;
+    if (state.combat) {
+      state.combat.monsterHp = this.activeEncounter.monsterHp;
+    }
+  }
+
   // Handle hand button click
   handleHandButton(state: GameState, heroId: HeroId, hand: 'main' | 'off'): void {
     const hero = state.heroes[heroId];
@@ -75,27 +124,28 @@ export class CombatController {
     const now = Date.now();
     const recoveryEnd = hero.recovery[hand];
     if (recoveryEnd > now) {
-      sound.play('sfx_no');
+      sound.play('sfx_ui_button_denied');
       return;
     }
 
     // Check if in combat
     if (!this.activeEncounter) {
-      sound.play('sfx_no');
+      sound.play('sfx_ui_button_denied');
       return;
     }
 
     // Check mana cost
     if (!actionSystem.canUseAction(hero, hand, state)) {
-      sound.play('sfx_no_mana');
+      sound.play('sfx_ui_button_denied');
       return;
     }
 
-    // Front-two melee rule: check if hero can melee
+    // Front-two melee rule: back row cannot use melee items
     const actionDef = actionSystem.getActionDefPublic(hero.id, hand);
-    if (actionDef && !actionDef.ranged && hero.formation === 'back') {
-      // Back row cannot melee (ranged is falsy/undefined for melee weapons)
-      sound.play('sfx_no');
+    const item = hero.equipment[hand];
+    const isRanged = !!(actionDef?.ranged || actionDef?.note?.includes('ranged') || item === 'wand' || item === 'scroll');
+    if (!isRanged && hero.formation === 'back' && MELEE_ITEMS.includes(item)) {
+      sound.play('sfx_ui_button_denied');
       return;
     }
 
@@ -109,42 +159,36 @@ export class CombatController {
     const result = actionSystem.performAction(hero, hand, target, state);
 
     if (result.success) {
-      // Play action ready sound (recovery started)
-      sound.play('sfx_act_ready');
-
       if (result.miss) {
-        // Miss
-        sound.play('sfx_attack_miss');
+        sound.play('sfx_ui_button');
+        gameLog.add(getLogMessage('miss', { hero: hero.name }));
         console.log(`${hero.name} missed!`);
       } else if (result.damage) {
-        // Hit
-        sound.play('sfx_attack_hit');
+        sound.play('sfx_hit');
         this.activeEncounter.monsterHp = Math.max(0, this.activeEncounter.monsterHp - result.damage);
+        this.syncTileHp(state);
+        gameLog.add(getLogMessage('hit', {
+          hero: hero.name,
+          monster: monsterName(this.activeEncounter.monster),
+          n: result.damage,
+        }));
         console.log(`${hero.name} hit for ${result.damage} damage!`);
 
-        // Check if monster defeated
         if (this.activeEncounter.monsterHp <= 0) {
-          console.log(`${this.activeEncounter.monster} defeated!`);
-          this.endCombat();
-
-          // Remove monster from floor
-          const floor = state.floors.get(state.party.floor);
-          if (floor && this.activeEncounter) {
-            const { x, y } = this.activeEncounter.tile;
-            if (x >= 0 && x < floor.width && y >= 0 && y < floor.height) {
-              floor.tiles[y][x].monster = undefined;
-              floor.tiles[y][x].monsterHp = undefined;
-              floor.tiles[y][x].monsterMaxHp = undefined;
-            }
-          }
+          const deadName = this.activeEncounter.monster;
+          const { x, y } = this.activeEncounter.tile;
+          gameLog.add(getLogMessage('monster_dies', { monster: monsterName(deadName) }));
+          console.log(`${deadName} defeated!`);
+          this.removeMonsterFromFloor(state, x, y);
+          this.endCombat(state);
         }
       } else if (result.healing) {
-        // Healing
-        sound.play('sfx_spell_cast');
+        sound.play('sfx_potion');
+        gameLog.add(result.effect || `${hero.name} healed for ${result.healing}!`);
         console.log(`${hero.name} healed for ${result.healing}!`);
       } else {
-        // Other effect
-        sound.play('sfx_spell_cast');
+        sound.play('sfx_ui_button');
+        gameLog.add(result.effect || `${hero.name} used ${actionDef?.item || 'action'}!`);
         console.log(`${hero.name} used ${actionDef?.item || 'action'}!`);
       }
     }

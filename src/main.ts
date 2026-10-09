@@ -137,6 +137,10 @@ async function main() {
     uiRenderer585 = new UIRenderer585();
     titleScreen = new TitleScreen();
     await titleScreen.loadAssets();
+    if (gameController.shouldSkipTitle()) {
+      inTitleScreen = false;
+      console.log('Skipping title screen (URL override)');
+    }
     console.log('New game controller initialized');
   }
   
