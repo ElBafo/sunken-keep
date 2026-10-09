@@ -126,7 +126,7 @@ async function main() {
   let gameController: GameController | null = null;
   let uiRenderer585: UIRenderer585 | null = null;
   let titleScreen: TitleScreen | null = null;
-  let inTitleScreen = true;
+  let inTitleScreen = false; // Temporarily bypass title screen to test
   
   if (USE_NEW_CONTROLLER) {
     gameController = new GameController();
