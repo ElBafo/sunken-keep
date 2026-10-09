@@ -86,6 +86,14 @@ export const SUNBEAM_INTENSITY = 0.38;
  */
 export const FLOOR_AMBIENT: readonly number[] = [0, 0.14, 0.12, 0.05, 0.045, 0.042, 0.04, 0.038, 0.035];
 export const AMBIENT_MIN = 0.03;
+/** Torch/lantern weight below this counts as unlit for eye/item glints. */
+export const DARK_LIGHT_THRESHOLD = 0.08;
+export const EYE_ANIM_FPS = 8;
+export const GLINT_ANIM_FPS = 12;
+export const GLINT_REST_MIN_MS = 1500;
+export const GLINT_REST_MAX_MS = 3000;
+/** 3 dB duck on halls ambience in true dark. */
+export const DARK_AMB_DUCK_DB = 3;
 
 /** Clamp a floor index for FLOOR_AMBIENT. Missing / invalid values keep `fallback`. */
 export function parseAmbientFloor(raw: string | null | undefined, fallback = 1): number {

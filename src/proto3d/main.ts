@@ -24,6 +24,7 @@ import { SpriteManager } from './sprites';
 import { TorchSystem, torchWorldPos } from './torches';
 import { VertexLightingManager } from './vertex-lighting';
 import { WaterSystem } from './water';
+import { DarkFx } from './dark-fx';
 
 class Game {
   renderer!: PixelRenderer;
@@ -37,6 +38,7 @@ class Game {
   dressing!: Dressing;
   water!: WaterSystem;
   torches!: TorchSystem;
+  darkFx!: DarkFx;
   quality: QualityLevel = 'high';
   bright = 1;
   oil = OIL_START;
@@ -111,6 +113,8 @@ class Game {
 
     this.spriteManager = new SpriteManager(this.renderer.camera);
     await this.spriteManager.loadSprites(this.renderer.scene, floor1);
+    this.darkFx = new DarkFx();
+    await this.darkFx.load(this.renderer.scene, floor1, this.spriteManager);
     this.updateOilHud();
     await this.loadLogText();
 
@@ -179,6 +183,7 @@ class Game {
     tile.item = undefined;
     this.player.hasKey = true;
     this.spriteManager.hideItemAt(x, y);
+    this.darkFx.hideItemAt(x, y);
     this.audioManager.playUi('key', 0.8);
     this.showMessage('Key.');
     return true;
@@ -302,6 +307,14 @@ class Game {
         this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
         this.vertexLighting.updateAllMeshes(this.renderer.scene);
         this.spriteManager.update(performance.now(), this.player.x, this.player.y, this.player.dir);
+        this.darkFx.update(
+          performance.now(),
+          this.vertexLighting,
+          this.spriteManager,
+          this.audioManager,
+          this.player.x,
+          this.player.y
+        );
         this.updateDoorButton();
         this.renderer.render();
       },
@@ -444,6 +457,8 @@ class Game {
         floor1Sconces.map((s) => ({ x: s.x, y: s.y, face: s.face, lit: s.lit, capped: !!s.capped })),
       tileBrightness: (x: number, y: number) =>
         this.vertexLighting.calculateBrightness(x, y, !!floor1.tiles[y]?.[x]?.floorNDark),
+      isSquareLit: (x: number, y: number) => this.vertexLighting.isSquareLit(x, y),
+      darkFx: () => this.darkFx.snapshot(),
       lightFacingTorch: () => this.lightFacingTorch(),
       tryMoveForward: () => {
         const before = { x: this.player.x, y: this.player.y };
@@ -529,6 +544,7 @@ class Game {
     const prevFrame = this.torches.flameFrame();
     this.torches.update(now);
     this.spriteManager.update(now, this.player.x, this.player.y, this.player.dir);
+    this.darkFx.update(now, this.vertexLighting, this.spriteManager, this.audioManager, this.player.x, this.player.y);
     const nextFrame = this.torches.flameFrame();
     if (nextFrame !== prevFrame) this.vertexLighting.setFlickerFrame(nextFrame);
 

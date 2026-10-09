@@ -4,6 +4,7 @@ import {
   BRIGHT_MAX,
   BRIGHT_MIN,
   CELL_SIZE,
+  DARK_LIGHT_THRESHOLD,
   EMBER_INTENSITY,
   EMBER_RADIUS_TILES,
   FACE_INTO_ROOM,
@@ -237,6 +238,32 @@ export class VertexLightingManager {
       return { radius: LANTERN_RADIUS_TILES, intensity: LANTERN_INTENSITY, rgb: LANTERN_RGB };
     }
     return { radius: EMBER_RADIUS_TILES, intensity: EMBER_INTENSITY, rgb: EMBER_RGB };
+  }
+
+  /** Combined torch + lantern weight at a tile (no ambient, no sunbeam). */
+  sourceLight(tileX: number, tileY: number): number {
+    const wx = tileX * CELL_SIZE;
+    const wy = CELL_SIZE / 2;
+    const wz = tileY * CELL_SIZE;
+    const lantern = this.lanternSpec();
+    const pdx = tileX - this.partyX;
+    const pdz = tileY - this.partyY;
+    const partyDist = Math.sqrt(pdx * pdx + pdz * pdz);
+    let maxW = lantern.intensity * partyFalloff(partyDist, lantern.radius);
+    const radius = SCONCE_RADIUS_TILES * CELL_SIZE;
+    for (const s of this.sconceWorld) {
+      const dx = wx - s.x;
+      const dy = wy - s.y;
+      const dz = wz - s.z;
+      const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+      if (dist >= radius) continue;
+      maxW = Math.max(maxW, TORCH_INTENSITY * smoothFalloff(dist / CELL_SIZE, SCONCE_RADIUS_TILES));
+    }
+    return maxW * this.bright;
+  }
+
+  isSquareLit(tileX: number, tileY: number): boolean {
+    return this.sourceLight(tileX, tileY) >= DARK_LIGHT_THRESHOLD;
   }
 
   calculateBrightness(tileX: number, tileY: number, isDark: boolean): number {

@@ -52,6 +52,7 @@ interface SpriteInfo {
   currentFrame: number;
   animSpeed: number;
   lastFrameTime: number;
+  pickedUp?: boolean;
 }
 
 function configureSpriteTexture(tex: THREE.Texture) {
@@ -109,7 +110,24 @@ export class SpriteManager {
   hideItemAt(x: number, y: number) {
     for (const sprite of this.sprites) {
       if (sprite.kind === 'item' && sprite.x === x && sprite.y === y) {
+        sprite.pickedUp = true;
         sprite.object.visible = false;
+      }
+    }
+  }
+
+  isItemPresent(x: number, y: number): boolean {
+    return this.sprites.some((s) => s.kind === 'item' && s.x === x && s.y === y && !s.pickedUp);
+  }
+
+  setLitVisible(x: number, y: number, kind: 'monster' | 'item' | 'sconce', lit: boolean) {
+    for (const sprite of this.sprites) {
+      if (sprite.kind === kind && sprite.x === x && sprite.y === y) {
+        if (sprite.pickedUp) {
+          sprite.object.visible = false;
+          continue;
+        }
+        sprite.object.visible = lit;
       }
     }
   }

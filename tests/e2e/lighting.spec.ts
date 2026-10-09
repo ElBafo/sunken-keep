@@ -13,6 +13,12 @@ type Proto3d = {
   getBright: () => number;
   getAmbientFloor: () => number;
   getAmbient: () => number;
+  isSquareLit: (x: number, y: number) => boolean;
+  darkFx: () => {
+    eyes: Array<{ x: number; y: number; monster: string; tint: string; visible: boolean }>;
+    glints: Array<{ x: number; y: number; item: string; visible: boolean }>;
+    stairs: number;
+  };
   lastMessage: () => string;
   getPosition: () => { x: number; y: number; dir: number };
   torchStates: () => Array<{ x: number; y: number; face: string; lit: boolean; capped: boolean }>;
@@ -295,6 +301,24 @@ test('proto3d lighting: ?ambientFloor=3 is near-black beyond the lantern', async
   await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.setPosition(1, 7, 1));
   await page.waitForTimeout(220);
   await page.screenshot({ path: `${OUT}/lighting_ambient_floor3_preview.png`, fullPage: false });
+
+  const fx = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    p.setPosition(5, 2, 1);
+    return {
+      lit: p.isSquareLit(7, 2),
+      fx: p.darkFx()
+    };
+  });
+  console.log('DARK FX', fx);
+  expect(fx.lit, 'slime square is outside torch and lantern').toBe(false);
+  const slimeEyes = fx.fx.eyes.find((e) => e.x === 7 && e.y === 2);
+  expect(slimeEyes, 'slime has eye glints').toBeTruthy();
+  expect(slimeEyes!.tint, 'slime eyes are amber').toBe('amber');
+  expect(slimeEyes!.visible, 'slime eyes show in the dark').toBe(true);
+  expect(fx.fx.stairs, 'stairs-down glow is placed').toBeGreaterThan(0);
+  await page.waitForTimeout(220);
+  await page.screenshot({ path: `${OUT}/lighting_eye_glints_dark.png`, fullPage: false });
 
   expect(errors, 'console errors').toEqual([]);
   expect(failed404s, '404s').toEqual([]);
