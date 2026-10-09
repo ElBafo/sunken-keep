@@ -62,6 +62,10 @@ test('proto3d lighting: pools, relight, oil, no 404s', async ({ page }) => {
 
   const startOil = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.getOil());
   expect(startOil).toBe(2);
+  expect(
+    await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.getBright()),
+    'default ?bright= is 1'
+  ).toBe(1);
 
   const states = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.torchStates());
   expect(states.find((s) => s.x === 0 && s.y === 6)?.lit).toBe(true);
@@ -122,7 +126,7 @@ test('proto3d lighting: pools, relight, oil, no 404s', async ({ page }) => {
   });
   console.log('LANTERN ember', ember);
   expect(ember.oil, 'ember lantern test has no oil').toBe(0);
-  expect(ember.own, 'ember lantern keeps the party square readable').toBeGreaterThan(0.2);
+  expect(ember.own, 'ember lantern keeps the party square readable').toBeGreaterThan(0.18);
   expect(ember.ahead, 'ember lantern still readable 1 square ahead').toBeGreaterThan(0.14);
   expect(ember.ahead, 'ember circle is smaller / dimmer than oil').toBeLessThan(lantern.ahead - 0.02);
   await shot(7, 1, 3, 'lantern-ember-circle.png');

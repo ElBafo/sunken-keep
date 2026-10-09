@@ -57,9 +57,12 @@ class Game {
     const params = new URLSearchParams(window.location.search);
     this.quality = qualityFromSearch(params);
     this.persist = persistEnabled();
-    const brightRaw = Number(params.get('bright'));
-    if (Number.isFinite(brightRaw)) {
-      this.bright = Math.min(BRIGHT_MAX, Math.max(BRIGHT_MIN, brightRaw));
+    const brightParam = params.get('bright');
+    if (brightParam != null && brightParam !== '') {
+      const brightRaw = Number(brightParam);
+      if (Number.isFinite(brightRaw)) {
+        this.bright = Math.min(BRIGHT_MAX, Math.max(BRIGHT_MIN, brightRaw));
+      }
     }
     this.oil = loadProgress(floor1Sconces, this.persist);
 
