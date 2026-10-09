@@ -88,6 +88,9 @@ async function main() {
     if (inputHandler) {
       inputHandler.setScale(scale);
     }
+    if (!installHint.classList.contains('hidden')) {
+      positionInstallHint();
+    }
   }
   
   window.addEventListener('resize', handleResize);
@@ -144,31 +147,52 @@ async function main() {
     console.log('New game controller initialized');
   }
   
-  // Check if running as PWA (standalone mode)
-  let isStandalone = false;
-  try {
-    isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
-                   (window.navigator as any).standalone === true;
-    
-    // Show install hint on iOS Safari when not standalone (one-time)
-    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-    const installHintDismissed = localStorage.getItem('installHintDismissed');
-    
-    // Dismiss hint on tap
-    installHint.addEventListener('click', () => {
-      installHint.classList.add('hidden');
-      localStorage.setItem('installHintDismissed', 'true');
-    });
-    
-    if (isIOS && isSafari && !isStandalone && !installHintDismissed) {
-      setTimeout(() => {
-        installHint.classList.remove('hidden');
-      }, 3000);
+  function isStandaloneMode(): boolean {
+    try {
+      return window.matchMedia('(display-mode: standalone)').matches ||
+             (window.navigator as any).standalone === true;
+    } catch {
+      return false;
     }
-  } catch (error) {
-    console.error('PWA check error:', error);
   }
+
+  function positionInstallHint(): void {
+    const rect = canvas.getBoundingClientRect();
+    const scaleY = rect.height / BASE_HEIGHT;
+    // Sit in the empty band between the tagline (~102) and Continue (404)
+    // so the hint never covers title buttons or in-game controls.
+    const canvasY = 300;
+    installHint.style.left = `${rect.left + rect.width / 2}px`;
+    installHint.style.top = `${rect.top + canvasY * scaleY}px`;
+    installHint.style.transform = 'translate(-50%, -50%)';
+    installHint.style.bottom = 'auto';
+  }
+
+  function updateInstallHint(): void {
+    try {
+      const standalone = isStandaloneMode();
+      const dismissed = localStorage.getItem('installHintDismissed');
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+      const isSafari = /Safari/i.test(navigator.userAgent) && !/CriOS|FxiOS|Chrome|Android/i.test(navigator.userAgent);
+      const show = inTitleScreen && !standalone && !dismissed && isIOS && isSafari;
+      if (show) {
+        positionInstallHint();
+        installHint.classList.remove('hidden');
+      } else {
+        installHint.classList.add('hidden');
+      }
+    } catch (error) {
+      installHint.classList.add('hidden');
+      console.error('PWA check error:', error);
+    }
+  }
+
+  installHint.addEventListener('click', () => {
+    installHint.classList.add('hidden');
+    localStorage.setItem('installHintDismissed', 'true');
+  });
+
+  updateInstallHint();
   
   let gameStarted = false;
   let audioUnlocked = false;
@@ -215,10 +239,11 @@ async function main() {
         
         if (result === 'new_game') {
           // Start new game
+          inTitleScreen = false;
+          updateInstallHint();
           const newController = new GameController();
           newController.init().then(() => {
             gameController = newController;
-            inTitleScreen = false;
             console.log('New game started');
           });
           return;
@@ -228,11 +253,12 @@ async function main() {
           if (slot) {
             const save = SaveSystem.load(slot);
             if (save) {
+              inTitleScreen = false;
+              updateInstallHint();
               const newController = new GameController();
               newController.init().then(() => {
                 SaveSystem.restoreState(save, newController.getState());
                 gameController = newController;
-                inTitleScreen = false;
                 console.log(`Continued from slot ${slot}`);
               });
             }
@@ -242,11 +268,12 @@ async function main() {
           // Load specific slot
           const save = SaveSystem.load(result);
           if (save) {
+            inTitleScreen = false;
+            updateInstallHint();
             const newController = new GameController();
             newController.init().then(() => {
               SaveSystem.restoreState(save, newController.getState());
               gameController = newController;
-              inTitleScreen = false;
               console.log(`Loaded slot ${result}`);
             });
           }
