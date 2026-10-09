@@ -129,6 +129,20 @@ export class SoundManager {
       sound.play().catch(() => {});
     }
   }
+  
+  playLoop(event: string, volume: number = 1.0): HTMLAudioElement | null {
+    if (!this.unlocked) return null;
+    
+    const soundKey = event.startsWith('sfx_') ? event : `sfx_${event}`;
+    const sound = this.sounds.get(soundKey);
+    if (sound) {
+      sound.volume = this.muted ? 0 : volume;
+      sound.loop = true;
+      sound.play().catch(() => {});
+      return sound;
+    }
+    return null;
+  }
 
   playMusic(name: string) {
     if (!this.unlocked) return;

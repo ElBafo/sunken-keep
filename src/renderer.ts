@@ -11,6 +11,20 @@ const VIEWPORT_HEIGHT = UI.VIEWPORT_HEIGHT;
 export class Renderer {
   private bubbleFrame: HTMLImageElement;
   private bubbleTail: HTMLImageElement;
+  
+  // Torch flicker state
+  private torchFrame = 0;
+  private lastTorchFrameTime = 0;
+  private torchFrameDelay = 133; // ~7.5 fps (6-8 fps range)
+  
+  // View caching for performance
+  private cachedView: {
+    key: string;
+    canvas: HTMLCanvasElement;
+  } | null = null;
+  
+  // Water shimmer offset
+  private waterShimmerTime = 0;
 
   constructor() {
     this.bubbleFrame = assets.loadImage('/sunken-keep/art/ui/bubble_9slice.png');
@@ -48,23 +62,34 @@ export class Renderer {
     const states = ['idle', 'attack', 'hurt', 'death'];
     const frameCounts = { idle: 4, attack: 3, hurt: 1, death: 4 };
     
+    // Use dungeon_v2 for repainted assets
+    const dungeonPath = '/sunken-keep/art/dungeon_v2';
+    
     // Load backdrops
-    assets.loadImage('/sunken-keep/art/dungeon/backdrop_stone.png');
-    assets.loadImage('/sunken-keep/art/dungeon/backdrop_shallow.png');
-    assets.loadImage('/sunken-keep/art/dungeon/backdrop_deep.png');
+    assets.loadImage(`${dungeonPath}/backdrop_stone.png`);
+    assets.loadImage(`${dungeonPath}/backdrop_shallow.png`);
+    assets.loadImage(`${dungeonPath}/backdrop_deep.png`);
     
     // Load floor water overlays
     ['shallow', 'deep'].forEach(type => {
       distances.forEach(dist => {
-        assets.loadImage(`/sunken-keep/art/dungeon/floor_water_${type}_${dist}.png`);
+        assets.loadImage(`${dungeonPath}/floor_water_${type}_${dist}.png`);
       });
     });
     
+    // Load sconces (dead and lit frames 1-3)
     distances.forEach(dist => {
-      walls.forEach(wall => assets.loadImage(`/sunken-keep/art/dungeon/${wall}_${dist}.png`));
-      doors.forEach(door => assets.loadImage(`/sunken-keep/art/dungeon/${door}_${dist}.png`));
-      secrets.forEach(secret => assets.loadImage(`/sunken-keep/art/dungeon/${secret}_${dist}.png`));
-      items.forEach(item => assets.loadImage(`/sunken-keep/art/dungeon/${item}_${dist}.png`));
+      assets.loadImage(`${dungeonPath}/sconce_dead_${dist}.png`);
+      for (let i = 1; i <= 3; i++) {
+        assets.loadImage(`${dungeonPath}/sconce_lit_${i}_${dist}.png`);
+      }
+    });
+    
+    distances.forEach(dist => {
+      walls.forEach(wall => assets.loadImage(`${dungeonPath}/${wall}_${dist}.png`));
+      doors.forEach(door => assets.loadImage(`${dungeonPath}/${door}_${dist}.png`));
+      secrets.forEach(secret => assets.loadImage(`${dungeonPath}/${secret}_${dist}.png`));
+      items.forEach(item => assets.loadImage(`/sunken-keep/art/dungeon/${item}_${dist}.png`)); // Items still in old folder
       
       // Load monster animation frames
       monsters.forEach(monster => {
@@ -84,10 +109,74 @@ export class Renderer {
     floor: FloorData,
     now: number
   ) {
+    // Update torch flicker frame (6-8 fps)
+    if (now - this.lastTorchFrameTime > this.torchFrameDelay) {
+      this.torchFrame = (this.torchFrame + 1) % 3; // 0, 1, 2 for frames lit_1, lit_2, lit_3
+      this.lastTorchFrameTime = now;
+      // Vary the delay slightly for more natural flicker
+      this.torchFrameDelay = 125 + Math.random() * 33; // 125-158ms = 6.3-8 fps
+    }
+    
+    // Update water shimmer time
+    this.waterShimmerTime = (now * 0.001) % 10; // Slow 10-second cycle
+    
+    // Generate cache key for static view
+    const cacheKey = `${party.x},${party.y},${party.dir},${this.torchFrame}`;
+    
+    // Check if we can use cached static view
+    let useCache = this.cachedView && this.cachedView.key === cacheKey;
+    
+    if (!useCache) {
+      // Create or reuse canvas for caching
+      if (!this.cachedView) {
+        this.cachedView = {
+          key: cacheKey,
+          canvas: document.createElement('canvas')
+        };
+        this.cachedView.canvas.width = VIEWPORT_WIDTH;
+        this.cachedView.canvas.height = VIEWPORT_HEIGHT;
+      } else {
+        this.cachedView.key = cacheKey;
+      }
+      
+      const cacheCtx = this.cachedView.canvas.getContext('2d')!;
+      cacheCtx.imageSmoothingEnabled = false;
+      
+      // Render static view to cache
+      this.renderStaticView(cacheCtx, party, floor, now);
+    }
+    
+    // Draw cached static view
+    if (this.cachedView) {
+      ctx.drawImage(this.cachedView.canvas, 0, 0);
+    }
+    
+    // Draw animated elements on top
+    this.drawAnimatedElements(ctx, party, floor, now);
+    
+    // Apply distance darkness overlay
+    this.applyDistanceDarkness(ctx, party, floor);
+    
+    // Draw warm torch lighting
+    this.drawTorchLighting(ctx, party, floor);
+    
+    // Draw speech bubble if active
+    const bark = getActiveBark(now);
+    if (bark) {
+      this.drawSpeechBubble(ctx, bark.bark.text, characters.indexOf(bark.speaker));
+    }
+  }
+  
+  private renderStaticView(
+    ctx: CanvasRenderingContext2D,
+    party: Party,
+    floor: FloorData,
+    _now: number
+  ) {
     // Step 1: Draw backdrop (floor + ceiling)
     this.drawBackdrop(ctx, party, floor);
     
-    // Step 2: Draw floor water overlays per distance
+    // Step 2: Draw floor water overlays with shimmer
     this.drawWaterOverlays(ctx, party, floor);
     
     // Step 3: Draw walls from far to near
@@ -95,15 +184,26 @@ export class Renderer {
       this.drawWallsAtDistance(ctx, party, floor, dist as 1 | 2 | 3);
     }
     
-    // Step 4: Draw items and monsters from far to near (on top of walls)
+    // Step 4: Draw sconces from far to near
     for (let dist = 3; dist >= 1; dist--) {
-      this.drawSpritesAtDistance(ctx, party, floor, dist as 1 | 2 | 3, now);
+      this.drawSconcesAtDistance(ctx, party, floor, dist as 1 | 2 | 3);
     }
-
-    // Step 5: Draw speech bubble if active
-    const bark = getActiveBark(now);
-    if (bark) {
-      this.drawSpeechBubble(ctx, bark.bark.text, characters.indexOf(bark.speaker));
+    
+    // Step 5: Draw items from far to near (static)
+    for (let dist = 3; dist >= 1; dist--) {
+      this.drawItemsAtDistance(ctx, party, floor, dist as 1 | 2 | 3);
+    }
+  }
+  
+  private drawAnimatedElements(
+    ctx: CanvasRenderingContext2D,
+    party: Party,
+    floor: FloorData,
+    now: number
+  ) {
+    // Draw monsters from far to near (they animate)
+    for (let dist = 3; dist >= 1; dist--) {
+      this.drawMonstersAtDistance(ctx, party, floor, dist as 1 | 2 | 3, now);
     }
   }
   
@@ -118,7 +218,7 @@ export class Renderer {
       backdropName = 'shallow';
     }
     
-    const backdropPath = `/sunken-keep/art/dungeon/backdrop_${backdropName}.png`;
+    const backdropPath = `/sunken-keep/art/dungeon_v2/backdrop_${backdropName}.png`;
     const backdrop = assets.getImage(backdropPath);
     
     if (backdrop && backdrop.complete) {
@@ -131,7 +231,7 @@ export class Renderer {
   }
   
   private drawWaterOverlays(ctx: CanvasRenderingContext2D, party: Party, floor: FloorData) {
-    // Draw water overlays for each distance band
+    // Draw water overlays for each distance band with shimmer
     for (let dist = 1; dist <= 3; dist++) {
       const pos = party.getPosition(dist, 0);
       if (!this.isInBounds(pos, floor)) continue;
@@ -140,11 +240,21 @@ export class Renderer {
       if (tile.shallowWater || tile.deepWater) {
         const type = tile.deepWater ? 'deep' : 'shallow';
         const distKey = dist === 1 ? 'near' : dist === 2 ? 'mid' : 'far';
-        const overlayPath = `/sunken-keep/art/dungeon/floor_water_${type}_${distKey}.png`;
+        const overlayPath = `/sunken-keep/art/dungeon_v2/floor_water_${type}_${distKey}.png`;
         const overlay = assets.getImage(overlayPath);
         
         if (overlay && overlay.complete) {
-          ctx.drawImage(overlay, 0, 0);
+          ctx.save();
+          
+          // Subtle shimmer: slight horizontal offset oscillation
+          const shimmerOffset = Math.sin(this.waterShimmerTime * Math.PI * 0.4 + dist) * 0.5;
+          
+          // Very subtle alpha oscillation for sparkle effect
+          const shimmerAlpha = 0.95 + Math.sin(this.waterShimmerTime * Math.PI * 0.3) * 0.05;
+          ctx.globalAlpha = shimmerAlpha;
+          
+          ctx.drawImage(overlay, shimmerOffset, 0);
+          ctx.restore();
         }
       }
     }
@@ -219,7 +329,7 @@ export class Renderer {
   
   private drawWallFrontAt(ctx: CanvasRenderingContext2D, distance: 1 | 2 | 3, x: number) {
     const distKey = distance === 1 ? 'near' : distance === 2 ? 'mid' : 'far';
-    const imgPath = `/sunken-keep/art/dungeon/wall_front_${distKey}.png`;
+    const imgPath = `/sunken-keep/art/dungeon_v2/wall_front_${distKey}.png`;
     const img = assets.getImage(imgPath);
     
     if (!img || !img.complete) return;
@@ -233,27 +343,21 @@ export class Renderer {
     ctx.drawImage(img, x, yPos);
   }
   
-  private drawSpritesAtDistance(
+  private drawItemsAtDistance(
     ctx: CanvasRenderingContext2D,
     party: Party,
     floor: FloorData,
-    distance: 1 | 2 | 3,
-    _now: number
+    distance: 1 | 2 | 3
   ) {
-    // Only draw sprites in the front cell at this distance
+    // Only draw items in the front cell at this distance
     const pos = party.getPosition(distance, 0);
     if (!this.isInBounds(pos, floor)) return;
     
     const tile = floor.tiles[pos.y][pos.x];
     
-    // Draw items first (behind monsters)
+    // Draw items
     if (tile.item) {
       this.drawItem(ctx, tile.item, distance);
-    }
-    
-    // Draw monsters on top
-    if (tile.monster) {
-      this.drawMonsterSprite(ctx, tile.monster, distance, tile.monsterState || 'idle', tile.monsterAnimTime || 0);
     }
     
     // Draw carvings on front walls
@@ -261,10 +365,195 @@ export class Renderer {
       this.drawCarving(ctx, tile.carving, distance);
     }
   }
+  
+  private drawMonstersAtDistance(
+    ctx: CanvasRenderingContext2D,
+    party: Party,
+    floor: FloorData,
+    distance: 1 | 2 | 3,
+    _now: number
+  ) {
+    // Only draw monsters in the front cell at this distance
+    const pos = party.getPosition(distance, 0);
+    if (!this.isInBounds(pos, floor)) return;
+    
+    const tile = floor.tiles[pos.y][pos.x];
+    
+    // Draw monsters
+    if (tile.monster) {
+      this.drawMonsterSprite(ctx, tile.monster, distance, tile.monsterState || 'idle', tile.monsterAnimTime || 0);
+    }
+  }
+  
+  // Legacy method - kept for compatibility but no longer used directly
+  // Now split into drawItemsAtDistance and drawMonstersAtDistance for caching
+  /*
+  private drawSpritesAtDistance(
+    ctx: CanvasRenderingContext2D,
+    party: Party,
+    floor: FloorData,
+    distance: 1 | 2 | 3,
+    now: number
+  ) {
+    this.drawItemsAtDistance(ctx, party, floor, distance);
+    this.drawMonstersAtDistance(ctx, party, floor, distance, now);
+  }
+  */
+
+  private drawSconcesAtDistance(
+    ctx: CanvasRenderingContext2D,
+    party: Party,
+    floor: FloorData,
+    distance: 1 | 2 | 3
+  ) {
+    if (!floor.sconces) return;
+    
+    const distKey = distance === 1 ? 'near' : distance === 2 ? 'mid' : 'far';
+    
+    // Sconce positions from README
+    const sconceOffsets = {
+      near: { x: 30, y: 40 },
+      mid: { x: 22, y: 28 },
+      far: { x: 15, y: 20 }
+    }[distKey];
+    
+    // Wall piece positions (from drawWallSprite)
+    const wallPos = {
+      near: { front: { x: 55, y: 30 }, left: { x: 15, y: 30 }, right: { x: 215, y: 30 } },
+      mid: { front: { x: 75, y: 50 }, left: { x: 45, y: 50 }, right: { x: 195, y: 50 } },
+      far: { front: { x: 95, y: 65 }, left: { x: 75, y: 65 }, right: { x: 175, y: 65 } }
+    }[distKey];
+    
+    // Check sconces visible at this distance
+    floor.sconces.forEach(sconce => {
+      const sconcePos = party.getPosition(distance, 0);
+      
+      // Check if sconce is on a wall visible at this distance
+      let visible = false;
+      let wallType: 'front' | 'left' | 'right' | null = null;
+      
+      // Front wall
+      if (sconce.x === sconcePos.x && sconce.y === sconcePos.y) {
+        visible = true;
+        wallType = 'front';
+      }
+      
+      // Left wall
+      const leftPos = party.getPosition(distance, -1);
+      if (sconce.x === leftPos.x && sconce.y === leftPos.y) {
+        visible = true;
+        wallType = 'left';
+      }
+      
+      // Right wall
+      const rightPos = party.getPosition(distance, 1);
+      if (sconce.x === rightPos.x && sconce.y === rightPos.y) {
+        visible = true;
+        wallType = 'right';
+      }
+      
+      if (!visible || !wallType) return;
+      
+      // Get sconce sprite
+      const frame = sconce.lit ? `lit_${this.torchFrame + 1}` : 'dead';
+      const imgPath = `/sunken-keep/art/dungeon_v2/sconce_${frame}_${distKey}.png`;
+      const img = assets.getImage(imgPath);
+      
+      if (!img || !img.complete) return;
+      
+      // Calculate sconce position on wall
+      const basePos = wallPos[wallType];
+      let x = basePos.x + sconceOffsets.x;
+      let y = basePos.y + sconceOffsets.y;
+      
+      // Adjust for side walls (place near outer edge)
+      if (wallType === 'left') {
+        x = basePos.x + 5;
+      } else if (wallType === 'right') {
+        x = basePos.x + (distance === 1 ? 30 : distance === 2 ? 20 : 13);
+      }
+      
+      ctx.drawImage(img, x, y);
+    });
+  }
+  
+  private applyDistanceDarkness(
+    ctx: CanvasRenderingContext2D,
+    _party: Party,
+    _floor: FloorData
+  ) {
+    // Green-black darkness overlay for far and mid bands
+    // Far band (distance 3): y 65-135, darkest
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = '#0d1812'; // Dark green-black
+    ctx.globalAlpha = 0.7;
+    ctx.fillRect(0, 65, VIEWPORT_WIDTH, 70);
+    
+    // Mid band (distance 2): y 50-115, medium dark
+    ctx.fillStyle = '#1a2418';
+    ctx.globalAlpha = 0.5;
+    ctx.fillRect(0, 50, VIEWPORT_WIDTH, 65);
+    
+    ctx.restore();
+  }
+  
+  private drawTorchLighting(
+    ctx: CanvasRenderingContext2D,
+    party: Party,
+    floor: FloorData
+  ) {
+    if (!floor.sconces) return;
+    
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter'; // Additive blending for warm glow
+    
+    floor.sconces.forEach(sconce => {
+      if (!sconce.lit) return; // Only lit sconces emit light
+      
+      // Calculate distance from party to sconce
+      const dx = sconce.x - party.x;
+      const dy = sconce.y - party.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      
+      if (dist > 3) return; // Light doesn't reach beyond 3 squares
+      
+      // Check if sconce is in view direction (simplified)
+      const angle = Math.atan2(dy, dx);
+      const partyAngle = party.dir * Math.PI / 2 - Math.PI / 2;
+      const angleDiff = Math.abs(angle - partyAngle);
+      
+      if (angleDiff > Math.PI / 2 && angleDiff < 3 * Math.PI / 2) return; // Behind party
+      
+      // Calculate light intensity based on distance
+      let intensity = 0;
+      if (dist <= 1) {
+        intensity = 0.3 + Math.random() * 0.1; // Flicker at close range
+      } else if (dist <= 2) {
+        intensity = 0.15 + Math.random() * 0.05;
+      } else {
+        intensity = 0.05 + Math.random() * 0.02;
+      }
+      
+      // Warm orange glow #ff8844
+      const gradient = ctx.createRadialGradient(
+        VIEWPORT_WIDTH / 2, 100, 10,
+        VIEWPORT_WIDTH / 2, 100, 150
+      );
+      gradient.addColorStop(0, `rgba(255, 136, 68, ${intensity})`);
+      gradient.addColorStop(0.5, `rgba(255, 136, 68, ${intensity * 0.5})`);
+      gradient.addColorStop(1, 'rgba(255, 136, 68, 0)');
+      
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
+    });
+    
+    ctx.restore();
+  }
 
   private drawWallSprite(ctx: CanvasRenderingContext2D, distance: 1 | 2 | 3, side: 'front' | 'left' | 'right') {
     const distKey = distance === 1 ? 'near' : distance === 2 ? 'mid' : 'far';
-    const imgPath = `/sunken-keep/art/dungeon/wall_${side}_${distKey}.png`;
+    const imgPath = `/sunken-keep/art/dungeon_v2/wall_${side}_${distKey}.png`;
     const img = assets.getImage(imgPath);
 
     if (!img || !img.complete) {
@@ -306,7 +595,7 @@ export class Renderer {
   private drawDoorSprite(ctx: CanvasRenderingContext2D, distance: 1 | 2 | 3, locked: boolean) {
     const distKey = distance === 1 ? 'near' : distance === 2 ? 'mid' : 'far';
     const state = locked ? 'locked' : 'open';
-    const imgPath = `/sunken-keep/art/dungeon/door_${state}_${distKey}.png`;
+    const imgPath = `/sunken-keep/art/dungeon_v2/door_${state}_${distKey}.png`;
     const img = assets.getImage(imgPath);
 
     if (!img || !img.complete) {
@@ -348,7 +637,7 @@ export class Renderer {
   private drawSecretSprite(ctx: CanvasRenderingContext2D, distance: 1 | 2 | 3, open: boolean) {
     const distKey = distance === 1 ? 'near' : distance === 2 ? 'mid' : 'far';
     const state = open ? 'open' : 'closed';
-    const imgPath = `/sunken-keep/art/dungeon/secret_${state}_${distKey}.png`;
+    const imgPath = `/sunken-keep/art/dungeon_v2/secret_${state}_${distKey}.png`;
     const img = assets.getImage(imgPath);
 
     if (!img || !img.complete) {
