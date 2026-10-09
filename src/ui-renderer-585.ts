@@ -1,6 +1,8 @@
 import { assets } from './assets';
 import type { GameState, Hero } from './types';
 import type { HeroId } from './constants';
+import { Renderer } from './renderer';
+import { createPartyAdapter } from './render-adapter';
 import {
   CANVAS_WIDTH,
   CANVAS_HEIGHT,
@@ -14,11 +16,12 @@ import {
 
 export class UIRenderer585 {
   private stoneStripTile: HTMLImageElement | null = null;
+  private dungeonRenderer: Renderer;
 
   constructor() {
-    // Preload stone strip tile
-    const baseUrl = '/sunken-keep/';
-    this.stoneStripTile = assets.loadImage(`${baseUrl}art/ui/layout585/stone_strip_tile.png`);
+    // Preload stone strip tile - deferred to avoid WebKit crash
+    // Will be loaded on first render if needed
+    this.dungeonRenderer = new Renderer();
   }
 
   // Render full UI (called after dungeon view is rendered)
@@ -27,17 +30,37 @@ export class UIRenderer585 {
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    // Render placeholder dungeon view (dark stone wall)
-    ctx.fillStyle = '#2a2420';
-    ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
-    
-    // Draw horizon line
-    ctx.strokeStyle = '#4a4440';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, HORIZON_Y);
-    ctx.lineTo(VIEW_WIDTH, HORIZON_Y);
-    ctx.stroke();
+    // Render dungeon view using old renderer (270×380)
+    try {
+      const party = createPartyAdapter(state);
+      const floor = state.floors.get(state.party.floor);
+      if (floor && party) {
+        // Convert floor to old format for renderer
+        const oldFloor = {
+          width: floor.width,
+          height: floor.height,
+          startX: floor.startX,
+          startY: floor.startY,
+          startDir: floor.startDir,
+          tiles: floor.tiles,
+          sconces: floor.sconces,
+        };
+        this.dungeonRenderer.drawViewport(ctx, party, oldFloor as any, now);
+      }
+    } catch (error) {
+      console.error('Renderer error:', error);
+      // Fallback: dark stone wall
+      ctx.fillStyle = '#2a2420';
+      ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+      
+      // Draw horizon line
+      ctx.strokeStyle = '#4a4440';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, HORIZON_Y);
+      ctx.lineTo(VIEW_WIDTH, HORIZON_Y);
+      ctx.stroke();
+    }
 
     // Fill any extra height below panel with stone strip tile
     this.fillExtraHeight(ctx);
@@ -215,9 +238,9 @@ export class UIRenderer585 {
     }
 
     const iconPath = `${baseUrl}art/ui/hands/hand_${iconName}.png`;
-    const icon = assets.getImage(iconPath);
+    const icon = assets.loadImage(iconPath); // Use loadImage to ensure it starts loading
 
-    if (icon && icon.complete) {
+    if (assets.isImageReady(icon)) {
       // Center 24x24 icon in 31x28 button
       const iconX = x + (w - 24) / 2;
       const iconY = y + (h - 24) / 2;
@@ -227,8 +250,9 @@ export class UIRenderer585 {
       const recovering = recoveryEnd > now;
 
       // Check if back row melee (greyed out)
-      const actionDef = this.getActionDef(hero, hand);
-      const isBackRowMelee = actionDef?.range === 'melee' && hero.formation === 'back';
+      const item = hero.equipment[hand];
+      const meleeItems = ['axe', 'shield', 'mace', 'dagger', 'empty_hand'];
+      const isBackRowMelee = meleeItems.includes(item) && hero.formation === 'back';
 
       if (recovering) {
         // Dim the icon
@@ -260,17 +284,6 @@ export class UIRenderer585 {
         ctx.drawImage(icon, iconX, iconY, 24, 24);
       }
     }
-  }
-
-  // Helper to get action def for hero (needed for range check)
-  private getActionDef(hero: Hero, hand: 'main' | 'off'): { range?: string } | null {
-    // Simple check: melee items
-    const item = hero.equipment[hand];
-    const meleeItems = ['axe', 'shield', 'mace', 'dagger', 'empty_hand'];
-    if (meleeItems.includes(item)) {
-      return { range: 'melee' };
-    }
-    return { range: 'ranged' };
   }
 
   private drawLog(_ctx: CanvasRenderingContext2D): void {

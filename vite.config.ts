@@ -4,6 +4,8 @@ export default defineConfig({
   base: '/sunken-keep/',
   build: {
     target: 'es2020',
-    assetsInlineLimit: 0
+    assetsInlineLimit: 0,
+    minify: 'esbuild',
+    sourcemap: false,
   }
 });

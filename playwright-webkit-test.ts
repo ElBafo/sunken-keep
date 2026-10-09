@@ -26,11 +26,13 @@ async function testWebKit() {
   // Capture page errors
   page.on('pageerror', (error) => {
     console.log('[PAGE ERROR]', error.message);
+    console.log('[PAGE ERROR STACK]', error.stack);
     errors.push(`Page Error: ${error.message}`);
   });
 
   // Capture failed network requests (404s)
   page.on('requestfailed', (request) => {
+    console.log('[REQUEST FAILED]', request.url(), request.failure()?.errorText);
     failed404s.push(`${request.url()} - ${request.failure()?.errorText}`);
   });
 
