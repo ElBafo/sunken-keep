@@ -39,13 +39,13 @@ test('proto3d camera offset, wall sconces, no errors', async ({ page }) => {
   // (b) facing the locked door from 1 square
   await pose(5, 2, 3, 'proto3d-door-1sq.png');
   // (c) walking past a sconce on a side wall (flat on the wall)
-  await pose(1, 6, 0, 'proto3d-sconce-side.png');
+  await pose(1, 5, 2, 'proto3d-sconce-side.png');
   // (d) sconce on the far wall
   await pose(3, 6, 3, 'proto3d-sconce-far.png');
   // left-wall sconce, looking north from the start corridor
   await pose(1, 7, 0, 'proto3d-sconce-left.png');
-  // right-wall sconce in the water hall
-  await pose(3, 1, 0, 'proto3d-sconce-right.png');
+  // right-wall sconce: one square south of the water-hall torch, facing north
+  await pose(3, 2, 0, 'proto3d-sconce-right.png');
   // face-on sconce
   await pose(1, 6, 3, 'proto3d-sconce-face.png');
   // palette snap at start pose
