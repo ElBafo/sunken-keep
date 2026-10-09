@@ -20,7 +20,7 @@ export async function loadAllFloors(): Promise<Map<number, FloorDataTypes>> {
   const floors = new Map<number, FloorDataTypes>();
   
   try {
-    // Floor 1: 9x9 (keep original, but load monster stats from monsters.json)
+    // Floor 1: 9x9 Levie layout (pantry chest on the south wall so the keep rat can path out)
     const floor1 = createFloor1();
     floors.set(1, floor1 as any);
     
@@ -69,20 +69,20 @@ function createFloor1(): FloorData {
     tiles: [
       // Row 0
       [ { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true } ],
-      // Row 1: stairs down at (7,1)
+      // Row 1: flooded hall | secret wall | stairs down at (7,1)
       [ { wall: true }, { shallowWater: true }, { deepWater: true }, { shallowWater: true }, { wall: true }, { secret: true, carving: 'carving_secret', item: 'scroll' }, {}, { stairs: 'down' }, { wall: true } ],
-      // Row 2: leeches 12 HP, slime 40 HP (from monsters.json)
+      // Row 2: leeches in the shallows by the locked door; slime guards the vault
       [ { wall: true }, { shallowWater: true }, { deepWater: true }, { ...m('bog_leeches'), shallowWater: true }, { door: true, doorLocked: true, carving: 'carving_door' }, {}, {}, m('slime'), { wall: true } ],
-      // Row 3: rust crab 24 HP (from monsters.json)
+      // Row 3: rust crab just inside the door
       [ { wall: true }, { shallowWater: true }, { deepWater: true }, { shallowWater: true }, { wall: true }, m('rust_crab'), { item: 'potion_red' }, {}, { wall: true } ],
       // Row 4
       [ { wall: true }, { shallowWater: true }, { shallowWater: true }, { shallowWater: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true } ],
-      // Row 5: keep rat 14 HP (from monsters.json)
-      [ { wall: true }, {}, { item: 'key' }, {}, {}, { item: 'potion_blue' }, { chest: true }, m('keep_rat'), { wall: true } ],
-      // Row 6
+      // Row 5: key in the corridor; pantry opens east. Chest moved off the rat's path.
+      [ { wall: true }, {}, { item: 'key' }, {}, {}, { item: 'potion_blue' }, {}, m('keep_rat'), { wall: true } ],
+      // Row 6: first carving in front of the party at the start
       [ { wall: true }, { carving: 'carving_start' }, {}, {}, { wall: true }, {}, {}, {}, { wall: true } ],
-      // Row 7
-      [ { wall: true }, {}, {}, {}, { wall: true }, {}, {}, { item: 'potion_green' }, { wall: true } ],
+      // Row 7 (start): pantry chest sits on the south wall so the keep rat can leave
+      [ { wall: true }, {}, {}, {}, { wall: true }, { chest: true }, {}, { item: 'potion_green' }, { wall: true } ],
       // Row 8
       [ { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true } ]
     ]

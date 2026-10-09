@@ -5,6 +5,7 @@ import { FloorData } from './party';
 // -> locked door (carving 2) -> crab + slime -> secret wall (carving 3 + Orrun's journal).
 // Side room: the old pantry with the keep rat, the chest and a potion.
 // Drowned dwarf and tide spawn are moved to deeper floors.
+// Stairs down at (7,1), past the slime; floor 2 starts on the same square.
 const m = (monster: string, hp: number) => ({ monster, monsterState: 'idle' as const, monsterAnimTime: 0, monsterHp: hp, monsterMaxHp: hp });
 
 export const floor1: FloorData = {
@@ -16,29 +17,29 @@ export const floor1: FloorData = {
   startDir: 0,
   sconces: [
     { x: 0, y: 6, face: 'E', lit: true },   // beside the first carving, warm light at the start
-    { x: 4, y: 1, face: 'W', lit: true },   // wall above the locked door
+    { x: 4, y: 1, face: 'W', lit: true },   // next to the locked door and its carving
     { x: 0, y: 3, face: 'E', lit: false },  // flooded hall, dead
     { x: 4, y: 6, face: 'W', lit: false },  // west corridor, dead
     { x: 8, y: 6, face: 'W', lit: false },  // pantry, dead
-    { x: 8, y: 1, face: 'W', lit: false },  // vault behind the slime, dead
+    { x: 8, y: 1, face: 'W', lit: false },  // vault behind the slime, dead; the last carving stays cold
   ],
   tiles: [
     // Row 0
     [ { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true } ],
     // Row 1: flooded hall | secret wall with the last carving and Orrun's journal behind it
-    [ { wall: true }, { shallowWater: true }, { deepWater: true }, { shallowWater: true }, { wall: true }, { secret: true, carving: 'carving_secret', item: 'scroll' }, {}, {}, { wall: true } ],
+    [ { wall: true }, { shallowWater: true }, { deepWater: true }, { shallowWater: true }, { wall: true }, { secret: true, carving: 'carving_secret', item: 'scroll' }, {}, { stairs: 'down' }, { wall: true } ],
     // Row 2: leeches wait in the shallows by the locked door; slime guards the back of the vault
-    [ { wall: true }, { shallowWater: true }, { deepWater: true }, { ...m('bog_leeches', 10), shallowWater: true }, { door: true, doorLocked: true, carving: 'carving_door' }, {}, {}, m('slime', 22), { wall: true } ],
+    [ { wall: true }, { shallowWater: true }, { deepWater: true }, { ...m('bog_leeches', 12), shallowWater: true }, { door: true, doorLocked: true, carving: 'carving_door' }, {}, {}, m('slime', 40), { wall: true } ],
     // Row 3: a rust crab sits just inside the door
-    [ { wall: true }, { shallowWater: true }, { deepWater: true }, { shallowWater: true }, { wall: true }, m('rust_crab', 18), { item: 'potion_red' }, {}, { wall: true } ],
+    [ { wall: true }, { shallowWater: true }, { deepWater: true }, { shallowWater: true }, { wall: true }, m('rust_crab', 24), { item: 'potion_red' }, {}, { wall: true } ],
     // Row 4
     [ { wall: true }, { shallowWater: true }, { shallowWater: true }, { shallowWater: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true } ],
-    // Row 5: key in the corridor; the pantry opens to the east
-    [ { wall: true }, {}, { item: 'key' }, {}, {}, { item: 'potion_blue' }, { chest: true }, m('keep_rat', 12), { wall: true } ],
+    // Row 5: key in the corridor; the pantry opens to the east. Chest no longer blocks the rat.
+    [ { wall: true }, {}, { item: 'key' }, {}, {}, { item: 'potion_blue' }, {}, m('keep_rat', 14), { wall: true } ],
     // Row 6: first carving right in front of the party at the start
     [ { wall: true }, { carving: 'carving_start' }, {}, {}, { wall: true }, {}, {}, {}, { wall: true } ],
-    // Row 7 (start)
-    [ { wall: true }, {}, {}, {}, { wall: true }, {}, {}, { item: 'potion_green' }, { wall: true } ],
+    // Row 7 (start): pantry chest on the south wall so the keep rat can leave
+    [ { wall: true }, {}, {}, {}, { wall: true }, { chest: true }, {}, { item: 'potion_green' }, { wall: true } ],
     // Row 8
     [ { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true } ]
   ]

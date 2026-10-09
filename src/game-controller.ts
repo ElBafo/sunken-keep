@@ -6,6 +6,7 @@ import { combatController } from './combat-controller';
 import { dialogueSystem } from './dialogue-system';
 import { SaveSystem } from './save-system';
 import { sound } from './assets';
+import { processMonsterTurn } from './monster-ai';
 
 export class GameController {
   private state: GameState;
@@ -163,6 +164,7 @@ export class GameController {
     if (combatController.isInCombat()) return;
     this.state.party.dir = (this.state.party.dir + 3) % 4;
     sound.play('ui_turn');
+    processMonsterTurn(this.state);
   }
 
   // Movement: turn right
@@ -170,6 +172,7 @@ export class GameController {
     if (combatController.isInCombat()) return;
     this.state.party.dir = (this.state.party.dir + 1) % 4;
     sound.play('ui_turn');
+    processMonsterTurn(this.state);
   }
 
   // Movement: move forward
@@ -247,5 +250,7 @@ export class GameController {
       combatController.regenerateMana(this.state, this.walkStepCounter);
       this.walkStepCounter = 0;
     }
+
+    processMonsterTurn(this.state);
   }
 }
