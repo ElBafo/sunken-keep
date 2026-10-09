@@ -162,7 +162,7 @@ test('proto3d lighting: pools, relight, oil, no 404s', async ({ page }) => {
   expect(oilAfterLight).toBe(1);
   await expect(oilHud).toHaveText('Oil 1/4');
 
-  await shot(1, 7, 0, 'corridor-two-torch-pools.png');
+  await shot(1, 7, 0, 'lighting_dark_corridor_pools.png');
 
   await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.setPosition(5, 7, 0));
   const pool = await page.evaluate(() =>
