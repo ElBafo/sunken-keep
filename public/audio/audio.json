@@ -27,7 +27,19 @@
   "slime_hurt": "sfx_slime_hurt",
   "drowned_dwarf_hurt": "sfx_drowned_dwarf_hurt",
   "tide_spawn_hurt": "sfx_tide_spawn_hurt",
-  "tide_spawn_song_loop": "sfx_tide_spawn_song_loop"
+  "tide_spawn_song_loop": "sfx_tide_spawn_song_loop",
+  "keep_rat_alert": "sfx_keep_rat_alert",
+  "keep_rat_attack": "sfx_keep_rat_attack",
+  "keep_rat_hurt": "sfx_keep_rat_hurt",
+  "keep_rat_death": "sfx_keep_rat_death",
+  "rust_crab_alert": "sfx_rust_crab_alert",
+  "rust_crab_attack": "sfx_rust_crab_attack",
+  "rust_crab_hurt": "sfx_rust_crab_hurt",
+  "rust_crab_death": "sfx_rust_crab_death",
+  "bog_leeches_alert": "sfx_bog_leeches_alert",
+  "bog_leeches_attack": "sfx_bog_leeches_attack",
+  "bog_leeches_hurt": "sfx_bog_leeches_hurt",
+  "bog_leeches_death": "sfx_bog_leeches_death"
  },
  "music": {
   "intro": {
@@ -69,6 +81,7 @@
   "hurt": "Party member taking damage; 'hit' is the party striking an enemy.",
   "monsters": "{monster}_alert when it notices the party, _attack when it strikes, _death on kill. Names match Pixelartie's sprite prefixes.",
   "tide_spawn_song_loop": "Loop quietly while a tide spawn is within ~3 squares, louder when closer. Goes with Ilsevar's 'It's singing' line.",
-  "ambience": "amb_flooded_halls for all indoor floors; amb_swamp only for outdoor scenes (intro shot 5)."
+  "ambience": "amb_flooded_halls for all indoor floors; amb_swamp only for outdoor scenes (intro shot 5).",
+  "leech_latch": "For a latched leech draining health, repeat bog_leeches_attack at low volume each drain tick."
  }
 }

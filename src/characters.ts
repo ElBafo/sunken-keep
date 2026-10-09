@@ -94,6 +94,14 @@ export function damageCharacter(char: Character, amount: number) {
   }, 500);
 }
 
+export function healCharacter(char: Character, amount: number) {
+  char.hp = Math.min(char.maxHp, char.hp + amount);
+  char.expression = 'smirk';
+  setTimeout(() => {
+    if (char.expression === 'smirk') char.expression = 'neutral';
+  }, 500);
+}
+
 export function resetIdleTimers() {
   const now = Date.now();
   characters.forEach(c => {

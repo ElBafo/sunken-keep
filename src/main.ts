@@ -21,14 +21,32 @@ async function main() {
   canvas.width = BASE_WIDTH;
   canvas.height = BASE_HEIGHT;
   
-  // Calculate scale with better portrait support
+  // Calculate scale with better portrait support and iOS Safari toolbar handling
   function updateScale() {
-    // Try to fill the screen as much as possible
-    const scaleX = window.innerWidth / BASE_WIDTH;
-    const scaleY = window.innerHeight / BASE_HEIGHT;
-    const scale = Math.max(1, Math.min(scaleX, scaleY));
+    // Use visualViewport when available (iOS Safari) for accurate dimensions after toolbar movement
+    let viewportWidth = window.visualViewport?.width ?? window.innerWidth;
+    let viewportHeight = window.visualViewport?.height ?? window.innerHeight;
     
-    // Use the calculated scale (non-integer allowed)
+    // Account for safe area insets (iPhone notch and home bar)
+    // In standalone (Home Screen) mode, visualViewport already excludes safe areas
+    // In Safari tab mode, we need to manually account for them
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                         (window.navigator as any).standalone === true;
+    
+    if (!isStandalone && window.visualViewport) {
+      // In Safari tab, manually subtract safe areas from available space
+      const style = getComputedStyle(document.documentElement);
+      const safeTop = parseInt(style.getPropertyValue('--safe-area-inset-top') || '0');
+      const safeBottom = parseInt(style.getPropertyValue('--safe-area-inset-bottom') || '0');
+      viewportHeight -= (safeTop + safeBottom);
+    }
+    
+    // Calculate scale to fit letterboxed (maintain aspect ratio)
+    const scaleX = viewportWidth / BASE_WIDTH;
+    const scaleY = viewportHeight / BASE_HEIGHT;
+    const scale = Math.min(scaleX, scaleY);
+    
+    // Use the calculated scale
     const displayWidth = BASE_WIDTH * scale;
     const displayHeight = BASE_HEIGHT * scale;
     
@@ -39,10 +57,36 @@ async function main() {
   }
   
   let scale = updateScale();
-  window.addEventListener('resize', () => {
+  
+  // Expose safe area insets as CSS variables for calculations
+  function updateSafeAreaInsets() {
+    const style = getComputedStyle(document.documentElement);
+    const safeTop = style.getPropertyValue('padding-top') || '0px';
+    const safeBottom = style.getPropertyValue('padding-bottom') || '0px';
+    document.documentElement.style.setProperty('--safe-area-inset-top', safeTop);
+    document.documentElement.style.setProperty('--safe-area-inset-bottom', safeBottom);
+  }
+  
+  updateSafeAreaInsets();
+  
+  // Re-run resize on all viewport changes
+  function handleResize() {
     scale = updateScale();
-    inputHandler.setScale(scale);
+    if (inputHandler) {
+      inputHandler.setScale(scale);
+    }
+  }
+  
+  window.addEventListener('resize', handleResize);
+  window.addEventListener('orientationchange', () => {
+    // iOS Safari needs a delay after orientation change for toolbar to settle
+    setTimeout(handleResize, 100);
+    setTimeout(handleResize, 300);
   });
+  
+  if (window.visualViewport) {
+    window.visualViewport.addEventListener('resize', handleResize);
+  }
   
   // Disable image smoothing (keep pixels crisp even with non-integer scaling)
   ctx.imageSmoothingEnabled = false;
