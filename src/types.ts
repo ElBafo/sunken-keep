@@ -1,4 +1,4 @@
-import type { HeroId, ItemType, EquipSlot, GameScreen, LanternState, FormationRow } from './constants';
+import type { HeroId, ItemType, GameScreen, LanternState, FormationRow } from './constants';
 
 // Hero state
 export interface Hero {

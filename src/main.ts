@@ -1,5 +1,6 @@
 import './style.css';
 import { Game } from './game';
+import { GameController } from './game-controller';
 import { InputHandler } from './input';
 import { loadFont } from './font';
 import { loadPortraits } from './characters';
@@ -9,6 +10,9 @@ import { assets, sound } from './assets';
 
 const BASE_WIDTH = 270;
 const BASE_HEIGHT = 480;
+
+// Check if we should use new game controller (for testing)
+const USE_NEW_CONTROLLER = true;
 
 async function main() {
   const canvas = document.getElementById('game') as HTMLCanvasElement;
@@ -110,6 +114,14 @@ async function main() {
   const game = new Game();
   await game.init();
   
+  // Initialize new game controller for testing
+  let gameController: GameController | null = null;
+  if (USE_NEW_CONTROLLER) {
+    gameController = new GameController();
+    await gameController.init();
+    console.log('New game controller initialized');
+  }
+  
   // Check if running as PWA (standalone mode)
   const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
                        (window.navigator as any).standalone === true;
@@ -200,6 +212,16 @@ async function main() {
       return;
     }
     
+    // Handle stairs with space bar (new controller only)
+    if (e.key === ' ' && gameController && USE_NEW_CONTROLLER) {
+      const stairs = gameController.checkStairs();
+      if (stairs) {
+        gameController.handleStairs(stairs);
+        e.preventDefault();
+        return;
+      }
+    }
+    
     game.handleKey(e.key);
     
     // Prevent default for game keys
@@ -214,6 +236,23 @@ async function main() {
     if (gameStarted) {
       game.update(now);
       game.render(ctx, now);
+      
+      // Display floor number if using new controller
+      if (gameController && USE_NEW_CONTROLLER) {
+        const state = gameController.getState();
+        ctx.save();
+        ctx.fillStyle = '#ffffff';
+        ctx.font = '12px monospace';
+        ctx.fillText(`Floor ${state.party.floor}`, 10, 20);
+        ctx.fillText(`Pos: (${state.party.x}, ${state.party.y})`, 10, 35);
+        
+        // Check for stairs
+        const stairs = gameController.checkStairs();
+        if (stairs) {
+          ctx.fillText(`Stairs ${stairs} - Press Space`, 10, 50);
+        }
+        ctx.restore();
+      }
     }
     requestAnimationFrame(gameLoop);
   }

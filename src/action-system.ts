@@ -1,6 +1,6 @@
 import type { GameState, Hero, ActionDef, MonsterDef } from './types';
-import type { HeroId, ItemType } from './constants';
-import { MELEE_ITEMS, DEFAULT_FORMATION } from './constants';
+import type { HeroId } from './constants';
+import { MELEE_ITEMS } from './constants';
 
 // D20 roll
 function rollD20(): number {
@@ -77,7 +77,7 @@ export class ActionSystem {
     hero: Hero,
     hand: 'main' | 'off',
     target: { monster?: string; monsterAc?: number; monsterHp?: number } | Hero,
-    state: GameState
+    _state: GameState
   ): {
     success: boolean;
     damage?: number;
@@ -101,7 +101,7 @@ export class ActionSystem {
 
     // Handle different action types
     if (actionDef.effect) {
-      return this.handleEffect(hero, actionDef, target, state);
+      return this.handleEffect(hero, actionDef, target, _state);
     }
 
     // Standard attack
@@ -147,7 +147,7 @@ export class ActionSystem {
 
   // Handle special effects (healing, buffs, etc.)
   private handleEffect(
-    hero: Hero,
+    _hero: Hero,
     actionDef: ActionDef,
     target: any,
     state: GameState

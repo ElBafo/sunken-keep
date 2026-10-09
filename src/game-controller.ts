@@ -1,0 +1,146 @@
+import type { GameState } from './types';
+import { createNewGameState } from './game-state';
+import { loadAllFloors, getFloorStart } from './floor-loader';
+import { actionSystem } from './action-system';
+import { SaveSystem } from './save-system';
+import { sound } from './assets';
+
+export class GameController {
+  private state: GameState;
+  private baseUrl: string;
+
+  constructor() {
+    this.state = createNewGameState();
+    // Get base URL from Vite's import.meta or fallback
+    this.baseUrl = '/sunken-keep/';
+    if (typeof window !== 'undefined' && (window as any).BASE_URL) {
+      this.baseUrl = (window as any).BASE_URL;
+    }
+  }
+
+  async init(): Promise<void> {
+    // Load floors
+    const floors = await loadAllFloors();
+    this.state.floors = floors;
+
+    // Load action data
+    await actionSystem.loadData(this.baseUrl);
+
+    // Initialize audio
+    await sound.init();
+
+    // Parse URL parameters for testing
+    this.parseURLParams();
+
+    // Load settings
+    const settings = SaveSystem.loadSettings();
+    this.state.brightness = settings.brightness;
+    this.state.settings = {
+      musicVolume: settings.musicVolume,
+      sfxVolume: settings.sfxVolume,
+    };
+
+    // Setup auto-save on page leave
+    SaveSystem.setupAutoSaveOnLeave(() => this.state);
+
+    console.log('GameController initialized');
+  }
+
+  // Parse URL parameters: ?floor=N&flags=a,b,c
+  private parseURLParams(): void {
+    const params = new URLSearchParams(window.location.search);
+    
+    // Floor override
+    const floorParam = params.get('floor');
+    if (floorParam) {
+      const floorNum = parseInt(floorParam);
+      if (floorNum >= 1 && floorNum <= 4) {
+        const start = getFloorStart(floorNum, this.state.floors);
+        this.state.party.floor = floorNum;
+        this.state.party.x = start.x;
+        this.state.party.y = start.y;
+        this.state.party.dir = start.dir;
+        this.state.screen = 'playing';
+        console.log(`URL override: Starting on floor ${floorNum}`);
+      }
+    }
+
+    // Flags override
+    const flagsParam = params.get('flags');
+    if (flagsParam) {
+      const flags = flagsParam.split(',').filter(f => f.trim());
+      flags.forEach(flag => this.state.flags.add(flag.trim()));
+      console.log(`URL override: Set flags: ${flags.join(', ')}`);
+    }
+  }
+
+  getState(): GameState {
+    return this.state;
+  }
+
+  // Handle stairs
+  handleStairs(direction: 'up' | 'down'): void {
+    const currentFloor = this.state.party.floor;
+    
+    if (direction === 'down') {
+      const nextFloor = currentFloor + 1;
+      if (nextFloor <= 4) {
+        const start = getFloorStart(nextFloor, this.state.floors);
+        this.state.party.floor = nextFloor;
+        this.state.party.x = start.x;
+        this.state.party.y = start.y;
+        this.state.party.dir = start.dir;
+        
+        // Auto-save at stairs
+        if (!this.state.escapeRunActive) {
+          SaveSystem.autoSave(this.state);
+        }
+        
+        sound.play('ui_log_line');
+        console.log(`Descended to floor ${nextFloor}`);
+      }
+    } else {
+      const prevFloor = currentFloor - 1;
+      if (prevFloor >= 1) {
+        // Find stairs down on previous floor
+        const prevFloorData = this.state.floors.get(prevFloor);
+        if (prevFloorData) {
+          let stairsX = prevFloorData.startX;
+          let stairsY = prevFloorData.startY;
+          
+          // Find the stairs down tile
+          for (let y = 0; y < prevFloorData.height; y++) {
+            for (let x = 0; x < prevFloorData.width; x++) {
+              const tile = prevFloorData.tiles[y][x];
+              if (tile.stairs === 'down') {
+                stairsX = x;
+                stairsY = y;
+                break;
+              }
+            }
+          }
+          
+          this.state.party.floor = prevFloor;
+          this.state.party.x = stairsX;
+          this.state.party.y = stairsY;
+          this.state.party.dir = 0;
+          
+          sound.play('ui_log_line');
+          console.log(`Ascended to floor ${prevFloor}`);
+        }
+      }
+    }
+  }
+
+  // Check if current tile has stairs
+  checkStairs(): 'up' | 'down' | null {
+    const floor = this.state.floors.get(this.state.party.floor);
+    if (!floor) return null;
+
+    const { x, y } = this.state.party;
+    if (x < 0 || x >= floor.width || y < 0 || y >= floor.height) return null;
+
+    const tile = floor.tiles[y][x];
+    return tile.stairs || null;
+  }
+}

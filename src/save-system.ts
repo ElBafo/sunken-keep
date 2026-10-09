@@ -69,13 +69,14 @@ export class SaveSystem {
     const slots = this.getAllSlots();
     let mostRecent: { slot: number; time: number } | null = null;
 
-    slots.forEach((save, index) => {
+    for (let i = 0; i < slots.length; i++) {
+      const save = slots[i];
       if (save && (!mostRecent || save.timestamp > mostRecent.time)) {
-        mostRecent = { slot: index + 1, time: save.timestamp };
+        mostRecent = { slot: i + 1, time: save.timestamp };
       }
-    });
+    }
 
-    return mostRecent?.slot ?? null;
+    return mostRecent ? mostRecent.slot : null;
   }
 
   // Auto-save to last used slot or slot 1
