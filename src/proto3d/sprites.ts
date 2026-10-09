@@ -143,7 +143,9 @@ export class SpriteManager {
 
       const wx = sconce.x * CELL_SIZE;
       const wz = sconce.y * CELL_SIZE;
-      const offset = 0.88;
+      // Hang on the ROOM side of the wall face (half-cell + a few cm),
+      // not inside the wall block — otherwise depth test hides the flame.
+      const offset = CELL_SIZE / 2 + 0.08;
 
       let x = wx;
       let z = wz;
@@ -152,7 +154,7 @@ export class SpriteManager {
       else if (sconce.face === 'S') z = wz + offset;
       else if (sconce.face === 'W') x = wx - offset;
 
-      const sprite = makeBillboard(mat, x, 0.85, z, 0.55, 0.75);
+      const sprite = makeBillboard(mat, x, 0.9, z, 0.7, 0.9);
       scene.add(sprite);
 
       this.sprites.push({
