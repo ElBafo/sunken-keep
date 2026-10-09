@@ -3,7 +3,7 @@ import { defineConfig } from 'vite';
 export default defineConfig({
   base: '/sunken-keep/',
   build: {
-    minify: false,
+    minify: true,
     sourcemap: true,
   },
 });
