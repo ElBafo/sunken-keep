@@ -68,7 +68,8 @@ export function pickVariantIndex(count: number, x: number, y: number, face: stri
   return faceHash(x, y, face, 1) % count;
 }
 
-export function wallMirror(x: number, y: number, face: string): boolean {
+/** Floor/ceiling only — walls must not flip (frieze and brick rows have to line up). */
+export function floorFlipX(x: number, y: number, face: string): boolean {
   return (faceHash(x, y, face, 2) & 1) === 1;
 }
 

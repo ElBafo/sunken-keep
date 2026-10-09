@@ -2,14 +2,14 @@ import * as THREE from 'three';
 import { CELL_SIZE, CUTOUT_ALPHA_TEST, FACE_SEGMENTS } from './constants';
 import {
   flipUVsX,
+  floorFlipX,
+  floorQuarterTurns,
   listedTex3dFiles,
   pickVariantIndex,
   rotateUVs,
   VARIANT_SURFACES,
   variantFilenames,
-  VariantSurface,
-  wallMirror,
-  floorQuarterTurns
+  VariantSurface
 } from './texture-variants';
 import { FloorData, Tile } from './types';
 
@@ -130,6 +130,7 @@ export class SceneBuilder {
 
         const floorGeo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE, FACE_SEGMENTS, FACE_SEGMENTS);
         rotateUVs(floorGeo, floorQuarterTurns(x, y, 'F'));
+        if (floorFlipX(x, y, 'F')) flipUVsX(floorGeo);
         const floorMat = new THREE.MeshBasicMaterial({
           map: floorTex,
           vertexColors: true,
@@ -144,6 +145,7 @@ export class SceneBuilder {
 
         const ceilingGeo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE, FACE_SEGMENTS, FACE_SEGMENTS);
         rotateUVs(ceilingGeo, floorQuarterTurns(x, y, 'C'));
+        if (floorFlipX(x, y, 'C')) flipUVsX(ceilingGeo);
         const ceilingMat = new THREE.MeshBasicMaterial({
           map: this.pick('ceiling', x, y, 'C'),
           vertexColors: true,
@@ -201,10 +203,8 @@ export class SceneBuilder {
 
     let texture: THREE.Texture = this.pick('wall_plain', x, y, face);
     let cutout = false;
-    let masonry = true;
 
     if (tile.door) {
-      masonry = false;
       if (tile.doorLocked) {
         texture = this.doorLocked!;
       } else {
@@ -212,7 +212,6 @@ export class SceneBuilder {
         cutout = true;
       }
     } else if (tile.secret) {
-      masonry = false;
       if (tile.secretOpen) {
         texture = this.secretOpen!;
         cutout = true;
@@ -221,10 +220,8 @@ export class SceneBuilder {
       }
     }
 
+    // Walls are never flipped or rotated — knot band and brick rows must line up.
     const geo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE, FACE_SEGMENTS, FACE_SEGMENTS);
-    if (masonry && wallMirror(x, y, face)) {
-      flipUVsX(geo);
-    }
 
     const mat = new THREE.MeshBasicMaterial({
       map: texture,
