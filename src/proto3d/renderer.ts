@@ -19,17 +19,22 @@ export class PixelRenderer {
     
     // Main scene
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0x0a0f0a, 0.08); // Reduced fog density for better visibility
+    // Disable fog for debugging
+    // this.scene.fog = new THREE.FogExp2(0x0a0f0a, 0.08);
     
     // Camera
     this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 20);
     this.camera.position.set(0, 0, 0);
     
-    // WebGL renderer
+    // WebGL renderer with preserveDrawingBuffer for screenshots
+    const params = new URLSearchParams(window.location.search);
+    const preserveBuffer = params.get('test') === '1' || true; // Always enable for debugging
+    
     this.renderer = new THREE.WebGLRenderer({ 
       canvas,
       antialias: false,
-      powerPreference: 'high-performance'
+      powerPreference: 'high-performance',
+      preserveDrawingBuffer: preserveBuffer
     });
     this.renderer.setPixelRatio(1);
     
@@ -58,7 +63,7 @@ export class PixelRenderer {
         varying vec2 vUv;
         void main() {
           vUv = uv;
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          gl_Position = vec4(position, 1.0);
         }
       `,
       fragmentShader: `
@@ -90,9 +95,11 @@ export class PixelRenderer {
         void main() {
           vec4 texel = texture2D(tDiffuse, vUv);
           vec3 quantized = quantizeColor(texel.rgb);
-          gl_FragColor = vec4(quantized, texel.a);
+          gl_FragColor = vec4(quantized, 1.0);
         }
-      `
+      `,
+      depthTest: false,
+      depthWrite: false
     });
     
     const quad = new THREE.Mesh(
@@ -164,10 +171,33 @@ export class PixelRenderer {
   render() {
     // Render scene to low-res target
     this.renderer.setRenderTarget(this.renderTarget);
+    this.renderer.clear();
     this.renderer.render(this.scene, this.camera);
     
     // Render quantized upscale to screen
     this.renderer.setRenderTarget(null);
+    this.renderer.clear();
     this.renderer.render(this.finalScene, this.finalCamera);
+    
+    // Debug: Read center pixel after render
+    if (typeof window !== 'undefined' && (window as any).__debugFrame === true) {
+      const gl = this.renderer.getContext();
+      const pixels = new Uint8Array(4);
+      const centerX = Math.floor(this.canvas.width / 2);
+      const centerY = Math.floor(this.canvas.height / 2);
+      gl.readPixels(centerX, centerY, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+      console.log(`Center pixel RGB: ${pixels[0]}, ${pixels[1]}, ${pixels[2]}, ${pixels[3]}`);
+      
+      // Also check render target
+      this.renderer.setRenderTarget(this.renderTarget);
+      const rtPixels = new Uint8Array(4);
+      const rtCenterX = Math.floor(RENDER_WIDTH / 2);
+      const rtCenterY = Math.floor(this.renderTarget.height / 2);
+      gl.readPixels(rtCenterX, rtCenterY, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, rtPixels);
+      console.log(`Render target center pixel RGB: ${rtPixels[0]}, ${rtPixels[1]}, ${rtPixels[2]}, ${rtPixels[3]}`);
+      this.renderer.setRenderTarget(null);
+      
+      (window as any).__debugFrame = false;
+    }
   }
 }

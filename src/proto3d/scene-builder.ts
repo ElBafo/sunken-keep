@@ -71,14 +71,12 @@ export class SceneBuilder {
         
         // Floor
         const isWater = tile.deepWater || tile.shallowWater;
-        const floorTex = isWater ? this.textures!.floorWater : this.textures!.floorStone;
         const floorY = isWater ? -0.15 : 0;
         
         const floorGeo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE);
-        const floorMat = new THREE.MeshStandardMaterial({ 
-          map: floorTex,
-          roughness: 0.9,
-          metalness: 0.1
+        const floorMat = new THREE.MeshBasicMaterial({ 
+          color: isWater ? 0x0055ff : 0x888888,
+          side: THREE.DoubleSide
         });
         const floor = new THREE.Mesh(floorGeo, floorMat);
         floor.rotation.x = -Math.PI / 2;
@@ -87,10 +85,9 @@ export class SceneBuilder {
         
         // Ceiling
         const ceilingGeo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE);
-        const ceilingMat = new THREE.MeshStandardMaterial({ 
-          map: this.textures!.ceiling,
-          roughness: 0.9,
-          metalness: 0.1
+        const ceilingMat = new THREE.MeshBasicMaterial({ 
+          color: 0x444444,
+          side: THREE.DoubleSide
         });
         const ceiling = new THREE.Mesh(ceilingGeo, ceilingMat);
         ceiling.rotation.x = Math.PI / 2;
@@ -142,17 +139,10 @@ export class SceneBuilder {
       const neighbor = tiles[nz][nx];
       if (!neighbor.wall && !neighbor.door) {
         // Build wall face
-        let texture = this.textures!.wallPlain;
-        
-        if (tile.door && tile.doorLocked) {
-          texture = this.textures!.doorLocked;
-        }
-        
         const geo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE);
-        const mat = new THREE.MeshStandardMaterial({ 
-          map: texture,
-          roughness: 0.9,
-          metalness: 0.1
+        const mat = new THREE.MeshBasicMaterial({ 
+          color: tile.door ? 0xff0000 : 0xcccccc,
+          side: THREE.DoubleSide
         });
         const wall = new THREE.Mesh(geo, mat);
         

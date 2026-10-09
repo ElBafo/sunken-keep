@@ -7,8 +7,8 @@ export class LightingManager {
   lights: THREE.PointLight[] = [];
   
   setupLights(scene: THREE.Scene, sconces: readonly Sconce[], camera: THREE.Camera) {
-    // Dark ambient (increased from 0.3 to 0.5 for visibility)
-    const ambient = new THREE.AmbientLight(0x0a1e14, 0.5);
+    // Bright ambient for debugging
+    const ambient = new THREE.AmbientLight(0xffffff, 2.0);
     scene.add(ambient);
     
     // Party light (follows camera)

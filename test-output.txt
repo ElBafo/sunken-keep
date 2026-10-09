@@ -1,0 +1,134 @@
+
+Running 4 tests using 2 workers
+
+(node:4144) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:4145) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:4144) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:4145) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  1 [webkit] › tests/proto3d.spec.ts:8:3 › 3D Prototype Tests › should load without 404 errors (2ms)
+  ✘  2 [webkit] › tests/proto3d.spec.ts:37:3 › 3D Prototype Tests › should measure FPS (2ms)
+(node:4734) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:4769) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:4734) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+(node:4769) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
+(Use `node --trace-warnings ...` to show where the warning was created)
+  ✘  3 [webkit] › tests/proto3d.spec.ts:64:3 › 3D Prototype Tests › should take screenshots at key locations (3ms)
+  ✘  4 [webkit] › tests/proto3d.spec.ts:114:3 › 3D Prototype Tests › should test palette toggle (2ms)
+
+
+  1) [webkit] › tests/proto3d.spec.ts:8:3 › 3D Prototype Tests › should load without 404 errors ────
+
+    Error: browserType.launch: 
+    ╔══════════════════════════════════════════════════════╗
+    ║ Host system is missing dependencies to run browsers. ║
+    ║ Please install them with the following command:      ║
+    ║                                                      ║
+    ║     sudo npx playwright install-deps                 ║
+    ║                                                      ║
+    ║ Alternatively, use apt:                              ║
+    ║     sudo apt-get install libxslt1.1\                 ║
+    ║         libevent-2.1-7t64\                           ║
+    ║         libgstreamer-plugins-base1.0-0\              ║
+    ║         libgstreamer-gl1.0-0\                        ║
+    ║         libgstreamer-plugins-bad1.0-0\               ║
+    ║         libavif16\                                   ║
+    ║         libharfbuzz-icu0\                            ║
+    ║         libwayland-server0\                          ║
+    ║         libmanette-0.2-0\                            ║
+    ║         libhyphen0                                   ║
+    ║                                                      ║
+    ║ <3 Playwright Team                                   ║
+    ╚══════════════════════════════════════════════════════╝
+
+    Error Context: test-results/proto3d-3D-Prototype-Tests-should-load-without-404-errors-webkit/error-context.md
+
+  2) [webkit] › tests/proto3d.spec.ts:37:3 › 3D Prototype Tests › should measure FPS ───────────────
+
+    Error: browserType.launch: 
+    ╔══════════════════════════════════════════════════════╗
+    ║ Host system is missing dependencies to run browsers. ║
+    ║ Please install them with the following command:      ║
+    ║                                                      ║
+    ║     sudo npx playwright install-deps                 ║
+    ║                                                      ║
+    ║ Alternatively, use apt:                              ║
+    ║     sudo apt-get install libxslt1.1\                 ║
+    ║         libevent-2.1-7t64\                           ║
+    ║         libgstreamer-plugins-base1.0-0\              ║
+    ║         libgstreamer-gl1.0-0\                        ║
+    ║         libgstreamer-plugins-bad1.0-0\               ║
+    ║         libavif16\                                   ║
+    ║         libharfbuzz-icu0\                            ║
+    ║         libwayland-server0\                          ║
+    ║         libmanette-0.2-0\                            ║
+    ║         libhyphen0                                   ║
+    ║                                                      ║
+    ║ <3 Playwright Team                                   ║
+    ╚══════════════════════════════════════════════════════╝
+
+    Error Context: test-results/proto3d-3D-Prototype-Tests-should-measure-FPS-webkit/error-context.md
+
+  3) [webkit] › tests/proto3d.spec.ts:64:3 › 3D Prototype Tests › should take screenshots at key locations 
+
+    Error: browserType.launch: 
+    ╔══════════════════════════════════════════════════════╗
+    ║ Host system is missing dependencies to run browsers. ║
+    ║ Please install them with the following command:      ║
+    ║                                                      ║
+    ║     sudo npx playwright install-deps                 ║
+    ║                                                      ║
+    ║ Alternatively, use apt:                              ║
+    ║     sudo apt-get install libxslt1.1\                 ║
+    ║         libevent-2.1-7t64\                           ║
+    ║         libgstreamer-plugins-base1.0-0\              ║
+    ║         libgstreamer-gl1.0-0\                        ║
+    ║         libgstreamer-plugins-bad1.0-0\               ║
+    ║         libavif16\                                   ║
+    ║         libharfbuzz-icu0\                            ║
+    ║         libwayland-server0\                          ║
+    ║         libmanette-0.2-0\                            ║
+    ║         libhyphen0                                   ║
+    ║                                                      ║
+    ║ <3 Playwright Team                                   ║
+    ╚══════════════════════════════════════════════════════╝
+
+    Error Context: test-results/proto3d-3D-Prototype-Tests-44079-creenshots-at-key-locations-webkit/error-context.md
+
+  4) [webkit] › tests/proto3d.spec.ts:114:3 › 3D Prototype Tests › should test palette toggle ──────
+
+    Error: browserType.launch: 
+    ╔══════════════════════════════════════════════════════╗
+    ║ Host system is missing dependencies to run browsers. ║
+    ║ Please install them with the following command:      ║
+    ║                                                      ║
+    ║     sudo npx playwright install-deps                 ║
+    ║                                                      ║
+    ║ Alternatively, use apt:                              ║
+    ║     sudo apt-get install libxslt1.1\                 ║
+    ║         libevent-2.1-7t64\                           ║
+    ║         libgstreamer-plugins-base1.0-0\              ║
+    ║         libgstreamer-gl1.0-0\                        ║
+    ║         libgstreamer-plugins-bad1.0-0\               ║
+    ║         libavif16\                                   ║
+    ║         libharfbuzz-icu0\                            ║
+    ║         libwayland-server0\                          ║
+    ║         libmanette-0.2-0\                            ║
+    ║         libhyphen0                                   ║
+    ║                                                      ║
+    ║ <3 Playwright Team                                   ║
+    ╚══════════════════════════════════════════════════════╝
+
+    Error Context: test-results/proto3d-3D-Prototype-Tests-should-test-palette-toggle-webkit/error-context.md
+
+  4 failed
+    [webkit] › tests/proto3d.spec.ts:8:3 › 3D Prototype Tests › should load without 404 errors ─────
+    [webkit] › tests/proto3d.spec.ts:37:3 › 3D Prototype Tests › should measure FPS ────────────────
+    [webkit] › tests/proto3d.spec.ts:64:3 › 3D Prototype Tests › should take screenshots at key locations 
+    [webkit] › tests/proto3d.spec.ts:114:3 › 3D Prototype Tests › should test palette toggle ───────

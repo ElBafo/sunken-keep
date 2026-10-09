@@ -40,8 +40,8 @@ export class Player {
       const interpY = this.moveFromY + (this.moveToY - this.moveFromY) * eased;
       
       // Interpolate rotation
-      let fromRot = this.moveFromDir * Math.PI / 2;
-      let toRot = this.moveToDir * Math.PI / 2;
+      let fromRot = -this.moveFromDir * Math.PI / 2;
+      let toRot = -this.moveToDir * Math.PI / 2;
       
       // Handle wrap-around for shortest path
       if (Math.abs(toRot - fromRot) > Math.PI) {
@@ -55,7 +55,7 @@ export class Player {
       const wz = interpY * CELL_SIZE;
       
       this.camera.position.set(wx, 0.8, wz);
-      this.camera.rotation.y = Math.PI + interpRot;
+      this.camera.rotation.y = interpRot;
       
       if (t >= 1) {
         this.isMoving = false;
@@ -73,10 +73,15 @@ export class Player {
   updateCameraPosition(_t: number = 1) {
     const wx = this.x * CELL_SIZE;
     const wz = this.y * CELL_SIZE;
-    const rot = this.dir * Math.PI / 2;
+    // Fix camera rotation: dir 0 (north) should face -Z
+    // rotation.y = 0 looks down -Z (north)
+    // rotation.y = -π/2 looks down +X (east)
+    // rotation.y = π looks down +Z (south)
+    // rotation.y = π/2 looks down -X (west)
+    const rot = -this.dir * Math.PI / 2;
     
     this.camera.position.set(wx, 0.8, wz);
-    this.camera.rotation.y = Math.PI + rot;
+    this.camera.rotation.y = rot;
   }
   
   canMove(dx: number, dy: number): boolean {
