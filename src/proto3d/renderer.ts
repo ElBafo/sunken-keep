@@ -4,6 +4,8 @@ import * as THREE from 'three';
 THREE.ColorManagement.enabled = true;
 
 const RENDER_WIDTH = 270;
+const DEFAULT_RENDER_HEIGHT = 380;
+const MIN_BUTTON_PX = 44;
 
 export class PixelRenderer {
   scene: THREE.Scene;
@@ -41,10 +43,8 @@ export class PixelRenderer {
     this.renderer.setPixelRatio(1);
     this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace; // No conversion on final quad
     
-    // Low-res render target - renders in linear space
-    const aspect = window.innerHeight / window.innerWidth;
-    const renderHeight = Math.round(RENDER_WIDTH * aspect);
-    this.renderTarget = new THREE.WebGLRenderTarget(RENDER_WIDTH, renderHeight, {
+    // Low-res render target — 270×380 logical, nearest-neighbour upscaled in CSS
+    this.renderTarget = new THREE.WebGLRenderTarget(RENDER_WIDTH, DEFAULT_RENDER_HEIGHT, {
       minFilter: THREE.NearestFilter,
       magFilter: THREE.NearestFilter,
       format: THREE.RGBAFormat,
@@ -194,21 +194,41 @@ export class PixelRenderer {
   }
   
   resize() {
-    const aspect = window.innerHeight / window.innerWidth;
-    const renderHeight = Math.round(RENDER_WIDTH * aspect);
-    
+    const vw = window.innerWidth;
+    const vh = window.innerHeight;
+    const scale = vw / RENDER_WIDTH;
+
+    const bodyStyle = getComputedStyle(document.body);
+    const padTop = parseFloat(bodyStyle.paddingTop) || 0;
+    const padBottom = parseFloat(bodyStyle.paddingBottom) || 0;
+
+    const controls = document.getElementById('controls');
+    let controlsSpace = MIN_BUTTON_PX * 2 + 16;
+    if (controls) {
+      const cs = getComputedStyle(controls);
+      controlsSpace =
+        controls.offsetHeight +
+        (parseFloat(cs.marginTop) || 0) +
+        (parseFloat(cs.marginBottom) || 0);
+    }
+
+    const available = Math.max(1, vh - padTop - padBottom - controlsSpace);
+    let cssHeight = DEFAULT_RENDER_HEIGHT * scale;
+    // Prefer shrinking the view over overlapping the D-pad on short screens
+    if (cssHeight > available) {
+      cssHeight = available;
+    }
+
+    const renderHeight = Math.max(1, Math.round((cssHeight / scale)));
+
     this.renderTarget.setSize(RENDER_WIDTH, renderHeight);
     this.camera.aspect = RENDER_WIDTH / renderHeight;
     this.camera.updateProjectionMatrix();
-    
-    // Canvas always renders at 270px fixed size
-    this.canvas.width = RENDER_WIDTH;
-    this.canvas.height = renderHeight;
+
+    // Drawing buffer stays 270×logicalH; CSS upscales nearest-neighbour to the viewport
     this.renderer.setSize(RENDER_WIDTH, renderHeight, false);
-    
-    // No CSS scaling - canvas displays at native size
-    this.canvas.style.width = '270px';
-    this.canvas.style.height = `${renderHeight}px`;
+    this.canvas.style.width = `${vw}px`;
+    this.canvas.style.height = `${cssHeight}px`;
   }
   
   render() {
