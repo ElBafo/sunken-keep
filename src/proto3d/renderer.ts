@@ -19,7 +19,7 @@ export class PixelRenderer {
     
     // Main scene
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0x0a0f0a, 0.15);
+    this.scene.fog = new THREE.FogExp2(0x0a0f0a, 0.08); // Reduced fog density for better visibility
     
     // Camera
     this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 20);
@@ -125,8 +125,13 @@ export class PixelRenderer {
       return new THREE.Vector3(r, g, b);
     });
     
+    // Pad to 64 entries to match shader array size
+    while (colors.length < 64) {
+      colors.push(new THREE.Vector3(0, 0, 0));
+    }
+    
     this.finalMaterial.uniforms.palette.value = colors;
-    this.finalMaterial.uniforms.paletteSize.value = colors.length;
+    this.finalMaterial.uniforms.paletteSize.value = this.palette.length;
   }
   
   setPaletteEnabled(enabled: boolean) {
@@ -142,7 +147,18 @@ export class PixelRenderer {
     this.camera.aspect = RENDER_WIDTH / renderHeight;
     this.camera.updateProjectionMatrix();
     
-    this.renderer.setSize(window.innerWidth, window.innerHeight);
+    // Set canvas to render at 270px width, CSS will upscale
+    this.canvas.width = RENDER_WIDTH;
+    this.canvas.height = renderHeight;
+    this.renderer.setSize(RENDER_WIDTH, renderHeight, false);
+    
+    // Scale canvas with CSS to fit viewport
+    const scale = Math.min(
+      window.innerWidth / RENDER_WIDTH,
+      window.innerHeight / renderHeight
+    );
+    this.canvas.style.width = `${RENDER_WIDTH * scale}px`;
+    this.canvas.style.height = `${renderHeight * scale}px`;
   }
   
   render() {
