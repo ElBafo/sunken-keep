@@ -20,6 +20,9 @@ type Proto3d = {
     stairs: number;
   };
   lastMessage: () => string;
+  lastNote: () => { title: string; text: string };
+  tryMoveForward: () => { result: string; after: { x: number; y: number; dir: number } };
+  doorOpen: (x: number, y: number) => boolean;
   getPosition: () => { x: number; y: number; dir: number };
   torchStates: () => Array<{ x: number; y: number; face: string; lit: boolean; capped: boolean }>;
   tileBrightness: (x: number, y: number) => number;
@@ -153,12 +156,12 @@ test('proto3d lighting: pools, relight, oil, no 404s', async ({ page }) => {
 
   await shot(1, 7, 0, 'torch-side-profile.png');
   await shot(6, 7, 0, 'oil-flask.png');
-  const oilSprite = await page.evaluate(() =>
-    (window as unknown as { __proto3d: Proto3d }).__proto3d.sprites().find((s) => s.item === 'oil')
+  const oilSprites = await page.evaluate(() =>
+    (window as unknown as { __proto3d: Proto3d }).__proto3d.sprites().filter((s) => s.item === 'oil')
   );
-  expect(oilSprite, 'oil flask sprite').toBeTruthy();
-  expect(oilSprite!.x).toBe(6);
-  expect(oilSprite!.y).toBe(6);
+  expect(oilSprites, 'two oil flasks').toHaveLength(2);
+  expect(oilSprites.some((s) => s.x === 6 && s.y === 6), 'pantry oil').toBe(true);
+  expect(oilSprites.some((s) => s.x === 12 && s.y === 8), 'lamp-room oil').toBe(true);
 
   await shot(3, 6, 1, 'dead-torch-before.png');
   await page.evaluate(() => {
@@ -306,19 +309,177 @@ test('proto3d lighting: ?ambientFloor=3 is near-black beyond the lantern', async
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
     p.setPosition(5, 2, 1);
     return {
-      lit: p.isSquareLit(7, 2),
+      lit: p.isSquareLit(7, 3),
       fx: p.darkFx()
     };
   });
   console.log('DARK FX', fx);
   expect(fx.lit, 'slime square is outside torch and lantern').toBe(false);
-  const slimeEyes = fx.fx.eyes.find((e) => e.x === 7 && e.y === 2);
+  const slimeEyes = fx.fx.eyes.find((e) => e.x === 7 && e.y === 3);
   expect(slimeEyes, 'slime has eye glints').toBeTruthy();
   expect(slimeEyes!.tint, 'slime eyes are amber').toBe('amber');
   expect(slimeEyes!.visible, 'slime eyes show in the dark').toBe(true);
   expect(fx.fx.stairs, 'stairs-down glow is placed').toBeGreaterThan(0);
   await page.waitForTimeout(220);
   await page.screenshot({ path: `${OUT}/lighting_eye_glints_dark.png`, fullPage: false });
+
+  expect(errors, 'console errors').toEqual([]);
+  expect(failed404s, '404s').toEqual([]);
+});
+
+test('proto3d floor1v2: start-key-door-hall-stairs and pantry-lamp room', async ({ page }) => {
+  test.setTimeout(120000);
+  mkdirSync(OUT, { recursive: true });
+  const errors: string[] = [];
+  const failed404s: string[] = [];
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') errors.push(msg.text());
+  });
+  page.on('response', (response) => {
+    if (response.status() === 404) failed404s.push(response.url());
+  });
+
+  await page.goto(`${BASE_URL}/proto3d.html?test=1&debug=1`);
+  await page.waitForFunction(
+    () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
+    null,
+    { timeout: 25000 }
+  );
+  await page.locator('#tap-to-start').click();
+  await page.waitForTimeout(400);
+
+  const pose = async (x: number, y: number, dir: number) => {
+    await page.evaluate(([px, py, pd]) => {
+      (window as unknown as { __proto3d: Proto3d }).__proto3d.setPosition(px, py, pd);
+    }, [x, y, dir] as const);
+  };
+  const step = async (expectResult = 'ok') => {
+    const moved = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.tryMoveForward());
+    expect(moved.result).toBe(expectResult);
+    return moved;
+  };
+  const tap = async () => {
+    await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.interact());
+  };
+
+  await pose(1, 7, 0);
+  expect((await step()).after).toMatchObject({ x: 1, y: 6 });
+  await pose(1, 6, 0);
+  expect((await step()).after).toMatchObject({ x: 1, y: 5 });
+  await pose(1, 5, 1);
+  expect((await step()).after).toMatchObject({ x: 2, y: 5 });
+  await tap();
+  expect(await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.lastMessage())).toBe(
+    'Key.'
+  );
+
+  await pose(2, 5, 0);
+  expect((await step()).after).toMatchObject({ x: 2, y: 4 });
+  await pose(2, 4, 0);
+  expect((await step()).after).toMatchObject({ x: 2, y: 3 });
+  await pose(2, 3, 0);
+  expect((await step()).after).toMatchObject({ x: 2, y: 2 });
+  await pose(2, 2, 1);
+  expect((await step()).after).toMatchObject({ x: 3, y: 2 });
+  await tap();
+  await page.waitForTimeout(900);
+  expect(
+    await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.doorOpen(4, 2))
+  ).toBe(true);
+
+  for (const [x, y] of [
+    [3, 2],
+    [4, 2],
+    [5, 2],
+    [6, 2],
+    [7, 2],
+    [8, 2],
+    [9, 2],
+    [10, 2]
+  ] as const) {
+    await pose(x, y, 1);
+    expect((await step()).after).toMatchObject({ x: x + 1, y: 2 });
+  }
+  await pose(11, 2, 1);
+  expect((await step()).result).toBe('wall');
+  await page.waitForTimeout(220);
+  await page.screenshot({ path: `${OUT}/floor1_guard_hall_beams_sunbeam.png`, fullPage: false });
+
+  await pose(11, 2, 2);
+  expect((await step()).after).toMatchObject({ x: 11, y: 3 });
+  await pose(11, 3, 1);
+  expect((await step()).after).toMatchObject({ x: 12, y: 3 });
+  await pose(12, 3, 1);
+  expect((await step()).after).toMatchObject({ x: 13, y: 3 });
+  await pose(13, 3, 2);
+  expect((await step()).after).toMatchObject({ x: 13, y: 4 });
+  expect(
+    await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.darkFx().stairs),
+    'stairs glow at (13,4)'
+  ).toBeGreaterThan(0);
+
+  await page.goto(`${BASE_URL}/proto3d.html?test=1&debug=1`);
+  await page.waitForFunction(
+    () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
+    null,
+    { timeout: 25000 }
+  );
+  await page.locator('#tap-to-start').click();
+  await page.waitForTimeout(400);
+
+  await pose(1, 7, 1);
+  expect((await step()).after).toMatchObject({ x: 2, y: 7 });
+  await pose(2, 7, 1);
+  expect((await step()).after).toMatchObject({ x: 3, y: 7 });
+  await pose(3, 7, 0);
+  expect((await step()).after).toMatchObject({ x: 3, y: 6 });
+  await pose(3, 6, 0);
+  expect((await step()).after).toMatchObject({ x: 3, y: 5 });
+  await pose(3, 5, 1);
+  expect((await step()).after).toMatchObject({ x: 4, y: 5 });
+  await pose(4, 5, 1);
+  expect((await step()).after).toMatchObject({ x: 5, y: 5 });
+  await pose(5, 5, 1);
+  expect((await step()).after).toMatchObject({ x: 6, y: 5 });
+  await pose(6, 5, 0);
+  expect((await step()).after).toMatchObject({ x: 6, y: 6 });
+  await pose(6, 6, 1);
+  expect((await step()).after).toMatchObject({ x: 7, y: 6 });
+  await pose(7, 6, 1);
+  expect((await step()).after).toMatchObject({ x: 8, y: 6 });
+
+  await pose(11, 8, 2);
+  await page.waitForTimeout(220);
+  await page.screenshot({ path: `${OUT}/floor1_lamp_room_unlit.png`, fullPage: false });
+
+  await pose(8, 6, 0);
+  await tap();
+  await page.waitForTimeout(700);
+  expect(
+    await page.evaluate(
+      () => (window as unknown as { __proto3d: Proto3d }).__proto3d.torchStates().find((s) => s.x === 8 && s.y === 5)?.lit
+    ),
+    'lamp-room dead torch relit'
+  ).toBe(true);
+
+  await pose(8, 6, 1);
+  expect((await step()).after).toMatchObject({ x: 9, y: 6 });
+  await pose(9, 6, 1);
+  expect((await step()).after).toMatchObject({ x: 10, y: 6 });
+  await pose(10, 6, 1);
+  expect((await step()).after).toMatchObject({ x: 11, y: 6 });
+  await pose(11, 6, 2);
+  expect((await step()).after).toMatchObject({ x: 11, y: 7 });
+  await pose(11, 7, 2);
+  expect((await step()).after).toMatchObject({ x: 11, y: 8 });
+
+  await pose(11, 9, 1);
+  await tap();
+  const note = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.lastMessage());
+  expect(note).toContain('They took the lamps first');
+  expect(note).toContain('Pell');
+  await page.waitForTimeout(220);
+  await page.screenshot({ path: `${OUT}/floor1_lamp_room_lit.png`, fullPage: false });
 
   expect(errors, 'console errors').toEqual([]);
   expect(failed404s, '404s').toEqual([]);

@@ -132,9 +132,30 @@ test('proto3d feedback: camera, doors, bump, fog, floors, no 404s', async ({ pag
   expect(walk[2].result).toBe('ok');
   expect(walk[2].at.x).toBe(6);
   expect(walk[2].at.y).toBe(2);
-  expect(walk[3].result).toBe('monster');
-  expect(walk[3].at.x).toBe(6);
+  expect(walk[3].result).toBe('ok');
+  expect(walk[3].at.x).toBe(7);
   expect(walk[3].at.y).toBe(2);
+
+  await page.evaluate(() => {
+    (window as unknown as { __proto3d: { setPosition: (a: number, b: number, c: number) => void } }).__proto3d.setPosition(
+      7,
+      2,
+      2
+    );
+  });
+  const slimeBump = await page.evaluate(() => {
+    const api = window as unknown as {
+      __proto3d: {
+        tryMoveForward: () => { result: string };
+        getPosition: () => { x: number; y: number };
+      };
+    };
+    const { result } = api.__proto3d.tryMoveForward();
+    return { result, at: api.__proto3d.getPosition() };
+  });
+  expect(slimeBump.result, 'slime at (7,3) blocks from the arch').toBe('monster');
+  expect(slimeBump.at.x).toBe(7);
+  expect(slimeBump.at.y).toBe(2);
   await page.waitForTimeout(200);
   await page.screenshot({ path: `${OUT}/slime-bump.png`, fullPage: false });
   console.log(

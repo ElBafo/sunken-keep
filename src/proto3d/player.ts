@@ -131,6 +131,7 @@ export class Player {
     if (tile.secret && !tile.secretOpen) return 'secret';
     if (tile.door && !tile.doorOpen) return 'door';
     if (tile.monster) return 'monster';
+    if (tile.prop === 'beams_fallen' || tile.prop === 'desk') return 'wall';
     return 'ok';
   }
 

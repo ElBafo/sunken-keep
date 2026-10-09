@@ -59,10 +59,18 @@ const ATMO_FILES = [
   'splash_3',
   'tally_marks',
   'water_edge',
-  'water_line'
+  'water_line',
+  'lamp_hooks'
 ] as const;
 
-const SKIP_KINDS = new Set(['banner_sunken', 'wet_strip']);
+const SKIP_KINDS = new Set([
+  'banner_sunken',
+  'wet_strip',
+  'desk_note',
+  'jar_rack',
+  'lamp_capped',
+  'beams_fallen'
+]);
 const FOG_READABLE = new Set(['tally_marks', 'water_line', 'ash_bowl']);
 const DECAL_OFFSET = 0.02;
 const AGAINST_TO_WALL: Record<Face, { dx: number; dy: number; face: Face }> = {
@@ -189,6 +197,7 @@ export class Dressing {
           if (mark) this.marks.bones.push(mark);
         } else if (kind === 'water_line') this.placeWallNamed(floorData, item, 'water_line', true);
         else if (kind === 'rust_stain') this.placeWallNamed(floorData, item, 'rust_stain', false, 0.03);
+        else if (kind === 'lamp_hooks') this.placeWallNamed(floorData, item, 'lamp_hooks', false);
         else {
           // Any other name is the same as its file.
           if (!this.textures.has(kind)) return;

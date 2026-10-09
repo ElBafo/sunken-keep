@@ -25,6 +25,7 @@ import { TorchSystem, torchWorldPos } from './torches';
 import { VertexLightingManager } from './vertex-lighting';
 import { WaterSystem } from './water';
 import { DarkFx } from './dark-fx';
+import { PropBuilder } from './props';
 
 class Game {
   renderer!: PixelRenderer;
@@ -39,12 +40,14 @@ class Game {
   water!: WaterSystem;
   torches!: TorchSystem;
   darkFx!: DarkFx;
+  props!: PropBuilder;
   quality: QualityLevel = 'high';
   bright = 1;
   oil = OIL_START;
   persist = true;
   oilPickupText = 'Oil flask. Wren\'s lantern drinks it.';
   lastMessage = '';
+  lampNote = { title: "Lamp-keeper's note", text: '' };
   messageTimer = 0;
 
   lastTime = 0;
@@ -83,8 +86,10 @@ class Game {
 
     this.dressing = new Dressing();
     this.water = new WaterSystem();
-    await Promise.all([this.dressing.load(), this.water.load()]);
+    this.props = new PropBuilder();
+    await Promise.all([this.dressing.load(), this.water.load(), this.props.load()]);
     await this.dressing.place(this.renderer.scene, floor1);
+    this.props.place(this.renderer.scene, floor1);
 
     this.atmosphere.build(this.renderer.scene, floor1, this.dressing);
     this.water.build(this.renderer.scene, floor1, floor1Sconces, this.dressing.marks.sunbeams);
@@ -116,7 +121,7 @@ class Game {
     this.darkFx = new DarkFx();
     await this.darkFx.load(this.renderer.scene, floor1, this.spriteManager);
     this.updateOilHud();
-    await this.loadLogText();
+    await Promise.all([this.loadLogText(), this.loadLampNote()]);
 
     this.audioManager = new AudioManager(this.renderer.camera, this.quality);
     await this.audioManager.init();
@@ -224,6 +229,49 @@ class Game {
     }
   }
 
+  async loadLampNote() {
+    try {
+      const baseUrl = import.meta.env.BASE_URL;
+      const res = await fetch(`${baseUrl}story/note_lampkeeper.json`);
+      const note = (await res.json()) as { title?: string; text?: string };
+      if (note.title) this.lampNote.title = note.title;
+      if (note.text) this.lampNote.text = note.text;
+    } catch {
+      this.lampNote.text =
+        "They took the lamps first. Then the oil. Thane's orders. I kept one. Don't tell him. - Pell, lamp-keeper";
+    }
+  }
+
+  showNote() {
+    const text = this.lampNote.text;
+    this.lastMessage = text;
+    const overlay = document.getElementById('note-overlay');
+    const titleEl = document.getElementById('note-title');
+    const textEl = document.getElementById('note-text');
+    if (titleEl) titleEl.textContent = this.lampNote.title;
+    if (textEl) textEl.textContent = text;
+    if (overlay) overlay.classList.add('show');
+    const toast = document.getElementById('message-toast');
+    if (toast) {
+      toast.textContent = text;
+      toast.classList.add('show');
+    }
+    this.messageTimer = performance.now() + 5000;
+  }
+
+  hideNote() {
+    document.getElementById('note-overlay')?.classList.remove('show');
+  }
+
+  readFacingDesk(): boolean {
+    const { x, y } = this.player.facingPos(1);
+    const tile = this.player.tileAt(x, y);
+    if (!tile) return false;
+    if (tile.prop !== 'desk' && !tile.readNote) return false;
+    this.showNote();
+    return true;
+  }
+
   setOil(value: number) {
     const next = Math.min(OIL_MAX, Math.max(0, Math.floor(value)));
     const prev = this.oil;
@@ -270,9 +318,11 @@ class Game {
     if (this.pickupKeyAt(facing.x, facing.y)) return;
     if (this.pickupOilAt(facing.x, facing.y)) return;
     if (this.lightFacingTorch()) return;
+    if (this.readFacingDesk()) return;
 
     const ahead = this.doorAhead();
     if (ahead) this.handleDoor(ahead.x, ahead.y);
+    else this.hideNote();
   }
 
   handleDoor(x: number, y: number) {
@@ -442,6 +492,7 @@ class Game {
       },
       hasKey: () => this.player.hasKey,
       lastMessage: () => this.lastMessage,
+      lastNote: () => this.lampNote,
       getOil: () => this.oil,
       setOil: (n: number) => this.setOil(n),
       getBright: () => this.bright,
@@ -464,8 +515,13 @@ class Game {
         const before = { x: this.player.x, y: this.player.y };
         const result = this.player.moveForward();
         this.handleMove(result);
-        return { result, before, after: { x: this.player.x, y: this.player.y, dir: this.player.dir } };
+        const dest = this.player.isMoving
+          ? { x: this.player.moveToX, y: this.player.moveToY, dir: this.player.moveToDir }
+          : { x: this.player.x, y: this.player.y, dir: this.player.dir };
+        return { result, before, after: dest };
       },
+      tryTurnLeft: () => this.player.turnLeft(),
+      tryTurnRight: () => this.player.turnRight(),
       doorOpen: (x: number, y: number) => !!this.sceneBuilder.doors.get(x, y)?.tile.doorOpen,
       openDoor: (x: number, y: number) => {
         const visual = this.sceneBuilder.doors.get(x, y);
@@ -501,6 +557,13 @@ class Game {
       this.audioManager.attachDressing(this.renderer.scene, this.dressing.marks);
       this.audioManager.attachLeeches(this.renderer.scene, floor1);
       this.audioManager.attachWaterPools(this.renderer.scene, floor1);
+      this.audioManager.startNamedLoop(
+        'lamp_hooks',
+        11 * CELL_SIZE,
+        0.55,
+        9 * CELL_SIZE,
+        0.38
+      );
       this.lastTime = performance.now();
       this.fpsLastTime = this.lastTime;
       requestAnimationFrame(() => this.gameLoop());
@@ -551,6 +614,7 @@ class Game {
     if (this.messageTimer && now >= this.messageTimer) {
       this.messageTimer = 0;
       document.getElementById('message-toast')?.classList.remove('show');
+      this.hideNote();
     }
 
     this.renderer.render();

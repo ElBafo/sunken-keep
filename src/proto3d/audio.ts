@@ -113,7 +113,8 @@ export class AudioManager {
       ['lantern_loop', 'audio/sfx_lantern_loop.mp3'],
       ['lantern_ember_loop', 'audio/sfx_lantern_ember_loop.mp3'],
       ['dark_presence', 'audio/sfx_dark_presence_loop.mp3'],
-      ['glint', 'audio/sfx_glint.mp3']
+      ['glint', 'audio/sfx_glint.mp3'],
+      ['lamp_hooks', 'audio/sfx_lamp_hooks_loop.mp3']
     ];
 
     const results = await Promise.all(

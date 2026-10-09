@@ -96,7 +96,7 @@ test('proto3d iPhone fixes: sorting, items, walls, water, doors, no 404s', async
     { item: 'key', x: 2, y: 5, away: { x: 2, y: 6, dir: 0 } },
     { item: 'potion_red', x: 6, y: 3, away: { x: 6, y: 2, dir: 2 } },
     { item: 'potion_blue', x: 5, y: 5, away: { x: 4, y: 5, dir: 1 } },
-    { item: 'chest', x: 6, y: 5, away: { x: 5, y: 5, dir: 1 } },
+    { item: 'chest', x: 5, y: 7, away: { x: 5, y: 6, dir: 2 } },
     { item: 'potion_green', x: 7, y: 7, away: { x: 7, y: 6, dir: 2 } }
   ];
   for (const it of itemTiles) {

@@ -162,6 +162,34 @@
       z-index: 200;
       pointer-events: none;
     }
+    #note-overlay {
+      position: fixed;
+      left: 50%;
+      top: 22%;
+      transform: translate(-50%, 0);
+      width: min(86vw, 340px);
+      background: rgba(18, 14, 10, 0.92);
+      border: 1px solid #8a7348;
+      color: #e8e0d0;
+      font-family: monospace;
+      padding: 12px 14px 14px;
+      z-index: 280;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s;
+    }
+    #note-overlay.show { opacity: 1; }
+    #note-title {
+      font-size: 13px;
+      letter-spacing: 0.06em;
+      color: #d4b56a;
+      margin-bottom: 8px;
+    }
+    #note-text {
+      font-size: 13px;
+      line-height: 1.45;
+      white-space: pre-wrap;
+    }
   </style>
 </head>
 <body>
@@ -180,6 +208,10 @@
     <button id="btn-right" class="control-btn">→</button>
   </div>
   <div id="message-toast"></div>
+  <div id="note-overlay">
+    <div id="note-title"></div>
+    <div id="note-text"></div>
+  </div>
   <div id="oil-readout">Oil 2/4</div>
   <div id="fps-counter">FPS: --</div>
   <script type="module" src="/src/proto3d/main.ts"></script>
