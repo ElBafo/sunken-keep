@@ -7,7 +7,7 @@ import {
   DOOR_PANEL_INSET,
   DOOR_SLIDE,
   FACE_INTO_ROOM,
-  FOG_COLOR,
+  FACE_SEGMENTS,
   WALL_TOP
 } from './constants';
 import { Tile } from './types';
@@ -23,7 +23,7 @@ export interface DoorVisual {
   x: number;
   y: number;
   tile: Tile;
-  /** Slider groups (dark backing + panel) that travel up into the lintel. */
+  /** Slider groups (lit backing + panel) that travel up into the lintel. */
   panels: THREE.Object3D[];
   meshes: THREE.Object3D[];
   animStart: number;
@@ -35,6 +35,29 @@ export interface DoorVisual {
 
 function keyOf(x: number, y: number): string {
   return `${x},${y}`;
+}
+
+function makeDoorGeometry(): THREE.PlaneGeometry {
+  // Same segment density as walls so vertex lighting bands match neighbouring faces.
+  return new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE, FACE_SEGMENTS, FACE_SEGMENTS);
+}
+
+function doorMaterial(
+  map: THREE.Texture,
+  opts: { alphaTest: number; transparent: boolean }
+): THREE.MeshBasicMaterial {
+  return new THREE.MeshBasicMaterial({
+    map,
+    color: 0xffffff,
+    vertexColors: true,
+    side: THREE.FrontSide,
+    transparent: opts.transparent,
+    alphaTest: opts.alphaTest,
+    depthWrite: true,
+    depthTest: true,
+    fog: true,
+    toneMapped: false
+  });
 }
 
 export class DoorSystem {
@@ -82,34 +105,20 @@ export class DoorSystem {
     const slider = new THREE.Group();
     slider.userData.kind = 'door-slider';
 
-    // Opaque dark fill behind the cutout panel so water cannot show through
-    // the PNG's transparent margin. Slides up with the panel.
-    const backing = new THREE.Mesh(
-      new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE),
-      new THREE.MeshBasicMaterial({
-        color: FOG_COLOR,
-        side: THREE.FrontSide,
-        fog: true,
-        toneMapped: false
-      })
-    );
+    // Opaque fill behind the cutout, lit with the same vertex colours as the
+    // panel / neighbouring walls so the door never drops to fog-black at 1 sq.
+    const backing = new THREE.Mesh(makeDoorGeometry(), doorMaterial(panelTex, { alphaTest: 0, transparent: false }));
     backing.position.z = -DOOR_PANEL_INSET - 0.012;
     backing.userData.kind = 'door-backing';
     backing.userData.noPick = true;
-    backing.userData.skipVertexLighting = true;
     backing.userData.lightX = lightX;
     backing.userData.lightY = lightY;
     slider.add(backing);
 
-    const panelMat = new THREE.MeshBasicMaterial({
-      map: panelTex,
-      vertexColors: true,
-      side: THREE.FrontSide,
-      transparent: true,
-      alphaTest: CUTOUT_ALPHA_TEST,
-      depthWrite: true
-    });
-    const panel = new THREE.Mesh(new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE), panelMat);
+    const panel = new THREE.Mesh(
+      makeDoorGeometry(),
+      doorMaterial(panelTex, { alphaTest: CUTOUT_ALPHA_TEST, transparent: false })
+    );
     panel.position.z = -DOOR_PANEL_INSET;
     panel.renderOrder = 0;
     panel.userData.lightX = lightX;
@@ -118,15 +127,10 @@ export class DoorSystem {
     slider.add(panel);
     holder.add(slider);
 
-    const frameMat = new THREE.MeshBasicMaterial({
-      map: frameTex,
-      vertexColors: true,
-      side: THREE.FrontSide,
-      transparent: true,
-      alphaTest: CUTOUT_ALPHA_TEST,
-      depthWrite: true
-    });
-    const frame = new THREE.Mesh(new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE), frameMat);
+    const frame = new THREE.Mesh(
+      makeDoorGeometry(),
+      doorMaterial(frameTex, { alphaTest: CUTOUT_ALPHA_TEST, transparent: false })
+    );
     frame.position.z = 0;
     frame.renderOrder = 1;
     frame.userData.lightX = lightX;
@@ -189,7 +193,6 @@ export class DoorSystem {
       const y = visual.animFrom + (visual.animTo - visual.animFrom) * eased;
       for (const p of visual.panels) {
         p.position.y = y;
-        // Hide above the arch so the lintel fully occludes the last sliver.
         p.visible = y < WALL_TOP - 0.02;
       }
       if (t >= 1) {

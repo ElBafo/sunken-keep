@@ -7,8 +7,12 @@ import {
   SCONCE_HEIGHT_TILES,
   SCONCE_WALL_OFFSET_TILES,
   SCONCE_WIDTH_TILES,
-  WATER_Y,
-  sconceNeedsMirror
+  SPRITE_SURFACE_LIFT,
+  WATER_SURFACE_Y,
+  cameraOffsetXZ,
+  isWaterTile,
+  sconceNeedsMirror,
+  tileBedY
 } from './constants';
 import { FloorData, Sconce, Tile } from './types';
 
@@ -20,8 +24,22 @@ const MONSTER_SPRITE: Record<string, { w: number; h: number }> = {
   keep_rat: { w: 1.3, h: 1.2 }
 };
 
-function tileFloorY(tile: Tile): number {
-  return tile.deepWater || tile.shallowWater ? WATER_Y : 0;
+const ITEM_SPRITE: Record<string, { file: string; w: number; h: number }> = {
+  key: { file: 'item_key_near.png', w: 0.62, h: 0.32 },
+  potion_red: { file: 'item_potion_red_near.png', w: 0.3, h: 0.44 },
+  potion_blue: { file: 'item_potion_blue_near.png', w: 0.3, h: 0.44 },
+  potion_green: { file: 'item_potion_green_near.png', w: 0.3, h: 0.44 },
+  chest: { file: 'item_chest_near.png', w: 0.72, h: 0.5 },
+  scroll: { file: 'item_scroll_near.png', w: 0.42, h: 0.32 }
+};
+
+const OWN_SQUARE_SCALE = 0.55;
+const OWN_SQUARE_FORWARD = 0.82;
+const SPRITE_RENDER_ORDER = 10;
+
+function spriteFeetY(tile: Tile): number {
+  if (isWaterTile(tile)) return WATER_SURFACE_Y + SPRITE_SURFACE_LIFT;
+  return tileBedY(tile) + SPRITE_SURFACE_LIFT;
 }
 
 interface SpriteInfo {
@@ -29,6 +47,10 @@ interface SpriteInfo {
   material: THREE.SpriteMaterial | THREE.MeshBasicMaterial;
   x: number;
   y: number;
+  kind: 'monster' | 'item' | 'sconce';
+  baseW: number;
+  baseH: number;
+  floorY: number;
   frames?: THREE.Texture[];
   currentFrame: number;
   animSpeed: number;
@@ -37,7 +59,7 @@ interface SpriteInfo {
 
 function configureSpriteTexture(tex: THREE.Texture) {
   tex.colorSpace = THREE.SRGBColorSpace;
-  (tex as any).encoding = 3001; // sRGBEncoding fallback
+  (tex as any).encoding = 3001;
   tex.magFilter = THREE.NearestFilter;
   tex.minFilter = THREE.NearestFilter;
   tex.generateMipmaps = false;
@@ -66,16 +88,14 @@ function makeBillboard(
   y: number,
   z: number,
   width: number,
-  height: number,
-  renderOrder = 10
+  height: number
 ): THREE.Sprite {
   const sprite = new THREE.Sprite(material);
-  // Anchor at the feet so scale changes don't sink into the floor
   sprite.center.set(0.5, 0);
   sprite.position.set(x, y, z);
   sprite.scale.set(width, height, 1);
   sprite.frustumCulled = false;
-  sprite.renderOrder = renderOrder;
+  sprite.renderOrder = SPRITE_RENDER_ORDER;
   sprite.userData.isSprite = true;
   sprite.matrixAutoUpdate = true;
   return sprite;
@@ -113,7 +133,7 @@ export class SpriteManager {
 
   hideItemAt(x: number, y: number) {
     for (const sprite of this.sprites) {
-      if (sprite.x === x && sprite.y === y && !sprite.frames) {
+      if (sprite.kind === 'item' && sprite.x === x && sprite.y === y) {
         sprite.object.visible = false;
       }
     }
@@ -146,6 +166,7 @@ export class SpriteManager {
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const tile = tiles[y][x];
+        const feetY = spriteFeetY(tile);
 
         if (tile.monster) {
           const kind = tile.monster;
@@ -156,27 +177,8 @@ export class SpriteManager {
             loadTex(`art/dungeon/${kind}_idle_4_near.png`)
           ]);
           const size = MONSTER_SPRITE[kind] ?? { w: 1.6, h: 1.3 };
-          const onWater = !!(tile.deepWater || tile.shallowWater);
           const mat = makeSpriteMaterial(frames[0]);
-          // Sit on this square's floor (water is WATER_Y). Draw after the water
-          // surface so the sprite is neither floating nor buried in it.
-          const sprite = makeBillboard(
-            mat,
-            x * CELL_SIZE,
-            tileFloorY(tile) + 0.02,
-            y * CELL_SIZE,
-            size.w,
-            size.h,
-            onWater ? 20 : 10
-          );
-          if (onWater) {
-            mat.depthTest = true;
-            mat.depthWrite = false;
-            mat.polygonOffset = true;
-            mat.polygonOffsetFactor = -4;
-            mat.polygonOffsetUnits = -4;
-            sprite.renderOrder = 20;
-          }
+          const sprite = makeBillboard(mat, x * CELL_SIZE, feetY, y * CELL_SIZE, size.w, size.h);
           scene.add(sprite);
 
           this.sprites.push({
@@ -184,6 +186,10 @@ export class SpriteManager {
             material: mat,
             x,
             y,
+            kind: 'monster',
+            baseW: size.w,
+            baseH: size.h,
+            floorY: feetY,
             frames,
             currentFrame: 0,
             animSpeed: 200,
@@ -191,11 +197,16 @@ export class SpriteManager {
           });
         }
 
-        if (tile.item === 'key') {
-          const tex = await loadTex('art/dungeon/item_key_near.png');
+        if (tile.item && !(tile.secret && !tile.secretOpen)) {
+          const def = ITEM_SPRITE[tile.item] ?? {
+            file: `item_${tile.item}_near.png`,
+            w: 0.4,
+            h: 0.4
+          };
+          const tex = await loadTex(`art/dungeon/${def.file}`);
           const mat = makeSpriteMaterial(tex);
-          const sprite = makeBillboard(mat, x * CELL_SIZE, 0.15, y * CELL_SIZE, 0.9, 0.9);
-          sprite.userData.item = 'key';
+          const sprite = makeBillboard(mat, x * CELL_SIZE, feetY, y * CELL_SIZE, def.w, def.h);
+          sprite.userData.item = tile.item;
           scene.add(sprite);
 
           this.sprites.push({
@@ -203,6 +214,10 @@ export class SpriteManager {
             material: mat,
             x,
             y,
+            kind: 'item',
+            baseW: def.w,
+            baseH: def.h,
+            floorY: feetY,
             currentFrame: 0,
             animSpeed: 0,
             lastFrameTime: 0
@@ -253,6 +268,10 @@ export class SpriteManager {
         material: mat,
         x: sconce.x,
         y: sconce.y,
+        kind: 'sconce',
+        baseW: sconceW,
+        baseH: sconceH,
+        floorY: midHeight,
         frames: sconce.lit ? litFrames : undefined,
         currentFrame: 0,
         animSpeed: sconce.lit ? frameMs : 0,
@@ -266,7 +285,32 @@ export class SpriteManager {
     return lit?.currentFrame ?? 0;
   }
 
-  update(time: number) {
+  layoutItems(playerX: number, playerY: number, dir: number) {
+    const rotY = (-dir * Math.PI) / 2;
+    const [ox, oz] = cameraOffsetXZ(rotY);
+    const fx = -Math.sin(rotY);
+    const fz = -Math.cos(rotY);
+    const camX = playerX * CELL_SIZE + ox;
+    const camZ = playerY * CELL_SIZE + oz;
+
+    for (const sprite of this.sprites) {
+      if (sprite.kind !== 'item' || !sprite.object.visible) continue;
+      const onOwn = sprite.x === playerX && sprite.y === playerY;
+      if (onOwn) {
+        sprite.object.position.set(
+          camX + fx * OWN_SQUARE_FORWARD,
+          sprite.floorY,
+          camZ + fz * OWN_SQUARE_FORWARD
+        );
+        sprite.object.scale.set(sprite.baseW * OWN_SQUARE_SCALE, sprite.baseH * OWN_SQUARE_SCALE, 1);
+      } else {
+        sprite.object.position.set(sprite.x * CELL_SIZE, sprite.floorY, sprite.y * CELL_SIZE);
+        sprite.object.scale.set(sprite.baseW, sprite.baseH, 1);
+      }
+    }
+  }
+
+  update(time: number, playerX?: number, playerY?: number, dir?: number) {
     for (const sprite of this.sprites) {
       if (sprite.frames && sprite.frames.length > 1 && sprite.animSpeed > 0) {
         if (time - sprite.lastFrameTime > sprite.animSpeed) {
@@ -276,6 +320,9 @@ export class SpriteManager {
           sprite.lastFrameTime = time;
         }
       }
+    }
+    if (playerX !== undefined && playerY !== undefined && dir !== undefined) {
+      this.layoutItems(playerX, playerY, dir);
     }
   }
 }

@@ -17,15 +17,15 @@ export default defineConfig({
     {
       name: 'webkit-iphone',
       use: {
-        ...devices['iPhone 13'],
-        viewport: { width: 390, height: 844 },
+        ...devices['iPhone 15'],
       },
     },
   ],
 
   webServer: {
-    command: 'npm run preview',
-    url: 'http://localhost:4173',
+    command: 'npm run build && npx vite preview --host 127.0.0.1 --port 4173 --strictPort',
+    url: 'http://127.0.0.1:4173/sunken-keep/proto3d.html',
+    timeout: 180000,
     reuseExistingServer: !process.env.CI,
   },
 });

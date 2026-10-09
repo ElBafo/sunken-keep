@@ -3,11 +3,11 @@ import {
   CELL_SIZE,
   CUTOUT_ALPHA_TEST,
   FACE_SEGMENTS,
-  WALL_BOTTOM,
-  WALL_TOP,
-  WATER_Y
+  isWaterTile,
+  tileBedY
 } from './constants';
 import { DoorSystem } from './doors';
+import { makeWallGeometry, wallMidY } from './geometry';
 import {
   flipUVsX,
   floorFlipX,
@@ -27,13 +27,10 @@ type TexOpts = {
   mipmaps: boolean;
 };
 
-function isSolid(tile: Tile | undefined): boolean {
+/** True for cells that hide a neighbouring wall face. Doors and water are not solid. */
+function occludesWallFace(tile: Tile | undefined): boolean {
   if (!tile) return true;
-  return !!tile.wall || (!!tile.secret && !tile.secretOpen) || !!tile.door;
-}
-
-function isWater(tile: Tile): boolean {
-  return !!(tile.deepWater || tile.shallowWater);
+  return !!tile.wall || (!!tile.secret && !tile.secretOpen);
 }
 
 export class SceneBuilder {
@@ -42,6 +39,8 @@ export class SceneBuilder {
   private doorPanel: THREE.Texture | null = null;
   private secretClosed: THREE.Texture | null = null;
   private secretOpen: THREE.Texture | null = null;
+  private submergedShallow: THREE.Texture[] = [];
+  private submergedDeep: THREE.Texture[] = [];
   doors = new DoorSystem();
 
   async loadTextures(): Promise<void> {
@@ -112,7 +111,31 @@ export class SceneBuilder {
     this.secretClosed = secretClosed;
     this.secretOpen = secretOpen;
 
+    const waterFloor: TexOpts = {
+      wrapS: THREE.RepeatWrapping,
+      wrapT: THREE.RepeatWrapping,
+      mipmaps: true
+    };
+    this.submergedShallow = await Promise.all(
+      ['floor_submerged.png', 'floor_submerged_2.png', 'floor_submerged_3.png', 'floor_submerged_4.png'].map((n) =>
+        loadTex(`proto3d/tex3d/water/${n}`, waterFloor)
+      )
+    );
+    this.submergedDeep = await Promise.all(
+      [
+        'floor_submerged_deep.png',
+        'floor_submerged_deep_2.png',
+        'floor_submerged_deep_3.png',
+        'floor_submerged_deep_4.png'
+      ].map((n) => loadTex(`proto3d/tex3d/water/${n}`, waterFloor))
+    );
+
     console.log('All textures loaded successfully');
+  }
+
+  private pickWaterBed(tile: Tile, x: number, y: number): THREE.Texture {
+    const list = tile.deepWater ? this.submergedDeep : this.submergedShallow;
+    return list[pickVariantIndex(list.length, x, y, 'F')];
   }
 
   private pick(surface: VariantSurface, x: number, y: number, face: string): THREE.Texture {
@@ -131,19 +154,6 @@ export class SceneBuilder {
     return group;
   }
 
-  private makeWallGeometry(): THREE.PlaneGeometry {
-    const height = WALL_TOP - WALL_BOTTOM;
-    const geo = new THREE.PlaneGeometry(CELL_SIZE, height, FACE_SEGMENTS, FACE_SEGMENTS);
-    const uv = geo.attributes.uv;
-    for (let i = 0; i < uv.count; i++) {
-      const v = uv.getY(i);
-      const worldY = WALL_BOTTOM + v * height;
-      uv.setY(i, worldY / CELL_SIZE);
-    }
-    uv.needsUpdate = true;
-    return geo;
-  }
-
   buildFloorAndCeiling(group: THREE.Group, floorData: FloorData) {
     const { tiles, width, height } = floorData;
 
@@ -157,9 +167,9 @@ export class SceneBuilder {
         const wx = x * CELL_SIZE;
         const wz = y * CELL_SIZE;
 
-        const water = isWater(tile);
-        const floorTex = this.pick(water ? 'floor_water' : 'floor_stone', x, y, 'F');
-        const floorY = water ? WATER_Y : 0;
+        const water = isWaterTile(tile);
+        const floorTex = water ? this.pickWaterBed(tile, x, y) : this.pick('floor_stone', x, y, 'F');
+        const floorY = tileBedY(tile);
 
         const floorGeo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE, FACE_SEGMENTS, FACE_SEGMENTS);
         rotateUVs(floorGeo, floorQuarterTurns(x, y, 'F'));
@@ -174,7 +184,7 @@ export class SceneBuilder {
         floor.position.set(wx, floorY, wz);
         floor.userData.lightX = x;
         floor.userData.lightY = y;
-        floor.userData.kind = water ? 'water' : 'floor';
+        floor.userData.kind = water ? (tile.deepWater ? 'water-deep' : 'water-shallow') : 'floor';
         group.add(floor);
 
         const ceilingGeo = new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE, FACE_SEGMENTS, FACE_SEGMENTS);
@@ -234,7 +244,9 @@ export class SceneBuilder {
 
     if (nx < 0 || nx >= width || nz < 0 || nz >= height) return;
     const neighbor = tiles[nz][nx];
-    if (isSolid(neighbor) && !tile.door) return;
+    // Doors are walkable, so neighbouring walls must still emit faces into the
+    // door cell — otherwise the corridor through the door is missing side walls.
+    if (occludesWallFace(neighbor) && !tile.door) return;
     if (tile.door && (neighbor.wall || neighbor.door || neighbor.secret)) return;
 
     if (tile.door) {
@@ -264,7 +276,7 @@ export class SceneBuilder {
       }
     }
 
-    const geo = this.makeWallGeometry();
+    const geo = makeWallGeometry();
     const mat = new THREE.MeshBasicMaterial({
       map: texture,
       vertexColors: true,
@@ -273,7 +285,7 @@ export class SceneBuilder {
       alphaTest: cutout ? CUTOUT_ALPHA_TEST : 0
     });
     const wall = new THREE.Mesh(geo, mat);
-    const midY = (WALL_TOP + WALL_BOTTOM) / 2;
+    const midY = wallMidY();
 
     if (face === 'N') {
       wall.position.set(wx, midY, wz - CELL_SIZE / 2);
