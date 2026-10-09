@@ -2,8 +2,10 @@ import './style.css';
 // import { Game } from './game';  // Disabled for new system
 import { GameController } from './game-controller';
 import { UIRenderer585 } from './ui-renderer-585';
+import { TitleScreen } from './title-screen';
 import { combatController } from './combat-controller';
 import { inputManager } from './input-manager';
+import { SaveSystem } from './save-system';
 import { InputHandler } from './input';
 import { loadFont } from './font';
 import { loadPortraits } from './characters';
@@ -123,10 +125,14 @@ async function main() {
   // Initialize new game controller for testing
   let gameController: GameController | null = null;
   let uiRenderer585: UIRenderer585 | null = null;
+  let titleScreen: TitleScreen | null = null;
+  let inTitleScreen = true;
+  
   if (USE_NEW_CONTROLLER) {
     gameController = new GameController();
     await gameController.init();
     uiRenderer585 = new UIRenderer585();
+    titleScreen = new TitleScreen();
     console.log('New game controller initialized');
   }
   
@@ -183,6 +189,49 @@ async function main() {
     const x = (e.clientX - rect.left) * scaleX;
     const y = (e.clientY - rect.top) * scaleY;
 
+    // Handle title screen
+    if (inTitleScreen && titleScreen) {
+      const result = titleScreen.handleClick(x, y, CANVAS_WIDTH, CANVAS_HEIGHT);
+      
+      if (result === 'new') {
+        // Start new game
+        gameController = new GameController();
+        gameController.init().then(() => {
+          inTitleScreen = false;
+          console.log('New game started');
+        });
+        return;
+      } else if (result === 'continue') {
+        // Load most recent save
+        const slot = SaveSystem.getMostRecentSlot();
+        if (slot) {
+          const save = SaveSystem.load(slot);
+          if (save) {
+            gameController = new GameController();
+            gameController.init().then(() => {
+              SaveSystem.restoreState(gameController.getState(), save);
+              inTitleScreen = false;
+              console.log(`Continued from slot ${slot}`);
+            });
+          }
+        }
+        return;
+      } else if (typeof result === 'number') {
+        // Load specific slot
+        const save = SaveSystem.load(result);
+        if (save) {
+          gameController = new GameController();
+          gameController.init().then(() => {
+            SaveSystem.restoreState(gameController.getState(), save);
+            inTitleScreen = false;
+            console.log(`Loaded slot ${result}`);
+          });
+        }
+        return;
+      }
+      return;
+    }
+
     // Check hand buttons (combat)
     const handButton = inputManager.checkHandButton(x, y);
     if (handButton) {
@@ -225,17 +274,24 @@ async function main() {
       return;
     }
 
+    // Check save button
+    if (inputManager.checkSaveButton(x, y)) {
+      // Manual save to most recent slot or slot 1
+      const slot = SaveSystem.getMostRecentSlot() || 1;
+      const success = SaveSystem.save(gameController.getState(), slot, false);
+      if (success) {
+        sound.play('ui_button');
+        console.log(`Saved to slot ${slot}`);
+      } else {
+        sound.play('no');
+      }
+      return;
+    }
+
     // Check menu button
     if (inputManager.checkMenuButton(x, y)) {
       console.log('Menu clicked');
       // TODO: Open menu
-      return;
-    }
-
-    // Check save button
-    if (inputManager.checkSaveButton(x, y)) {
-      console.log('Save clicked');
-      // TODO: Manual save
       return;
     }
 
@@ -371,14 +427,12 @@ async function main() {
   function gameLoop() {
     const now = Date.now();
     if (gameStarted) {
-      // Render existing game (if not using new controller)
-      // if (game && !USE_NEW_CONTROLLER) {
-      //   game.update(now);
-      //   game.render(ctx, now);
-      // }
-      
-      // Render new UI overlay if using new controller
-      if (gameController && uiRenderer585 && USE_NEW_CONTROLLER) {
+      // Render title screen if active
+      if (inTitleScreen && titleScreen && USE_NEW_CONTROLLER) {
+        titleScreen.render(ctx, CANVAS_WIDTH, CANVAS_HEIGHT);
+      }
+      // Render game UI if past title screen
+      else if (gameController && uiRenderer585 && USE_NEW_CONTROLLER && !inTitleScreen) {
         const state = gameController.getState();
         
         // Render 585 UI
@@ -395,6 +449,14 @@ async function main() {
         const stairs = gameController.checkStairs();
         if (stairs) {
           ctx.fillText(`Stairs ${stairs} - Press Space`, 10, 50);
+        }
+        
+        // Show combat status
+        if (combatController.isInCombat()) {
+          const info = combatController.getCombatInfo();
+          if (info) {
+            ctx.fillText(`Combat: ${info.monster} ${info.monsterHp}/${info.monsterMaxHp}`, 10, 65);
+          }
         }
         ctx.restore();
       }

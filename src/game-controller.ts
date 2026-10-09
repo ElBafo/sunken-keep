@@ -130,6 +130,11 @@ export class GameController {
           this.state.party.y = stairsY;
           this.state.party.dir = 0;
           
+          // Auto-save at stairs
+          if (!this.state.escapeRunActive) {
+            SaveSystem.autoSave(this.state);
+          }
+          
           sound.play('ui_log_line');
           console.log(`Ascended to floor ${prevFloor}`);
         }
