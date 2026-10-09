@@ -307,18 +307,20 @@ test('proto3d lighting: ?ambientFloor=3 is near-black beyond the lantern', async
 
   const fx = await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-    p.setPosition(5, 2, 1);
+    p.setPosition(13, 1, 3);
     return {
-      lit: p.isSquareLit(7, 3),
+      slimeLit: p.isSquareLit(7, 3),
+      ratLit: p.isSquareLit(10, 1),
       fx: p.darkFx()
     };
   });
   console.log('DARK FX', fx);
-  expect(fx.lit, 'slime square is outside torch and lantern').toBe(false);
-  const slimeEyes = fx.fx.eyes.find((e) => e.x === 7 && e.y === 3);
-  expect(slimeEyes, 'slime has eye glints').toBeTruthy();
-  expect(slimeEyes!.tint, 'slime eyes are amber').toBe('amber');
-  expect(slimeEyes!.visible, 'slime eyes show in the dark').toBe(true);
+  expect(fx.slimeLit, 'slime at (7,3) sits in the (6,4) torch pool').toBe(true);
+  expect(fx.ratLit, 'beam-hall rat is outside torch and lantern').toBe(false);
+  const ratEyes = fx.fx.eyes.find((e) => e.x === 10 && e.y === 1);
+  expect(ratEyes, 'dark rat has eye glints').toBeTruthy();
+  expect(ratEyes!.tint, 'rat eyes are green').toBe('green');
+  expect(ratEyes!.visible, 'rat eyes show in the dark').toBe(true);
   expect(fx.fx.stairs, 'stairs-down glow is placed').toBeGreaterThan(0);
   await page.waitForTimeout(220);
   await page.screenshot({ path: `${OUT}/lighting_eye_glints_dark.png`, fullPage: false });
@@ -368,6 +370,7 @@ test('proto3d floor1v2: start-key-door-hall-stairs and pantry-lamp room', async 
   expect((await step()).after).toMatchObject({ x: 1, y: 5 });
   await pose(1, 5, 1);
   expect((await step()).after).toMatchObject({ x: 2, y: 5 });
+  await pose(2, 5, 0);
   await tap();
   expect(await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.lastMessage())).toBe(
     'Key.'
@@ -381,6 +384,7 @@ test('proto3d floor1v2: start-key-door-hall-stairs and pantry-lamp room', async 
   expect((await step()).after).toMatchObject({ x: 2, y: 2 });
   await pose(2, 2, 1);
   expect((await step()).after).toMatchObject({ x: 3, y: 2 });
+  await pose(3, 2, 1);
   await tap();
   await page.waitForTimeout(900);
   expect(
