@@ -249,7 +249,7 @@ class Game {
     const titleEl = document.getElementById('note-title');
     const textEl = document.getElementById('note-text');
     if (titleEl) titleEl.textContent = this.lampNote.title;
-    if (textEl) textEl.textContent = text;
+    if (textEl) textEl.textContent = text.replace(/\. /g, '.\n');
     if (overlay) overlay.classList.add('show');
     document.getElementById('message-toast')?.classList.remove('show');
     this.messageTimer = performance.now() + 6000;
