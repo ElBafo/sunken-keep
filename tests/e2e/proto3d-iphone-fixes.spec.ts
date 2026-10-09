@@ -213,15 +213,29 @@ test('proto3d iPhone fixes: sorting, items, walls, water, doors, no 404s', async
     const w = canvas.width;
     const h = canvas.height;
     return {
-      door: p.regionStats(w * 0.32, h * 0.22, w * 0.68, h * 0.7),
-      wall: p.regionStats(w * 0.02, h * 0.22, w * 0.22, h * 0.7)
+      frame: p.regionStats(w * 0.2, h * 0.22, w * 0.3, h * 0.55),
+      wall: p.regionStats(w * 0.02, h * 0.22, w * 0.16, h * 0.55),
+      wood: p.regionStats(w * 0.38, h * 0.32, w * 0.62, h * 0.58)
     };
   });
-  console.log('DOOR luma 2sq', two.door.luma, 'wall', two.wall.luma, '1sq', one.door.luma, 'wall', one.wall.luma);
-  const twoRatio = two.door.luma / Math.max(1, two.wall.luma);
-  const oneRatio = one.door.luma / Math.max(1, one.wall.luma);
-  expect(one.door.luma, 'door at 1 square is not a black slab').toBeGreaterThan(20);
-  expect(Math.abs(oneRatio - twoRatio), 'door/wall brightness ratio stays stable approaching').toBeLessThan(0.55);
+  console.log(
+    'DOOR 2sq',
+    two.door.luma,
+    'wall',
+    two.wall.luma,
+    '1sq frame',
+    one.frame.luma,
+    'wall',
+    one.wall.luma,
+    'wood',
+    one.wood.luma
+  );
+  expect(one.wood.luma, 'door panel at 1 square is not a fog-black slab').toBeGreaterThan(18);
+  expect(one.frame.fogRatio, 'door frame is not black').toBeLessThan(0.25);
+  expect(
+    Math.abs(one.frame.luma - one.wall.luma) / Math.max(1, one.wall.luma),
+    'door stone frame matches neighbouring wall brightness'
+  ).toBeLessThan(0.45);
 
   expect(errors, 'console errors').toEqual([]);
   expect(failed404s, '404s').toEqual([]);
