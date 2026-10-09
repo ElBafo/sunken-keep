@@ -308,5 +308,105 @@
     "face": "wince",
     "listener": "mags",
     "listenerFace": "smirk"
+  },
+  {
+    "trigger": "first_sight_keep_rat",
+    "speaker": "mags",
+    "text": "Aww, look at his little bread!",
+    "face": "smirk",
+    "listener": "brannoc",
+    "listenerFace": "wince"
+  },
+  {
+    "trigger": "first_sight_keep_rat",
+    "speaker": "brannoc",
+    "text": "That's my ancestors' bread, thief.",
+    "face": "wince",
+    "listener": "mags",
+    "listenerFace": "smirk"
+  },
+  {
+    "trigger": "first_sight_keep_rat",
+    "speaker": "wren",
+    "text": "It's eaten better than we have.",
+    "face": "neutral"
+  },
+  {
+    "trigger": "first_sight_rust_crab",
+    "speaker": "brannoc",
+    "text": "Is that crab wearing my uncle's helm?",
+    "face": "shocked",
+    "listener": "mags",
+    "listenerFace": "smirk"
+  },
+  {
+    "trigger": "first_sight_rust_crab",
+    "speaker": "mags",
+    "text": "Suits him better, honestly.",
+    "face": "smirk",
+    "listener": "brannoc",
+    "listenerFace": "wince"
+  },
+  {
+    "trigger": "first_sight_rust_crab",
+    "speaker": "ilsevar",
+    "text": "Hermit behaviour. Dwarven hermit.",
+    "face": "neutral"
+  },
+  {
+    "trigger": "first_sight_bog_leeches",
+    "speaker": "wren",
+    "text": "Leeches. Ember preserve us.",
+    "face": "wince"
+  },
+  {
+    "trigger": "first_sight_bog_leeches",
+    "speaker": "mags",
+    "text": "Nobody's sucking anything of mine.",
+    "face": "shocked"
+  },
+  {
+    "trigger": "first_sight_bog_leeches",
+    "speaker": "ilsevar",
+    "text": "Medicinal, technically. Still no.",
+    "face": "wince"
+  },
+  {
+    "trigger": "leech_latch",
+    "speaker": "brannoc",
+    "text": "Get it off! Not the beard!",
+    "face": "wince"
+  },
+  {
+    "trigger": "leech_latch",
+    "speaker": "mags",
+    "text": "It's on my— don't look!",
+    "face": "shocked"
+  },
+  {
+    "trigger": "leech_latch",
+    "speaker": "wren",
+    "text": "Hold still. I'll burn it off.",
+    "face": "wince"
+  },
+  {
+    "trigger": "leech_latch",
+    "speaker": "ilsevar",
+    "text": "It likes me. That's worse.",
+    "face": "wince"
+  },
+  {
+    "trigger": "pantry",
+    "speaker": "brannoc",
+    "text": "The old larder. Gods, the smell.",
+    "face": "wince"
+  },
+  {
+    "trigger": "pantry",
+    "speaker": "mags",
+    "text": "Mine now. All of it. Even the mould.",
+    "face": "smirk",
+    "listener": "wren",
+    "listenerFace": "wince"
   }
 ]

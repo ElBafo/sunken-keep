@@ -24,7 +24,7 @@ export class Renderer {
     const walls = ['wall_front', 'wall_left', 'wall_right'];
     const doors = ['door_locked', 'door_open'];
     const secrets = ['secret_closed', 'secret_open'];
-    const monsters = ['slime', 'drowned_dwarf', 'tide_spawn'];
+    const monsters = ['slime', 'drowned_dwarf', 'tide_spawn', 'bog_leeches', 'keep_rat', 'rust_crab'];
     const items = ['item_key', 'item_chest', 'item_potion_red', 'item_potion_blue', 'item_potion_green', 'item_scroll'];
     const states = ['idle', 'attack', 'hurt', 'death'];
     const frameCounts = { idle: 4, attack: 3, hurt: 1, death: 4 };

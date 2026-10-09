@@ -7,6 +7,11 @@ export interface Position {
 
 export type MonsterState = 'idle' | 'attack' | 'hurt' | 'death';
 
+export interface LatchState {
+  turns: number;
+  drainPerTurn: number;
+}
+
 export interface Tile {
   wall?: boolean;
   door?: boolean;
@@ -23,9 +28,12 @@ export interface Tile {
   monsterHp?: number;
   monsterMaxHp?: number;
   monsterAlerted?: boolean;
+  monsterArmor?: number;
+  monsterLatch?: LatchState;
   carving?: string;
   chest?: boolean;
   chestOpen?: boolean;
+  firstSightFired?: boolean; // Track if first sight bark has fired
 }
 
 export interface FloorData {

@@ -85,6 +85,69 @@ export function triggerBark(trigger: string, scriptedText?: string, scriptedSpea
   resetIdleTimers();
 }
 
+// Trigger scripted bark sequence (e.g., first_sight_keep_rat)
+export function triggerScriptedBark(trigger: string) {
+  const candidates = barks.filter(b => b.trigger === trigger);
+  if (candidates.length === 0) return;
+  
+  const now = Date.now();
+  
+  // Play first bark immediately
+  const firstBark = candidates[0];
+  const speaker = characters.find(c => c.id === firstBark.speaker);
+  if (!speaker) return;
+  
+  const listener = firstBark.listener ? characters.find(c => c.id === firstBark.listener) : undefined;
+  
+  speaker.expression = firstBark.face;
+  speaker.talkingUntil = now + BARK_DURATION;
+  
+  if (listener && firstBark.listenerFace) {
+    listener.expression = firstBark.listenerFace;
+  }
+  
+  activeBark = {
+    bark: firstBark,
+    speaker,
+    listener,
+    startTime: now,
+    duration: BARK_DURATION
+  };
+  
+  sound.play('bark');
+  resetIdleTimers();
+  
+  // Queue follow-up barks if any
+  if (candidates.length > 1) {
+    candidates.slice(1).forEach((bark, index) => {
+      setTimeout(() => {
+        const nextNow = Date.now();
+        const nextSpeaker = characters.find(c => c.id === bark.speaker);
+        if (!nextSpeaker) return;
+        
+        const nextListener = bark.listener ? characters.find(c => c.id === bark.listener) : undefined;
+        
+        nextSpeaker.expression = bark.face;
+        nextSpeaker.talkingUntil = nextNow + BARK_DURATION;
+        
+        if (nextListener && bark.listenerFace) {
+          nextListener.expression = bark.listenerFace;
+        }
+        
+        activeBark = {
+          bark,
+          speaker: nextSpeaker,
+          listener: nextListener,
+          startTime: nextNow,
+          duration: BARK_DURATION
+        };
+        
+        sound.play('bark');
+      }, (index + 1) * (BARK_DURATION + 200));
+    });
+  }
+}
+
 export function getActiveBark(now: number): ActiveBark | null {
   if (activeBark && now - activeBark.startTime < activeBark.duration) {
     return activeBark;
