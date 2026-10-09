@@ -6,7 +6,7 @@ import { getActiveBark } from './barks';
 import { UI, MessageLog } from './ui-layout';
 
 const VIEWPORT_WIDTH = 270;
-const VIEWPORT_HEIGHT = UI.VIEWPORT_HEIGHT;
+const VIEWPORT_HEIGHT = 264; // Match UI.VIEWPORT_HEIGHT
 
 export class Renderer {
   private bubbleFrame: HTMLImageElement;
@@ -25,6 +25,9 @@ export class Renderer {
   
   // Water shimmer offset
   private waterShimmerTime = 0;
+  
+  // Track missing images to avoid spamming console
+  private missingImages = new Set<string>();
 
   constructor() {
     this.bubbleFrame = assets.loadImage('/sunken-keep/art/ui/bubble_9slice.png');
@@ -35,6 +38,40 @@ export class Renderer {
     
     // Preload panel UI art
     this.preloadPanelArt();
+  }
+  
+  // Safe image drawing - never throws even if image is broken
+  private safeDrawImage(
+    ctx: CanvasRenderingContext2D,
+    imgPath: string,
+    ...args: any[]
+  ): boolean {
+    const img = assets.getImage(imgPath);
+    
+    if (!assets.isImageReady(img)) {
+      if (!this.missingImages.has(imgPath)) {
+        console.warn(`Missing or broken image: ${imgPath}`);
+        this.missingImages.add(imgPath);
+      }
+      return false;
+    }
+    
+    try {
+      if (args.length === 2) {
+        ctx.drawImage(img!, args[0], args[1]);
+      } else if (args.length === 4) {
+        ctx.drawImage(img!, args[0], args[1], args[2], args[3]);
+      } else if (args.length === 8) {
+        ctx.drawImage(img!, args[0], args[1], args[2], args[3], args[4], args[5], args[6], args[7]);
+      }
+      return true;
+    } catch (e) {
+      if (!this.missingImages.has(imgPath)) {
+        console.error(`Failed to draw image ${imgPath}:`, e);
+        this.missingImages.add(imgPath);
+      }
+      return false;
+    }
   }
   
   private preloadPanelArt() {
@@ -219,11 +256,8 @@ export class Renderer {
     }
     
     const backdropPath = `/sunken-keep/art/dungeon_v2/backdrop_${backdropName}.png`;
-    const backdrop = assets.getImage(backdropPath);
     
-    if (backdrop && backdrop.complete) {
-      ctx.drawImage(backdrop, 0, 0);
-    } else {
+    if (!this.safeDrawImage(ctx, backdropPath, 0, 0)) {
       // Fallback: dark background
       ctx.fillStyle = '#0a1612';
       ctx.fillRect(0, 0, VIEWPORT_WIDTH, VIEWPORT_HEIGHT);
@@ -241,21 +275,18 @@ export class Renderer {
         const type = tile.deepWater ? 'deep' : 'shallow';
         const distKey = dist === 1 ? 'near' : dist === 2 ? 'mid' : 'far';
         const overlayPath = `/sunken-keep/art/dungeon_v2/floor_water_${type}_${distKey}.png`;
-        const overlay = assets.getImage(overlayPath);
         
-        if (overlay && overlay.complete) {
-          ctx.save();
-          
-          // Subtle shimmer: slight horizontal offset oscillation
-          const shimmerOffset = Math.sin(this.waterShimmerTime * Math.PI * 0.4 + dist) * 0.5;
-          
-          // Very subtle alpha oscillation for sparkle effect
-          const shimmerAlpha = 0.95 + Math.sin(this.waterShimmerTime * Math.PI * 0.3) * 0.05;
-          ctx.globalAlpha = shimmerAlpha;
-          
-          ctx.drawImage(overlay, shimmerOffset, 0);
-          ctx.restore();
-        }
+        ctx.save();
+        
+        // Subtle shimmer: slight horizontal offset oscillation
+        const shimmerOffset = Math.sin(this.waterShimmerTime * Math.PI * 0.4 + dist) * 0.5;
+        
+        // Very subtle alpha oscillation for sparkle effect
+        const shimmerAlpha = 0.95 + Math.sin(this.waterShimmerTime * Math.PI * 0.3) * 0.05;
+        ctx.globalAlpha = shimmerAlpha;
+        
+        this.safeDrawImage(ctx, overlayPath, shimmerOffset, 0);
+        ctx.restore();
       }
     }
   }
@@ -330,9 +361,6 @@ export class Renderer {
   private drawWallFrontAt(ctx: CanvasRenderingContext2D, distance: 1 | 2 | 3, x: number) {
     const distKey = distance === 1 ? 'near' : distance === 2 ? 'mid' : 'far';
     const imgPath = `/sunken-keep/art/dungeon_v2/wall_front_${distKey}.png`;
-    const img = assets.getImage(imgPath);
-    
-    if (!img || !img.complete) return;
     
     const yPos = {
       near: 30,
@@ -340,7 +368,7 @@ export class Renderer {
       far: 65
     }[distKey];
     
-    ctx.drawImage(img, x, yPos);
+    this.safeDrawImage(ctx, imgPath, x, yPos);
   }
   
   private drawItemsAtDistance(
@@ -457,9 +485,6 @@ export class Renderer {
       // Get sconce sprite
       const frame = sconce.lit ? `lit_${this.torchFrame + 1}` : 'dead';
       const imgPath = `/sunken-keep/art/dungeon_v2/sconce_${frame}_${distKey}.png`;
-      const img = assets.getImage(imgPath);
-      
-      if (!img || !img.complete) return;
       
       // Calculate sconce position on wall
       const basePos = wallPos[wallType];
@@ -473,7 +498,7 @@ export class Renderer {
         x = basePos.x + (distance === 1 ? 30 : distance === 2 ? 20 : 13);
       }
       
-      ctx.drawImage(img, x, y);
+      this.safeDrawImage(ctx, imgPath, x, y);
     });
   }
   
@@ -569,7 +594,7 @@ export class Renderer {
     };
 
     const pos = positions[distKey][side];
-    ctx.drawImage(img, pos.x, pos.y);
+    this.safeDrawImage(ctx, imgPath, pos.x, pos.y);
   }
 
   private drawWallPlaceholder(ctx: CanvasRenderingContext2D, distance: 1 | 2 | 3, side: 'front' | 'left' | 'right') {
@@ -610,7 +635,7 @@ export class Renderer {
     };
 
     const pos = positions[distKey];
-    ctx.drawImage(img, pos.x, pos.y);
+    this.safeDrawImage(ctx, imgPath, pos.x, pos.y);
   }
 
   private drawDoorPlaceholder(ctx: CanvasRenderingContext2D, distance: 1 | 2 | 3, locked: boolean) {
@@ -652,7 +677,7 @@ export class Renderer {
     };
 
     const pos = positions[distKey];
-    ctx.drawImage(img, pos.x, pos.y);
+    this.safeDrawImage(ctx, imgPath, pos.x, pos.y);
   }
 
   private drawItem(ctx: CanvasRenderingContext2D, item: string, distance: 1 | 2 | 3) {
@@ -660,13 +685,13 @@ export class Renderer {
     const imgPath = `/sunken-keep/art/dungeon/item_${item}_${distKey}.png`;
     const img = assets.getImage(imgPath);
 
-    if (!img || !img.complete) return;
+    if (!img || !img.complete || !assets.isImageReady(img)) return;
 
     // Items are bottom-aligned at y=100 line
     const x = 135 - img.width / 2;
     const y = 100 - img.height;
 
-    ctx.drawImage(img, x, y);
+    this.safeDrawImage(ctx, imgPath, x, y);
   }
 
   private drawMonsterSprite(
@@ -766,7 +791,10 @@ export class Renderer {
     const centerY = baseY + img.height / 2;
     ctx.translate(centerX + offsetX, centerY + offsetY);
     ctx.scale(scaleX, scaleY);
-    ctx.drawImage(img, -img.width / 2, -img.height / 2);
+    
+    // Use the loaded image path for safe drawing
+    const imgPath = hasFrames ? framePath : `/sunken-keep/art/dungeon/${monsterType}_${distKey}.png`;
+    this.safeDrawImage(ctx, imgPath, -img.width / 2, -img.height / 2);
     
     // Flash effect for hurt (enhance even with frames)
     if (state === 'hurt' && animTime < 0.2) {
@@ -800,14 +828,14 @@ export class Renderer {
     const imgPath = `/sunken-keep/art/decals/${carving}_${distKey}.png`;
     const img = assets.getImage(imgPath);
     
-    if (!img || !img.complete) return;
+    if (!img || !img.complete || !assets.isImageReady(img)) return;
 
     // Center on front wall
     const x = 135 - img.width / 2;
     const yOffsets = { 1: 70, 2: 80, 3: 90 };
     const y = yOffsets[distance];
 
-    ctx.drawImage(img, x, y);
+    this.safeDrawImage(ctx, imgPath, x, y);
   }
 
   private drawSpeechBubble(ctx: CanvasRenderingContext2D, text: string, speakerIndex: number) {
@@ -873,8 +901,8 @@ export class Renderer {
   ) {
     // Draw panel background
     const panelBg = assets.getImage(UI.PANEL_BG);
-    if (panelBg && panelBg.complete) {
-      ctx.drawImage(panelBg, 0, UI.PANEL_Y);
+    if (panelBg && panelBg.complete && assets.isImageReady(panelBg)) {
+      this.safeDrawImage(ctx, UI.PANEL_BG, 0, UI.PANEL_Y);
     } else {
       // Fallback solid background
       ctx.fillStyle = '#1a1612';

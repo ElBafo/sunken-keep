@@ -15,7 +15,7 @@ export const floor1: FloorData = {
   startDir: 0,
   sconces: [
     { x: 0, y: 6, face: 'E', lit: true },   // beside the first carving, warm light at the start
-    { x: 4, y: 2, face: 'W', lit: true },   // next to the locked door and its carving
+    { x: 4, y: 1, face: 'W', lit: true },   // wall above the locked door
     { x: 0, y: 3, face: 'E', lit: false },  // flooded hall, dead
     { x: 4, y: 6, face: 'W', lit: false },  // west corridor, dead
     { x: 8, y: 6, face: 'W', lit: false },  // pantry, dead

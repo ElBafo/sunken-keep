@@ -39,7 +39,17 @@
   "bog_leeches_alert": "sfx_bog_leeches_alert",
   "bog_leeches_attack": "sfx_bog_leeches_attack",
   "bog_leeches_hurt": "sfx_bog_leeches_hurt",
-  "bog_leeches_death": "sfx_bog_leeches_death"
+  "bog_leeches_death": "sfx_bog_leeches_death",
+  "ui_button": "sfx_ui_button",
+  "ui_button_denied": "sfx_ui_button_denied",
+  "ui_menu_open": "sfx_ui_menu_open",
+  "ui_menu_close": "sfx_ui_menu_close",
+  "ui_turn": "sfx_ui_turn",
+  "ui_inventory_move": "sfx_ui_inventory_move",
+  "ui_log_line": "sfx_ui_log_line",
+  "torch_loop": "sfx_torch_loop",
+  "torch_ignite": "sfx_torch_ignite",
+  "torch_extinguish": "sfx_torch_extinguish"
  },
  "music": {
   "intro": {
@@ -82,6 +92,9 @@
   "monsters": "{monster}_alert when it notices the party, _attack when it strikes, _death on kill. Names match Pixelartie's sprite prefixes.",
   "tide_spawn_song_loop": "Loop quietly while a tide spawn is within ~3 squares, louder when closer. Goes with Ilsevar's 'It's singing' line.",
   "ambience": "amb_flooded_halls for all indoor floors; amb_swamp only for outdoor scenes (intro shot 5).",
-  "leech_latch": "For a latched leech draining health, repeat bog_leeches_attack at low volume each drain tick."
+  "leech_latch": "For a latched leech draining health, repeat bog_leeches_attack at low volume each drain tick.",
+  "ui": "ui_button for any panel press (incl. attack before the hit sound), ui_button_denied for a hero who can't act yet, ui_turn on turning left/right, ui_log_line very quietly when a new log line appears.",
+  "torch_loop": "One loop per lit sconce in view/nearby; volume ~0.6 at 1 square, 0.3 at 2, 0.12 at 3, silent beyond. Start each instance at a random offset so two torches don't phase. Dead sconces are silent.",
+  "torch_ignite": "For Wren relighting a dead sconce later; torch_extinguish for the Tide snuffing one."
  }
 }

@@ -26,6 +26,13 @@ export class AssetLoader {
   getImage(path: string): HTMLImageElement | undefined {
     return this.images.get(path);
   }
+  
+  isImageReady(img: HTMLImageElement | undefined): boolean {
+    if (!img) return false;
+    if (!img.complete) return false;
+    if (img.naturalWidth === 0) return false;
+    return true;
+  }
 
   async waitForAll(): Promise<void> {
     await Promise.all(this.loadPromises);
