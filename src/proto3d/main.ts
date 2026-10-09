@@ -92,7 +92,7 @@ class Game {
     const slime = this.spriteManager.sprites.find(s => s.frames && s.frames.length === 4 && s.x === 7 && s.y === 2);
     console.log('Sprites added:', this.spriteManager.sprites.length);
     console.log('Sprite positions:', this.spriteManager.sprites.map(s => `(${s.x},${s.y})`));
-    console.log('Slime sprite:', slime ? `world (${slime.sprite.position.x}, ${slime.sprite.position.y}, ${slime.sprite.position.z})` : 'MISSING');
+    console.log('Slime sprite:', slime ? `world (${slime.object.position.x}, ${slime.object.position.y}, ${slime.object.position.z})` : 'MISSING');
     
     // Setup audio
     this.audioManager = new AudioManager(this.renderer.camera);
@@ -121,10 +121,15 @@ class Game {
       sprites: () => this.spriteManager.sprites.map(s => ({
         x: s.x,
         y: s.y,
-        world: s.sprite.position.toArray(),
+        world: s.object.position.toArray(),
         frames: s.frames?.length ?? 0,
         currentFrame: s.currentFrame
-      }))
+      })),
+      getCamera: () => ({
+        position: this.renderer.camera.position.toArray(),
+        rotation: this.renderer.camera.rotation.toArray().slice(0, 3),
+        fov: this.renderer.camera.fov
+      })
     };
   }
   

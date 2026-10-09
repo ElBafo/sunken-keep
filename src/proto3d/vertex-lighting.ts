@@ -161,7 +161,7 @@ export class VertexLightingManager {
     scene.traverse((obj) => {
       if (!(obj instanceof THREE.Mesh) || !obj.geometry.attributes.position) return;
       // Skip sprite billboards (THREE.Sprite is not a Mesh; keep this for any plane leftover)
-      if (obj.userData.isSprite || obj instanceof THREE.Sprite) return;
+      if (obj.userData.isSprite || obj.userData.skipVertexLighting || obj instanceof THREE.Sprite) return;
 
       const tileX = Math.round(obj.position.x / CELL_SIZE);
       const tileY = Math.round(obj.position.z / CELL_SIZE);

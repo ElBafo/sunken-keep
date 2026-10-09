@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { CAMERA_FAR, CAMERA_FOV, CAMERA_NEAR } from './constants';
 
 // Enable Three.js color management for proper sRGB handling
 THREE.ColorManagement.enabled = true;
@@ -26,8 +27,9 @@ export class PixelRenderer {
     this.scene = new THREE.Scene();
     this.scene.fog = new THREE.FogExp2(0x1a2e1a, 0.015); // Reduced - darkness only at far end
     
-    // Camera with proper FOV and aspect
-    this.camera = new THREE.PerspectiveCamera(65, 1, 0.1, 20);
+    // Vertical FOV is wide enough that an adjacent wall sits in frame with a floor strip
+    this.camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, CAMERA_NEAR, CAMERA_FAR);
+    this.camera.rotation.order = 'YXZ';
     this.camera.position.set(0, 0, 0);
     
     // WebGL renderer with preserveDrawingBuffer only for ?test=1
