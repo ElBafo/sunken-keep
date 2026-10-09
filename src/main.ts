@@ -188,174 +188,6 @@ async function main() {
     tapToStart.classList.add('hidden');
     muteToggle.classList.remove('hidden');
   });
-
-  // Canvas click/tap handler (for new controller)
-  canvas.addEventListener('click', (e) => {
-    if (!gameStarted || !gameController || !USE_NEW_CONTROLLER) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const scaleX = canvas.width / rect.width;
-    const scaleY = canvas.height / rect.height;
-    const x = (e.clientX - rect.left) * scaleX;
-    const y = (e.clientY - rect.top) * scaleY;
-
-    // Handle title screen clicks
-    if (inTitleScreen && titleScreen) {
-      const action = titleScreen.handleClick(x, y);
-      if (action === 'new_game') {
-        inTitleScreen = false;
-        // Start new game
-        return;
-      } else if (action === 'continue') {
-        const mostRecentSlot = SaveSystem.getMostRecentSlot();
-        if (mostRecentSlot !== null) {
-          const save = SaveSystem.load(mostRecentSlot);
-          if (save) {
-            const state = gameController.getState();
-            SaveSystem.restoreState(save, state);
-            inTitleScreen = false;
-          }
-        }
-        return;
-      } else if (action === 'load') {
-        // Title screen will switch to load mode internally
-        return;
-      } else if (typeof action === 'number') {
-        // Load from specific slot
-        const save = SaveSystem.load(action);
-        if (save) {
-          const state = gameController.getState();
-          SaveSystem.restoreState(save, state);
-          inTitleScreen = false;
-          titleScreen.reset();
-        }
-        return;
-      } else if (action === 'back') {
-        // Back to title (handled by titleScreen internally)
-        return;
-      } else if (action === 'settings') {
-        // TODO: implement settings menu
-        console.log('Settings not yet implemented');
-        return;
-      }
-    }
-
-    // Handle title screen
-    if (inTitleScreen && titleScreen) {
-      const result = titleScreen.handleClick(x, y);
-      
-      if (result === 'new_game') {
-        // Start new game
-        gameController = new GameController();
-        gameController.init().then(() => {
-          inTitleScreen = false;
-          console.log('New game started');
-        });
-        return;
-      } else if (result === 'continue') {
-        // Load most recent save
-        const slot = SaveSystem.getMostRecentSlot();
-        if (slot && gameController) {
-          const save = SaveSystem.load(slot);
-          if (save) {
-            const newController = new GameController();
-            newController.init().then(() => {
-              SaveSystem.restoreState(save, newController.getState());
-              gameController = newController;
-              inTitleScreen = false;
-              console.log(`Continued from slot ${slot}`);
-            });
-          }
-        }
-        return;
-      } else if (typeof result === 'number') {
-        // Load specific slot
-        const save = SaveSystem.load(result);
-        if (save && gameController) {
-          const newController = new GameController();
-          newController.init().then(() => {
-            SaveSystem.restoreState(save, newController.getState());
-            gameController = newController;
-            inTitleScreen = false;
-            console.log(`Loaded slot ${result}`);
-          });
-        }
-        return;
-      }
-      return;
-    }
-
-    // Check hand buttons (combat)
-    const handButton = inputManager.checkHandButton(x, y);
-    if (handButton) {
-      const state = gameController.getState();
-      combatController.handleHandButton(state, handButton.heroId, handButton.hand);
-      return;
-    }
-
-    // Check movement pad
-    const movement = inputManager.checkMovementPad(x, y);
-    if (movement) {
-      switch (movement) {
-        case 'turn_left':
-          gameController.turnLeft();
-          break;
-        case 'turn_right':
-          gameController.turnRight();
-          break;
-        case 'forward':
-          gameController.moveForward();
-          break;
-        case 'back':
-          gameController.moveBackward();
-          break;
-        case 'strafe_left':
-          gameController.strafeLeft();
-          break;
-        case 'strafe_right':
-          gameController.strafeRight();
-          break;
-      }
-      return;
-    }
-
-    // Check potion buttons
-    const potion = inputManager.checkPotionButton(x, y);
-    if (potion) {
-      console.log(`Potion ${potion} clicked`);
-      // TODO: Use potion
-      return;
-    }
-
-    // Check save button
-    if (inputManager.checkSaveButton(x, y)) {
-      // Manual save to most recent slot or slot 1
-      const slot = SaveSystem.getMostRecentSlot() || 1;
-      const success = SaveSystem.save(gameController.getState(), slot, false);
-      if (success) {
-        sound.play('ui_button');
-        console.log(`Saved to slot ${slot}`);
-      } else {
-        sound.play('no');
-      }
-      return;
-    }
-
-    // Check menu button
-    if (inputManager.checkMenuButton(x, y)) {
-      console.log('Menu clicked');
-      // TODO: Open menu
-      return;
-    }
-
-    // Check portrait (character sheet)
-    const portrait = inputManager.checkPortrait(x, y);
-    if (portrait) {
-      console.log(`Portrait ${portrait} clicked`);
-      // TODO: Open character sheet
-      return;
-    }
-  });
   
   // Mute toggle
   muteToggle.addEventListener('click', () => {
@@ -364,7 +196,7 @@ async function main() {
     muteToggle.textContent = muted ? '🔊' : '🔇';
   });
   
-  // Input handling for swipes (turn left/right on phone)
+  // Input handling for swipes and taps (unified for touch and mouse)
   inputHandler = new InputHandler(
     canvas,
     (direction) => {
@@ -378,8 +210,116 @@ async function main() {
         gameController.turnRight();
       }
     },
-    (_x, _y) => {
-      // Tap handler - handled by canvas click listener below
+    (x, y) => {
+      // Unified tap handler for both touch and mouse
+      if (!gameStarted || !gameController || !USE_NEW_CONTROLLER) return;
+
+      // Handle title screen taps
+      if (inTitleScreen && titleScreen) {
+        const result = titleScreen.handleClick(x, y);
+        
+        if (result === 'new_game') {
+          // Start new game
+          const newController = new GameController();
+          newController.init().then(() => {
+            gameController = newController;
+            inTitleScreen = false;
+            console.log('New game started');
+          });
+          return;
+        } else if (result === 'continue') {
+          // Load most recent save
+          const slot = SaveSystem.getMostRecentSlot();
+          if (slot) {
+            const save = SaveSystem.load(slot);
+            if (save) {
+              const newController = new GameController();
+              newController.init().then(() => {
+                SaveSystem.restoreState(save, newController.getState());
+                gameController = newController;
+                inTitleScreen = false;
+                console.log(`Continued from slot ${slot}`);
+              });
+            }
+          }
+          return;
+        } else if (typeof result === 'number') {
+          // Load specific slot
+          const save = SaveSystem.load(result);
+          if (save) {
+            const newController = new GameController();
+            newController.init().then(() => {
+              SaveSystem.restoreState(save, newController.getState());
+              gameController = newController;
+              inTitleScreen = false;
+              console.log(`Loaded slot ${result}`);
+            });
+          }
+          return;
+        } else if (result === 'load' || result === 'back' || result === 'settings') {
+          // These are handled internally by titleScreen
+          return;
+        }
+        return;
+      }
+
+      // In-game UI handling
+      const handButton = inputManager.checkHandButton(x, y);
+      if (handButton) {
+        console.log(`Hand button: hero ${handButton.heroId}, hand ${handButton.hand}`);
+        
+        const hero = gameController.getState().heroes[handButton.heroId];
+        const item = hero.equipment[handButton.hand];
+        
+        // Check recovery
+        const recoveryEnd = hero.recovery[handButton.hand];
+        const now = Date.now();
+        if (recoveryEnd > now) {
+          sound.play('sfx_ui_button_denied');
+          return;
+        }
+        
+        // Check if back row melee (greyed out)
+        const meleeItems = ['axe', 'shield', 'mace', 'dagger', 'empty_hand'];
+        if (meleeItems.includes(item) && hero.formation === 'back') {
+          sound.play('sfx_ui_button_denied');
+          return;
+        }
+        
+        if (combatController.isInCombat()) {
+          const state = gameController.getState();
+          combatController.handleHandButton(state, handButton.heroId, handButton.hand);
+        }
+        return;
+      }
+
+      // Check movement pad
+      const direction = inputManager.checkMovementPad(x, y);
+      if (direction) {
+        if (direction === 'forward') {
+          gameController.moveForward();
+        } else if (direction === 'back') {
+          gameController.moveBackward();
+        } else if (direction === 'strafe_left') {
+          gameController.strafeLeft();
+        } else if (direction === 'strafe_right') {
+          gameController.strafeRight();
+        } else if (direction === 'turn_left') {
+          gameController.turnLeft();
+        } else if (direction === 'turn_right') {
+          gameController.turnRight();
+        }
+        return;
+      }
+
+      // Check save button (x: 202, y: 545, w: 30, h: 30)
+      if (x >= 202 && x < 232 && y >= 545 && y < 575) {
+        const state = gameController.getState();
+        const slot = 1; // Auto-save slot
+        SaveSystem.save(state, slot, true);
+        console.log('Game saved');
+        return;
+      }
     },
     (direction) => {
       // Two-finger swipe: left/right turn
@@ -530,6 +470,11 @@ async function main() {
     }
     requestAnimationFrame(gameLoop);
   }
+  
+  // Wait for all assets to load before starting
+  console.log('Waiting for assets to load...');
+  await assets.waitForAll();
+  console.log('All assets loaded');
   
   gameLoop();
 }
