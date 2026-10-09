@@ -114,6 +114,14 @@ export class PixelRenderer {
           if (paletteSize == 0 || paletteEnabled < 0.5) {
             return linearToSRGB(linearColor);
           }
+
+          // Crush only the deepest linear values so floor-3 ambient can
+          // actually land on #000000 instead of a mid-dark stone swatch.
+          float linL = dot(linearColor, vec3(0.2126, 0.7152, 0.0722));
+          if (linL < 0.024) {
+            float t = linL / 0.024;
+            linearColor *= t;
+          }
           
           // Convert linear to sRGB for display
           vec3 srgb = linearToSRGB(linearColor);
@@ -138,12 +146,13 @@ export class PixelRenderer {
             vec3 palLab = linearToOKLab(palLinear);
             float palL = luma(palColor);
 
-            // OKLab nearest-neighbour lifts dim stone onto mid-dark swatches
-            // (#282828). Penalise brighter picks so near-black can stay near-black.
-            float lift = max(0.0, palL - pixL);
-            float dist = distance(lab, palLab) + lift * 8.0 + lift * lift * 18.0;
-            if (pixL < 0.06 && palL > pixL + 0.05) {
-              dist += 4.0;
+            float dist = distance(lab, palLab);
+            // Only dark pixels: OKLab otherwise lifts dim stone onto #282828.
+            // Mid/bright torch stone must still be allowed to snap upward.
+            if (pixL < 0.12) {
+              float lift = max(0.0, palL - pixL);
+              dist += lift * 10.0 + lift * lift * 24.0;
+              if (palL > pixL + 0.04) dist += 6.0;
             }
             if (dist < minDist) {
               minDist = dist;

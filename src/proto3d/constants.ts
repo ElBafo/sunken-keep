@@ -69,15 +69,15 @@ export const FLARE_ANIM_FPS = 12;
 export const SCONCE_FLICKER = [0.78, 0.58, 1.08] as const;
 /** Lit torch pool — warm, smooth falloff. */
 export const SCONCE_RADIUS_TILES = 2.5;
-export const TORCH_INTENSITY = 1.0;
+export const TORCH_INTENSITY = 1.45;
 /** Wren's lantern with oil — full on the party square, near-ambient by 1.5. */
 export const LANTERN_RADIUS_TILES = 1.5;
-export const LANTERN_INTENSITY = 0.78;
+export const LANTERN_INTENSITY = 0.64;
 /** Ember-only lantern — dies just past the next square's near edge. */
 export const EMBER_RADIUS_TILES = 1.1;
 export const EMBER_INTENSITY = 0.4;
-/** Own-square floor stays full; falloff starts at the tile edge. */
-export const LANTERN_CORE_TILES = 0.38;
+/** Own-square floor stays full; falloff starts near the tile edge. */
+export const LANTERN_CORE_TILES = 0.28;
 /** Held-lantern height (world Y) so ceilings use 3D falloff. */
 export const LANTERN_HEIGHT = 0.88;
 /** Cold sunbeam from a ceiling crack. */
@@ -89,8 +89,8 @@ export const SUNBEAM_INTENSITY = 0.38;
  * Floors 3+: near-black (~2%) beyond torch and lantern light.
  * Override the lookup with ?ambientFloor=N (floor 1 is the only playable map).
  */
-export const FLOOR_AMBIENT: readonly number[] = [0, 0.072, 0.06, 0.026, 0.024, 0.022, 0.02, 0.02, 0.018];
-export const AMBIENT_MIN = 0.016;
+export const FLOOR_AMBIENT: readonly number[] = [0, 0.068, 0.055, 0.018, 0.017, 0.016, 0.016, 0.016, 0.016];
+export const AMBIENT_MIN = 0.014;
 /** Torch/lantern weight below this counts as unlit for eye/item glints. */
 export const DARK_LIGHT_THRESHOLD = 0.08;
 export const EYE_ANIM_FPS = 8;

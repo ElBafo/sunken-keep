@@ -514,6 +514,10 @@ class Game {
       tileBrightness: (x: number, y: number) =>
         this.vertexLighting.calculateBrightness(x, y, !!floor1.tiles[y]?.[x]?.floorNDark),
       isSquareLit: (x: number, y: number) => this.vertexLighting.isSquareLit(x, y),
+      setFlickerFrame: (frame: number) => {
+        this.vertexLighting.setFlickerFrame(frame);
+        this.renderer.render();
+      },
       darkFx: () => this.darkFx.snapshot(),
       lightFacingTorch: () => this.lightFacingTorch(),
       tryMoveForward: () => {

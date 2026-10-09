@@ -10,6 +10,7 @@ type Proto3d = {
   interact: () => void;
   getOil: () => number;
   setOil: (n: number) => void;
+  setFlickerFrame: (frame: number) => void;
   getBright: () => number;
   getAmbientFloor: () => number;
   getAmbient: () => number;
@@ -529,23 +530,39 @@ test('proto3d lighting: screen luma of the 3D view', async ({ page }) => {
 
   const poseLuma = async (x: number, y: number, dir: number, file?: string) => {
     await page.evaluate(([px, py, pd]) => {
-      (window as unknown as { __proto3d: Proto3d }).__proto3d.setPosition(px, py, pd);
+      const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+      p.setPosition(px, py, pd);
+      // Brightest flame frame so torch-lit luma is not flicker-lucky.
+      p.setFlickerFrame(2);
     }, [x, y, dir] as const);
-    await page.waitForTimeout(220);
+    await page.waitForTimeout(80);
     if (file) await page.screenshot({ path: `${OUT}/${file}`, fullPage: false });
-    return page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.meanLuma());
+    return page.evaluate(() => {
+      const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+      p.setFlickerFrame(2);
+      return p.meanLuma();
+    });
   };
 
+  await boot('&ambientFloor=3');
+  // Lamp room — no lit torch reaches here, so the lantern is the only pool.
+  const floor3 = await poseLuma(10, 9, 1, 'after_ambient_floor3.png');
+  const floor3Fill = await page.evaluate(
+    () => (window as unknown as { __proto3d: Proto3d }).__proto3d.getAmbient()
+  );
+
   await boot('');
-  const darkCorridor = await poseLuma(1, 7, 1, 'after_dark_corridor.png');
-  const torchLit = await poseLuma(1, 7, 0, 'after_torch_lit.png');
+  const darkCorridor = await poseLuma(10, 9, 1, 'after_dark_corridor.png');
+  // Face the (0,6) torch so the pool fills the 3D view.
+  const torchLit = await poseLuma(1, 6, 3, 'after_torch_lit.png');
   const relightBefore = await poseLuma(3, 6, 1, 'after_relight_unlit.png');
   await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.interact());
   await page.waitForTimeout(700);
   const relightAfter = await poseLuma(3, 6, 1, 'after_relight_lit.png');
-
-  await boot('&ambientFloor=3');
-  const floor3 = await poseLuma(1, 7, 1, 'after_ambient_floor3.png');
+  const floor1Fill = await page.evaluate(
+    () => (window as unknown as { __proto3d: Proto3d }).__proto3d.getAmbient()
+  );
+  console.log('AMBIENT fill F1', floor1Fill.toFixed(3), 'F3', floor3Fill.toFixed(3));
 
   const darkRatio = darkCorridor / torchLit;
   const floor3Ratio = floor3 / torchLit;

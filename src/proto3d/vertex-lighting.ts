@@ -39,7 +39,7 @@ interface SconceWorld {
   tileY: number;
 }
 
-const TORCH_RGB: [number, number, number] = [1.0, 0.68, 0.32];
+const TORCH_RGB: [number, number, number] = [1.0, 0.86, 0.58];
 const LANTERN_RGB: [number, number, number] = [0.92, 0.82, 0.64];
 const EMBER_RGB: [number, number, number] = [0.55, 0.72, 1.0];
 const SUNBEAM_RGB: [number, number, number] = [0.7, 0.84, 1.0];
@@ -78,9 +78,12 @@ function partyFalloff(distTiles: number, radius: number, coreTiles = LANTERN_COR
 
 function partyDistTiles(wx: number, wy: number, wz: number, partyX: number, partyY: number): number {
   const dx = wx / CELL_SIZE - partyX;
-  const dy = (wy - LANTERN_HEIGHT) / CELL_SIZE;
   const dz = wz / CELL_SIZE - partyY;
-  return Math.sqrt(dx * dx + dy * dy + dz * dz);
+  const horiz = Math.sqrt(dx * dx + dz * dz);
+  // Floor disk: 2D reach. Walls and ceiling pay extra so they die past the puddle.
+  if (wy < 0.28) return horiz;
+  const dy = (wy - LANTERN_HEIGHT) / CELL_SIZE;
+  return Math.sqrt(horiz * horiz + dy * dy) + 0.55;
 }
 
 function parseBright(value: number): number {
@@ -248,7 +251,7 @@ export class VertexLightingManager {
   /** Combined torch + lantern weight at a tile (no ambient, no sunbeam). */
   sourceLight(tileX: number, tileY: number): number {
     const wx = tileX * CELL_SIZE;
-    const wy = CELL_SIZE / 2;
+    const wy = 0.08;
     const wz = tileY * CELL_SIZE;
     const lantern = this.lanternSpec();
     const partyDist = partyDistTiles(wx, wy, wz, this.partyX, this.partyY);
@@ -272,7 +275,7 @@ export class VertexLightingManager {
   calculateBrightness(tileX: number, tileY: number, isDark: boolean): number {
     const wx = tileX * CELL_SIZE;
     const wz = tileY * CELL_SIZE;
-    const [r, g, b] = this.shadeVertex(wx, CELL_SIZE / 2, wz, isDark, 1);
+    const [r, g, b] = this.shadeVertex(wx, 0.08, wz, isDark, 1);
     return (r + g + b) / 3;
   }
 
