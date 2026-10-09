@@ -11,6 +11,7 @@ type Proto3d = {
   getOil: () => number;
   setOil: (n: number) => void;
   getBright: () => number;
+  getAmbientFloor: () => number;
   lastMessage: () => string;
   getPosition: () => { x: number; y: number; dir: number };
   torchStates: () => Array<{ x: number; y: number; face: string; lit: boolean; capped: boolean }>;
@@ -93,8 +94,12 @@ test('proto3d lighting: pools, relight, oil, no 404s', async ({ page }) => {
     unlitAmbient.toFixed(3)
   );
   expect(poolBefore, 'lit pool brighter than dark stretch').toBeGreaterThan(darkBefore + 0.12);
-  expect(unlitAmbient, 'unlit stretch is near-black (3–6% ambient, not 0)').toBeGreaterThan(0.02);
-  expect(unlitAmbient, 'unlit stretch is near-black (3–6% ambient, not 0)').toBeLessThan(0.08);
+  expect(
+    await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.getAmbientFloor()),
+    'default ambient table is floor 1'
+  ).toBe(1);
+  expect(unlitAmbient, 'floor 1 unlit stone stays faintly readable').toBeGreaterThan(0.08);
+  expect(unlitAmbient, 'floor 1 unlit stone stays a low ambient').toBeLessThan(0.18);
 
   const lantern = await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
@@ -229,6 +234,57 @@ test('proto3d lighting: pools, relight, oil, no 404s', async ({ page }) => {
     };
   });
   console.log('REGION near luma', region.near.luma.toFixed(1), 'mid luma', region.mid.luma.toFixed(1));
+
+  expect(errors, 'console errors').toEqual([]);
+  expect(failed404s, '404s').toEqual([]);
+});
+
+test('proto3d lighting: ?ambientFloor=3 is near-black beyond the lantern', async ({ page }) => {
+  test.setTimeout(60000);
+  mkdirSync(OUT, { recursive: true });
+  const errors: string[] = [];
+  const failed404s: string[] = [];
+  page.on('console', (msg) => {
+    if (msg.type() === 'error') errors.push(msg.text());
+  });
+  page.on('response', (response) => {
+    if (response.status() === 404) failed404s.push(response.url());
+  });
+
+  await page.goto(`${BASE_URL}/proto3d.html?test=1&debug=1&ambientFloor=3`);
+  await page.waitForFunction(
+    () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
+    null,
+    { timeout: 25000 }
+  );
+  await page.locator('#tap-to-start').click();
+  await page.waitForTimeout(400);
+
+  expect(
+    await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.getAmbientFloor())
+  ).toBe(3);
+
+  const deep = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    p.setOil(2);
+    p.setPosition(5, 7, 0);
+    const unlit = p.tileBrightness(3, 7);
+    p.setPosition(7, 1, 3);
+    return {
+      unlit,
+      own: p.tileBrightness(7, 1),
+      ahead: p.tileBrightness(6, 1)
+    };
+  });
+  console.log('AMBIENT floor3', deep);
+  expect(deep.unlit, 'floor 3+ unlit is near-black (3–5%, not 0)').toBeGreaterThan(0.02);
+  expect(deep.unlit, 'floor 3+ unlit is near-black (3–5%, not 0)').toBeLessThan(0.08);
+  expect(deep.own, 'lantern still reads the party square on floor 3 ambient').toBeGreaterThan(0.3);
+  expect(deep.ahead, 'lantern still reads the next square on floor 3 ambient').toBeGreaterThan(0.2);
+
+  await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.setPosition(1, 7, 1));
+  await page.waitForTimeout(220);
+  await page.screenshot({ path: `${OUT}/lighting_ambient_floor3_preview.png`, fullPage: false });
 
   expect(errors, 'console errors').toEqual([]);
   expect(failed404s, '404s').toEqual([]);

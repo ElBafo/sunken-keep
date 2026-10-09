@@ -79,12 +79,21 @@ export const LANTERN_CORE_TILES = 1.05;
 export const SUNBEAM_RADIUS_TILES = 2.0;
 export const SUNBEAM_INTENSITY = 0.38;
 /**
- * Per-floor ambient as a fraction of full white (never 0). Unlit stone sits
- * around 3–6%; every floor is dark, and deeper floors tick slightly darker.
- * Readability comes from the lantern and lit torches, not this fill.
+ * Per-floor ambient as a fraction of full white (never 0).
+ * Floors 1–2: low fill so unlit stone 1–2 squares ahead stays faintly readable.
+ * Floors 3+: near-black (about 3–5%) beyond torch and lantern light.
+ * Override the lookup with ?ambientFloor=N (floor 1 is the only playable map).
  */
-export const FLOOR_AMBIENT: readonly number[] = [0, 0.058, 0.052, 0.048, 0.044, 0.04, 0.038, 0.036, 0.035];
+export const FLOOR_AMBIENT: readonly number[] = [0, 0.14, 0.12, 0.05, 0.045, 0.042, 0.04, 0.038, 0.035];
 export const AMBIENT_MIN = 0.03;
+
+/** Clamp a floor index for FLOOR_AMBIENT. Missing / invalid values keep `fallback`. */
+export function parseAmbientFloor(raw: string | null | undefined, fallback = 1): number {
+  if (raw == null || raw === '') return fallback;
+  const n = Number(raw);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.max(1, Math.min(FLOOR_AMBIENT.length - 1, Math.floor(n)));
+}
 export const BRIGHT_MIN = 0.6;
 export const BRIGHT_MAX = 1.6;
 export const OIL_START = 2;

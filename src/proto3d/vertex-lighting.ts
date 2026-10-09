@@ -124,6 +124,15 @@ export class VertexLightingManager {
     this.bright = parseBright(value);
   }
 
+  getAmbientFloor(): number {
+    return this.floor;
+  }
+
+  setAmbientFloor(floor: number) {
+    const max = FLOOR_AMBIENT.length - 1;
+    this.floor = Math.max(1, Math.min(max, Math.floor(floor)));
+  }
+
   setSunbeams(sunbeams: DressingMark[]) {
     this.sunbeams = sunbeams;
   }

@@ -9,7 +9,8 @@ import {
   OIL_FLASK,
   OIL_MAX,
   OIL_START,
-  OIL_TORCH_COST
+  OIL_TORCH_COST,
+  parseAmbientFloor
 } from './constants';
 import { Dressing } from './dressing';
 import { floor1, floor1Sconces } from './floor-data';
@@ -95,7 +96,7 @@ class Game {
     }
 
     this.vertexLighting = new VertexLightingManager(floor1, floor1Sconces, {
-      floor: 1,
+      floor: parseAmbientFloor(params.get('ambientFloor'), 1),
       bright: this.bright,
       sunbeams: this.dressing.marks.sunbeams,
       oil: () => this.oil
@@ -431,6 +432,7 @@ class Game {
       getOil: () => this.oil,
       setOil: (n: number) => this.setOil(n),
       getBright: () => this.bright,
+      getAmbientFloor: () => this.vertexLighting.getAmbientFloor(),
       setBright: (n: number) => {
         this.bright = Math.min(BRIGHT_MAX, Math.max(BRIGHT_MIN, n));
         this.vertexLighting.setBright(this.bright);
