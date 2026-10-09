@@ -162,7 +162,7 @@ export class PixelRenderer {
   async loadPalette() {
     try {
       const baseUrl = import.meta.env.BASE_URL;
-      const response = await fetch(`${baseUrl}art/palette.json`);
+      const response = await fetch(`${baseUrl}proto3d/palette.json`);
       const data = await response.json();
       this.palette = data.colors || [];
       this.updatePaletteUniform();

@@ -41,13 +41,13 @@ export class SceneBuilder {
     };
     
     const [wallPlain, wallPilaster, wallKnot, doorLocked, floorStone, floorWater, ceiling] = await Promise.all([
-      loadTex('art/tex3d/wall_plain.png'),
-      loadTex('art/tex3d/wall_pilaster.png'),
-      loadTex('art/tex3d/wall_knot.png'),
-      loadTex('art/tex3d/door_locked.png'),
-      loadTex('art/tex3d/floor_stone.png'),
-      loadTex('art/tex3d/floor_water.png'),
-      loadTex('art/tex3d/ceiling.png')
+      loadTex('proto3d/tex3d/wall_plain.png'),
+      loadTex('proto3d/tex3d/wall_pilaster.png'),
+      loadTex('proto3d/tex3d/wall_knot.png'),
+      loadTex('proto3d/tex3d/door_locked.png'),
+      loadTex('proto3d/tex3d/floor_stone.png'),
+      loadTex('proto3d/tex3d/floor_water.png'),
+      loadTex('proto3d/tex3d/ceiling.png')
     ]);
     
     this.textures = {

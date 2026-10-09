@@ -134,9 +134,9 @@ export class SpriteManager {
       if (!sconce.lit) continue;
 
       const frames = await Promise.all([
-        loadTex('art/dungeon/sconce_lit_1_near.png'),
-        loadTex('art/dungeon/sconce_lit_2_near.png'),
-        loadTex('art/dungeon/sconce_lit_3_near.png')
+        loadTex('proto3d/sconce_lit_1_near.png'),
+        loadTex('proto3d/sconce_lit_2_near.png'),
+        loadTex('proto3d/sconce_lit_3_near.png')
       ]);
 
       const mat = makeSpriteMaterial(frames[0]);

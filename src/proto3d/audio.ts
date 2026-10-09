@@ -52,7 +52,7 @@ export class AudioManager {
       // Torch loop for each lit sconce
       const torchBuffer = await new Promise<AudioBuffer>((resolve, reject) => {
         audioLoader.load(
-          `${baseUrl}audio/sfx_torch_loop.mp3`,
+          `${baseUrl}proto3d/sfx_torch_loop.mp3`,
           resolve,
           undefined,
           reject
@@ -92,7 +92,7 @@ export class AudioManager {
       // Add a drip sound at one water location
       const dripBuffer = await new Promise<AudioBuffer>((resolve, reject) => {
         audioLoader.load(
-          `${baseUrl}audio/sfx_drip_1.mp3`,
+          `${baseUrl}proto3d/sfx_drip_1.mp3`,
           resolve,
           undefined,
           reject
