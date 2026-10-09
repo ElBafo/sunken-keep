@@ -3,11 +3,21 @@ import {
   CAMERA_EYE_HEIGHT,
   CAMERA_PITCH,
   CELL_SIZE,
+  STEP_BOB_AMPLITUDE,
   cameraOffsetXZ
 } from './constants';
-import { FloorData } from './types';
+import { FloorData, Tile } from './types';
 
 const MOVE_DURATION = 180;
+
+const DIRS = [
+  [0, -1],
+  [1, 0],
+  [0, 1],
+  [-1, 0]
+] as const;
+
+export type MoveResult = 'ok' | 'busy' | 'bounds' | 'wall' | 'secret' | 'door' | 'monster';
 
 export class Player {
   x: number;
@@ -15,6 +25,7 @@ export class Player {
   dir: number; // 0=N, 1=E, 2=S, 3=W
   camera: THREE.Camera;
   floorData: FloorData;
+  hasKey = false;
 
   isMoving = false;
   moveStartTime = 0;
@@ -35,6 +46,22 @@ export class Player {
     this.updateCameraPosition(1);
   }
 
+  tileAt(x: number, y: number): Tile | undefined {
+    if (x < 0 || y < 0 || x >= this.floorData.width || y >= this.floorData.height) {
+      return undefined;
+    }
+    return this.floorData.tiles[y][x];
+  }
+
+  facingDelta(): readonly [number, number] {
+    return DIRS[this.dir];
+  }
+
+  facingPos(steps = 1): { x: number; y: number } {
+    const [dx, dy] = this.facingDelta();
+    return { x: this.x + dx * steps, y: this.y + dy * steps };
+  }
+
   update(_deltaTime: number) {
     if (this.isMoving) {
       const elapsed = performance.now() - this.moveStartTime;
@@ -53,7 +80,9 @@ export class Player {
       }
 
       const interpRot = fromRot + (toRot - fromRot) * eased;
-      this.poseCamera(interpX, interpY, interpRot);
+      const translating = this.moveToX !== this.moveFromX || this.moveToY !== this.moveFromY;
+      const bob = translating ? Math.sin(t * Math.PI) * STEP_BOB_AMPLITUDE : 0;
+      this.poseCamera(interpX, interpY, interpRot, bob);
 
       if (t >= 1) {
         this.isMoving = false;
@@ -68,11 +97,11 @@ export class Player {
     return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
   }
 
-  poseCamera(gridX: number, gridY: number, rotY: number) {
+  poseCamera(gridX: number, gridY: number, rotY: number, bob = 0) {
     const [ox, oz] = cameraOffsetXZ(rotY);
     this.camera.position.set(
       gridX * CELL_SIZE + ox,
-      CAMERA_EYE_HEIGHT,
+      CAMERA_EYE_HEIGHT + bob,
       gridY * CELL_SIZE + oz
     );
     this.camera.rotation.order = 'YXZ';
@@ -84,10 +113,9 @@ export class Player {
 
   updateCameraPosition(_t: number = 1) {
     const rot = (-this.dir * Math.PI) / 2;
-    this.poseCamera(this.x, this.y, rot);
+    this.poseCamera(this.x, this.y, rot, 0);
   }
 
-  // Instant teleport for tests / query-string start poses.
   setPosition(x: number, y: number, dir: number) {
     this.isMoving = false;
     this.x = x;
@@ -96,61 +124,54 @@ export class Player {
     this.updateCameraPosition(1);
   }
 
+  blockReason(x: number, y: number): MoveResult {
+    const tile = this.tileAt(x, y);
+    if (!tile) return 'bounds';
+    if (tile.wall) return 'wall';
+    if (tile.secret && !tile.secretOpen) return 'secret';
+    if (tile.door && !tile.doorOpen) return 'door';
+    if (tile.monster) return 'monster';
+    return 'ok';
+  }
+
   canMove(dx: number, dy: number): boolean {
-    const newX = this.x + dx;
-    const newY = this.y + dy;
-
-    if (newX < 0 || newX >= this.floorData.width) return false;
-    if (newY < 0 || newY >= this.floorData.height) return false;
-
-    const tile = this.floorData.tiles[newY][newX];
-    // Prototype has no key-use interaction; locked doors are walk-through
-    // so the vault (and slime at tiles[2][7] = x=7,y=2) is reachable.
-    return !tile.wall && !tile.secret;
+    return this.blockReason(this.x + dx, this.y + dy) === 'ok';
   }
 
-  moveForward() {
-    if (this.isMoving) return;
-
-    const dirs = [
-      [0, -1],
-      [1, 0],
-      [0, 1],
-      [-1, 0]
-    ];
-    const [dx, dy] = dirs[this.dir];
-
-    if (this.canMove(dx, dy)) {
+  moveForward(): MoveResult {
+    if (this.isMoving) return 'busy';
+    const [dx, dy] = DIRS[this.dir];
+    const reason = this.blockReason(this.x + dx, this.y + dy);
+    if (reason === 'ok') {
       this.startMove(this.x + dx, this.y + dy, this.dir);
+      return 'ok';
     }
+    return reason;
   }
 
-  moveBackward() {
-    if (this.isMoving) return;
-
-    const dirs = [
-      [0, -1],
-      [1, 0],
-      [0, 1],
-      [-1, 0]
-    ];
-    const [dx, dy] = dirs[this.dir];
-
-    if (this.canMove(-dx, -dy)) {
+  moveBackward(): MoveResult {
+    if (this.isMoving) return 'busy';
+    const [dx, dy] = DIRS[this.dir];
+    const reason = this.blockReason(this.x - dx, this.y - dy);
+    if (reason === 'ok') {
       this.startMove(this.x - dx, this.y - dy, this.dir);
+      return 'ok';
     }
+    return reason;
   }
 
-  turnLeft() {
-    if (this.isMoving) return;
+  turnLeft(): MoveResult {
+    if (this.isMoving) return 'busy';
     const newDir = (this.dir + 3) % 4;
     this.startMove(this.x, this.y, newDir);
+    return 'ok';
   }
 
-  turnRight() {
-    if (this.isMoving) return;
+  turnRight(): MoveResult {
+    if (this.isMoving) return 'busy';
     const newDir = (this.dir + 1) % 4;
     this.startMove(this.x, this.y, newDir);
+    return 'ok';
   }
 
   startMove(toX: number, toY: number, toDir: number) {

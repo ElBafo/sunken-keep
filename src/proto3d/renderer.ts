@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CAMERA_FAR, CAMERA_FOV, CAMERA_NEAR } from './constants';
+import { CAMERA_FAR, CAMERA_FOV, CAMERA_NEAR, FOG_COLOR, FOG_FAR, FOG_NEAR } from './constants';
 
 // Enable Three.js color management for proper sRGB handling
 THREE.ColorManagement.enabled = true;
@@ -25,7 +25,8 @@ export class PixelRenderer {
     
     // Main scene
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0x161514, 0.02);
+    this.scene.fog = new THREE.Fog(FOG_COLOR, FOG_NEAR, FOG_FAR);
+    this.scene.background = new THREE.Color(FOG_COLOR);
     
     // Vertical FOV is wide enough that an adjacent wall sits in frame with a floor strip
     this.camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, CAMERA_NEAR, CAMERA_FAR);
@@ -43,6 +44,7 @@ export class PixelRenderer {
       preserveDrawingBuffer: preserveBuffer
     });
     this.renderer.setPixelRatio(1);
+    this.renderer.setClearColor(FOG_COLOR, 1);
     this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace; // No conversion on final quad
     
     // Low-res render target — 270×380 logical, nearest-neighbour upscaled in CSS

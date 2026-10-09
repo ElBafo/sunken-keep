@@ -18,6 +18,7 @@ const BASE_FILES = [
   'wall_knot.png',
   'door_locked.png',
   'door_open.png',
+  'door_panel.png',
   'secret_closed.png',
   'secret_open.png',
   'floor_stone.png',

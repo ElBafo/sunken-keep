@@ -97,7 +97,20 @@ export class SpriteManager {
     this.camera = camera;
   }
 
-  async loadSprites(scene: THREE.Scene, floorData: FloorData, sconces: readonly Sconce[]) {
+  hideItemAt(x: number, y: number) {
+    for (const sprite of this.sprites) {
+      if (sprite.x === x && sprite.y === y && !sprite.frames) {
+        sprite.object.visible = false;
+      }
+    }
+  }
+
+  async loadSprites(
+    scene: THREE.Scene,
+    floorData: FloorData,
+    sconces: readonly Sconce[],
+    cappedSconces: Set<string> = new Set()
+  ) {
     const loader = new THREE.TextureLoader();
     const baseUrl = import.meta.env.BASE_URL;
 
@@ -150,6 +163,7 @@ export class SpriteManager {
           const tex = await loadTex('art/dungeon/item_key_near.png');
           const mat = makeSpriteMaterial(tex);
           const sprite = makeBillboard(mat, x * CELL_SIZE, 0.15, y * CELL_SIZE, 0.9, 0.9);
+          sprite.userData.item = 'key';
           scene.add(sprite);
 
           this.sprites.push({
@@ -178,6 +192,7 @@ export class SpriteManager {
     const frameMs = 1000 / SCONCE_ANIM_FPS;
 
     for (const sconce of sconces) {
+      if (!sconce.lit && cappedSconces.has(`${sconce.x},${sconce.y}`)) continue;
       const map = sconce.lit ? litFrames[0] : sconceDead;
       const geo = new THREE.PlaneGeometry(sconceW, sconceH);
       if (sconceNeedsMirror(sconce.face)) flipUVs(geo);

@@ -9,7 +9,7 @@ Monster tiers rise slowly; Act 1 = vermin and the first drowned.
 - Story: the three carvings tell the pact in miniature.
   - "Thane Orrun keeps the clan dry." (start)
   - "One flame given. One floor spared." (by the locked door)
-  - "We gave too much. It is still hungry." (behind the secret wall, in the dark)
+  - "We gave much. We need more." (behind the secret wall, in the dark)
 - Must-have: pantry (5,5), locked door + key, one secret wall, shallow/deep water.
 - Monsters: keep rats, rust crab, bog leeches, slime (boss-ish, 40 HP).
 - Exit hook: stairs down; Brannoc spots a cold, dead dwarven lamp on the stair: "These used to burn forever. Who put them out?"

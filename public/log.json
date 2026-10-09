@@ -16,7 +16,7 @@
  },
  {
   "key": "carving_secret",
-  "text": "\"We gave too much. It is still hungry.\"",
+  "text": "\"We gave much. We need more.\"",
   "when": "tap glowing plate"
  },
  {

@@ -56,7 +56,12 @@
   "no_mana": "sfx_ui_button_denied",
   "spell_cast": "sfx_act_scroll",
   "torch_ignite": "sfx_torch_ignite",
-  "torch_extinguish": "sfx_torch_extinguish"
+  "torch_extinguish": "sfx_torch_extinguish",
+  "chain_sway_1": "sfx_chain_sway_1",
+  "chain_sway_2": "sfx_chain_sway_2",
+  "crack_wind_loop": "sfx_crack_wind_loop",
+  "banner_flutter": "sfx_banner_flutter",
+  "bones_settle": "sfx_bones_settle"
  },
  "music": {
   "intro": {
