@@ -33,8 +33,9 @@ const ITEM_SPRITE: Record<string, { file: string; w: number; h: number }> = {
   scroll: { file: 'item_scroll_near.png', w: 0.42, h: 0.32 }
 };
 
-const OWN_SQUARE_SCALE = 0.55;
-const OWN_SQUARE_FORWARD = 0.82;
+const OWN_SQUARE_SCALE = 0.72;
+/** Must be in the visible floor strip (near plane hits y=0 at ~1.0 in front of the camera). */
+const OWN_SQUARE_FORWARD = 1.18;
 const SPRITE_RENDER_ORDER = 10;
 
 function spriteFeetY(tile: Tile): number {
@@ -197,16 +198,17 @@ export class SpriteManager {
           });
         }
 
-        if (tile.item && !(tile.secret && !tile.secretOpen)) {
-          const def = ITEM_SPRITE[tile.item] ?? {
-            file: `item_${tile.item}_near.png`,
+        const itemName = tile.item || (tile.chest ? 'chest' : undefined);
+        if (itemName && !(tile.secret && !tile.secretOpen)) {
+          const def = ITEM_SPRITE[itemName] ?? {
+            file: `item_${itemName}_near.png`,
             w: 0.4,
             h: 0.4
           };
           const tex = await loadTex(`art/dungeon/${def.file}`);
           const mat = makeSpriteMaterial(tex);
           const sprite = makeBillboard(mat, x * CELL_SIZE, feetY, y * CELL_SIZE, def.w, def.h);
-          sprite.userData.item = tile.item;
+          sprite.userData.item = itemName;
           scene.add(sprite);
 
           this.sprites.push({
