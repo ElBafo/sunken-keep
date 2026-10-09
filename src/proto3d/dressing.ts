@@ -6,7 +6,7 @@ import {
   SCONCE_HEIGHT_TILES,
   SCONCE_WALL_OFFSET_TILES,
   SCONCE_WIDTH_TILES,
-  WATER_Y
+  tileBedY
 } from './constants';
 import { faceHash } from './texture-variants';
 import { FloorData, Sconce, Tile } from './types';
@@ -91,10 +91,6 @@ function isWallish(tile: Tile | undefined): boolean {
 
 function isWalkable(tile: Tile | undefined): boolean {
   return !!tile && !tile.wall && !tile.secret;
-}
-
-function isWater(tile: Tile | undefined): boolean {
-  return !!tile && !!(tile.deepWater || tile.shallowWater);
 }
 
 function configureAtmoTex(tex: THREE.Texture, repeatS = false) {
@@ -420,17 +416,27 @@ export class Dressing {
       { dx: 0, dz: 1, face: 'S' },
       { dx: -1, dz: 0, face: 'W' }
     ];
-    const h = -WATER_Y;
     const map = this.tex('water_edge');
+
+    const bedY = (tile: Tile | undefined): number | null => {
+      if (!tile || tile.wall) return null;
+      if (tile.secret && !tile.secretOpen) return null;
+      return tileBedY(tile);
+    };
+
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
-        const tile = tiles[y][x];
-        if (!isWalkable(tile) || isWater(tile)) continue;
+        const y0 = bedY(tiles[y][x]);
+        if (y0 == null) continue;
         for (const { dx, dz, face } of faces) {
           const nx = x + dx;
           const ny = y + dz;
           if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
-          if (!isWater(tiles[ny][nx])) continue;
+          const neighbor = tiles[ny][nx];
+          if (neighbor.wall || (neighbor.secret && !neighbor.secretOpen)) continue;
+          const y1 = bedY(neighbor);
+          if (y1 == null || y1 >= y0 - 0.001) continue;
+          const h = y0 - y1;
           const geo = new THREE.PlaneGeometry(CELL_SIZE, h);
           const mat = new THREE.MeshBasicMaterial({
             map,
@@ -441,12 +447,12 @@ export class Dressing {
           const { rotY } = FACE_INTO_ROOM[face];
           mesh.position.set(
             x * CELL_SIZE + dx * (CELL_SIZE / 2),
-            WATER_Y / 2,
+            (y0 + y1) / 2,
             y * CELL_SIZE + dz * (CELL_SIZE / 2)
           );
           mesh.rotation.y = rotY;
-          mesh.userData.lightX = x;
-          mesh.userData.lightY = y;
+          mesh.userData.lightX = nx;
+          mesh.userData.lightY = ny;
           mesh.userData.noPick = true;
           mesh.userData.kind = 'water-edge';
           this.group.add(mesh);

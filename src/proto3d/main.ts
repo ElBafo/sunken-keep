@@ -1,6 +1,7 @@
+import * as THREE from 'three';
 import { Atmosphere } from './atmosphere';
 import { AudioManager } from './audio';
-import { DOOR_UNLOCK_LEAD_MS } from './constants';
+import { CELL_SIZE, DOOR_UNLOCK_LEAD_MS } from './constants';
 import { Dressing } from './dressing';
 import { floor1, floor1Sconces } from './floor-data';
 import { InputManager } from './input';
@@ -10,6 +11,7 @@ import { PixelRenderer } from './renderer';
 import { SceneBuilder } from './scene-builder';
 import { SpriteManager } from './sprites';
 import { VertexLightingManager } from './vertex-lighting';
+import { WaterSystem } from './water';
 
 class Game {
   renderer!: PixelRenderer;
@@ -21,6 +23,7 @@ class Game {
   audioManager!: AudioManager;
   atmosphere!: Atmosphere;
   dressing!: Dressing;
+  water!: WaterSystem;
   quality: QualityLevel = 'high';
   lastMessage = '';
   messageTimer = 0;
@@ -51,10 +54,12 @@ class Game {
     this.sceneBuilder.buildScene(this.renderer.scene, floor1);
 
     this.dressing = new Dressing();
-    await this.dressing.load();
+    this.water = new WaterSystem();
+    await Promise.all([this.dressing.load(), this.water.load()]);
     await this.dressing.place(this.renderer.scene, floor1);
 
     this.atmosphere.build(this.renderer.scene, floor1, this.dressing);
+    this.water.build(this.renderer.scene, floor1, floor1Sconces, this.dressing.marks.sunbeams);
 
     this.player = new Player(this.renderer.camera, floor1);
     const startX = params.has('x') ? Number(params.get('x')) : floor1.startX;
@@ -92,8 +97,26 @@ class Game {
   }
 
   handleMove(result: MoveResult) {
-    if (result === 'ok' || result === 'busy') return;
+    if (result === 'ok') {
+      this.playFootstep(this.player.moveToX, this.player.moveToY);
+      return;
+    }
+    if (result === 'busy') return;
     this.audioManager.playUi('bump', 0.65);
+  }
+
+  playFootstep(x: number, y: number) {
+    const tile = this.player.tileAt(x, y);
+    if (!tile) return;
+    if (tile.deepWater) {
+      this.audioManager.playUi('step_water_deep', 0.7);
+      this.atmosphere.spawnStepSplash(x * CELL_SIZE, y * CELL_SIZE);
+    } else if (tile.shallowWater) {
+      this.audioManager.playUi('step_water_shallow', 0.7);
+      this.atmosphere.spawnStepSplash(x * CELL_SIZE, y * CELL_SIZE);
+    } else {
+      this.audioManager.playUi('step', 0.5);
+    }
   }
 
   doorAhead(): { x: number; y: number } | null {
@@ -169,7 +192,7 @@ class Game {
         this.player.setPosition(x, y, dir);
         this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
         this.vertexLighting.updateAllMeshes(this.renderer.scene);
-        this.spriteManager.update(performance.now());
+        this.spriteManager.update(performance.now(), this.player.x, this.player.y, this.player.dir);
         this.updateDoorButton();
         this.renderer.render();
       },
@@ -178,10 +201,94 @@ class Game {
         this.spriteManager.sprites.map((s) => ({
           x: s.x,
           y: s.y,
+          kind: s.kind,
           world: s.object.position.toArray(),
+          scale: s.object.scale.toArray(),
+          renderOrder: s.object.renderOrder,
+          depthTest: (s.material as THREE.Material).depthTest,
+          item: s.object.userData.item,
           frames: s.frames?.length ?? 0,
           currentFrame: s.currentFrame
         })),
+      regionStats: (x0: number, y0: number, x1: number, y1: number) => {
+        this.renderer.render();
+        const gl = this.renderer.renderer.getContext();
+        const w = this.renderer.canvas.width;
+        const h = this.renderer.canvas.height;
+        const pixels = new Uint8Array(w * h * 4);
+        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+        const xMin = Math.max(0, Math.floor(x0));
+        const xMax = Math.min(w, Math.ceil(x1));
+        const yMin = Math.max(0, Math.floor(y0));
+        const yMax = Math.min(h, Math.ceil(y1));
+        let sum = 0;
+        let fog = 0;
+        let n = 0;
+        for (let y = yMin; y < yMax; y++) {
+          for (let x = xMin; x < xMax; x++) {
+            const i = ((h - 1 - y) * w + x) * 4;
+            const r = pixels[i];
+            const g = pixels[i + 1];
+            const b = pixels[i + 2];
+            sum += (r + g + b) / 3;
+            if (r < 14 && g < 14 && b < 14) fog++;
+            n++;
+          }
+        }
+        return { luma: n ? sum / n : 0, fogRatio: n ? fog / n : 0, n };
+      },
+      faceKinds: () => {
+        const out: Array<{ kind: string; lightX: number; lightY: number }> = [];
+        this.renderer.scene.traverse((obj) => {
+          if (!(obj instanceof THREE.Mesh)) return;
+          if (typeof obj.userData.kind !== 'string') return;
+          out.push({
+            kind: obj.userData.kind,
+            lightX: obj.userData.lightX,
+            lightY: obj.userData.lightY
+          });
+        });
+        return out;
+      },
+      faceLighting: () => {
+        this.renderer.scene.updateMatrixWorld(true);
+        const out: Array<{
+          kind: string;
+          lightX: number;
+          lightY: number;
+          worldX: number;
+          worldZ: number;
+          avgR: number;
+        }> = [];
+        const v = new THREE.Vector3();
+        this.renderer.scene.traverse((obj) => {
+          if (!(obj instanceof THREE.Mesh)) return;
+          if (typeof obj.userData.kind !== 'string') return;
+          const pos = obj.geometry.attributes.position;
+          const col = obj.geometry.attributes.color;
+          if (!pos) return;
+          obj.updateWorldMatrix(true, false);
+          let sx = 0;
+          let sz = 0;
+          let sr = 0;
+          const n = pos.count;
+          for (let i = 0; i < n; i++) {
+            v.fromBufferAttribute(pos, i).applyMatrix4(obj.matrixWorld);
+            sx += v.x;
+            sz += v.z;
+            sr += col ? col.getX(i) : 1;
+          }
+          out.push({
+            kind: obj.userData.kind,
+            lightX: obj.userData.lightX,
+            lightY: obj.userData.lightY,
+            worldX: sx / n,
+            worldZ: sz / n,
+            avgR: sr / n
+          });
+        });
+        return out;
+      },
       getCamera: () => ({
         position: this.renderer.camera.position.toArray(),
         rotation: this.renderer.camera.rotation.toArray().slice(0, 3),
@@ -252,6 +359,7 @@ class Game {
       await this.audioManager.loadSounds(this.renderer.scene, floor1Sconces);
       this.audioManager.attachDressing(this.renderer.scene, this.dressing.marks);
       this.audioManager.attachLeeches(this.renderer.scene, floor1);
+      this.audioManager.attachWaterPools(this.renderer.scene, floor1);
       this.lastTime = performance.now();
       this.fpsLastTime = this.lastTime;
       requestAnimationFrame(() => this.gameLoop());
@@ -288,11 +396,12 @@ class Game {
 
     this.sceneBuilder.doors.update(now);
     this.dressing.update(now);
+    this.water.update(now);
     this.atmosphere.update(dtSec, now, this.renderer.camera);
     this.audioManager.update(now, this.renderer.camera.position.x, this.renderer.camera.position.z);
 
     const prevFrame = this.spriteManager.sconceFrame();
-    this.spriteManager.update(now);
+    this.spriteManager.update(now, this.player.x, this.player.y, this.player.dir);
     const nextFrame = this.spriteManager.sconceFrame();
     if (nextFrame !== prevFrame) this.vertexLighting.setFlickerFrame(nextFrame);
 

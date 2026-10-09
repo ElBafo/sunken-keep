@@ -68,13 +68,19 @@ export class VertexLightingManager {
     this.faces = [];
     const radiusTiles = SCONCE_RADIUS_TILES + 1;
 
+    // Nested door groups store translation/rotation on a parent holder, not the
+    // mesh. updateMatrixWorld(true) on the mesh alone does not refresh ancestors,
+    // so vertices were cached in local space near the origin. Walking east toward
+    // a door then darkened the whole block (party moved *away* from that origin).
+    scene.updateMatrixWorld(true);
+
     scene.traverse((obj) => {
       if (!(obj instanceof THREE.Mesh) || !obj.geometry.attributes.position) return;
       if (obj.userData.isSprite || obj.userData.skipVertexLighting || obj instanceof THREE.Sprite) {
         return;
       }
 
-      obj.updateMatrixWorld(true);
+      obj.updateWorldMatrix(true, false);
       const geometry = obj.geometry;
       if (!geometry.attributes.color) {
         const colors = new Float32Array(geometry.attributes.position.count * 3);

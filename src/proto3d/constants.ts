@@ -1,4 +1,4 @@
-import { Sconce } from './types';
+import { Sconce, Tile } from './types';
 
 /** World units per grid tile. Wall quads are CELL_SIZE × CELL_SIZE. */
 export const CELL_SIZE = 2;
@@ -14,10 +14,28 @@ export const CAMERA_NEAR = 0.08;
 export const CAMERA_FAR = 32;
 export const STEP_BOB_AMPLITUDE = 0.038;
 
-/** Recessed water; walls and stone skirts drop to this so the step isn't a black gap. */
-export const WATER_Y = -0.15;
-export const WALL_BOTTOM = WATER_Y;
+/** Shallow flooded bed. Deep lane sinks further; the translucent surface sits at y 0. */
+export const WATER_SHALLOW_Y = -0.15;
+export const WATER_DEEP_Y = -0.4;
+export const WATER_SURFACE_Y = 0;
+/** @deprecated alias for WATER_SHALLOW_Y */
+export const WATER_Y = WATER_SHALLOW_Y;
+/** Walls drop to the deep bed so no black gap shows beside deep water. */
+export const WALL_BOTTOM = WATER_DEEP_Y;
 export const WALL_TOP = CELL_SIZE;
+export const WATER_SURFACE_FPS = 6;
+/** Billboards sit this far above a floor or water surface so they pass the depth test. */
+export const SPRITE_SURFACE_LIFT = 0.04;
+
+export function tileBedY(tile: Pick<Tile, 'deepWater' | 'shallowWater'>): number {
+  if (tile.deepWater) return WATER_DEEP_Y;
+  if (tile.shallowWater) return WATER_SHALLOW_Y;
+  return 0;
+}
+
+export function isWaterTile(tile: Pick<Tile, 'deepWater' | 'shallowWater'>): boolean {
+  return !!(tile.deepWater || tile.shallowWater);
+}
 
 export const FOG_COLOR = 0x060504;
 export const FOG_NEAR = 3.2;

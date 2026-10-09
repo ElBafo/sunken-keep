@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CELL_SIZE, FOG_COLOR, FOG_FAR, FOG_NEAR, WATER_Y } from './constants';
+import { CELL_SIZE, FOG_COLOR, FOG_FAR, FOG_NEAR, WATER_SURFACE_Y } from './constants';
 import { Dressing } from './dressing';
 import { QUALITY_PRESETS, QualityLevel } from './quality';
 import { FloorData } from './types';
@@ -40,6 +40,30 @@ export class Atmosphere {
 
   setSplashHandler(fn: (x: number, y: number, z: number) => void) {
     this.onSplash = fn;
+  }
+
+  spawnStepSplash(wx: number, wz: number) {
+    if (this.splashMaps.length === 0) return;
+    let slot: DripSlot | null = null;
+    for (const d of this.drips) {
+      if (!d.active && !d.splashing) {
+        slot = d;
+        break;
+      }
+    }
+    if (!slot) slot = this.drips[0] ?? null;
+    if (!slot) return;
+    slot.active = false;
+    slot.mesh.visible = false;
+    slot.splashing = true;
+    slot.splashAge = 0;
+    slot.splashFrame = 0;
+    slot.splash.visible = true;
+    slot.splash.scale.set(2.1, 2.1, 1);
+    slot.splash.position.set(wx, WATER_SURFACE_Y + 0.025, wz);
+    (slot.splash.material as THREE.MeshBasicMaterial).map = this.splashMaps[0];
+    (slot.splash.material as THREE.MeshBasicMaterial).needsUpdate = true;
+    this.onSplash?.(wx, WATER_SURFACE_Y, wz);
   }
 
   applyFog(scene: THREE.Scene, renderer: THREE.WebGLRenderer) {
@@ -265,16 +289,17 @@ export class Atmosphere {
         d.mesh.position.set(d.x, d.y, d.z);
         this.dropLook.copy(camera.position);
         d.mesh.lookAt(this.dropLook);
-        if (d.y <= WATER_Y + 0.03) {
+        if (d.y <= WATER_SURFACE_Y + 0.03) {
           d.active = false;
           d.mesh.visible = false;
           d.splashing = true;
           d.splashAge = 0;
           d.splashFrame = 0;
           d.splash.visible = true;
-          d.splash.position.set(d.x, WATER_Y + 0.02, d.z);
+          d.splash.scale.set(1, 1, 1);
+          d.splash.position.set(d.x, WATER_SURFACE_Y + 0.02, d.z);
           (d.splash.material as THREE.MeshBasicMaterial).map = this.splashMaps[0];
-          this.onSplash?.(d.x, WATER_Y, d.z);
+          this.onSplash?.(d.x, WATER_SURFACE_Y, d.z);
         }
       } else if (d.splashing) {
         d.splashAge += dtSec;
@@ -287,6 +312,7 @@ export class Atmosphere {
         if (d.splashAge >= 0.3) {
           d.splashing = false;
           d.splash.visible = false;
+          d.splash.scale.set(1, 1, 1);
         }
       }
     }

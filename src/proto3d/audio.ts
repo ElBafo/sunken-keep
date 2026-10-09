@@ -1,5 +1,11 @@
 import * as THREE from 'three';
-import { CELL_SIZE, FACE_INTO_ROOM, SCONCE_WALL_OFFSET_TILES, WATER_Y } from './constants';
+import {
+  CELL_SIZE,
+  FACE_INTO_ROOM,
+  SCONCE_WALL_OFFSET_TILES,
+  WATER_SURFACE_Y,
+  isWaterTile
+} from './constants';
 import { QUALITY_PRESETS, QualityLevel } from './quality';
 import { DressingMarks } from './dressing';
 import { FloorData, Sconce } from './types';
@@ -11,7 +17,7 @@ interface PositionalVoice {
   object: THREE.Object3D;
   loop: boolean;
   baseVolume: number;
-  kind: 'torch' | 'drip' | 'far' | 'door' | 'chain' | 'banner' | 'wind' | 'bones' | 'leech';
+  kind: 'torch' | 'drip' | 'far' | 'door' | 'chain' | 'banner' | 'wind' | 'bones' | 'leech' | 'water';
 }
 
 export class AudioManager {
@@ -85,7 +91,11 @@ export class AudioManager {
       ['banner', 'audio/sfx_banner_flutter.mp3'],
       ['bones', 'audio/sfx_bones_settle.mp3'],
       ['music_act1', 'audio/music_act1_loop.mp3'],
-      ['leech_idle', 'audio/sfx_bog_leeches_idle_loop.mp3']
+      ['leech_idle', 'audio/sfx_bog_leeches_idle_loop.mp3'],
+      ['step', 'audio/sfx_step.mp3'],
+      ['step_water_shallow', 'audio/sfx_step_water_shallow.mp3'],
+      ['step_water_deep', 'audio/sfx_step_water_deep.mp3'],
+      ['water_lap', 'audio/sfx_water_lap_loop.mp3']
     ];
 
     const results = await Promise.all(
@@ -181,7 +191,7 @@ export class AudioManager {
       for (let x = 0; x < width; x++) {
         const tile = tiles[y][x];
         if (tile.monster !== 'bog_leeches') continue;
-        const floorY = tile.deepWater || tile.shallowWater ? WATER_Y : 0;
+        const floorY = tile.deepWater || tile.shallowWater ? WATER_SURFACE_Y : 0;
         const object = new THREE.Object3D();
         object.position.set(x * CELL_SIZE, floorY + 0.2, y * CELL_SIZE);
         const audio = new THREE.PositionalAudio(this.listener);
@@ -195,6 +205,57 @@ export class AudioManager {
         scene.add(object);
         audio.play();
         this.voices.push({ audio, object, loop: true, baseVolume: 0.4, kind: 'leech' });
+      }
+    }
+  }
+
+  attachWaterPools(scene: THREE.Scene, floorData: FloorData) {
+    const buf = this.buffers.get('water_lap');
+    if (!buf) return;
+    const { tiles, width, height } = floorData;
+    const seen = new Set<string>();
+    const dirs: Array<[number, number]> = [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1]
+    ];
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        if (!isWaterTile(tiles[y][x])) continue;
+        const start = `${x},${y}`;
+        if (seen.has(start)) continue;
+        const cells: Array<[number, number]> = [];
+        const stack: Array<[number, number]> = [[x, y]];
+        while (stack.length) {
+          const [cx, cy] = stack.pop()!;
+          const k = `${cx},${cy}`;
+          if (seen.has(k)) continue;
+          const tile = tiles[cy]?.[cx];
+          if (!tile || !isWaterTile(tile)) continue;
+          seen.add(k);
+          cells.push([cx, cy]);
+          for (const [dx, dy] of dirs) stack.push([cx + dx, cy + dy]);
+        }
+        let sx = 0;
+        let sy = 0;
+        for (const [cx, cy] of cells) {
+          sx += cx;
+          sy += cy;
+        }
+        const object = new THREE.Object3D();
+        object.position.set((sx / cells.length) * CELL_SIZE, WATER_SURFACE_Y, (sy / cells.length) * CELL_SIZE);
+        const audio = new THREE.PositionalAudio(this.listener);
+        audio.setBuffer(buf);
+        audio.setRefDistance(2 * CELL_SIZE);
+        audio.setMaxDistance(6 * CELL_SIZE);
+        audio.setRolloffFactor(1);
+        audio.setLoop(true);
+        audio.setVolume(0.35);
+        object.add(audio);
+        scene.add(object);
+        audio.play();
+        this.voices.push({ audio, object, loop: true, baseVolume: 0.35, kind: 'water' });
       }
     }
   }
