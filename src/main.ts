@@ -126,21 +126,21 @@ async function main() {
   let gameController: GameController | null = null;
   let uiRenderer585: UIRenderer585 | null = null;
   let titleScreen: TitleScreen | null = null;
-  let inTitleScreen = false; // Temporarily bypass title screen to test
+  let inTitleScreen = true; // Start in title screen
   
   if (USE_NEW_CONTROLLER) {
     gameController = new GameController();
     await gameController.init();
     uiRenderer585 = new UIRenderer585();
-    // Temporarily skip TitleScreen to test WebKit
-    // titleScreen = new TitleScreen();
+    titleScreen = new TitleScreen();
     console.log('New game controller initialized');
   }
   
   // Check if running as PWA (standalone mode)
+  let isStandalone = false;
   try {
-    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
-                         (window.navigator as any).standalone === true;
+    isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                   (window.navigator as any).standalone === true;
     
     // Show install hint on iOS Safari when not standalone (one-time)
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
@@ -196,11 +196,52 @@ async function main() {
     const x = (e.clientX - rect.left) * scaleX;
     const y = (e.clientY - rect.top) * scaleY;
 
+    // Handle title screen clicks
+    if (inTitleScreen && titleScreen) {
+      const action = titleScreen.handleClick(x, y);
+      if (action === 'new_game') {
+        inTitleScreen = false;
+        // Start new game
+        return;
+      } else if (action === 'continue') {
+        const mostRecentSlot = SaveSystem.getMostRecentSlot();
+        if (mostRecentSlot !== null) {
+          const save = SaveSystem.load(mostRecentSlot);
+          if (save) {
+            const state = gameController.getState();
+            SaveSystem.restoreState(save, state);
+            inTitleScreen = false;
+          }
+        }
+        return;
+      } else if (action === 'load') {
+        // Title screen will switch to load mode internally
+        return;
+      } else if (typeof action === 'number') {
+        // Load from specific slot
+        const save = SaveSystem.load(action);
+        if (save) {
+          const state = gameController.getState();
+          SaveSystem.restoreState(save, state);
+          inTitleScreen = false;
+          titleScreen.reset();
+        }
+        return;
+      } else if (action === 'back') {
+        // Back to title (handled by titleScreen internally)
+        return;
+      } else if (action === 'settings') {
+        // TODO: implement settings menu
+        console.log('Settings not yet implemented');
+        return;
+      }
+    }
+
     // Handle title screen
     if (inTitleScreen && titleScreen) {
-      const result = titleScreen.handleClick(x, y, CANVAS_WIDTH, CANVAS_HEIGHT);
+      const result = titleScreen.handleClick(x, y);
       
-      if (result === 'new') {
+      if (result === 'new_game') {
         // Start new game
         gameController = new GameController();
         gameController.init().then(() => {
@@ -447,7 +488,7 @@ async function main() {
     if (gameStarted) {
       // Render title screen if active
       if (inTitleScreen && titleScreen && USE_NEW_CONTROLLER) {
-        titleScreen.render(ctx, CANVAS_WIDTH, CANVAS_HEIGHT);
+        titleScreen.render(ctx, CANVAS_WIDTH, CANVAS_HEIGHT, now);
       }
       // Render game UI if past title screen
       else if (gameController && uiRenderer585 && USE_NEW_CONTROLLER && !inTitleScreen) {

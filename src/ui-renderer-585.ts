@@ -1,6 +1,8 @@
 import { assets } from './assets';
 import type { GameState, Hero } from './types';
 import type { HeroId } from './constants';
+import { Renderer } from './renderer';
+import { createPartyAdapter } from './render-adapter';
 import {
   CANVAS_WIDTH,
   CANVAS_HEIGHT,
@@ -14,28 +16,54 @@ import {
 
 export class UIRenderer585 {
   private stoneStripTile: HTMLImageElement | null = null;
+  private dungeonRenderer: Renderer | null = null;
 
   constructor() {
     // Minimal initialization
   }
 
+  private ensureRendererInit(): void {
+    if (!this.dungeonRenderer) {
+      this.dungeonRenderer = new Renderer();
+    }
+  }
+
   // Render full UI
   render(ctx: CanvasRenderingContext2D, state: GameState, now: number): void {
+    this.ensureRendererInit();
+
     // Clear canvas
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    // Placeholder dungeon view
-    ctx.fillStyle = '#2a2420';
-    ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
-    
-    // Draw horizon line
-    ctx.strokeStyle = '#4a4440';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, HORIZON_Y);
-    ctx.lineTo(VIEW_WIDTH, HORIZON_Y);
-    ctx.stroke();
+    // Render dungeon view using old renderer (270×380)
+    try {
+      const party = createPartyAdapter(state);
+      const floor = state.floors.get(state.party.floor);
+      if (floor && party && this.dungeonRenderer) {
+        const oldFloor = {
+          width: floor.width,
+          height: floor.height,
+          startX: floor.startX,
+          startY: floor.startY,
+          startDir: floor.startDir,
+          tiles: floor.tiles,
+          sconces: floor.sconces,
+        };
+        this.dungeonRenderer.drawViewport(ctx, party, oldFloor as any, now);
+      }
+    } catch (error) {
+      console.error('Renderer error:', error);
+      // Fallback
+      ctx.fillStyle = '#2a2420';
+      ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+      ctx.strokeStyle = '#4a4440';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, HORIZON_Y);
+      ctx.lineTo(VIEW_WIDTH, HORIZON_Y);
+      ctx.stroke();
+    }
 
     // Fill any extra height below panel with stone strip tile
     this.fillExtraHeight(ctx);
