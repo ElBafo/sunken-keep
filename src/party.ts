@@ -43,6 +43,14 @@ export interface FloorData {
   startX: number;
   startY: number;
   startDir: Direction;
+  sconces?: Sconce[];
+}
+
+export interface Sconce {
+  x: number;  // Wall block x
+  y: number;  // Wall block y
+  face: 'N' | 'E' | 'S' | 'W';  // Which side of the wall block
+  lit: boolean;
 }
 
 export class Party {

@@ -93,8 +93,8 @@ export class MessageLog {
   private messages: LogMessage[] = [];
   private maxMessages = 20;  // Keep history beyond visible lines
   
-  add(text: string, color = UI.LOG_TEXT_COLOR) {
-    this.messages.push({ text, time: Date.now(), color });
+  add(text: string, color?: string) {
+    this.messages.push({ text, time: Date.now(), color: color || '#d8ccb0' });
     if (this.messages.length > this.maxMessages) {
       this.messages.shift();
     }

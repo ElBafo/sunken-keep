@@ -26,6 +26,13 @@ export class AssetLoader {
   getImage(path: string): HTMLImageElement | undefined {
     return this.images.get(path);
   }
+  
+  isImageReady(img: HTMLImageElement | undefined): boolean {
+    if (!img) return false;
+    if (!img.complete) return false;
+    if (img.naturalWidth === 0) return false;
+    return true;
+  }
 
   async waitForAll(): Promise<void> {
     await Promise.all(this.loadPromises);
@@ -128,6 +135,20 @@ export class SoundManager {
       sound.currentTime = 0;
       sound.play().catch(() => {});
     }
+  }
+  
+  playLoop(event: string, volume: number = 1.0): HTMLAudioElement | null {
+    if (!this.unlocked) return null;
+    
+    const soundKey = event.startsWith('sfx_') ? event : `sfx_${event}`;
+    const sound = this.sounds.get(soundKey);
+    if (sound) {
+      sound.volume = this.muted ? 0 : volume;
+      sound.loop = true;
+      sound.play().catch(() => {});
+      return sound;
+    }
+    return null;
   }
 
   playMusic(name: string) {

@@ -29,6 +29,9 @@ export class Game {
   private potionCount = 0;
   private hasScroll = false;
   
+  // Torch audio loops
+  private torchLoops: Map<string, HTMLAudioElement> = new Map();
+  
   // Combat state
   private combatTile: Tile | null = null;
   private combatMonsterType: string = '';
@@ -87,6 +90,9 @@ export class Game {
       
       // Process leech latches
       this.updateLeeches();
+      
+      // Update torch audio loops
+      this.updateTorchAudio();
     }
     
     if (this.state === 'combat') {
@@ -158,6 +164,56 @@ export class Game {
         }
       }
     }
+  }
+  
+  private updateTorchAudio() {
+    if (!this.floor.sconces) return;
+    
+    // Update volume for each lit sconce based on distance
+    this.floor.sconces.forEach((sconce, index) => {
+      if (!sconce.lit) return;
+      
+      // Calculate distance from party to sconce
+      const dx = sconce.x - this.party.x;
+      const dy = sconce.y - this.party.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      
+      // Volume based on distance: 1.0 at 1 square, 0.5 at 2, very quiet at 3, silent beyond
+      let volume = 0;
+      if (dist <= 1) {
+        volume = 1.0;
+      } else if (dist <= 2) {
+        volume = 0.5;
+      } else if (dist <= 3) {
+        volume = 0.1;
+      }
+      
+      const loopKey = `sconce_${index}`;
+      
+      if (volume > 0) {
+        // Play or update existing loop
+        if (!this.torchLoops.has(loopKey)) {
+          const loop = sound.playLoop('torch_loop', volume);
+          if (loop) {
+            // Start at random offset for more natural ambience
+            loop.currentTime = Math.random() * 10;
+            this.torchLoops.set(loopKey, loop);
+          }
+        } else {
+          const loop = this.torchLoops.get(loopKey);
+          if (loop) {
+            loop.volume = volume * (sound.isMuted() ? 0 : 1);
+          }
+        }
+      } else {
+        // Stop and remove loop
+        const loop = this.torchLoops.get(loopKey);
+        if (loop) {
+          loop.pause();
+          this.torchLoops.delete(loopKey);
+        }
+      }
+    });
   }
 
   render(ctx: CanvasRenderingContext2D, now: number) {

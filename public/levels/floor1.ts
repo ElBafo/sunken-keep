@@ -13,14 +13,6 @@ export const floor1: FloorData = {
   startX: 1,
   startY: 7,
   startDir: 0,
-  sconces: [
-    { x: 0, y: 6, face: 'E', lit: true },   // beside the first carving, warm light at the start
-    { x: 4, y: 1, face: 'W', lit: true },   // wall above the locked door
-    { x: 0, y: 3, face: 'E', lit: false },  // flooded hall, dead
-    { x: 4, y: 6, face: 'W', lit: false },  // west corridor, dead
-    { x: 8, y: 6, face: 'W', lit: false },  // pantry, dead
-    { x: 8, y: 1, face: 'W', lit: false },  // vault behind the slime, dead
-  ],
   tiles: [
     // Row 0
     [ { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true } ],
@@ -42,3 +34,14 @@ export const floor1: FloorData = {
     [ { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true } ]
   ]
 };
+
+// Wall sconces: { x, y } is the wall block, face is the side the sconce hangs on (N/E/S/W).
+// Upper floors are mostly cold: only the first carving and the locked door sit in warm light.
+export const floor1Sconces = [
+  { x: 0, y: 6, face: 'E', lit: true },   // beside the first carving, warm light at the start
+  { x: 4, y: 1, face: 'W', lit: true },   // next to the locked door and its carving
+  { x: 0, y: 3, face: 'E', lit: false },  // flooded hall, dead
+  { x: 4, y: 6, face: 'W', lit: false },  // west corridor, dead
+  { x: 8, y: 6, face: 'W', lit: false },  // pantry, dead
+  { x: 8, y: 1, face: 'W', lit: false },  // vault behind the slime, dead; the last carving stays cold
+] as const;
