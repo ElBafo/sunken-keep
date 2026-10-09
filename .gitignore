@@ -10,3 +10,5 @@ dist
 .env
 .env.local
 .netlify
+test-results/
+test-output.txt
