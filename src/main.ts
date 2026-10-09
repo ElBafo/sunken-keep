@@ -138,6 +138,7 @@ async function main() {
     gameController = new GameController();
     await gameController.init();
     uiRenderer585 = new UIRenderer585();
+    uiRenderer585.preloadAssets();
     titleScreen = new TitleScreen();
     await titleScreen.loadAssets();
     if (gameController.shouldSkipTitle()) {

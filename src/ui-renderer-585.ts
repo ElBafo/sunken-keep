@@ -22,7 +22,29 @@ export class UIRenderer585 {
   private offscreenCtx: CanvasRenderingContext2D | null = null;
 
   constructor() {
-    // Defer canvas creation to first render (WebKit-safe)
+    // Defer offscreen canvas creation to first render (WebKit-safe).
+    // Image preloading is started via preloadAssets() before the game loop.
+  }
+
+  preloadAssets(): void {
+    this.ensureRendererInit();
+    const baseUrl = '/sunken-keep/';
+    assets.loadImage(`${baseUrl}art/ui/layout585/panel_585.png`);
+    assets.loadImage(`${baseUrl}art/ui/layout585/stone_strip_tile.png`);
+    const hands = [
+      'axe', 'shield', 'mace', 'prayer_lantern', 'wand', 'scroll',
+      'dagger', 'tricks_pouch', 'fist_brannoc', 'fist_wren', 'fist_ilsevar', 'fist_mags',
+    ];
+    for (const hand of hands) {
+      assets.loadImage(`${baseUrl}art/ui/hands/hand_${hand}.png`);
+    }
+    const padKeys = ['turn_left', 'forward', 'turn_right', 'strafe_left', 'back', 'strafe_right', 'menu'];
+    for (const key of padKeys) {
+      assets.loadImage(`${baseUrl}art/ui/panel/icon_${key}.png`);
+    }
+    for (const dir of ['N', 'E', 'S', 'W']) {
+      assets.loadImage(`${baseUrl}art/ui/panel/compass_${dir}.png`);
+    }
   }
 
   private ensureCanvasInit(): void {

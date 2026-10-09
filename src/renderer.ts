@@ -34,10 +34,17 @@ export class Renderer {
     this.bubbleTail = assets.loadImage('/sunken-keep/art/ui/bubble_tail.png');
     
     // Preload dungeon art
-    this.preloadDungeonArt();
+    Renderer.preloadDungeonArt();
     
     // Preload panel UI art
-    this.preloadPanelArt();
+    Renderer.preloadPanelArt();
+  }
+
+  static preloadAll(): void {
+    Renderer.preloadDungeonArt();
+    Renderer.preloadPanelArt();
+    assets.loadImage('/sunken-keep/art/ui/bubble_9slice.png');
+    assets.loadImage('/sunken-keep/art/ui/bubble_tail.png');
   }
   
   // Safe image drawing - never throws even if image is broken
@@ -48,6 +55,13 @@ export class Renderer {
   ): boolean {
     const img = assets.getImage(imgPath);
     
+    if (!img) {
+      assets.loadImage(imgPath);
+      return false;
+    }
+    if (!img.complete) {
+      return false;
+    }
     if (!assets.isImageReady(img)) {
       if (!this.missingImages.has(imgPath)) {
         console.warn(`Missing or broken image: ${imgPath}`);
@@ -74,7 +88,7 @@ export class Renderer {
     }
   }
   
-  private preloadPanelArt() {
+  private static preloadPanelArt() {
     // Panel background
     assets.loadImage(UI.PANEL_BG);
     
@@ -89,7 +103,7 @@ export class Renderer {
     Object.values(UI.COMPASS_SPRITES).forEach(path => assets.loadImage(path));
   }
 
-  private preloadDungeonArt() {
+  private static preloadDungeonArt() {
     const distances = ['near', 'mid', 'far'];
     const walls = ['wall_front', 'wall_left', 'wall_right'];
     const doors = ['door_locked', 'door_open'];
@@ -127,6 +141,9 @@ export class Renderer {
       doors.forEach(door => assets.loadImage(`${dungeonPath}/${door}_${dist}.png`));
       secrets.forEach(secret => assets.loadImage(`${dungeonPath}/${secret}_${dist}.png`));
       items.forEach(item => assets.loadImage(`/sunken-keep/art/dungeon/${item}_${dist}.png`)); // Items still in old folder
+      ['carving_start', 'carving_door', 'carving_secret'].forEach(carving => {
+        assets.loadImage(`/sunken-keep/art/decals/${carving}_${dist}.png`);
+      });
       
       // Load monster animation frames
       monsters.forEach(monster => {

@@ -44,7 +44,24 @@ export class AssetLoader {
   }
 
   async waitForAll(): Promise<void> {
-    await Promise.all(this.loadPromises);
+    // Keep draining until a pass adds no new loads (preload can chain).
+    let previous = -1;
+    while (this.loadPromises.length !== previous) {
+      previous = this.loadPromises.length;
+      await Promise.all(this.loadPromises);
+    }
+
+    const decodes: Promise<void>[] = [];
+    for (const img of this.images.values()) {
+      if (typeof img.decode === 'function') {
+        decodes.push(img.decode().then(() => undefined, () => undefined));
+      }
+    }
+    await Promise.all(decodes);
+
+    if (this.loadPromises.length !== previous) {
+      await this.waitForAll();
+    }
   }
 }
 
