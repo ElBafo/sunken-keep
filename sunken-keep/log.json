@@ -108,6 +108,10 @@
     "text": "The {monster} sinks beneath the water."
   },
   {
+    "key": "monster_dies_dry",
+    "text": "The {monster} goes still."
+  },
+  {
     "key": "leech_latch",
     "text": "A leech latches onto {hero}!"
   },

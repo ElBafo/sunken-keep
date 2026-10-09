@@ -20,6 +20,7 @@ export interface Hero {
     off: number;
   };
   formation: FormationRow;
+  hitFlashUntil?: number;
 }
 
 // Party position and state

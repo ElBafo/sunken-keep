@@ -89,10 +89,11 @@ export class GameController {
       console.log(`URL override: Set flags: ${flags.join(', ')}`);
     }
 
-    // Combat test: start on the current floor with that monster adjacent, in front, already fighting
+    // Combat test: start on the current floor with that monster in front, already fighting.
+    // Optional ?dist=1|2|3 places the party that many squares away facing the monster.
     const fightParam = params.get('fight');
     if (fightParam) {
-      this.setupFight(fightParam);
+      this.setupFight(fightParam, params.get('dist'));
     }
   }
 
@@ -156,21 +157,32 @@ export class GameController {
     return null;
   }
 
-  private placePartyFacingMonster(floor: FloorData, mx: number, my: number): boolean {
+  private placePartyFacingMonster(floor: FloorData, mx: number, my: number, dist = 1): boolean {
     // Prefer standing south of the monster (facing north) so it fills the view
-    const neighbors: Array<[number, number, number]> = [
+    const rays: Array<[number, number, number]> = [
       [0, 1, 0],   // party south, face north
       [-1, 0, 1],  // party west, face east
       [1, 0, 3],   // party east, face west
       [0, -1, 2],  // party north, face south
     ];
-    for (const [dx, dy, dir] of neighbors) {
-      const x = mx + dx;
-      const y = my + dy;
+    for (const [dx, dy, dir] of rays) {
+      const x = mx + dx * dist;
+      const y = my + dy * dist;
       if (x < 0 || y < 0 || x >= floor.width || y >= floor.height) continue;
       const tile = floor.tiles[y][x];
       if (this.tileBlocks(tile)) continue;
       if (tile.monster) continue;
+      let blocked = false;
+      for (let i = 1; i < dist; i++) {
+        const ix = mx + dx * i;
+        const iy = my + dy * i;
+        const mid = floor.tiles[iy]?.[ix];
+        if (this.tileBlocks(mid) || mid?.monster) {
+          blocked = true;
+          break;
+        }
+      }
+      if (blocked) continue;
       this.state.party.x = x;
       this.state.party.y = y;
       this.state.party.dir = dir;
@@ -179,18 +191,24 @@ export class GameController {
     return false;
   }
 
-  private setupFight(monsterId: string): void {
+  private setupFight(monsterId: string, distParam?: string | null): void {
     const floor = this.state.floors.get(this.state.party.floor);
     if (!floor) {
       console.error(`Fight setup failed: no floor ${this.state.party.floor}`);
       return;
     }
 
+    const dist = distParam ? Math.max(1, Math.min(3, parseInt(distParam, 10) || 1)) : 1;
+
     let pos = this.findMonster(floor, monsterId);
     if (pos) {
-      if (!this.placePartyFacingMonster(floor, pos.x, pos.y)) {
-        console.warn(`Fight setup: no adjacent tile for ${monsterId}, spawning in front instead`);
-        pos = this.spawnMonsterInFront(floor, monsterId);
+      if (!this.placePartyFacingMonster(floor, pos.x, pos.y, dist)) {
+        console.warn(`Fight setup: no tile at dist ${dist} for ${monsterId}, trying closer`);
+        if (dist !== 1 && this.placePartyFacingMonster(floor, pos.x, pos.y, 1)) {
+          // placed at distance 1
+        } else {
+          pos = this.spawnMonsterInFront(floor, monsterId);
+        }
       }
     } else {
       pos = this.spawnMonsterInFront(floor, monsterId);
@@ -204,7 +222,7 @@ export class GameController {
     this.state.screen = 'playing';
     this.skipTitle = true;
     combatController.startCombat(this.state, monsterId, pos.x, pos.y);
-    console.log(`URL override: fight=${monsterId} at (${pos.x},${pos.y}) party at (${this.state.party.x},${this.state.party.y}) dir ${this.state.party.dir}`);
+    console.log(`URL override: fight=${monsterId} dist=${dist} at (${pos.x},${pos.y}) party at (${this.state.party.x},${this.state.party.y}) dir ${this.state.party.dir}`);
   }
 
   getState(): GameState {

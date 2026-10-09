@@ -458,6 +458,7 @@ async function main() {
       // Render game UI if past title screen
       else if (gameController && uiRenderer585 && USE_NEW_CONTROLLER && !inTitleScreen) {
         const state = gameController.getState();
+        combatController.update(state, now);
         
         // Render 585 UI
         uiRenderer585.render(ctx, state, now);

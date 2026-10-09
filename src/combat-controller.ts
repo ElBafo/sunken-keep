@@ -12,6 +12,8 @@ function monsterName(id: string): string {
 
 export class CombatController {
   private monsterData: Record<string, MonsterDef> = {};
+  private lastUpdate = 0;
+  private lastMonsterAttackAt = 0;
   private activeEncounter: {
     monster: string;
     monsterAc: number;
@@ -70,7 +72,78 @@ export class CombatController {
       startTime: Date.now(),
       lastActionTime: Date.now(),
     };
+    this.lastMonsterAttackAt = Date.now();
+    this.lastUpdate = Date.now();
     console.log(`Combat started: ${monster} (AC ${stats.ac}, HP ${hp})`);
+  }
+
+  // Tick monster animation and attack timers while combat is active
+  update(state: GameState, now: number): void {
+    if (!this.activeEncounter) {
+      this.lastUpdate = now;
+      return;
+    }
+
+    const floor = state.floors.get(state.party.floor);
+    const { x, y } = this.activeEncounter.tile;
+    const tile = floor?.tiles[y]?.[x];
+    const dt = this.lastUpdate ? (now - this.lastUpdate) / 1000 : 0;
+    this.lastUpdate = now;
+
+    if (tile?.monster) {
+      tile.monsterAnimTime = (tile.monsterAnimTime || 0) + dt;
+      if (tile.monsterState === 'attack' && tile.monsterAnimTime > 0.25) {
+        tile.monsterState = 'idle';
+        tile.monsterAnimTime = 0;
+      } else if (tile.monsterState === 'hurt' && tile.monsterAnimTime > 0.2) {
+        tile.monsterState = 'idle';
+        tile.monsterAnimTime = 0;
+      }
+    }
+
+    const stats = this.getMonsterStats(this.activeEncounter.monster);
+    if (!stats) return;
+    const intervalMs = (stats.interval ?? 2) * 1000;
+    if (now - this.lastMonsterAttackAt < intervalMs) return;
+    this.lastMonsterAttackAt = now;
+    this.performMonsterAttack(state, stats, now);
+  }
+
+  private performMonsterAttack(state: GameState, stats: MonsterDef, now: number): void {
+    if (!this.activeEncounter) return;
+
+    const livingFront = Object.values(state.heroes).filter(h => h.formation === 'front' && h.hp > 0);
+    const living = livingFront.length > 0
+      ? livingFront
+      : Object.values(state.heroes).filter(h => h.hp > 0);
+    if (living.length === 0) return;
+
+    const target = living[Math.floor(Math.random() * living.length)];
+    const [dmin, dmax] = stats.damage;
+    const damage = dmin + Math.floor(Math.random() * (dmax - dmin + 1));
+    target.hp = Math.max(0, target.hp - damage);
+    target.hitFlashUntil = now + 300;
+
+    const floor = state.floors.get(state.party.floor);
+    const { x, y } = this.activeEncounter.tile;
+    const tile = floor?.tiles[y]?.[x];
+    if (tile?.monster) {
+      tile.monsterState = 'attack';
+      tile.monsterAnimTime = 0;
+    }
+
+    sound.play('sfx_hurt');
+    sound.play(`${this.activeEncounter.monster}_attack`);
+    gameLog.add(getLogMessage('monster_hit', {
+      monster: monsterName(this.activeEncounter.monster),
+      hero: target.name,
+      n: damage,
+    }));
+    console.log(`The ${this.activeEncounter.monster} hits ${target.name} for ${damage}`);
+
+    if (target.hp <= 0) {
+      gameLog.add(getLogMessage('hero_down', { hero: target.name }));
+    }
   }
 
   // End combat (monster defeated or fled)
@@ -92,6 +165,13 @@ export class CombatController {
   // Get combat info
   getCombatInfo() {
     return this.activeEncounter;
+  }
+
+  private deathMessageKey(state: GameState, x: number, y: number): string {
+    const floor = state.floors.get(state.party.floor);
+    const tile = floor?.tiles[y]?.[x];
+    if (tile?.shallowWater || tile?.deepWater) return 'monster_dies';
+    return 'monster_dies_dry';
   }
 
   private removeMonsterFromFloor(state: GameState, x: number, y: number): void {
@@ -167,6 +247,15 @@ export class CombatController {
         sound.play('sfx_hit');
         this.activeEncounter.monsterHp = Math.max(0, this.activeEncounter.monsterHp - result.damage);
         this.syncTileHp(state);
+        {
+          const floor = state.floors.get(state.party.floor);
+          const { x, y } = this.activeEncounter.tile;
+          const tile = floor?.tiles[y]?.[x];
+          if (tile?.monster) {
+            tile.monsterState = 'hurt';
+            tile.monsterAnimTime = 0;
+          }
+        }
         gameLog.add(getLogMessage('hit', {
           hero: hero.name,
           monster: monsterName(this.activeEncounter.monster),
@@ -177,7 +266,8 @@ export class CombatController {
         if (this.activeEncounter.monsterHp <= 0) {
           const deadName = this.activeEncounter.monster;
           const { x, y } = this.activeEncounter.tile;
-          gameLog.add(getLogMessage('monster_dies', { monster: monsterName(deadName) }));
+          const deathKey = this.deathMessageKey(state, x, y);
+          gameLog.add(getLogMessage(deathKey, { monster: monsterName(deadName) }));
           console.log(`${deadName} defeated!`);
           this.removeMonsterFromFloor(state, x, y);
           this.endCombat(state);

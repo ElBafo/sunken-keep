@@ -1,7 +1,7 @@
 import { assets } from './assets';
-import type { GameState, Hero } from './types';
+import type { GameState, Hero, FloorData } from './types';
 import type { HeroId } from './constants';
-import { Renderer } from './renderer';
+import { Renderer, distKeyFor } from './renderer';
 import { createPartyAdapter } from './render-adapter';
 import { gameLog } from './game-log';
 import {
@@ -14,6 +14,9 @@ import {
   HERO_LAYOUT,
   CONTROLS_LAYOUT,
 } from './constants';
+
+const DUNGEON_BLIT_Y = 90;
+const V380_PATH = '/sunken-keep/art/dungeon_v2/v380';
 
 export class UIRenderer585 {
   private stoneStripTile: HTMLImageElement | null = null;
@@ -34,6 +37,15 @@ export class UIRenderer585 {
     const baseUrl = '/sunken-keep/';
     assets.loadImage(`${baseUrl}art/ui/layout585/panel_585.png`);
     assets.loadImage(`${baseUrl}art/ui/layout585/stone_strip_tile.png`);
+    this.stoneStripTile = assets.loadImage(`${baseUrl}art/ui/layout585/stone_strip_tile.png`);
+    for (const name of ['stone', 'shallow', 'deep']) {
+      assets.loadImage(`${V380_PATH}/backdrop_${name}.png`);
+    }
+    for (const type of ['shallow', 'deep']) {
+      for (const dist of ['near', 'mid', 'far']) {
+        assets.loadImage(`${V380_PATH}/floor_water_${type}_${dist}.png`);
+      }
+    }
     const hands = [
       'axe', 'shield', 'mace', 'prayer_lantern', 'wand', 'scroll',
       'dagger', 'tricks_pouch', 'fist_brannoc', 'fist_wren', 'fist_ilsevar', 'fist_mags',
@@ -74,16 +86,16 @@ export class UIRenderer585 {
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    // Render dungeon view using old renderer (270×200), then extend with ceiling/floor
+    // Draw the 270×380 backdrop at y=0 (no stretching), then 200-tall walls at y=90.
     try {
       const party = createPartyAdapter(state);
       const floor = state.floors.get(state.party.floor);
       if (floor && party && this.dungeonRenderer && this.offscreenCanvas && this.offscreenCtx) {
-        // Clear offscreen canvas
-        this.offscreenCtx.fillStyle = '#000000';
-        this.offscreenCtx.fillRect(0, 0, 270, 200);
-        
-        // Render to offscreen canvas
+        ctx.imageSmoothingEnabled = false;
+        this.drawV380Backdrop(ctx, floor, state.party.x, state.party.y);
+        this.drawV380Water(ctx, party, floor, now);
+
+        this.offscreenCtx.clearRect(0, 0, 270, 200);
         const oldFloor = {
           width: floor.width,
           height: floor.height,
@@ -93,18 +105,9 @@ export class UIRenderer585 {
           tiles: floor.tiles,
           sconces: floor.sconces,
         };
-        this.dungeonRenderer.drawViewport(this.offscreenCtx, party, oldFloor as any, now);
-        
-        // Draw ceiling (top 20px of rendered view, stretched to 90px tall)
-        ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(this.offscreenCanvas, 0, 0, 270, 20, 0, 0, 270, 90);
-        
-        // Draw main view at y=90 (horizon at y=100 in source → y=190 in dest)
-        ctx.drawImage(this.offscreenCanvas, 0, 0, 270, 200, 0, 90, 270, 200);
-        
-        // Draw floor (bottom 20px of rendered view, stretched to 90px tall)
-        ctx.drawImage(this.offscreenCanvas, 0, 180, 270, 20, 0, 290, 270, 90);
-        
+        this.dungeonRenderer.drawViewport(this.offscreenCtx, party, oldFloor as any, now, { geometryOnly: true });
+        ctx.drawImage(this.offscreenCanvas, 0, DUNGEON_BLIT_Y);
+        this.drawViewOverlays(ctx, party, floor);
         ctx.imageSmoothingEnabled = true;
       }
     } catch (error) {
@@ -143,6 +146,93 @@ export class UIRenderer585 {
 
     // Draw menu and save buttons
     this.drawMenuSaveButtons(ctx);
+  }
+
+  private drawV380Backdrop(
+    ctx: CanvasRenderingContext2D,
+    floor: FloorData,
+    x: number,
+    y: number
+  ): void {
+    const tile = floor.tiles[y]?.[x];
+    let name = 'stone';
+    if (tile?.deepWater) name = 'deep';
+    else if (tile?.shallowWater) name = 'shallow';
+    const path = `${V380_PATH}/backdrop_${name}.png`;
+    const img = assets.getImage(path);
+    if (img && img.complete && assets.isImageReady(img)) {
+      ctx.drawImage(img, 0, 0);
+    } else {
+      ctx.fillStyle = '#0a1612';
+      ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    }
+  }
+
+  private drawV380Water(
+    ctx: CanvasRenderingContext2D,
+    party: { getPosition: (distance: number, side: number) => { x: number; y: number } },
+    floor: FloorData,
+    now: number
+  ): void {
+    const shimmer = (now * 0.001) % 10;
+    for (let dist = 1; dist <= 3; dist++) {
+      const pos = party.getPosition(dist, 0);
+      if (pos.x < 0 || pos.y < 0 || pos.x >= floor.width || pos.y >= floor.height) continue;
+      const tile = floor.tiles[pos.y][pos.x];
+      if (!tile.shallowWater && !tile.deepWater) continue;
+      const type = tile.deepWater ? 'deep' : 'shallow';
+      const distKey = distKeyFor(dist as 1 | 2 | 3);
+      const path = `${V380_PATH}/floor_water_${type}_${distKey}.png`;
+      const img = assets.getImage(path);
+      if (!img || !img.complete || !assets.isImageReady(img)) continue;
+      ctx.save();
+      const shimmerOffset = Math.sin(shimmer * Math.PI * 0.4 + dist) * 0.5;
+      ctx.globalAlpha = 0.95 + Math.sin(shimmer * Math.PI * 0.3) * 0.05;
+      ctx.drawImage(img, shimmerOffset, 0);
+      ctx.restore();
+    }
+  }
+
+  private drawViewOverlays(
+    ctx: CanvasRenderingContext2D,
+    party: { x: number; y: number; dir: number },
+    floor: FloorData
+  ): void {
+    ctx.save();
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.fillStyle = '#3a4a38';
+    ctx.globalAlpha = 0.4;
+    ctx.fillRect(0, DUNGEON_BLIT_Y + 65, VIEW_WIDTH, 70);
+    ctx.fillStyle = '#5a6a58';
+    ctx.globalAlpha = 0.25;
+    ctx.fillRect(0, DUNGEON_BLIT_Y + 50, VIEW_WIDTH, 65);
+    ctx.restore();
+
+    if (!floor.sconces) return;
+    ctx.save();
+    ctx.globalCompositeOperation = 'lighter';
+    for (const sconce of floor.sconces) {
+      if (!sconce.lit) continue;
+      const dx = sconce.x - party.x;
+      const dy = sconce.y - party.y;
+      const dist = Math.sqrt(dx * dx + dy * dy);
+      if (dist > 3) continue;
+      let intensity = 0;
+      if (dist <= 1) intensity = 0.3;
+      else if (dist <= 2) intensity = 0.15;
+      else intensity = 0.05;
+      const horizon = DUNGEON_BLIT_Y + 100;
+      const gradient = ctx.createRadialGradient(
+        VIEW_WIDTH / 2, horizon, 10,
+        VIEW_WIDTH / 2, horizon, 150
+      );
+      gradient.addColorStop(0, `rgba(255, 136, 68, ${intensity})`);
+      gradient.addColorStop(0.5, `rgba(255, 136, 68, ${intensity * 0.5})`);
+      gradient.addColorStop(1, 'rgba(255, 136, 68, 0)');
+      ctx.fillStyle = gradient;
+      ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    }
+    ctx.restore();
   }
 
   private fillExtraHeight(ctx: CanvasRenderingContext2D): void {
@@ -201,7 +291,7 @@ export class UIRenderer585 {
     ctx: CanvasRenderingContext2D,
     hero: Hero,
     rect: [number, number, number, number],
-    _now: number
+    now: number
   ): void {
     const [x, y, w, h] = rect;
     const baseUrl = '/sunken-keep/';
@@ -222,6 +312,14 @@ export class UIRenderer585 {
       // Fallback: solid color
       ctx.fillStyle = hero.id === 'brannoc' ? '#8a4a2a' : hero.id === 'wren' ? '#4a6a8a' : hero.id === 'ilsevar' ? '#6a4a8a' : '#4a8a4a';
       ctx.fillRect(x, y, w, h);
+    }
+
+    if (hero.hitFlashUntil && now < hero.hitFlashUntil) {
+      ctx.save();
+      ctx.globalAlpha = Math.max(0, (hero.hitFlashUntil - now) / 300) * 0.5;
+      ctx.fillStyle = '#ff0000';
+      ctx.fillRect(x, y, w, h);
+      ctx.restore();
     }
 
     // Draw frame indicator for formation
