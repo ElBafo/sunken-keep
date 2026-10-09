@@ -74,10 +74,21 @@ test('proto3d lighting: pools, relight, oil, no 404s', async ({ page }) => {
   const darkBefore = await page.evaluate(() =>
     (window as unknown as { __proto3d: Proto3d }).__proto3d.tileBrightness(3, 6)
   );
-  console.log('BRIGHTNESS before relight pool', poolBefore.toFixed(3), 'dark', darkBefore.toFixed(3));
+  // (3,7) sits outside every lit torch and the lantern at (5,7).
+  const unlitAmbient = await page.evaluate(() =>
+    (window as unknown as { __proto3d: Proto3d }).__proto3d.tileBrightness(3, 7)
+  );
+  console.log(
+    'BRIGHTNESS before relight pool',
+    poolBefore.toFixed(3),
+    'dark',
+    darkBefore.toFixed(3),
+    'unlit ambient',
+    unlitAmbient.toFixed(3)
+  );
   expect(poolBefore, 'lit pool brighter than dark stretch').toBeGreaterThan(darkBefore + 0.12);
-  expect(darkBefore, 'unlit stretch is near-black (3–6% ambient, not 0)').toBeGreaterThan(0.02);
-  expect(darkBefore, 'unlit stretch is near-black (3–6% ambient, not 0)').toBeLessThan(0.08);
+  expect(unlitAmbient, 'unlit stretch is near-black (3–6% ambient, not 0)').toBeGreaterThan(0.02);
+  expect(unlitAmbient, 'unlit stretch is near-black (3–6% ambient, not 0)').toBeLessThan(0.08);
 
   await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
