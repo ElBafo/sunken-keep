@@ -69,10 +69,10 @@ export const SCONCE_RADIUS_TILES = 2.5;
 export const TORCH_INTENSITY = 1.0;
 /** Wren's lantern with oil — ~1.5–2 squares; own square + next stay readable. */
 export const LANTERN_RADIUS_TILES = 1.85;
-export const LANTERN_INTENSITY = 0.58;
+export const LANTERN_INTENSITY = 0.72;
 /** Ember-only lantern — smaller, cooler, still readable 1 square ahead. */
 export const EMBER_RADIUS_TILES = 1.35;
-export const EMBER_INTENSITY = 0.36;
+export const EMBER_INTENSITY = 0.42;
 /** Own + next square stay in the lantern's readable core (ember included). */
 export const LANTERN_CORE_TILES = 1.05;
 /** Cold sunbeam from a ceiling crack. */

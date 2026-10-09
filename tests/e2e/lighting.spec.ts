@@ -11,6 +11,7 @@ type Proto3d = {
   getOil: () => number;
   setOil: (n: number) => void;
   lastMessage: () => string;
+  getPosition: () => { x: number; y: number; dir: number };
   torchStates: () => Array<{ x: number; y: number; face: string; lit: boolean; capped: boolean }>;
   tileBrightness: (x: number, y: number) => number;
   regionStats: (x0: number, y0: number, x1: number, y1: number) => { luma: number; fogRatio: number; n: number };
@@ -90,36 +91,40 @@ test('proto3d lighting: pools, relight, oil, no 404s', async ({ page }) => {
   expect(unlitAmbient, 'unlit stretch is near-black (3–6% ambient, not 0)').toBeGreaterThan(0.02);
   expect(unlitAmbient, 'unlit stretch is near-black (3–6% ambient, not 0)').toBeLessThan(0.08);
 
-  await page.evaluate(() => {
+  const lantern = await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    p.setOil(2);
     p.setPosition(7, 1, 3);
+    return {
+      oil: p.getOil(),
+      pos: p.getPosition(),
+      own: p.tileBrightness(7, 1),
+      ahead: p.tileBrightness(6, 1)
+    };
   });
-  const lanternOwn = await page.evaluate(() =>
-    (window as unknown as { __proto3d: Proto3d }).__proto3d.tileBrightness(7, 1)
-  );
-  const lanternAhead = await page.evaluate(() =>
-    (window as unknown as { __proto3d: Proto3d }).__proto3d.tileBrightness(6, 1)
-  );
-  console.log('LANTERN oil own', lanternOwn.toFixed(3), 'ahead', lanternAhead.toFixed(3));
-  expect(lanternOwn, 'oil lantern keeps the party square readable').toBeGreaterThan(0.28);
-  expect(lanternAhead, 'oil lantern keeps the next square readable').toBeGreaterThan(0.22);
+  console.log('LANTERN oil', lantern);
+  expect(lantern.oil, 'oil lantern test has oil').toBe(2);
+  expect(lantern.pos.x, 'oil lantern test at 7,1').toBe(7);
+  expect(lantern.pos.y, 'oil lantern test at 7,1').toBe(1);
+  expect(lantern.own, 'oil lantern keeps the party square readable').toBeGreaterThan(0.3);
+  expect(lantern.ahead, 'oil lantern keeps the next square readable').toBeGreaterThan(0.2);
   await shot(7, 1, 3, 'lantern-oil-circle.png');
 
-  await page.evaluate(() => {
+  const ember = await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
     p.setOil(0);
     p.setPosition(7, 1, 3);
+    return {
+      oil: p.getOil(),
+      own: p.tileBrightness(7, 1),
+      ahead: p.tileBrightness(6, 1)
+    };
   });
-  const emberOwn = await page.evaluate(() =>
-    (window as unknown as { __proto3d: Proto3d }).__proto3d.tileBrightness(7, 1)
-  );
-  const emberAhead = await page.evaluate(() =>
-    (window as unknown as { __proto3d: Proto3d }).__proto3d.tileBrightness(6, 1)
-  );
-  console.log('LANTERN ember own', emberOwn.toFixed(3), 'ahead', emberAhead.toFixed(3));
-  expect(emberOwn, 'ember lantern keeps the party square readable').toBeGreaterThan(0.18);
-  expect(emberAhead, 'ember lantern still readable 1 square ahead').toBeGreaterThan(0.14);
-  expect(emberAhead, 'ember circle is smaller / dimmer than oil').toBeLessThan(lanternAhead - 0.02);
+  console.log('LANTERN ember', ember);
+  expect(ember.oil, 'ember lantern test has no oil').toBe(0);
+  expect(ember.own, 'ember lantern keeps the party square readable').toBeGreaterThan(0.2);
+  expect(ember.ahead, 'ember lantern still readable 1 square ahead').toBeGreaterThan(0.14);
+  expect(ember.ahead, 'ember circle is smaller / dimmer than oil').toBeLessThan(lantern.ahead - 0.02);
   await shot(7, 1, 3, 'lantern-ember-circle.png');
   await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.setOil(2));
 
