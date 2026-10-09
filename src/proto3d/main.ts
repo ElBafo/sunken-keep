@@ -250,6 +250,45 @@ class Game {
         });
         return out;
       },
+      faceLighting: () => {
+        this.renderer.scene.updateMatrixWorld(true);
+        const out: Array<{
+          kind: string;
+          lightX: number;
+          lightY: number;
+          worldX: number;
+          worldZ: number;
+          avgR: number;
+        }> = [];
+        const v = new THREE.Vector3();
+        this.renderer.scene.traverse((obj) => {
+          if (!(obj instanceof THREE.Mesh)) return;
+          if (typeof obj.userData.kind !== 'string') return;
+          const pos = obj.geometry.attributes.position;
+          const col = obj.geometry.attributes.color;
+          if (!pos) return;
+          obj.updateWorldMatrix(true, false);
+          let sx = 0;
+          let sz = 0;
+          let sr = 0;
+          const n = pos.count;
+          for (let i = 0; i < n; i++) {
+            v.fromBufferAttribute(pos, i).applyMatrix4(obj.matrixWorld);
+            sx += v.x;
+            sz += v.z;
+            sr += col ? col.getX(i) : 1;
+          }
+          out.push({
+            kind: obj.userData.kind,
+            lightX: obj.userData.lightX,
+            lightY: obj.userData.lightY,
+            worldX: sx / n,
+            worldZ: sz / n,
+            avgR: sr / n
+          });
+        });
+        return out;
+      },
       getCamera: () => ({
         position: this.renderer.camera.position.toArray(),
         rotation: this.renderer.camera.rotation.toArray().slice(0, 3),

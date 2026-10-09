@@ -44,19 +44,17 @@ function makeDoorGeometry(): THREE.PlaneGeometry {
 
 function doorMaterial(
   map: THREE.Texture,
-  opts: { alphaTest: number; transparent: boolean }
+  opts: { alphaTest: number }
 ): THREE.MeshBasicMaterial {
+  // Same flags as wall faces so fog, vertex colours and sconce warmth match.
   return new THREE.MeshBasicMaterial({
     map,
-    color: 0xffffff,
     vertexColors: true,
-    side: THREE.FrontSide,
-    transparent: opts.transparent,
+    side: THREE.DoubleSide,
+    transparent: false,
     alphaTest: opts.alphaTest,
     depthWrite: true,
-    depthTest: true,
-    fog: true,
-    toneMapped: false
+    depthTest: true
   });
 }
 
@@ -107,7 +105,7 @@ export class DoorSystem {
 
     // Opaque fill behind the cutout, lit with the same vertex colours as the
     // panel / neighbouring walls so the door never drops to fog-black at 1 sq.
-    const backing = new THREE.Mesh(makeDoorGeometry(), doorMaterial(panelTex, { alphaTest: 0, transparent: false }));
+    const backing = new THREE.Mesh(makeDoorGeometry(), doorMaterial(panelTex, { alphaTest: 0 }));
     backing.position.z = -DOOR_PANEL_INSET - 0.012;
     backing.userData.kind = 'door-backing';
     backing.userData.noPick = true;
@@ -117,7 +115,7 @@ export class DoorSystem {
 
     const panel = new THREE.Mesh(
       makeDoorGeometry(),
-      doorMaterial(panelTex, { alphaTest: CUTOUT_ALPHA_TEST, transparent: false })
+      doorMaterial(panelTex, { alphaTest: CUTOUT_ALPHA_TEST })
     );
     panel.position.z = -DOOR_PANEL_INSET;
     panel.renderOrder = 0;
@@ -129,7 +127,7 @@ export class DoorSystem {
 
     const frame = new THREE.Mesh(
       makeDoorGeometry(),
-      doorMaterial(frameTex, { alphaTest: CUTOUT_ALPHA_TEST, transparent: false })
+      doorMaterial(frameTex, { alphaTest: CUTOUT_ALPHA_TEST })
     );
     frame.position.z = 0;
     frame.renderOrder = 1;

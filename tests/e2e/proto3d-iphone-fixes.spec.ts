@@ -26,6 +26,14 @@ type Proto3d = {
     y1: number
   ) => { luma: number; fogRatio: number; n: number };
   faceKinds: () => Array<{ kind: string; lightX: number; lightY: number }>;
+  faceLighting: () => Array<{
+    kind: string;
+    lightX: number;
+    lightY: number;
+    worldX: number;
+    worldZ: number;
+    avgR: number;
+  }>;
   giveKey: () => void;
   snapDoor: (x: number, y: number, open: boolean) => void;
   tryMoveForward: () => { result: string };
@@ -194,18 +202,37 @@ test('proto3d iPhone fixes: sorting, items, walls, water, doors, no 404s', async
 
   // --- 5. Door brightness at 3 / 2 / 1 squares ---
   await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.snapDoor(4, 2, false));
+
+  const doorPlaneLighting = async (x: number, y: number, dir: number) => {
+    await page.evaluate(([px, py, pd]) => {
+      (window as unknown as { __proto3d: Proto3d }).__proto3d.setPosition(px, py, pd);
+    }, [x, y, dir] as const);
+    return page.evaluate(() => {
+      const faces = (window as unknown as { __proto3d: Proto3d }).__proto3d.faceLighting();
+      const onDoorPlane = (f: (typeof faces)[number]) => Math.abs(f.worldX - 7) < 0.2;
+      const avg = (kinds: string[]) => {
+        const list = faces.filter((f) => kinds.includes(f.kind) && onDoorPlane(f));
+        const n = list.length || 1;
+        return {
+          r: list.reduce((s, f) => s + f.avgR, 0) / n,
+          x: list.reduce((s, f) => s + f.worldX, 0) / n,
+          n: list.length
+        };
+      };
+      return {
+        frame: avg(['door-frame']),
+        panel: avg(['door-panel']),
+        backing: avg(['door-backing']),
+        wall: avg(['wall'])
+      };
+    });
+  };
+
+  const lit3 = await doorPlaneLighting(1, 2, 1);
   await shot(1, 2, 1, '05-door-3-squares.png');
+  const lit2 = await doorPlaneLighting(2, 2, 1);
   await shot(2, 2, 1, '05-door-2-squares.png');
-  const two = await page.evaluate(() => {
-    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-    const canvas = document.getElementById('render-canvas') as HTMLCanvasElement;
-    const w = canvas.width;
-    const h = canvas.height;
-    return {
-      door: p.regionStats(w * 0.38, h * 0.28, w * 0.62, h * 0.58),
-      wall: p.regionStats(w * 0.08, h * 0.28, w * 0.28, h * 0.58)
-    };
-  });
+  const lit1 = await doorPlaneLighting(3, 2, 1);
   await shot(3, 2, 1, '05-door-1-square.png');
   const one = await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
@@ -214,28 +241,55 @@ test('proto3d iPhone fixes: sorting, items, walls, water, doors, no 404s', async
     const h = canvas.height;
     return {
       frame: p.regionStats(w * 0.2, h * 0.22, w * 0.3, h * 0.55),
-      wall: p.regionStats(w * 0.02, h * 0.22, w * 0.16, h * 0.55),
+      wall: p.regionStats(w * 0.84, h * 0.22, w * 0.98, h * 0.55),
       wood: p.regionStats(w * 0.38, h * 0.32, w * 0.62, h * 0.58)
     };
   });
+  console.log('DOOR VERTEX 3sq', lit3, '2sq', lit2, '1sq', lit1);
   console.log(
-    'DOOR 2sq',
-    two.door.luma,
-    'wall',
-    two.wall.luma,
-    '1sq frame',
+    'DOOR 1sq frame luma',
     one.frame.luma,
     'wall',
     one.wall.luma,
     'wood',
     one.wood.luma
   );
+
+  expect(lit1.frame.n, 'door frame on the west plane').toBeGreaterThan(0);
+  expect(lit1.frame.x, 'door is lit at the wall plane, not the origin').toBeGreaterThan(6.5);
+  expect(lit1.frame.x, 'door is lit at the wall plane, not the origin').toBeLessThan(7.5);
+
+  // Party-distance bands for the west door plane (x=7): 3sq→0.42, 2sq→0.65, 1sq→1.0.
+  // Walking closer must brighten the door, never darken it.
+  expect(lit3.frame.r, '3sq frame uses the two-square falloff').toBeGreaterThan(0.35);
+  expect(lit3.frame.r, '3sq frame uses the two-square falloff').toBeLessThan(0.55);
+  expect(lit2.frame.r, '2sq frame uses the one-square falloff').toBeGreaterThan(0.55);
+  expect(lit2.frame.r, '2sq frame uses the one-square falloff').toBeLessThan(0.8);
+  expect(lit1.frame.r, '1sq frame is fully lit like a near wall').toBeGreaterThan(0.9);
+  expect(lit1.frame.r).toBeGreaterThan(lit2.frame.r);
+  expect(lit2.frame.r).toBeGreaterThan(lit3.frame.r);
+
+  for (const [label, lit] of [
+    ['3sq', lit3],
+    ['2sq', lit2],
+    ['1sq', lit1]
+  ] as const) {
+    expect(
+      Math.abs(lit.panel.r - lit.frame.r),
+      `${label} panel matches frame lighting`
+    ).toBeLessThan(0.08);
+    expect(
+      Math.abs(lit.backing.r - lit.frame.r),
+      `${label} backing matches frame lighting`
+    ).toBeLessThan(0.08);
+  }
+
   expect(one.wood.luma, 'door panel at 1 square is not a fog-black slab').toBeGreaterThan(18);
   expect(one.frame.fogRatio, 'door frame is not black').toBeLessThan(0.25);
   expect(
     Math.abs(one.frame.luma - one.wall.luma) / Math.max(1, one.wall.luma),
     'door stone frame matches neighbouring wall brightness'
-  ).toBeLessThan(0.45);
+  ).toBeLessThan(0.28);
 
   expect(errors, 'console errors').toEqual([]);
   expect(failed404s, '404s').toEqual([]);
