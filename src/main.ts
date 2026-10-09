@@ -191,6 +191,32 @@ async function main() {
       return;
     }
 
+    // Check movement pad
+    const movement = inputManager.checkMovementPad(x, y);
+    if (movement) {
+      switch (movement) {
+        case 'turn_left':
+          gameController.turnLeft();
+          break;
+        case 'turn_right':
+          gameController.turnRight();
+          break;
+        case 'forward':
+          gameController.moveForward();
+          break;
+        case 'back':
+          gameController.moveBackward();
+          break;
+        case 'strafe_left':
+          gameController.strafeLeft();
+          break;
+        case 'strafe_right':
+          gameController.strafeRight();
+          break;
+      }
+      return;
+    }
+
     // Check potion buttons
     const potion = inputManager.checkPotionButton(x, y);
     if (potion) {
@@ -269,8 +295,14 @@ async function main() {
       return;
     }
     
-    // TEST: Start combat with 'C' key (for Milestone 3 testing)
-    if ((e.key === 'c' || e.key === 'C') && gameController && USE_NEW_CONTROLLER) {
+    if (!gameController || !USE_NEW_CONTROLLER) return;
+
+    // Check for debug mode
+    const urlParams = new URLSearchParams(window.location.search);
+    const debugMode = urlParams.get('debug') === '1';
+    
+    // TEST: Start combat with 'C' key (debug only)
+    if ((e.key === 'c' || e.key === 'C') && debugMode) {
       const state = gameController.getState();
       const floor = state.floors.get(state.party.floor);
       if (floor) {
@@ -279,14 +311,7 @@ async function main() {
           for (let x = 0; x < floor.width; x++) {
             const tile = floor.tiles[y][x];
             if (tile.monster && tile.monsterHp) {
-              combatController.startCombat(
-                state,
-                tile.monster,
-                10,  // AC placeholder
-                tile.monsterHp,
-                x,
-                y
-              );
+              combatController.startCombat(state, tile.monster, x, y);
               console.log(`Combat started with ${tile.monster}`);
               e.preventDefault();
               return;
@@ -299,23 +324,46 @@ async function main() {
       return;
     }
     
-    // Handle stairs with space bar (new controller only)
-    if (e.key === ' ' && gameController && USE_NEW_CONTROLLER) {
+    // Movement keys
+    if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') {
+      gameController.moveForward();
+      e.preventDefault();
+      return;
+    }
+    if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') {
+      gameController.moveBackward();
+      e.preventDefault();
+      return;
+    }
+    if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A') {
+      gameController.strafeLeft();
+      e.preventDefault();
+      return;
+    }
+    if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') {
+      gameController.strafeRight();
+      e.preventDefault();
+      return;
+    }
+    if (e.key === 'q' || e.key === 'Q') {
+      gameController.turnLeft();
+      e.preventDefault();
+      return;
+    }
+    if (e.key === 'e' || e.key === 'E') {
+      gameController.turnRight();
+      e.preventDefault();
+      return;
+    }
+    
+    // Handle stairs with space bar
+    if (e.key === ' ') {
       const stairs = gameController.checkStairs();
       if (stairs) {
         gameController.handleStairs(stairs);
         e.preventDefault();
         return;
       }
-    }
-    
-    // if (game && !USE_NEW_CONTROLLER) {
-    //   game.handleKey(e.key);
-    // }
-    
-    // Prevent default for game keys
-    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', ' ', 'w', 'a', 's', 'd', 'q', 'e', 'c', 'C'].includes(e.key)) {
-      e.preventDefault();
     }
   });
   

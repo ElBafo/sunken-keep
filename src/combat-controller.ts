@@ -1,10 +1,11 @@
-import type { GameState } from './types';
+import type { GameState, MonsterDef } from './types';
 import { HERO_LAYOUT, CONTROLS_LAYOUT } from './constants';
 import type { HeroId } from './constants';
 import { actionSystem } from './action-system';
 import { sound } from './assets';
 
 export class CombatController {
+  private monsterData: Record<string, MonsterDef> = {};
   private activeEncounter: {
     monster: string;
     monsterAc: number;
@@ -13,16 +14,39 @@ export class CombatController {
     tile: { x: number; y: number };
   } | null = null;
 
+  // Load monster data
+  async loadMonsterData(baseUrl: string): Promise<void> {
+    try {
+      const response = await fetch(`${baseUrl}levels/monsters.json`);
+      this.monsterData = await response.json();
+      delete (this.monsterData as any)._note;
+      console.log('Monster data loaded');
+    } catch (error) {
+      console.error('Failed to load monster data:', error);
+    }
+  }
+
+  // Get monster stats
+  getMonsterStats(monsterType: string): MonsterDef | null {
+    return this.monsterData[monsterType] || null;
+  }
+
   // Start combat with a monster
-  startCombat(state: GameState, monster: string, monsterAc: number, monsterHp: number, x: number, y: number): void {
+  startCombat(state: GameState, monster: string, x: number, y: number): void {
+    const stats = this.getMonsterStats(monster);
+    if (!stats) {
+      console.error(`Monster not found: ${monster}`);
+      return;
+    }
+
     this.activeEncounter = {
       monster,
-      monsterAc,
-      monsterHp,
-      monsterMaxHp: monsterHp,
+      monsterAc: stats.ac,
+      monsterHp: stats.hp,
+      monsterMaxHp: stats.hp,
       tile: { x, y },
     };
-    console.log(`Combat started: ${monster} (AC ${monsterAc}, HP ${monsterHp})`);
+    console.log(`Combat started: ${monster} (AC ${stats.ac}, HP ${stats.hp})`);
   }
 
   // End combat (monster defeated or fled)

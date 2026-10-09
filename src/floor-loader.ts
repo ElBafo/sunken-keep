@@ -134,16 +134,16 @@ function createFloor1(): FloorData {
     tiles: [
       // Row 0
       [ { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true } ],
-      // Row 1
+      // Row 1: stairs down at (7,1)
       [ { wall: true }, { shallowWater: true }, { deepWater: true }, { shallowWater: true }, { wall: true }, { secret: true, carving: 'carving_secret', item: 'scroll' }, {}, { stairs: 'down' }, { wall: true } ],
-      // Row 2
-      [ { wall: true }, { shallowWater: true }, { deepWater: true }, { ...m('bog_leeches', 12), shallowWater: true }, { door: true, doorLocked: true, carving: 'carving_door' }, {}, {}, m('slime', 40), { wall: true } ],
-      // Row 3
-      [ { wall: true }, { shallowWater: true }, { deepWater: true }, { shallowWater: true }, { wall: true }, m('rust_crab', 24), { item: 'potion_red' }, {}, { wall: true } ],
+      // Row 2: leeches 10 HP (nerfed from 12), slime 22 HP (nerfed from 40)
+      [ { wall: true }, { shallowWater: true }, { deepWater: true }, { ...m('bog_leeches', 10), shallowWater: true }, { door: true, doorLocked: true, carving: 'carving_door' }, {}, {}, m('slime', 22), { wall: true } ],
+      // Row 3: rust crab 18 HP (nerfed from 24)
+      [ { wall: true }, { shallowWater: true }, { deepWater: true }, { shallowWater: true }, { wall: true }, m('rust_crab', 18), { item: 'potion_red' }, {}, { wall: true } ],
       // Row 4
       [ { wall: true }, { shallowWater: true }, { shallowWater: true }, { shallowWater: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true } ],
-      // Row 5
-      [ { wall: true }, {}, { item: 'key' }, {}, {}, { item: 'potion_blue' }, { chest: true }, m('keep_rat', 14), { wall: true } ],
+      // Row 5: keep rat 12 HP (nerfed from 14)
+      [ { wall: true }, {}, { item: 'key' }, {}, {}, { item: 'potion_blue' }, { chest: true }, m('keep_rat', 12), { wall: true } ],
       // Row 6
       [ { wall: true }, { carving: 'carving_start' }, {}, {}, { wall: true }, {}, {}, {}, { wall: true } ],
       // Row 7

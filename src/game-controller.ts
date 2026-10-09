@@ -2,12 +2,14 @@ import type { GameState } from './types';
 import { createNewGameState } from './game-state';
 import { loadAllFloors, getFloorStart } from './floor-loader';
 import { actionSystem } from './action-system';
+import { combatController } from './combat-controller';
 import { SaveSystem } from './save-system';
 import { sound } from './assets';
 
 export class GameController {
   private state: GameState;
   private baseUrl: string;
+  private walkStepCounter = 0;
 
   constructor() {
     this.state = createNewGameState();
@@ -26,6 +28,9 @@ export class GameController {
     // Load action data
     await actionSystem.loadData(this.baseUrl);
 
+    // Load monster data
+    await combatController.loadMonsterData(this.baseUrl);
+
     // Initialize audio
     await sound.init();
 
@@ -42,21 +47,6 @@ export class GameController {
 
     // Setup auto-save on page leave
     SaveSystem.setupAutoSaveOnLeave(() => this.state);
-
-    // TEST: Create a test monster encounter on floor 1
-    // This will be removed when proper encounter triggering is added
-    const floor1 = floors.get(1);
-    if (floor1 && this.state.party.floor === 1) {
-      // Place a test slime at (2, 6) - near the start
-      floor1.tiles[6][2] = {
-        monster: 'slime',
-        monsterHp: 20,
-        monsterMaxHp: 20,
-        monsterState: 'idle',
-        monsterAnimTime: 0,
-      };
-      console.log('TEST: Placed slime at (2, 6) for combat testing');
-    }
 
     console.log('GameController initialized');
   }
@@ -157,5 +147,96 @@ export class GameController {
 
     const tile = floor.tiles[y][x];
     return tile.stairs || null;
+  }
+
+  // Movement: turn left
+  turnLeft(): void {
+    if (combatController.isInCombat()) return;
+    this.state.party.dir = (this.state.party.dir + 3) % 4;
+    sound.play('ui_turn');
+  }
+
+  // Movement: turn right
+  turnRight(): void {
+    if (combatController.isInCombat()) return;
+    this.state.party.dir = (this.state.party.dir + 1) % 4;
+    sound.play('ui_turn');
+  }
+
+  // Movement: move forward
+  moveForward(): void {
+    if (combatController.isInCombat()) return;
+    this.tryMove(0);
+  }
+
+  // Movement: move backward
+  moveBackward(): void {
+    if (combatController.isInCombat()) return;
+    this.tryMove(2);
+  }
+
+  // Movement: strafe left
+  strafeLeft(): void {
+    if (combatController.isInCombat()) return;
+    this.tryMove(3);
+  }
+
+  // Movement: strafe right
+  strafeRight(): void {
+    if (combatController.isInCombat()) return;
+    this.tryMove(1);
+  }
+
+  // Try to move in relative direction (0=forward, 1=right, 2=back, 3=left)
+  private tryMove(relativeDir: number): void {
+    const floor = this.state.floors.get(this.state.party.floor);
+    if (!floor) return;
+
+    const absoluteDir = (this.state.party.dir + relativeDir) % 4;
+    const dx = [0, 1, 0, -1][absoluteDir];
+    const dy = [-1, 0, 1, 0][absoluteDir];
+
+    const newX = this.state.party.x + dx;
+    const newY = this.state.party.y + dy;
+
+    // Check bounds
+    if (newX < 0 || newX >= floor.width || newY < 0 || newY >= floor.height) {
+      sound.play('bump');
+      return;
+    }
+
+    const tile = floor.tiles[newY][newX];
+
+    // Check wall
+    if (tile.wall) {
+      sound.play('bump');
+      return;
+    }
+
+    // Check monster (start combat)
+    if (tile.monster && tile.monsterHp && tile.monsterHp > 0) {
+      combatController.startCombat(this.state, tile.monster, newX, newY);
+      return;
+    }
+
+    // Move successful
+    this.state.party.x = newX;
+    this.state.party.y = newY;
+
+    // Play step sound
+    if (tile.deepWater) {
+      sound.play('step_water_deep');
+    } else if (tile.shallowWater) {
+      sound.play('step_water_shallow');
+    } else {
+      sound.play('step');
+    }
+
+    // Increment walk counter for mana regen
+    this.walkStepCounter++;
+    if (this.walkStepCounter >= 10) {
+      combatController.regenerateMana(this.state, this.walkStepCounter);
+      this.walkStepCounter = 0;
+    }
   }
 }
