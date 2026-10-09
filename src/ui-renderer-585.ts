@@ -1,5 +1,4 @@
 import { assets } from './assets';
-import { drawText } from './font';
 import type { GameState, Hero } from './types';
 import type { HeroId } from './constants';
 import {
@@ -11,7 +10,6 @@ import {
   PANEL_Y,
   HERO_LAYOUT,
   CONTROLS_LAYOUT,
-  DEFAULT_EQUIPMENT,
 } from './constants';
 
 export class UIRenderer585 {

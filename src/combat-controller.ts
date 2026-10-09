@@ -1,5 +1,4 @@
 import type { GameState, MonsterDef } from './types';
-import { HERO_LAYOUT, CONTROLS_LAYOUT } from './constants';
 import type { HeroId } from './constants';
 import { actionSystem } from './action-system';
 import { sound } from './assets';
@@ -32,7 +31,7 @@ export class CombatController {
   }
 
   // Start combat with a monster
-  startCombat(state: GameState, monster: string, x: number, y: number): void {
+  startCombat(_state: GameState, monster: string, x: number, y: number): void {
     const stats = this.getMonsterStats(monster);
     if (!stats) {
       console.error(`Monster not found: ${monster}`);
@@ -87,15 +86,15 @@ export class CombatController {
     }
 
     // Check mana cost
-    if (!actionSystem.canUseAction(hero, hand)) {
+    if (!actionSystem.canUseAction(hero, hand, state)) {
       sound.play('sfx_no_mana');
       return;
     }
 
     // Front-two melee rule: check if hero can melee
     const actionDef = actionSystem.getActionDefPublic(hero.id, hand);
-    if (actionDef && actionDef.range === 'melee' && hero.formation === 'back') {
-      // Back row cannot melee
+    if (actionDef && !actionDef.ranged && hero.formation === 'back') {
+      // Back row cannot melee (ranged is falsy/undefined for melee weapons)
       sound.play('sfx_no');
       return;
     }
@@ -146,7 +145,7 @@ export class CombatController {
       } else {
         // Other effect
         sound.play('sfx_spell_cast');
-        console.log(`${hero.name} used ${actionDef?.name || 'action'}!`);
+        console.log(`${hero.name} used ${actionDef?.item || 'action'}!`);
       }
     }
   }

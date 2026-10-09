@@ -1,5 +1,3 @@
-import { assets } from './assets';
-import type { SaveSlot } from './types';
 import { SaveSystem } from './save-system';
 import { sound } from './assets';
 
@@ -22,7 +20,7 @@ export class TitleScreen {
     }
   }
 
-  private renderTitle(ctx: CanvasRenderingContext2D, width: number, height: number, baseUrl: string): void {
+  private renderTitle(ctx: CanvasRenderingContext2D, width: number, _height: number, _baseUrl: string): void {
     // Title
     ctx.fillStyle = '#d8ccb0';
     ctx.font = 'bold 24px serif';
@@ -55,7 +53,7 @@ export class TitleScreen {
     this.drawButton(ctx, width / 2 - 100, buttonY + buttonSpacing * 2, 200, buttonHeight, 'LOAD GAME', '#8a6a4a');
   }
 
-  private renderLoadMenu(ctx: CanvasRenderingContext2D, width: number, height: number): void {
+  private renderLoadMenu(ctx: CanvasRenderingContext2D, width: number, _height: number): void {
     // Title
     ctx.fillStyle = '#d8ccb0';
     ctx.font = 'bold 20px serif';
@@ -134,7 +132,7 @@ export class TitleScreen {
     }
   }
 
-  private handleTitleClick(x: number, y: number, width: number, height: number): 'new' | 'continue' | 'load' | null {
+  private handleTitleClick(x: number, y: number, width: number, _height: number): 'new' | 'continue' | 'load' | null {
     const buttonY = 160;
     const buttonHeight = 40;
     const buttonSpacing = 50;
@@ -166,7 +164,7 @@ export class TitleScreen {
     return null;
   }
 
-  private handleLoadClick(x: number, y: number, width: number, height: number): number | 'back' | null {
+  private handleLoadClick(x: number, y: number, width: number, _height: number): number | 'back' | null {
     const slotY = 100;
     const slotHeight = 70;
     const slotSpacing = 80;

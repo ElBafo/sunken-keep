@@ -12,7 +12,7 @@ import { loadPortraits } from './characters';
 import { loadBarks } from './barks';
 import { generateCutscenePlaceholders } from './cutscene-placeholders';
 import { assets, sound } from './assets';
-import { CANVAS_WIDTH, CANVAS_HEIGHT, VIEW_HEIGHT } from './constants';
+import { CANVAS_WIDTH, CANVAS_HEIGHT } from './constants';
 
 const BASE_WIDTH = CANVAS_WIDTH;  // 270
 const BASE_HEIGHT = CANVAS_HEIGHT;  // 585
@@ -204,12 +204,13 @@ async function main() {
       } else if (result === 'continue') {
         // Load most recent save
         const slot = SaveSystem.getMostRecentSlot();
-        if (slot) {
+        if (slot && gameController) {
           const save = SaveSystem.load(slot);
           if (save) {
-            gameController = new GameController();
-            gameController.init().then(() => {
-              SaveSystem.restoreState(gameController.getState(), save);
+            const newController = new GameController();
+            newController.init().then(() => {
+              SaveSystem.restoreState(save, newController.getState());
+              gameController = newController;
               inTitleScreen = false;
               console.log(`Continued from slot ${slot}`);
             });
@@ -219,10 +220,11 @@ async function main() {
       } else if (typeof result === 'number') {
         // Load specific slot
         const save = SaveSystem.load(result);
-        if (save) {
-          gameController = new GameController();
-          gameController.init().then(() => {
-            SaveSystem.restoreState(gameController.getState(), save);
+        if (save && gameController) {
+          const newController = new GameController();
+          newController.init().then(() => {
+            SaveSystem.restoreState(save, newController.getState());
+            gameController = newController;
             inTitleScreen = false;
             console.log(`Loaded slot ${result}`);
           });
@@ -311,23 +313,32 @@ async function main() {
     muteToggle.textContent = muted ? '🔊' : '🔇';
   });
   
-  // Input handling
+  // Input handling for swipes (turn left/right on phone)
   const inputHandler = new InputHandler(
     canvas,
     (direction) => {
-      if (!gameStarted) return;
-      game.handleSwipe(direction);
+      // Swipe handler: left = turn left, right = turn right
+      if (!gameStarted || !gameController || !USE_NEW_CONTROLLER) return;
+      if (inTitleScreen) return;
+      
+      if (direction === 'left') {
+        gameController.turnLeft();
+      } else if (direction === 'right') {
+        gameController.turnRight();
+      }
     },
-    (x, y) => {
-      if (!gameStarted) return;
-      game.handleTap(x, y);
+    (_x, _y) => {
+      // Tap handler - handled by canvas click listener below
     },
     (direction) => {
-      if (!gameStarted) return;
+      // Two-finger swipe: left/right turn
+      if (!gameStarted || !gameController || !USE_NEW_CONTROLLER) return;
+      if (inTitleScreen) return;
+      
       if (direction === 'left') {
-        game.handleKey('q');
+        gameController.turnLeft();
       } else {
-        game.handleKey('e');
+        gameController.turnRight();
       }
     }
   );

@@ -45,7 +45,7 @@ export class ActionSystem {
   }
 
   // Check if hero can use an action
-  canUseAction(hero: Hero, hand: 'main' | 'off', state: GameState): boolean {
+  canUseAction(hero: Hero, hand: 'main' | 'off', _state: GameState): boolean {
     // Check recovery time
     const now = Date.now();
     if (hero.recovery[hand] > now) {
@@ -114,7 +114,7 @@ export class ActionSystem {
 
   // Perform attack roll
   private performAttack(
-    hero: Hero,
+    _hero: Hero,
     actionDef: ActionDef,
     targetAc: number
   ): { success: boolean; damage?: number; miss?: boolean } {

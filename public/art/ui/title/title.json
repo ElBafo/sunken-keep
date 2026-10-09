@@ -1,0 +1,140 @@
+{
+ "canvas": [
+  270,
+  585
+ ],
+ "bg": "title_bg.png",
+ "logo": "title_logo.png",
+ "logoPos": [
+  0,
+  48
+ ],
+ "windowsGlow": "title_windows_glow.png",
+ "tagline": {
+  "y": 102,
+  "scale": 1,
+  "color": [
+   170,
+   190,
+   160
+  ],
+  "centered": true
+ },
+ "buttons": {
+  "normal": "btn_normal.png",
+  "pressed": "btn_pressed.png",
+  "dim": "btn_dim.png",
+  "size": [
+   140,
+   30
+  ],
+  "positions": {
+   "Continue": [
+    65,
+    404
+   ],
+   "New Game": [
+    65,
+    442
+   ],
+   "Load": [
+    65,
+    480
+   ],
+   "Settings": [
+    65,
+    518
+   ]
+  },
+  "labelFontScale": 2,
+  "note": "labels drawn in code from story/title_text.json; Continue uses dim when no save exists"
+ },
+ "saveSlot": {
+  "frame": "save_slot_frame.png",
+  "exampleFilled": "save_slot.png",
+  "exampleEmpty": "save_slot_empty.png",
+  "size": [
+   250,
+   70
+  ],
+  "portraitWells": [
+   [
+    8,
+    6,
+    30,
+    30
+   ],
+   [
+    44,
+    6,
+    30,
+    30
+   ],
+   [
+    80,
+    6,
+    30,
+    30
+   ],
+   [
+    116,
+    6,
+    30,
+    30
+   ]
+  ],
+  "portraitInset": [
+   1,
+   1,
+   28,
+   28
+  ],
+  "textLines": [
+   [
+    8,
+    43
+   ],
+   [
+    8,
+    56
+   ]
+  ],
+  "fontScale": 1,
+  "maxChars": 39
+ },
+ "overwrite": {
+  "frame": "save_overwrite_frame.png",
+  "example": "save_overwrite.png",
+  "size": [
+   220,
+   80
+  ],
+  "textLines": [
+   [
+    0,
+    12
+   ],
+   [
+    0,
+    26
+   ]
+  ],
+  "textCentered": true,
+  "buttons": {
+   "Overwrite": [
+    20,
+    48,
+    80,
+    22
+   ],
+   "Keep it": [
+    120,
+    48,
+    80,
+    22
+   ]
+  },
+  "buttonImage": "btn_normal.png (scale to 80x22) or draw"
+ },
+ "hint": "pulse title_windows_glow.png alpha 0.4..1.0 over 2s for breathing windows; boat is baked into bg"
+}

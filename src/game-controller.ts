@@ -3,6 +3,7 @@ import { createNewGameState } from './game-state';
 import { loadAllFloors, getFloorStart } from './floor-loader';
 import { actionSystem } from './action-system';
 import { combatController } from './combat-controller';
+import { dialogueSystem } from './dialogue-system';
 import { SaveSystem } from './save-system';
 import { sound } from './assets';
 
@@ -30,6 +31,9 @@ export class GameController {
 
     // Load monster data
     await combatController.loadMonsterData(this.baseUrl);
+
+    // Load dialogue data
+    await dialogueSystem.loadDialogues(this.baseUrl);
 
     // Initialize audio
     await sound.init();
