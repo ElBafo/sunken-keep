@@ -41,14 +41,15 @@ export class PropBuilder {
         );
       });
 
-    const [door, desk, jar, lamp] = await Promise.all([
-      load('proto3d/tex3d/door_panel.png', true),
+    const [beam, plain, desk, jar, lamp] = await Promise.all([
+      load('proto3d/tex3d/wood_beam.png', true),
+      load('proto3d/tex3d/wood_plain.png', true),
       load('proto3d/atmo/desk_note.png', false),
       load('proto3d/atmo/jar_rack.png', false),
       load('proto3d/atmo/lamp_capped.png', false)
     ]);
-    this.woodBeam = door;
-    this.woodPlain = door;
+    this.woodBeam = beam;
+    this.woodPlain = plain;
     this.deskNote = desk;
     this.jarFront = jar;
     this.lampTex = lamp;
@@ -71,10 +72,21 @@ export class PropBuilder {
     }
   }
 
-  private woodMat(map: THREE.Texture | null, color = WOOD_COLOR) {
+  private woodMat(
+    map: THREE.Texture | null,
+    color = WOOD_COLOR,
+    repeatS = 1,
+    repeatT = 1
+  ) {
+    let tex = map ?? undefined;
+    if (map && (repeatS !== 1 || repeatT !== 1)) {
+      tex = map.clone();
+      tex.repeat.set(repeatS, repeatT);
+      tex.needsUpdate = true;
+    }
     return new THREE.MeshBasicMaterial({
-      map: map ?? undefined,
-      color: map ? 0x6b4428 : color,
+      map: tex,
+      color: tex ? 0xffffff : color,
       vertexColors: true,
       toneMapped: false
     });
@@ -97,7 +109,10 @@ export class PropBuilder {
     y: number,
     kind: string
   ): THREE.Mesh {
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d, 2, 2, 2), this.woodMat(map));
+    const mesh = new THREE.Mesh(
+      new THREE.BoxGeometry(w, h, d, 2, 2, 2),
+      this.woodMat(map, WOOD_COLOR, Math.max(1, w), Math.max(1, h))
+    );
     this.tag(mesh, x, y, kind);
     return mesh;
   }
