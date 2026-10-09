@@ -3,10 +3,12 @@ import { floor1 } from './floor';
 import { Renderer } from './renderer';
 import { sound } from './assets';
 import { triggerBark, checkIdleBarks, triggerScriptedBark } from './barks';
-import { characters, damageCharacter, healCharacter, resetIdleTimers } from './characters';
+import { characters, damageCharacter, resetIdleTimers } from './characters';
 import { IntroPlayer } from './intro';
 import { getMonsterStats, getMonsterDamage, canLatch, getLatchInfo } from './monster-stats';
 import { scrollText, potionTexts } from './floor1-text';
+import { MessageLog } from './ui-layout';
+import { loadLogMessages, getLogMessage } from './log-messages';
 
 type GameState = 'intro' | 'playing' | 'combat' | 'reading';
 
@@ -20,6 +22,12 @@ export class Game {
   private discoveredSecret = false;
   private intro: IntroPlayer;
   private floorDepth = 1;
+  
+  // UI state
+  private messageLog: MessageLog;
+  private attackCooldowns: number[] = [0, 0, 0, 0];
+  private potionCount = 0;
+  private hasScroll = false;
   
   // Combat state
   private combatTile: Tile | null = null;
@@ -35,6 +43,9 @@ export class Game {
   private seenMonsters = new Set<string>();
   private enteredPantry = false;
   
+  // Water depth tracking for log messages
+  private lastWaterState: 'stone' | 'shallow' | 'deep' | null = null;
+  
   // Leech latch tracking
   private latchedLeeches: Array<{ tile: Tile; turns: number; drain: number }> = [];
 
@@ -44,12 +55,17 @@ export class Game {
     this.renderer = new Renderer();
     this.lastInputTime = Date.now();
     this.intro = new IntroPlayer();
+    this.messageLog = new MessageLog();
   }
 
   async init() {
     await sound.init();
     await this.intro.load();
+    await loadLogMessages();
     this.intro.start();
+    
+    // Show initial message when entering floor 1
+    this.messageLog.add(getLogMessage('enter_floor1'));
   }
 
   update(now: number) {
@@ -155,13 +171,15 @@ export class Game {
     ctx.fillRect(0, 0, 270, 480);
 
     this.renderer.drawViewport(ctx, this.party, this.floor, now);
-    this.renderer.drawPortraits(ctx, now);
-    
-    // Debug info
-    if (this.hasKey) {
-      ctx.fillStyle = '#ffff00';
-      ctx.fillRect(5, 5, 8, 8);
-    }
+    this.renderer.drawControlPanel(
+      ctx,
+      now,
+      this.messageLog,
+      this.hasKey,
+      { potions: this.potionCount, hasScroll: this.hasScroll },
+      this.attackCooldowns,
+      this.party.dir
+    );
     
     // Reading UI
     if (this.state === 'reading') {
@@ -345,6 +363,24 @@ export class Game {
   
   private playFootstepSound() {
     const tile = this.floor.tiles[this.party.y][this.party.x];
+    
+    // Track water depth changes
+    const currentWaterState = tile.deepWater ? 'deep' : tile.shallowWater ? 'shallow' : 'stone';
+    
+    if (this.lastWaterState !== currentWaterState) {
+      if (currentWaterState === 'shallow' && this.lastWaterState !== 'shallow') {
+        this.messageLog.add(getLogMessage('water_shallow'));
+        sound.play('ui_log_line');
+      } else if (currentWaterState === 'deep' && this.lastWaterState !== 'deep') {
+        this.messageLog.add(getLogMessage('water_deep'));
+        sound.play('ui_log_line');
+      } else if (currentWaterState === 'stone' && (this.lastWaterState === 'shallow' || this.lastWaterState === 'deep')) {
+        this.messageLog.add(getLogMessage('water_dry'));
+        sound.play('ui_log_line');
+      }
+      this.lastWaterState = currentWaterState;
+    }
+    
     if (tile.shallowWater) {
       sound.play('step_water_shallow');
     } else if (tile.deepWater) {
@@ -380,6 +416,8 @@ export class Game {
     // Pantry bark (first time stepping onto tile 5,5 from corridor)
     if (!this.enteredPantry && this.party.y === 5 && this.party.x === 5) {
       this.enteredPantry = true;
+      this.messageLog.add(getLogMessage('enter_pantry'));
+      sound.play('ui_log_line');
       triggerScriptedBark('pantry');
     }
     
@@ -388,31 +426,35 @@ export class Game {
       this.hasKey = true;
       tile.item = undefined;
       sound.play('key');
+      this.messageLog.add(getLogMessage('pickup_key'));
+      sound.play('ui_log_line');
       triggerBark('loot', "Rusty. Like Brannoc's charm.", 'mags');
     }
     
     // Potion pickup
     if (tile.item && tile.item.startsWith('potion_')) {
-      const text = potionTexts[tile.item as keyof typeof potionTexts];
+      const color = tile.item.split('_')[1];
+      this.potionCount++;
       tile.item = undefined;
       sound.play('pickup');
+      this.messageLog.add(getLogMessage(`pickup_potion_${color}`));
+      sound.play('ui_log_line');
+      const text = potionTexts[`potion_${color}` as keyof typeof potionTexts] || "A sealed vial.";
       triggerBark('loot', text, 'mags');
-      
-      // Heal party
-      setTimeout(() => {
-        healCharacter(characters[Math.floor(Math.random() * characters.length)], 15);
-        sound.play('potion');
-        triggerScriptedBark('drinking_potion');
-      }, 1000);
     }
     
     // Scroll pickup (behind secret wall)
     if (tile.item === 'scroll' && tile.secretOpen) {
+      this.hasScroll = true;
       tile.item = undefined;
       sound.play('pickup');
+      this.messageLog.add(getLogMessage('pickup_scroll'));
+      sound.play('ui_log_line');
       this.state = 'reading';
       this.readingText = scrollText;
       this.readingIndex = 0;
+      this.messageLog.add(getLogMessage('read_journal'));
+      sound.play('ui_log_line');
     }
     
     // Monster encounter
@@ -454,7 +496,11 @@ export class Game {
   private handleCombatAttack() {
     if (!this.combatTile || !this.playerTurn) return;
     
+    // Play UI sound
+    sound.play('ui_button');
+    
     // Player attacks
+    const attacker = characters[0]; // For simplicity, Brannoc attacks
     const damage = Math.floor(Math.random() * 6) + 5; // 5-10 damage
     const armor = this.combatTile.monsterArmor || 0;
     const actualDamage = Math.max(1, damage - armor);
@@ -466,9 +512,21 @@ export class Game {
     sound.play('hit');
     sound.play(`${this.combatMonsterType}_hurt`);
     
+    // Log hit
+    this.messageLog.add(getLogMessage('hit', {
+      hero: attacker.name,
+      monster: this.combatMonsterType.replace(/_/g, ' '),
+      n: actualDamage
+    }));
+    sound.play('ui_log_line');
+    
     if (this.combatTile.monsterHp <= 0) {
       // Monster dies
       sound.play(`${this.combatMonsterType}_death`);
+      this.messageLog.add(getLogMessage('monster_dies', {
+        monster: this.combatMonsterType.replace(/_/g, ' ')
+      }));
+      sound.play('ui_log_line');
       // Death animation will complete in update()
       return;
     }
@@ -488,6 +546,14 @@ export class Game {
       damageCharacter(target, monsterDamage);
       sound.play('hurt');
       
+      // Log monster hit
+      this.messageLog.add(getLogMessage('monster_hit', {
+        hero: target.name,
+        monster: this.combatMonsterType.replace(/_/g, ' '),
+        n: monsterDamage
+      }));
+      sound.play('ui_log_line');
+      
       // Check for leech latch
       if (this.combatMonsterType === 'bog_leeches' && canLatch(this.combatMonsterType)) {
         const latchInfo = getLatchInfo(this.combatMonsterType);
@@ -497,10 +563,13 @@ export class Game {
             turns: latchInfo.turns,
             drain: latchInfo.drainPerTurn
           });
+          this.messageLog.add(getLogMessage('leech_latch', { hero: target.name }));
+          sound.play('ui_log_line');
+          triggerScriptedBark('leech_latch');
         }
       }
       
-      if (target.hp / target.maxHp < 0.3) {
+      if (target.hp / target.maxHp < 0.3 && target.hp > 0) {
         setTimeout(() => triggerBark('low_health'), 500);
       }
       
@@ -521,6 +590,8 @@ export class Game {
     if (tile.chest && !tile.chestOpen) {
       tile.chestOpen = true;
       sound.play('chest');
+      this.messageLog.add(getLogMessage('chest_open'));
+      sound.play('ui_log_line');
       triggerScriptedBark('opening_chest');
       
       // Add potion inside
@@ -535,6 +606,8 @@ export class Game {
       tile.secretOpen = true;
       this.discoveredSecret = true;
       sound.play('secret_wall');
+      this.messageLog.add(getLogMessage('secret_found'));
+      sound.play('ui_log_line');
       triggerBark('secret_wall');
       return;
     }
@@ -544,29 +617,39 @@ export class Game {
       tile.doorOpen = true;
       this.hasKey = false;
       sound.play('door');
+      this.messageLog.add(getLogMessage('door_unlocked'));
+      sound.play('ui_log_line');
       triggerBark('loot', 'Smells like home. Damp home.', 'brannoc');
       return;
     }
     
     if (tile.door && tile.doorLocked && !tile.doorOpen && !this.hasKey) {
       sound.play('bump');
+      this.messageLog.add(getLogMessage('door_locked'));
+      sound.play('ui_log_line');
       return;
     }
   }
 
   private handleCarvingTap(carving: string) {
-    const texts = {
-      'carving_start': 'Thane Orrun keeps the clan dry.',
-      'carving_door': 'One flame given. One floor spared.',
-      'carving_secret': 'We gave too much. It is still hungry.'
+    const logKeys: {[key: string]: string} = {
+      'carving_start': 'carving_start',
+      'carving_door': 'carving_door',
+      'carving_secret': 'carving_secret'
     };
-
-    const text = texts[carving as keyof typeof texts];
-    if (text) {
+    
+    const logKey = logKeys[carving];
+    if (logKey) {
+      const text = getLogMessage(logKey);
+      this.messageLog.add(text);
+      sound.play('ui_log_line');
+      
       if (carving === 'carving_secret') {
         const volume = 0.2 + (this.floorDepth * 0.1);
         sound.play('tide_sigh', Math.min(volume, 1.0));
       }
+      
+      // Also trigger bark for Ilsevar
       triggerBark('loot', text, 'ilsevar');
     }
   }

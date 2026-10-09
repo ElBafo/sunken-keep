@@ -80,8 +80,9 @@ export class Party {
     }
 
     if (side !== 0) {
-      x += dx[side < 0 ? 0 : 2];
-      y += dy[side < 0 ? 0 : 2];
+      // FIX: side < 0 (left) should use index 2 (-right), side > 0 (right) should use index 0 (right)
+      x += dx[side < 0 ? 2 : 0];
+      y += dy[side < 0 ? 2 : 0];
     }
 
     return { x, y };

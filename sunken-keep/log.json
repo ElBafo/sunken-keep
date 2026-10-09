@@ -1,0 +1,138 @@
+[
+  {
+    "key": "enter_floor1",
+    "text": "The upper halls. Swamp water laps at you.",
+    "when": "on entering floor 1"
+  },
+  {
+    "key": "carving_start",
+    "text": "\"Thane Orrun keeps the clan dry.\"",
+    "when": "tap start plate"
+  },
+  {
+    "key": "carving_door",
+    "text": "\"One flame given. One floor spared.\"",
+    "when": "tap door plate"
+  },
+  {
+    "key": "carving_secret",
+    "text": "\"We gave too much. It is still hungry.\"",
+    "when": "tap glowing plate"
+  },
+  {
+    "key": "secret_found",
+    "text": "The stone grinds aside.",
+    "when": "secret wall opens"
+  },
+  {
+    "key": "door_locked",
+    "text": "The door is locked. A red rune glows.",
+    "when": "bump locked door"
+  },
+  {
+    "key": "door_unlocked",
+    "text": "The key turns. The lock groans open.",
+    "when": "use key"
+  },
+  {
+    "key": "pickup_key",
+    "text": "Found a rusty key."
+  },
+  {
+    "key": "pickup_potion_red",
+    "text": "Found a red potion."
+  },
+  {
+    "key": "pickup_potion_blue",
+    "text": "Found a blue potion."
+  },
+  {
+    "key": "pickup_potion_green",
+    "text": "Found a green potion."
+  },
+  {
+    "key": "pickup_scroll",
+    "text": "Found a waterlogged page."
+  },
+  {
+    "key": "read_journal",
+    "text": "Orrun's journal. The ink still holds.",
+    "when": "before journal text"
+  },
+  {
+    "key": "chest_open",
+    "text": "The chest creaks open."
+  },
+  {
+    "key": "chest_empty",
+    "text": "Empty. Someone got here first."
+  },
+  {
+    "key": "water_shallow",
+    "text": "The water deepens.",
+    "when": "first step into shallow water"
+  },
+  {
+    "key": "water_deep",
+    "text": "Black water to the chest. Cold.",
+    "when": "first step into deep water"
+  },
+  {
+    "key": "water_dry",
+    "text": "Dry stone, for once.",
+    "when": "leaving water onto stone"
+  },
+  {
+    "key": "enter_pantry",
+    "text": "The old pantry. Rot and crumbs.",
+    "when": "step onto (5,5)"
+  },
+  {
+    "key": "bump_wall",
+    "text": "Solid stone."
+  },
+  {
+    "key": "hit",
+    "text": "{hero} hits the {monster} for {n}."
+  },
+  {
+    "key": "miss",
+    "text": "{hero} misses."
+  },
+  {
+    "key": "monster_hit",
+    "text": "The {monster} hits {hero} for {n}."
+  },
+  {
+    "key": "monster_dies",
+    "text": "The {monster} sinks beneath the water."
+  },
+  {
+    "key": "leech_latch",
+    "text": "A leech latches onto {hero}!"
+  },
+  {
+    "key": "leech_drain",
+    "text": "The leech drains {hero}. ({n})"
+  },
+  {
+    "key": "hero_down",
+    "text": "{hero} collapses."
+  },
+  {
+    "key": "drink_potion",
+    "text": "{hero} drinks. +{n} health."
+  },
+  {
+    "key": "not_ready",
+    "text": "{hero} isn't ready yet."
+  },
+  {
+    "key": "party_dead",
+    "text": "The water takes you all."
+  },
+  {
+    "key": "floor_cleared",
+    "text": "The halls fall silent. Only dripping."
+  }
+]
