@@ -19,10 +19,10 @@ export class PixelRenderer {
     
     // Main scene
     this.scene = new THREE.Scene();
-    this.scene.fog = new THREE.FogExp2(0x0a0f0a, 0.025); // Further reduced density
+    this.scene.fog = new THREE.FogExp2(0x1a2e1a, 0.015); // Reduced - darkness only at far end
     
-    // Camera
-    this.camera = new THREE.PerspectiveCamera(60, 1, 0.1, 20);
+    // Camera with proper FOV and aspect
+    this.camera = new THREE.PerspectiveCamera(65, 1, 0.1, 20);
     this.camera.position.set(0, 0, 0);
     
     // WebGL renderer with preserveDrawingBuffer only for ?test=1

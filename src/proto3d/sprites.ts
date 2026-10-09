@@ -115,13 +115,13 @@ export class SpriteManager {
         side: THREE.DoubleSide
       });
       
-      const geo = new THREE.PlaneGeometry(1.2, 1.2);
+      const geo = new THREE.PlaneGeometry(0.6, 0.8);
       const mesh = new THREE.Mesh(geo, mat);
       
-      // Position on wall face
+      // Position close to wall face
       const wx = sconce.x * CELL_SIZE;
       const wz = sconce.y * CELL_SIZE;
-      const offset = 0.9;
+      const offset = 0.88; // Very close to wall
       
       if (sconce.face === 'N') {
         mesh.position.set(wx, 1.2, wz - offset);

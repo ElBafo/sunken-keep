@@ -35,6 +35,11 @@ class Game {
       this.renderer.setPaletteEnabled(false);
     }
     
+    // Show FPS counter only with ?debug=1
+    if (params.get('debug') === '1') {
+      this.fpsCounter.style.display = 'block';
+    }
+    
     // Load textures and build scene
     this.sceneBuilder = new SceneBuilder();
     await this.sceneBuilder.loadTextures();

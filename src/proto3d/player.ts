@@ -54,7 +54,8 @@ export class Player {
       const wx = interpX * CELL_SIZE;
       const wz = interpY * CELL_SIZE;
       
-      this.camera.position.set(wx, 0.8, wz);
+      // Camera at proper eye height: 0.55 of wall height (walls are 2.0 high)
+      this.camera.position.set(wx, 1.1, wz);
       this.camera.rotation.y = interpRot;
       
       if (t >= 1) {
@@ -73,14 +74,10 @@ export class Player {
   updateCameraPosition(_t: number = 1) {
     const wx = this.x * CELL_SIZE;
     const wz = this.y * CELL_SIZE;
-    // Fix camera rotation: dir 0 (north) should face -Z
-    // rotation.y = 0 looks down -Z (north)
-    // rotation.y = -π/2 looks down +X (east)
-    // rotation.y = π looks down +Z (south)
-    // rotation.y = π/2 looks down -X (west)
     const rot = -this.dir * Math.PI / 2;
     
-    this.camera.position.set(wx, 0.8, wz);
+    // Camera at proper eye height
+    this.camera.position.set(wx, 1.1, wz);
     this.camera.rotation.y = rot;
   }
   

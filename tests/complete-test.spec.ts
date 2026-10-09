@@ -34,29 +34,38 @@ test('3D prototype - complete visual test', async ({ page }) => {
   await page.screenshot({ path: 'screenshots/proto-start.png', fullPage: false });
   console.log('✓ Screenshot: proto-start.png (1,7 facing north)');
   
-  // Move to water hall - go forward several times
-  for (let i = 0; i < 5; i++) {
+  // Move forward once
+  await page.locator('#btn-forward').click();
+  await page.waitForTimeout(250);
+  
+  // Screenshot 2: One step forward
+  await page.screenshot({ path: 'screenshots/proto-forward.png' });
+  console.log('✓ Screenshot: proto-forward.png (one step forward)');
+  
+  // Move to water hall - continue forward
+  for (let i = 0; i < 4; i++) {
     await page.locator('#btn-forward').click();
     await page.waitForTimeout(250);
   }
   
-  // Screenshot 2: Water hall (around 2,2)
+  // Screenshot 3: Water hall (around 2,2)
   await page.screenshot({ path: 'screenshots/proto-water.png' });
   console.log('✓ Screenshot: proto-water.png (water hall)');
   
-  // Navigate to locked door (4,2)
+  // Navigate to locked door - but stop 2 squares away
   await page.locator('#btn-right').click();
   await page.waitForTimeout(250);
   await page.locator('#btn-forward').click();
   await page.waitForTimeout(250);
+  // Now facing door from 2 squares away
+  
+  // Screenshot 4: Door from 2 squares away
+  await page.screenshot({ path: 'screenshots/proto-door.png' });
+  console.log('✓ Screenshot: proto-door.png (door from 2 squares)');
+  
+  // Navigate toward slime - go around
   await page.locator('#btn-forward').click();
   await page.waitForTimeout(250);
-  
-  // Screenshot 3: Locked door
-  await page.screenshot({ path: 'screenshots/proto-door.png' });
-  console.log('✓ Screenshot: proto-door.png (locked door)');
-  
-  // Navigate to slime (7, 2) - go around
   await page.locator('#btn-right').click();
   await page.waitForTimeout(250);
   for (let i = 0; i < 4; i++) {
@@ -65,16 +74,17 @@ test('3D prototype - complete visual test', async ({ page }) => {
   }
   await page.locator('#btn-left').click();
   await page.waitForTimeout(250);
-  for (let i = 0; i < 5; i++) {
+  for (let i = 0; i < 3; i++) {
     await page.locator('#btn-forward').click();
     await page.waitForTimeout(250);
   }
+  // Now 2 squares from slime
   
-  // Screenshot 4: Slime
+  // Screenshot 5: Slime from 2 squares
   await page.screenshot({ path: 'screenshots/proto-slime.png' });
-  console.log('✓ Screenshot: proto-slime.png (slime)');
+  console.log('✓ Screenshot: proto-slime.png (slime from 2 squares)');
   
-  // Screenshot 5: Without palette
+  // Screenshot 6: Without palette
   await page.goto(`${BASE_URL}/proto3d.html?palette=0&test=1`);
   await page.locator('#tap-to-start').click();
   await page.waitForTimeout(2000);
@@ -96,9 +106,6 @@ test('3D prototype - complete visual test', async ({ page }) => {
   
   expect(errors.length).toBe(0);
   expect(failed404s.length).toBe(0);
-  
-  const fpsText = await page.locator('#fps-counter').textContent();
-  console.log(`FPS: ${fpsText}`);
 });
 
 test('3D prototype - pixel count assertion', async ({ page }) => {
@@ -120,8 +127,8 @@ test('3D prototype - pixel count assertion', async ({ page }) => {
       const r = pixels[i];
       const g = pixels[i + 1];
       const b = pixels[i + 2];
-      // Count as non-near-black if average > 30
-      if ((r + g + b) / 3 > 30) {
+      // Count as non-near-black if any channel > 20 (dungeon atmosphere)
+      if (r > 20 || g > 20 || b > 20) {
         nonBlackCount++;
       }
     }
@@ -129,7 +136,12 @@ test('3D prototype - pixel count assertion', async ({ page }) => {
     return nonBlackCount;
   });
   
-  console.log(`Non-near-black pixels: ${pixelCount}`);
-  // Dark dungeon atmosphere means fewer bright pixels, but geometry is clearly visible
-  expect(pixelCount).toBeGreaterThan(500);
+  const totalPixels = 270 * 453;
+  const percentage = ((pixelCount / totalPixels) * 100).toFixed(2);
+  console.log(`Non-near-black pixels: ${pixelCount} / ${totalPixels} (${percentage}%)`);
+  
+  // Dark dungeon atmosphere: require visible geometry (minimum 8% lit pixels)
+  const minPixels = Math.floor(totalPixels * 0.08);
+  console.log(`Minimum required: ${minPixels} pixels (8%)`);
+  expect(pixelCount).toBeGreaterThan(minPixels);
 });
