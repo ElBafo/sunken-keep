@@ -52,19 +52,72 @@ Same sizes as front walls, should look like normal walls but with subtle hints:
 - `secret_closed_near.png`, `secret_closed_mid.png`, `secret_closed_far.png`
 - `secret_open_near.png`, `secret_open_mid.png`, `secret_open_far.png`
 
-## Monster Sprites
+## Monster Sprites and Animation
 
-Placeholder green slime is implemented. Need proper monster sprites for:
-- **Slime** (current): Amorphous blob with glowing eyes
-- **Drowned dwarf**: Waterlogged, shambling
-- **Hollow Tide creature**: Aquatic aberration with tentacles
+Each monster has **animated** sprites with multiple states and frames:
 
-Each monster needs 3 sizes:
-- Near: 80×60 pixels at y=100
-- Mid: 50×40 pixels at y=100  
-- Far: 30×25 pixels at y=100
+### Monster Types
+- **Slime**: Amorphous blob with glowing eyes
+- **Drowned dwarf**: Waterlogged, shambling, bearing a Stonevow crest
+- **Tide spawn**: Aquatic aberration that sings
 
-**File naming:** `{monster}_near.png`, `{monster}_mid.png`, `{monster}_far.png`
+### Animation States and Frame Counts
+Each monster needs these animation states at 3 distances (near/mid/far):
+
+- **idle**: 4 frames (looping bob/breathing)
+- **attack**: 3 frames (lunge/strike toward camera)
+- **hurt**: 1 frame (recoil/flash)
+- **death**: 4 frames (collapse/sink into water with ripples)
+
+**Total frames per monster**: 12 frames × 3 distances = 36 frames per monster
+
+### File Naming Convention
+```
+<monster>_<state>_<frame>_<distance>.png
+```
+
+Examples:
+- `slime_idle_1_near.png` (first idle frame at near distance)
+- `drowned_dwarf_attack_2_mid.png` (second attack frame at mid distance)
+- `tide_spawn_death_4_far.png` (fourth/final death frame at far distance)
+
+### Sprite Positioning
+All monster sprites are **bottom-aligned** at y=100 (the floor line in the viewport):
+- The bottom of the sprite should be the base/feet touching the dungeon floor
+- Sprites are centered horizontally in the viewport
+- Transparent backgrounds (PNG with alpha)
+
+### Animation Playback
+- **idle**: 4 FPS (slow, looping bob)
+- **attack**: 12 FPS (fast lunge)
+- **hurt**: Shown for 0.2s with flash effect
+- **death**: 8 FPS (sink into water)
+
+### Fallback
+If animation frames are missing, the game will fall back to:
+1. Static sprite `<monster>_<distance>.png` (which should be idle frame 1)
+2. Code-based effects (bob, lunge, flash, fade) as a last resort
+
+### Suggested Frame Content
+
+**Idle frames** (4): Gentle breathing/bob cycle
+- Frame 1: Neutral stance
+- Frame 2: Slight up
+- Frame 3: Peak
+- Frame 4: Slight down (back to 1)
+
+**Attack frames** (3): Quick lunge toward camera
+- Frame 1: Wind-up/rear back
+- Frame 2: Mid-lunge (peak)
+- Frame 3: Follow-through/recovery
+
+**Hurt frame** (1): Recoil pose with clear silhouette change
+
+**Death frames** (4): Sink into the water
+- Frame 1: Start collapse
+- Frame 2: Halfway down with ripples starting
+- Frame 3: Mostly submerged, more ripples
+- Frame 4: Gone (small ripples remain)
 
 ## Additional Portrait Expressions
 
