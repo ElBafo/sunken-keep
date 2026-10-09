@@ -40,7 +40,7 @@ export class SaveSystem {
       if (!data) return null;
 
       const save: SaveSlot = JSON.parse(data);
-      console.log(`Game loaded from slot ${slot}`);
+      // console.log(`Game loaded from slot ${slot}`); // Too noisy, called every frame
       return save;
     } catch (error) {
       console.error('Failed to load game:', error);

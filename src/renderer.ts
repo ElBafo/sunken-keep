@@ -507,17 +507,17 @@ export class Renderer {
     _party: Party,
     _floor: FloorData
   ) {
-    // Green-black darkness overlay for far and mid bands
-    // Far band (distance 3): y 65-135, darkest
+    // Subtle green-black darkness overlay for far and mid bands
+    // Far band (distance 3): y 65-135, subtle
     ctx.save();
     ctx.globalCompositeOperation = 'multiply';
-    ctx.fillStyle = '#0d1812'; // Dark green-black
-    ctx.globalAlpha = 0.7;
+    ctx.fillStyle = '#3a4a38'; // Medium green-black
+    ctx.globalAlpha = 0.4;
     ctx.fillRect(0, 65, VIEWPORT_WIDTH, 70);
     
-    // Mid band (distance 2): y 50-115, medium dark
-    ctx.fillStyle = '#1a2418';
-    ctx.globalAlpha = 0.5;
+    // Mid band (distance 2): y 50-115, very subtle
+    ctx.fillStyle = '#5a6a58';
+    ctx.globalAlpha = 0.25;
     ctx.fillRect(0, 50, VIEWPORT_WIDTH, 65);
     
     ctx.restore();

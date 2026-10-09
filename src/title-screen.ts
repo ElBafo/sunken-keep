@@ -46,10 +46,10 @@ export class TitleScreen {
   private glowDirection: number = 1;
 
   constructor() {
-    this.loadAssets();
+    // Load assets async, will be ready before first tap
   }
 
-  private async loadAssets(): Promise<void> {
+  async loadAssets(): Promise<void> {
     const baseUrl = '/sunken-keep/';
     try {
       // Load layout

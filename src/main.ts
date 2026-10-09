@@ -136,6 +136,7 @@ async function main() {
     await gameController.init();
     uiRenderer585 = new UIRenderer585();
     titleScreen = new TitleScreen();
+    await titleScreen.loadAssets();
     console.log('New game controller initialized');
   }
   
@@ -166,28 +167,12 @@ async function main() {
   }
   
   let gameStarted = false;
+  let audioUnlocked = false;
   
-  // Tap to start handler
-  tapToStart.addEventListener('click', async () => {
-    if (gameStarted) return;
-    gameStarted = true;
-    
-    // Unlock audio on first user gesture
-    await sound.unlock();
-    
-    // Try to request fullscreen on Android Chrome
-    if (document.documentElement.requestFullscreen && !isStandalone) {
-      try {
-        await document.documentElement.requestFullscreen();
-      } catch (e) {
-        // Fullscreen denied or not supported
-        console.log('Fullscreen not available:', e);
-      }
-    }
-    
-    tapToStart.classList.add('hidden');
-    muteToggle.classList.remove('hidden');
-  });
+  // Hide tap-to-start immediately and start game
+  tapToStart.classList.add('hidden');
+  muteToggle.classList.remove('hidden');
+  gameStarted = true;
   
   // Mute toggle
   muteToggle.addEventListener('click', () => {
@@ -213,6 +198,12 @@ async function main() {
     (x, y) => {
       // Unified tap handler for both touch and mouse
       if (!gameStarted || !gameController || !USE_NEW_CONTROLLER) return;
+
+      // Unlock audio on first interaction
+      if (!audioUnlocked) {
+        sound.unlock();
+        audioUnlocked = true;
+      }
 
       // Handle title screen taps
       if (inTitleScreen && titleScreen) {
@@ -338,12 +329,6 @@ async function main() {
   
   // Keyboard input
   window.addEventListener('keydown', (e) => {
-    if (!gameStarted && (e.key === ' ' || e.key === 'Enter')) {
-      tapToStart.click();
-      e.preventDefault();
-      return;
-    }
-    
     if (!gameStarted) return;
     
     // Mute toggle with 'M' key

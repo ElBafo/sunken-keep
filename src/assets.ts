@@ -10,7 +10,16 @@ export class AssetLoader {
 
     const img = new Image();
     const promise = new Promise<void>((resolve) => {
-      img.onload = () => resolve();
+      img.onload = async () => {
+        try {
+          // Decode the image to ensure it's ready
+          await img.decode();
+          resolve();
+        } catch (error) {
+          console.warn(`Failed to decode image: ${path}`, error);
+          resolve(); // Don't fail, just warn
+        }
+      };
       img.onerror = () => {
         console.warn(`Failed to load image: ${path}`);
         resolve(); // Don't fail, just warn
