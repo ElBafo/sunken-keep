@@ -63,6 +63,8 @@ export class SpriteManager {
           mesh.userData.isSprite = true;
           scene.add(mesh);
           
+          console.log(`Added slime sprite at world (${x * CELL_SIZE}, 0.75, ${y * CELL_SIZE}) from tile (${x}, ${y})`);
+          
           this.sprites.push({
             mesh,
             x,

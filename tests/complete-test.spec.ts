@@ -74,22 +74,17 @@ test('3D prototype - complete visual test', async ({ page }) => {
   await page.screenshot({ path: 'screenshots/proto-door.png' });
   console.log('✓ Screenshot: proto-door.png (door from 2 squares away)');
   
-  // Navigate to slime at (6,4) - from (2,2) facing east
+  // Navigate to slime at (7,2) - from (2,2) facing east
+  // First go to (7,2) area
   await page.locator('#btn-forward').click(); // to (3,2)
   await page.waitForTimeout(250);
   await page.locator('#btn-forward').click(); // to (4,2)
   await page.waitForTimeout(250);
   await page.locator('#btn-forward').click(); // to (5,2)
   await page.waitForTimeout(250);
-  await page.locator('#btn-left').click(); // face north
+  await page.locator('#btn-forward').click(); // to (6,2)
   await page.waitForTimeout(250);
-  await page.locator('#btn-forward').click(); // to (5,3)
-  await page.waitForTimeout(250);
-  await page.locator('#btn-forward').click(); // to (5,4)
-  await page.waitForTimeout(250);
-  await page.locator('#btn-right').click(); // face east toward slime
-  await page.waitForTimeout(250);
-  // Now at (5,4) facing east, slime is at (6,4), 1 square ahead
+  // Now at (6,2) facing east, slime is at (7,2), 1 square ahead
   
   // Screenshot 5: Slime from 1 square away
   await page.screenshot({ path: 'screenshots/proto-slime.png' });

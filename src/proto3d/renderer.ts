@@ -84,12 +84,22 @@ export class PixelRenderer {
           vec3 c = step(vec3(0.0031308), linear);
           return mix(a, b, c);
         }
-        
-        // Perceptual distance using weighted RGB (human eye more sensitive to green)
-        float perceptualDistance(vec3 c1, vec3 c2) {
-          vec3 d = c1 - c2;
-          // Weight: red=2, green=4, blue=3 (roughly approximates perception)
-          return sqrt(2.0*d.r*d.r + 4.0*d.g*d.g + 3.0*d.b*d.b);
+        // Perceptual distance using OKLab color space (better than weighted RGB)
+        vec3 linearToOKLab(vec3 linear) {
+          // Linear RGB to OKLab
+          float l = 0.4122214708 * linear.r + 0.5363325363 * linear.g + 0.0514459929 * linear.b;
+          float m = 0.2119034982 * linear.r + 0.6806995451 * linear.g + 0.1073969566 * linear.b;
+          float s = 0.0883024619 * linear.r + 0.2817188376 * linear.g + 0.6299787005 * linear.b;
+          
+          float l_ = pow(l, 1.0/3.0);
+          float m_ = pow(m, 1.0/3.0);
+          float s_ = pow(s, 1.0/3.0);
+          
+          return vec3(
+            0.2104542553 * l_ + 0.7936177850 * m_ - 0.0040720468 * s_,
+            1.9779984951 * l_ - 2.4285922050 * m_ + 0.4505937099 * s_,
+            0.0259040371 * l_ + 0.7827717662 * m_ - 0.8086757660 * s_
+          );
         }
         
         vec3 quantizeColor(vec3 linearColor) {
@@ -97,10 +107,11 @@ export class PixelRenderer {
             return linearToSRGB(linearColor);
           }
           
-          // Convert linear working space to sRGB for palette matching
-          // Textures are sRGB -> converted to linear on read -> rendered in linear
-          // -> now convert back to sRGB to match palette.json colors
+          // Convert linear to sRGB for display
           vec3 srgb = linearToSRGB(linearColor);
+          
+          // Convert to OKLab for perceptual distance
+          vec3 lab = linearToOKLab(linearColor);
           
           float minDist = 999999.0;
           vec3 nearest = srgb;
@@ -108,7 +119,17 @@ export class PixelRenderer {
           for (int i = 0; i < 64; i++) {
             if (i >= paletteSize) break;
             vec3 palColor = palette[i];
-            float dist = perceptualDistance(srgb, palColor);
+            
+            // Convert palette color from sRGB to linear to OKLab
+            vec3 palLinear = vec3(
+              palColor.r <= 0.04045 ? palColor.r / 12.92 : pow((palColor.r + 0.055) / 1.055, 2.4),
+              palColor.g <= 0.04045 ? palColor.g / 12.92 : pow((palColor.g + 0.055) / 1.055, 2.4),
+              palColor.b <= 0.04045 ? palColor.b / 12.92 : pow((palColor.b + 0.055) / 1.055, 2.4)
+            );
+            vec3 palLab = linearToOKLab(palLinear);
+            
+            // Euclidean distance in OKLab space
+            float dist = distance(lab, palLab);
             if (dist < minDist) {
               minDist = dist;
               nearest = palColor;
@@ -180,18 +201,14 @@ export class PixelRenderer {
     this.camera.aspect = RENDER_WIDTH / renderHeight;
     this.camera.updateProjectionMatrix();
     
-    // Set canvas to render at 270px width, CSS will upscale
+    // Canvas always renders at 270px fixed size
     this.canvas.width = RENDER_WIDTH;
     this.canvas.height = renderHeight;
     this.renderer.setSize(RENDER_WIDTH, renderHeight, false);
     
-    // Scale canvas with CSS to fit viewport
-    const scale = Math.min(
-      window.innerWidth / RENDER_WIDTH,
-      window.innerHeight / renderHeight
-    );
-    this.canvas.style.width = `${RENDER_WIDTH * scale}px`;
-    this.canvas.style.height = `${renderHeight * scale}px`;
+    // No CSS scaling - canvas displays at native size
+    this.canvas.style.width = '270px';
+    this.canvas.style.height = `${renderHeight}px`;
   }
   
   render() {

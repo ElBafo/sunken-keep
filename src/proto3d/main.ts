@@ -80,10 +80,11 @@ class Game {
     this.vertexLighting.updateAllMeshes(this.renderer.scene);
     console.log('Vertex lighting initialized');
     
-    // Setup sprites
+    console.log('Loading sprites...');
     this.spriteManager = new SpriteManager(this.renderer.camera);
     await this.spriteManager.loadSprites(this.renderer.scene, floor1, floor1Sconces);
     console.log('Sprites added:', this.spriteManager.sprites.length);
+    console.log('Sprite positions:', this.spriteManager.sprites.map(s => `(${s.x},${s.y})`));
     
     // Setup audio
     this.audioManager = new AudioManager(this.renderer.camera);

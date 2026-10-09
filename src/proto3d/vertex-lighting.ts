@@ -140,6 +140,7 @@ export class VertexLightingManager {
     colors.needsUpdate = true;
     
     // Ensure material uses MeshBasicMaterial with vertex colors
+    // Sprites should NOT have their colors modulated (they're already marked to skip)
     if (!(mesh.material instanceof THREE.MeshBasicMaterial)) {
       const oldMat = mesh.material as THREE.Material;
       const map = (oldMat as any).map || null;
@@ -161,8 +162,11 @@ export class VertexLightingManager {
     
     scene.traverse((obj) => {
       if (obj instanceof THREE.Mesh && obj.geometry.attributes.position) {
-        // Skip sprite billboards
-        if (obj.userData.isSprite) return;
+        // Skip sprite billboards - they should remain unlit/full brightness
+        if (obj.userData.isSprite) {
+          console.log(`Skipping sprite at (${obj.position.x}, ${obj.position.y}, ${obj.position.z})`);
+          return;
+        }
         
         // Extract tile position from mesh world position
         const tileX = Math.round(obj.position.x / CELL_SIZE);
@@ -177,6 +181,6 @@ export class VertexLightingManager {
       }
     });
     
-    console.log(`VertexLightingManager: Updated ${meshCount} meshes`);
+    console.log(`VertexLightingManager: Updated ${meshCount} meshes (sprites skipped)`);
   }
 }
