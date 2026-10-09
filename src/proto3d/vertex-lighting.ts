@@ -69,9 +69,9 @@ export class VertexLightingManager {
       if (isDark && source.type === 'sconce') continue;
       
       // User spec: 1.0 at 0-1 distance, ×0.65 per further square
-      // More moderate boost to show depth falloff clearly
+      // Boost to achieve 35-60/255 mean while preserving depth falloff
       const falloff = this.getBandedFalloff(distance);
-      const brightness = source.intensity * falloff * 3.8; // Moderate boost for depth
+      const brightness = source.intensity * falloff * 4.7; // Fine-tuned for 35+ mean
       
       maxBrightness = Math.max(maxBrightness, brightness);
     }
@@ -87,7 +87,7 @@ export class VertexLightingManager {
       }
     }
     
-    return Math.min(maxBrightness, 3.8); // Moderate cap for visible falloff
+    return Math.min(maxBrightness, 4.7); // Cap tuned for 35-60 range
   }
   
   private getWarmTint(tileX: number, tileY: number): THREE.Color {
