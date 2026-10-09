@@ -3,8 +3,8 @@ import { CELL_SIZE } from './constants';
 import { FloorData, Tile } from './types';
 
 const WOOD_COLOR = 0x3a2414;
-const LAMP_W = 0.16;
-const LAMP_H = 0.24;
+const LAMP_W = 0.16 * CELL_SIZE;
+const LAMP_H = 0.24 * CELL_SIZE;
 
 function configureTex(tex: THREE.Texture, repeat: boolean) {
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -108,20 +108,20 @@ export class PropBuilder {
     const sign = mirror ? -1 : 1;
     const map = this.woodBeam;
 
-    const main = this.box(1.85, 0.15, 0.18, map, x, y, 'beam');
-    main.position.set(wx + 0.12 * sign, 0.42, wz - 0.08);
-    main.rotation.z = sign * 0.48;
-    main.rotation.x = 0.18;
+    const main = this.box(2.15, 0.28, 0.32, map, x, y, 'beam');
+    main.position.set(wx + 0.08 * sign, 0.62, wz - 0.06);
+    main.rotation.z = sign * 0.62;
+    main.rotation.x = 0.22;
 
-    const cross = this.box(1.15, 0.12, 0.14, map, x, y, 'beam');
-    cross.position.set(wx - 0.22 * sign, 0.22, wz + 0.28);
-    cross.rotation.z = sign * -0.32;
-    cross.rotation.y = 0.55 * sign;
+    const cross = this.box(1.55, 0.22, 0.26, map, x, y, 'beam');
+    cross.position.set(wx - 0.18 * sign, 0.34, wz + 0.32);
+    cross.rotation.z = sign * -0.4;
+    cross.rotation.y = 0.7 * sign;
 
-    const stub = this.box(0.42, 0.16, 0.3, map, x, y, 'beam');
-    stub.position.set(wx + 0.38 * sign, 0.08, wz + 0.36);
-    stub.rotation.y = 0.35 * sign;
-    stub.rotation.z = sign * 0.12;
+    const stub = this.box(0.55, 0.28, 0.42, map, x, y, 'beam');
+    stub.position.set(wx + 0.42 * sign, 0.14, wz + 0.4);
+    stub.rotation.y = 0.4 * sign;
+    stub.rotation.z = sign * 0.18;
   }
 
   private addDesk(x: number, y: number) {
@@ -162,8 +162,9 @@ export class PropBuilder {
         side: THREE.DoubleSide
       })
     );
-    // Face the approach from (12,8): north (−Z).
-    front.position.set(wx, (topY + 0.02) / 2, wz - topD / 2 - 0.01);
+    // Face the room (west, −X) so the note reads from (11,9).
+    front.position.set(wx - topW / 2 - 0.01, (topY + 0.02) / 2, wz);
+    front.rotation.y = -Math.PI / 2;
     this.tag(front, x, y, 'desk');
   }
 
@@ -219,7 +220,7 @@ export class PropBuilder {
     const sprite = new THREE.Sprite(mat);
     sprite.center.set(0.5, 0);
     // Stand by the desk — slightly west of cell centre, on the floor.
-    sprite.position.set(x * CELL_SIZE - 0.28, 0.02, y * CELL_SIZE + 0.1);
+    sprite.position.set(x * CELL_SIZE - 0.55, 0.02, y * CELL_SIZE + 0.15);
     sprite.scale.set(LAMP_W, LAMP_H, 1);
     sprite.frustumCulled = false;
     sprite.renderOrder = 8;

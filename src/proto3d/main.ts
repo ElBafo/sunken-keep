@@ -251,12 +251,8 @@ class Game {
     if (titleEl) titleEl.textContent = this.lampNote.title;
     if (textEl) textEl.textContent = text;
     if (overlay) overlay.classList.add('show');
-    const toast = document.getElementById('message-toast');
-    if (toast) {
-      toast.textContent = text;
-      toast.classList.add('show');
-    }
-    this.messageTimer = performance.now() + 5000;
+    document.getElementById('message-toast')?.classList.remove('show');
+    this.messageTimer = performance.now() + 6000;
   }
 
   hideNote() {
