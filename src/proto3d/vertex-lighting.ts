@@ -1,7 +1,12 @@
 import * as THREE from 'three';
+import {
+  CELL_SIZE,
+  FACE_INTO_ROOM,
+  SCONCE_FLICKER,
+  SCONCE_RADIUS_TILES,
+  SCONCE_WALL_OFFSET_TILES
+} from './constants';
 import { FloorData, Sconce } from './types';
-
-const CELL_SIZE = 2;
 
 interface LightSource {
   x: number;
@@ -10,166 +15,213 @@ interface LightSource {
   intensity: number;
 }
 
+interface CachedFace {
+  mesh: THREE.Mesh;
+  worldPos: Float32Array;
+  colors: THREE.BufferAttribute;
+  isDark: boolean;
+  nearSconce: boolean;
+}
+
+interface SconceWorld {
+  x: number;
+  y: number;
+  z: number;
+  tileX: number;
+  tileY: number;
+}
+
+function sconceWorldPos(s: Sconce): SconceWorld {
+  const { nx, nz } = FACE_INTO_ROOM[s.face];
+  const dist = CELL_SIZE / 2 + SCONCE_WALL_OFFSET_TILES * CELL_SIZE;
+  return {
+    x: s.x * CELL_SIZE + nx * dist,
+    y: CELL_SIZE / 2,
+    z: s.y * CELL_SIZE + nz * dist,
+    tileX: s.x,
+    tileY: s.y
+  };
+}
+
 export class VertexLightingManager {
   private floorData: FloorData;
   private sconces: readonly Sconce[];
   private partyX: number = 0;
   private partyY: number = 0;
-  
+  private faces: CachedFace[] = [];
+  private sconceWorld: SconceWorld[] = [];
+  private flickerFrame = 0;
+  private scratch = new THREE.Vector3();
+
   constructor(floorData: FloorData, sconces: readonly Sconce[]) {
     this.floorData = floorData;
     this.sconces = sconces;
+    this.sconceWorld = sconces.filter((s) => s.lit).map(sconceWorldPos);
   }
-  
+
   setPartyPosition(x: number, y: number) {
     this.partyX = x;
     this.partyY = y;
   }
-  
+
+  registerScene(scene: THREE.Scene) {
+    this.faces = [];
+    const radiusTiles = SCONCE_RADIUS_TILES + 1;
+
+    scene.traverse((obj) => {
+      if (!(obj instanceof THREE.Mesh) || !obj.geometry.attributes.position) return;
+      if (obj.userData.isSprite || obj.userData.skipVertexLighting || obj instanceof THREE.Sprite) {
+        return;
+      }
+
+      obj.updateMatrixWorld(true);
+      const geometry = obj.geometry;
+      if (!geometry.attributes.color) {
+        const colors = new Float32Array(geometry.attributes.position.count * 3);
+        geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+      }
+
+      if (obj.material instanceof THREE.MeshBasicMaterial) {
+        obj.material.vertexColors = true;
+        obj.material.needsUpdate = true;
+      }
+
+      const pos = geometry.attributes.position;
+      const worldPos = new Float32Array(pos.count * 3);
+      const v = this.scratch;
+      for (let i = 0; i < pos.count; i++) {
+        v.fromBufferAttribute(pos, i).applyMatrix4(obj.matrixWorld);
+        worldPos[i * 3] = v.x;
+        worldPos[i * 3 + 1] = v.y;
+        worldPos[i * 3 + 2] = v.z;
+      }
+
+      const tileX =
+        typeof obj.userData.lightX === 'number'
+          ? obj.userData.lightX
+          : Math.round(obj.position.x / CELL_SIZE);
+      const tileY =
+        typeof obj.userData.lightY === 'number'
+          ? obj.userData.lightY
+          : Math.round(obj.position.z / CELL_SIZE);
+      const tile = this.floorData.tiles[tileY]?.[tileX];
+      const isDark = tile?.floorNDark || false;
+
+      let nearSconce = false;
+      for (const s of this.sconceWorld) {
+        const dx = tileX - s.tileX;
+        const dy = tileY - s.tileY;
+        if (Math.sqrt(dx * dx + dy * dy) <= radiusTiles) {
+          nearSconce = true;
+          break;
+        }
+      }
+
+      this.faces.push({
+        mesh: obj,
+        worldPos,
+        colors: geometry.attributes.color as THREE.BufferAttribute,
+        isDark,
+        nearSconce
+      });
+    });
+  }
+
   private getBandedFalloff(distance: number): number {
-    // Party/lantern: 1.0 at 0-1 distance, ×0.65 per further square
-    // Make banding more obvious with stricter cutoffs
     const distSquares = Math.floor(distance);
     if (distSquares === 0) return 1.0;
-    
     return Math.pow(0.65, distSquares);
   }
-  
-  private calculateBrightness(tileX: number, tileY: number, isDark: boolean): number {
+
+  calculateBrightness(tileX: number, tileY: number, isDark: boolean): number {
     const sources: LightSource[] = [];
-    
-    // Party lantern
-    sources.push({
-      x: this.partyX,
-      y: this.partyY,
-      type: 'party',
-      intensity: 1.0
-    });
-    
-    // Lit sconces
+    sources.push({ x: this.partyX, y: this.partyY, type: 'party', intensity: 1.0 });
     for (const sconce of this.sconces) {
       if (sconce.lit) {
-        sources.push({
-          x: sconce.x,
-          y: sconce.y,
-          type: 'sconce',
-          intensity: 1.0
-        });
+        sources.push({ x: sconce.x, y: sconce.y, type: 'sconce', intensity: 1.0 });
       }
     }
-    
+
     let maxBrightness = 0;
-    
     for (const source of sources) {
       const dx = tileX - source.x;
       const dy = tileY - source.y;
       const distance = Math.sqrt(dx * dx + dy * dy);
-      
-      // For floorNDark squares, only party lantern
       if (isDark && source.type === 'sconce') continue;
-      
-      // User spec: 1.0 at 0-1 distance, ×0.65 per further square
-      // Boost to achieve 35-60/255 mean while preserving depth falloff
-      const falloff = this.getBandedFalloff(distance);
-      const brightness = source.intensity * falloff * 4.7; // Fine-tuned for 35+ mean
-      
-      maxBrightness = Math.max(maxBrightness, brightness);
+      maxBrightness = Math.max(maxBrightness, source.intensity * this.getBandedFalloff(distance));
     }
-    
-    // floorNDark squares: ~2 squares then black, plus faint floor on exits/vents
-    if (isDark) {
-      const distFromParty = Math.sqrt(
-        Math.pow(tileX - this.partyX, 2) + 
-        Math.pow(tileY - this.partyY, 2)
-      );
-      if (distFromParty > 2.0) {
-        maxBrightness = Math.max(maxBrightness, 0.16); // Faint floor, boosted
-      }
-    }
-    
-    return Math.min(maxBrightness, 4.7); // Cap tuned for 35-60 range
+    return Math.min(maxBrightness, 1.0);
   }
-  
-  private getWarmTint(tileX: number, tileY: number): THREE.Color {
-    // Slight warm tint near sconces
+
+  private shadeVertex(
+    wx: number,
+    wy: number,
+    wz: number,
+    isDark: boolean,
+    flick: number
+  ): [number, number, number] {
+    const pdx = wx / CELL_SIZE - this.partyX;
+    const pdz = wz / CELL_SIZE - this.partyY;
+    const partyDist = Math.sqrt(pdx * pdx + pdz * pdz);
+    let brightness = this.getBandedFalloff(partyDist);
     let warmth = 0;
-    
-    for (const sconce of this.sconces) {
-      if (!sconce.lit) continue;
-      
-      const dx = tileX - sconce.x;
-      const dy = tileY - sconce.y;
-      const distance = Math.sqrt(dx * dx + dy * dy);
-      
-      if (distance < 3.0) {
-        const strength = Math.max(0, 1.0 - distance / 3.0);
-        warmth = Math.max(warmth, strength * 0.15);
+
+    if (partyDist < 2.0) {
+      warmth = Math.max(warmth, (1.0 - partyDist / 2.0) * 0.08);
+    }
+
+    if (!isDark) {
+      const radius = SCONCE_RADIUS_TILES * CELL_SIZE;
+      for (const s of this.sconceWorld) {
+        const dx = wx - s.x;
+        const dy = wy - s.y;
+        const dz = wz - s.z;
+        const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (dist >= radius) continue;
+        const t = 1 - dist / radius;
+        const w = t * t * (3 - 2 * t) * flick;
+        // Torch warms the stone; only a modest brightness lift so the near
+        // square stays at the texture's own level.
+        brightness = Math.max(brightness, w * 0.4);
+        warmth = Math.max(warmth, w);
       }
     }
-    
-    // Subtle warm tint: (1.0, 1.0, 1.0) → (1.0, 0.98, 0.92)
-    // Less tinting to preserve neutral stone colors
-    return new THREE.Color(
-      1.0,
-      1.0 - warmth * 0.02,
-      1.0 - warmth * 0.08
-    );
+
+    brightness = Math.min(brightness, 1.0);
+    return [brightness, brightness * (1.0 - warmth * 0.14), brightness * (1.0 - warmth * 0.32)];
   }
-  
-  updateMeshLighting(mesh: THREE.Mesh, tileX: number, tileY: number, isDark: boolean = false) {
-    const geometry = mesh.geometry;
-    
-    if (!geometry.attributes.color) {
-      const colors = new Float32Array(geometry.attributes.position.count * 3);
-      geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-    }
-    
-    const brightness = this.calculateBrightness(tileX, tileY, isDark);
-    const tint = this.getWarmTint(tileX, tileY);
-    
-    const finalColor = new THREE.Color(
-      tint.r * brightness,
-      tint.g * brightness,
-      tint.b * brightness
-    );
-    
-    const colors = geometry.attributes.color as THREE.BufferAttribute;
-    for (let i = 0; i < colors.count; i++) {
-      colors.setXYZ(i, finalColor.r, finalColor.g, finalColor.b);
+
+  private bakeFace(face: CachedFace, flick: number) {
+    const { worldPos, colors } = face;
+    const n = colors.count;
+    for (let i = 0; i < n; i++) {
+      const [r, g, b] = this.shadeVertex(
+        worldPos[i * 3],
+        worldPos[i * 3 + 1],
+        worldPos[i * 3 + 2],
+        face.isDark,
+        flick
+      );
+      colors.setXYZ(i, r, g, b);
     }
     colors.needsUpdate = true;
-    
-    // Ensure material uses MeshBasicMaterial with vertex colors
-    // Sprites should NOT have their colors modulated (they're already marked to skip)
-    if (!(mesh.material instanceof THREE.MeshBasicMaterial)) {
-      const oldMat = mesh.material as THREE.Material;
-      const map = (oldMat as any).map || null;
-      mesh.material = new THREE.MeshBasicMaterial({
-        map: map,
-        vertexColors: true,
-        side: (oldMat as any).side || THREE.FrontSide
-      });
-      oldMat.dispose();
-    } else {
-      // Already BasicMaterial, ensure vertexColors is enabled
-      mesh.material.vertexColors = true;
-      mesh.material.needsUpdate = true;
+  }
+
+  updateAllMeshes(_scene?: THREE.Scene) {
+    const flick = SCONCE_FLICKER[this.flickerFrame % SCONCE_FLICKER.length];
+    for (const face of this.faces) {
+      this.bakeFace(face, flick);
     }
   }
-  
-  updateAllMeshes(scene: THREE.Scene) {
-    scene.traverse((obj) => {
-      if (!(obj instanceof THREE.Mesh) || !obj.geometry.attributes.position) return;
-      // Skip sprite billboards (THREE.Sprite is not a Mesh; keep this for any plane leftover)
-      if (obj.userData.isSprite || obj instanceof THREE.Sprite) return;
 
-      const tileX = Math.round(obj.position.x / CELL_SIZE);
-      const tileY = Math.round(obj.position.z / CELL_SIZE);
-
-      const tile = this.floorData.tiles[tileY]?.[tileX];
-      const isDark = tile?.floorNDark || false;
-
-      this.updateMeshLighting(obj, tileX, tileY, isDark);
-    });
+  /** Rebake only faces near lit sconces (flame-frame flicker). */
+  setFlickerFrame(frame: number) {
+    const wrapped = ((frame % SCONCE_FLICKER.length) + SCONCE_FLICKER.length) % SCONCE_FLICKER.length;
+    if (wrapped === this.flickerFrame) return;
+    this.flickerFrame = wrapped;
+    const flick = SCONCE_FLICKER[this.flickerFrame];
+    for (const face of this.faces) {
+      if (face.nearSconce) this.bakeFace(face, flick);
+    }
   }
 }

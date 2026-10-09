@@ -32,7 +32,7 @@ export const floor1Sconces: readonly Sconce[] = [
   { x: 0, y: 6, face: 'E', lit: true },
   { x: 4, y: 1, face: 'W', lit: true },
   { x: 0, y: 3, face: 'E', lit: false },
-  { x: 4, y: 6, face: 'W', lit: false },
+  { x: 4, y: 6, face: 'W', lit: true },
   { x: 8, y: 6, face: 'W', lit: false },
   { x: 8, y: 1, face: 'W', lit: false },
 ];

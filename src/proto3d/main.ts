@@ -21,6 +21,7 @@ class Game {
   fpsCounter = document.getElementById('fps-counter')!;
   fpsFrames = 0;
   fpsLastTime = 0;
+  lastFps = 0;
   
   async init() {
     const canvas = document.getElementById('render-canvas') as HTMLCanvasElement;
@@ -83,6 +84,7 @@ class Game {
     console.log('Sample brightness at (1,5) two squares ahead:', 
       (this.vertexLighting as any).calculateBrightness(1, 5, false));
     
+    this.vertexLighting.registerScene(this.renderer.scene);
     this.vertexLighting.updateAllMeshes(this.renderer.scene);
     console.log('Vertex lighting initialized');
     
@@ -92,7 +94,7 @@ class Game {
     const slime = this.spriteManager.sprites.find(s => s.frames && s.frames.length === 4 && s.x === 7 && s.y === 2);
     console.log('Sprites added:', this.spriteManager.sprites.length);
     console.log('Sprite positions:', this.spriteManager.sprites.map(s => `(${s.x},${s.y})`));
-    console.log('Slime sprite:', slime ? `world (${slime.sprite.position.x}, ${slime.sprite.position.y}, ${slime.sprite.position.z})` : 'MISSING');
+    console.log('Slime sprite:', slime ? `world (${slime.object.position.x}, ${slime.object.position.y}, ${slime.object.position.z})` : 'MISSING');
     
     // Setup audio
     this.audioManager = new AudioManager(this.renderer.camera);
@@ -121,10 +123,30 @@ class Game {
       sprites: () => this.spriteManager.sprites.map(s => ({
         x: s.x,
         y: s.y,
-        world: s.sprite.position.toArray(),
+        world: s.object.position.toArray(),
         frames: s.frames?.length ?? 0,
         currentFrame: s.currentFrame
-      }))
+      })),
+      getCamera: () => ({
+        position: this.renderer.camera.position.toArray(),
+        rotation: this.renderer.camera.rotation.toArray().slice(0, 3),
+        fov: this.renderer.camera.fov
+      }),
+      meanLuma: () => {
+        this.renderer.render();
+        const gl = this.renderer.renderer.getContext();
+        const w = this.renderer.canvas.width;
+        const h = this.renderer.canvas.height;
+        const pixels = new Uint8Array(w * h * 4);
+        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+        let sum = 0;
+        const n = w * h;
+        for (let i = 0; i < pixels.length; i += 4) {
+          sum += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+        }
+        return sum / n;
+      },
+      fps: () => this.lastFps
     };
   }
   
@@ -163,7 +185,12 @@ class Game {
       this.vertexLighting.updateAllMeshes(this.renderer.scene);
     }
 
+    const prevFrame = this.spriteManager.sconceFrame();
     this.spriteManager.update(now);
+    const nextFrame = this.spriteManager.sconceFrame();
+    if (nextFrame !== prevFrame) {
+      this.vertexLighting.setFlickerFrame(nextFrame);
+    }
     
     // Render
     this.renderer.render();
@@ -173,6 +200,7 @@ class Game {
     if (now - this.fpsLastTime >= 1000) {
       const fps = Math.round((this.fpsFrames * 1000) / (now - this.fpsLastTime));
       this.fpsCounter.textContent = `FPS: ${fps}`;
+      this.lastFps = fps;
       this.fpsFrames = 0;
       this.fpsLastTime = now;
     }

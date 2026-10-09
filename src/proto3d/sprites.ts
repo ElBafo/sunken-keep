@@ -1,10 +1,19 @@
 import * as THREE from 'three';
+import {
+  CELL_SIZE,
+  CUTOUT_ALPHA_TEST,
+  FACE_INTO_ROOM,
+  SCONCE_ANIM_FPS,
+  SCONCE_HEIGHT_TILES,
+  SCONCE_WALL_OFFSET_TILES,
+  SCONCE_WIDTH_TILES,
+  sconceNeedsMirror
+} from './constants';
 import { FloorData, Sconce } from './types';
 
-const CELL_SIZE = 2;
-
 interface SpriteInfo {
-  sprite: THREE.Sprite;
+  object: THREE.Object3D;
+  material: THREE.SpriteMaterial | THREE.MeshBasicMaterial;
   x: number;
   y: number;
   frames?: THREE.Texture[];
@@ -19,6 +28,8 @@ function configureSpriteTexture(tex: THREE.Texture) {
   tex.magFilter = THREE.NearestFilter;
   tex.minFilter = THREE.NearestFilter;
   tex.generateMipmaps = false;
+  tex.wrapS = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.ClampToEdgeWrapping;
   tex.needsUpdate = true;
 }
 
@@ -54,6 +65,28 @@ function makeBillboard(
   sprite.userData.isSprite = true;
   sprite.matrixAutoUpdate = true;
   return sprite;
+}
+
+function placeOnWall(
+  obj: THREE.Object3D,
+  cellX: number,
+  cellY: number,
+  face: Sconce['face'],
+  y: number,
+  insetTiles: number
+) {
+  const { nx, nz, rotY } = FACE_INTO_ROOM[face];
+  const dist = CELL_SIZE / 2 + insetTiles * CELL_SIZE;
+  obj.position.set(cellX * CELL_SIZE + nx * dist, y, cellY * CELL_SIZE + nz * dist);
+  obj.rotation.y = rotY;
+}
+
+function flipUVs(geo: THREE.PlaneGeometry) {
+  const uv = geo.attributes.uv;
+  for (let i = 0; i < uv.count; i++) {
+    uv.setX(i, 1 - uv.getX(i));
+  }
+  uv.needsUpdate = true;
 }
 
 export class SpriteManager {
@@ -102,7 +135,8 @@ export class SpriteManager {
           scene.add(sprite);
 
           this.sprites.push({
-            sprite,
+            object: sprite,
+            material: mat,
             x,
             y,
             frames,
@@ -119,7 +153,8 @@ export class SpriteManager {
           scene.add(sprite);
 
           this.sprites.push({
-            sprite,
+            object: sprite,
+            material: mat,
             x,
             y,
             currentFrame: 0,
@@ -130,53 +165,67 @@ export class SpriteManager {
       }
     }
 
+    const [sconceDead, sconceLit1, sconceLit2, sconceLit3] = await Promise.all([
+      loadTex('proto3d/tex3d/sconce_dead.png'),
+      loadTex('proto3d/tex3d/sconce_lit_1.png'),
+      loadTex('proto3d/tex3d/sconce_lit_2.png'),
+      loadTex('proto3d/tex3d/sconce_lit_3.png')
+    ]);
+    const litFrames = [sconceLit1, sconceLit2, sconceLit3];
+    const sconceW = SCONCE_WIDTH_TILES * CELL_SIZE;
+    const sconceH = SCONCE_HEIGHT_TILES * CELL_SIZE;
+    const midHeight = CELL_SIZE / 2;
+    const frameMs = 1000 / SCONCE_ANIM_FPS;
+
     for (const sconce of sconces) {
-      if (!sconce.lit) continue;
+      const map = sconce.lit ? litFrames[0] : sconceDead;
+      const geo = new THREE.PlaneGeometry(sconceW, sconceH);
+      if (sconceNeedsMirror(sconce.face)) flipUVs(geo);
 
-      const frames = await Promise.all([
-        loadTex('proto3d/sconce_lit_1_near.png'),
-        loadTex('proto3d/sconce_lit_2_near.png'),
-        loadTex('proto3d/sconce_lit_3_near.png')
-      ]);
+      const mat = new THREE.MeshBasicMaterial({
+        map,
+        color: 0xffffff,
+        transparent: true,
+        alphaTest: CUTOUT_ALPHA_TEST,
+        depthTest: true,
+        depthWrite: true,
+        fog: false,
+        toneMapped: false,
+        side: THREE.FrontSide
+      });
 
-      const mat = makeSpriteMaterial(frames[0]);
-
-      const wx = sconce.x * CELL_SIZE;
-      const wz = sconce.y * CELL_SIZE;
-      // Hang on the ROOM side of the wall face (half-cell + a few cm),
-      // not inside the wall block — otherwise depth test hides the flame.
-      const offset = CELL_SIZE / 2 + 0.08;
-
-      let x = wx;
-      let z = wz;
-      if (sconce.face === 'N') z = wz - offset;
-      else if (sconce.face === 'E') x = wx + offset;
-      else if (sconce.face === 'S') z = wz + offset;
-      else if (sconce.face === 'W') x = wx - offset;
-
-      const sprite = makeBillboard(mat, x, 0.9, z, 0.7, 0.9);
-      scene.add(sprite);
+      const mesh = new THREE.Mesh(geo, mat);
+      placeOnWall(mesh, sconce.x, sconce.y, sconce.face, midHeight, SCONCE_WALL_OFFSET_TILES);
+      mesh.renderOrder = 1;
+      mesh.userData.skipVertexLighting = true;
+      mesh.userData.isSconce = true;
+      scene.add(mesh);
 
       this.sprites.push({
-        sprite,
+        object: mesh,
+        material: mat,
         x: sconce.x,
         y: sconce.y,
-        frames,
+        frames: sconce.lit ? litFrames : undefined,
         currentFrame: 0,
-        animSpeed: 150,
+        animSpeed: sconce.lit ? frameMs : 0,
         lastFrameTime: 0
       });
     }
   }
 
+  sconceFrame(): number {
+    const lit = this.sprites.find((s) => s.frames && s.frames.length === 3 && s.animSpeed > 0);
+    return lit?.currentFrame ?? 0;
+  }
+
   update(time: number) {
     for (const sprite of this.sprites) {
-      if (sprite.frames && sprite.frames.length > 1) {
+      if (sprite.frames && sprite.frames.length > 1 && sprite.animSpeed > 0) {
         if (time - sprite.lastFrameTime > sprite.animSpeed) {
           sprite.currentFrame = (sprite.currentFrame + 1) % sprite.frames.length;
-          const mat = sprite.sprite.material;
-          mat.map = sprite.frames[sprite.currentFrame];
-          mat.needsUpdate = true;
+          sprite.material.map = sprite.frames[sprite.currentFrame];
+          sprite.material.needsUpdate = true;
           sprite.lastFrameTime = time;
         }
       }
