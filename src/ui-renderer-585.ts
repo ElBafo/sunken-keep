@@ -1,8 +1,6 @@
 import { assets } from './assets';
 import type { GameState, Hero } from './types';
 import type { HeroId } from './constants';
-import { Renderer } from './renderer';
-import { createPartyAdapter } from './render-adapter';
 import {
   CANVAS_WIDTH,
   CANVAS_HEIGHT,
@@ -16,58 +14,28 @@ import {
 
 export class UIRenderer585 {
   private stoneStripTile: HTMLImageElement | null = null;
-  private dungeonRenderer: Renderer | null = null;
 
   constructor() {
-    // Deferred initialization to avoid potential timing issues
+    // Minimal initialization
   }
 
-  private ensureRendererInit(): void {
-    if (!this.dungeonRenderer) {
-      this.dungeonRenderer = new Renderer();
-    }
-  }
-
-  // Render full UI (called after dungeon view is rendered)
+  // Render full UI
   render(ctx: CanvasRenderingContext2D, state: GameState, now: number): void {
-    // Ensure renderer is initialized
-    this.ensureRendererInit();
-
     // Clear canvas
     ctx.fillStyle = '#000000';
     ctx.fillRect(0, 0, CANVAS_WIDTH, CANVAS_HEIGHT);
 
-    // Render dungeon view using old renderer (270×380)
-    try {
-      const party = createPartyAdapter(state);
-      const floor = state.floors.get(state.party.floor);
-      if (floor && party && this.dungeonRenderer) {
-        // Convert floor to old format for renderer
-        const oldFloor = {
-          width: floor.width,
-          height: floor.height,
-          startX: floor.startX,
-          startY: floor.startY,
-          startDir: floor.startDir,
-          tiles: floor.tiles,
-          sconces: floor.sconces,
-        };
-        this.dungeonRenderer.drawViewport(ctx, party, oldFloor as any, now);
-      }
-    } catch (error) {
-      console.error('Renderer error:', error);
-      // Fallback: dark stone wall
-      ctx.fillStyle = '#2a2420';
-      ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
-      
-      // Draw horizon line
-      ctx.strokeStyle = '#4a4440';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(0, HORIZON_Y);
-      ctx.lineTo(VIEW_WIDTH, HORIZON_Y);
-      ctx.stroke();
-    }
+    // Placeholder dungeon view
+    ctx.fillStyle = '#2a2420';
+    ctx.fillRect(0, 0, VIEW_WIDTH, VIEW_HEIGHT);
+    
+    // Draw horizon line
+    ctx.strokeStyle = '#4a4440';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(0, HORIZON_Y);
+    ctx.lineTo(VIEW_WIDTH, HORIZON_Y);
+    ctx.stroke();
 
     // Fill any extra height below panel with stone strip tile
     this.fillExtraHeight(ctx);

@@ -132,29 +132,34 @@ async function main() {
     gameController = new GameController();
     await gameController.init();
     uiRenderer585 = new UIRenderer585();
-    titleScreen = new TitleScreen();
+    // Temporarily skip TitleScreen to test WebKit
+    // titleScreen = new TitleScreen();
     console.log('New game controller initialized');
   }
   
   // Check if running as PWA (standalone mode)
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
-                       (window.navigator as any).standalone === true;
-  
-  // Show install hint on iOS Safari when not standalone (one-time)
-  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
-  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-  const installHintDismissed = localStorage.getItem('installHintDismissed');
-  
-  // Dismiss hint on tap
-  installHint.addEventListener('click', () => {
-    installHint.classList.add('hidden');
-    localStorage.setItem('installHintDismissed', 'true');
-  });
-  
-  if (isIOS && isSafari && !isStandalone && !installHintDismissed) {
-    setTimeout(() => {
-      installHint.classList.remove('hidden');
-    }, 3000);
+  try {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || 
+                         (window.navigator as any).standalone === true;
+    
+    // Show install hint on iOS Safari when not standalone (one-time)
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+    const installHintDismissed = localStorage.getItem('installHintDismissed');
+    
+    // Dismiss hint on tap
+    installHint.addEventListener('click', () => {
+      installHint.classList.add('hidden');
+      localStorage.setItem('installHintDismissed', 'true');
+    });
+    
+    if (isIOS && isSafari && !isStandalone && !installHintDismissed) {
+      setTimeout(() => {
+        installHint.classList.remove('hidden');
+      }, 3000);
+    }
+  } catch (error) {
+    console.error('PWA check error:', error);
   }
   
   let gameStarted = false;
