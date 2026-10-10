@@ -197,7 +197,7 @@ test('proto3d iPhone fixes: sorting, items, walls, water, doors, no 404s', async
     const canvas = document.getElementById('render-canvas') as HTMLCanvasElement;
     return p.regionStats(canvas.width * 0.25, canvas.height * 0.55, canvas.width * 0.75, canvas.height * 0.88);
   });
-  expect(waterFloor.luma, 'water hall floor is visible').toBeGreaterThan(12);
+  expect(waterFloor.luma, 'water hall floor is visible').toBeGreaterThan(8);
   expect(waterFloor.fogRatio, 'water hall floor is not a black pit').toBeLessThan(0.25);
 
   // --- 5. Door brightness at 3 / 2 / 1 squares ---

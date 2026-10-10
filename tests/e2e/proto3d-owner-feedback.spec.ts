@@ -94,20 +94,9 @@ test('proto3d owner feedback: occluded light, hidden back torch, snuff, water st
   await shot(1, 5, 1, 'floor1-start-east-to-pantry.png');
   await shot(10, 9, 1, 'floor1-lamp-room.png');
 
-  // Light the (4,6) west-face torch (starts dead on the 15×12 map) then
-  // assert its light does not leak through the wall into (5,6).
-  await page.evaluate(() => {
-    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-    p.setOil(2);
-    p.setPosition(3, 6, 1);
-    p.interact();
-  });
-  await page.waitForTimeout(200);
-  expect(
-    await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.torchLit(4, 6)),
-    '(4,6) torch is lit for the leak check'
-  ).toBe(true);
-
+  // (4,6) is a one-cell pillar with an open square at (4,5), so light can
+  // walk around it. The solid (6,4) south-facing torch wall separates the
+  // pantry from the north rooms; its back face at (6,3) must stay ambient.
   await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.setPosition(1, 7, 0));
   const leak = await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
@@ -118,29 +107,29 @@ test('proto3d owner feedback: occluded light, hidden back torch, snuff, water st
       return { r: list.reduce((s, f) => s + f.avgR, 0) / n, n: list.length };
     };
     return {
-      litWall: avg((f) => f.kind === 'wall' && f.lightX === 3 && f.lightY === 6),
-      darkWall: avg((f) => f.kind === 'wall' && f.lightX === 5 && f.lightY === 6),
-      darkFloor: avg((f) => f.kind === 'floor' && f.lightX === 5 && f.lightY === 6),
-      litFloor: avg((f) => (f.kind === 'floor' || f.kind === 'water-shallow') && f.lightX === 3 && f.lightY === 6),
-      tileLit: p.tileLight(3, 6),
-      tileDark: p.tileLight(5, 6),
-      sourceDark: p.sourceLight(5, 6),
+      litWall: avg((f) => f.kind === 'wall' && f.lightX === 6 && f.lightY === 5),
+      darkWall: avg((f) => f.kind === 'wall' && f.lightX === 6 && f.lightY === 3),
+      darkFloor: avg((f) => f.kind === 'floor' && f.lightX === 6 && f.lightY === 3),
+      litFloor: avg((f) => f.kind === 'floor' && f.lightX === 6 && f.lightY === 5),
+      tileLit: p.tileLight(6, 5),
+      tileDark: p.tileLight(6, 3),
+      sourceDark: p.sourceLight(6, 3),
       ambient: p.getAmbient()
     };
   });
   console.log('LEAK', leak);
-  expect(leak.litWall.n, 'west face of the (4,6) torch wall').toBeGreaterThan(0);
-  expect(leak.darkWall.n, 'east / back face of the (4,6) torch wall').toBeGreaterThan(0);
+  expect(leak.litWall.n, 'south face of the (6,4) torch wall').toBeGreaterThan(0);
+  expect(leak.darkWall.n, 'north / back face of the (6,4) torch wall').toBeGreaterThan(0);
   expect(leak.darkFloor.n, 'floor behind the torch wall').toBeGreaterThan(0);
   expect(leak.litWall.r, 'torch-facing wall is warm').toBeGreaterThan(0.2);
   expect(leak.darkWall.r, 'back side of the torch wall stays ambient').toBeLessThan(0.08);
   expect(leak.darkFloor.r, 'square behind the wall stays ambient').toBeLessThan(0.08);
-  expect(leak.tileDark, 'BFS does not reach the pantry').toBeLessThan(0.08);
+  expect(leak.tileDark, 'BFS does not reach the north room').toBeLessThan(0.08);
   expect(leak.tileLit, 'torch still lights its own room').toBeGreaterThan(0.2);
   expect(leak.sourceDark, 'no torch or lantern on the back square').toBeLessThan(0.02);
 
-  await shot(3, 6, 1, 'torch-wall-lit-side.png');
-  await shot(5, 6, 3, 'torch-wall-dark-side.png');
+  await shot(6, 5, 0, 'torch-wall-lit-side.png');
+  await shot(6, 3, 2, 'torch-wall-dark-side.png');
 
   // --- Torch behind / on own-square sides must not render ---
   await shot(1, 6, 1, 'back-to-torch-wall.png');
