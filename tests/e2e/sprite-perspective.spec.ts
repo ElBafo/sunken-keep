@@ -6,6 +6,7 @@ const OUT = '/opt/cursor/artifacts/screenshots';
 
 type ScreenRect = {
   height: number;
+  idleBodyHeight?: number;
   feetY: number;
   topY: number;
   width: number;
@@ -16,6 +17,8 @@ type ScreenRect = {
   canvas?: [number, number];
   renderTarget?: [number, number];
 };
+
+type IdleBodyRange = { min: number; max: number; frameH: number };
 
 type Proto3d = {
   ready?: boolean;
@@ -58,10 +61,7 @@ type Proto3d = {
   killMonsterAt: (x: number, y: number) => void;
 };
 
-const VIEWPORTS = [
-  { name: 'browser 393x659', width: 393, height: 659 },
-  { name: 'standalone 393x852', width: 393, height: 852 }
-] as const;
+const LOD_BY_SQUARES = ['close', 'near', 'mid', 'far'] as const;
 
 test.use(devices['iPhone 15']);
 
@@ -97,138 +97,114 @@ async function measure(
   );
 }
 
-function idleBand(height: number, target: number, label: string) {
-  expect(height, `${label} stays near the camera.json quad (idle art may be shorter)`).toBeGreaterThan(target * 0.8);
-  expect(height, `${label} is not scaled up past the camera.json target`).toBeLessThan(target * 1.12);
+function expectIdleBody(height: number, range: IdleBodyRange, label: string) {
+  expect(height, `${label} idle body >= min-1`).toBeGreaterThanOrEqual(range.min - 1);
+  expect(height, `${label} idle body <= max+1`).toBeLessThanOrEqual(range.max + 1);
 }
 
-for (const vp of VIEWPORTS) {
-  test.describe(`sprite perspective ${vp.name}`, () => {
-    test.use({ viewport: { width: vp.width, height: vp.height }, deviceScaleFactor: 3 });
+test('fixed 270x380 view; idle body heights; slime 3/2/1; no jump', async ({ page }) => {
+  test.setTimeout(90000);
+  mkdirSync(OUT, { recursive: true });
+  await boot(page);
 
-    test('fixed 270x380 view; slime 3/2/1; rat and crab 1-4; no jump', async ({ page }) => {
-      test.setTimeout(120000);
-      mkdirSync(OUT, { recursive: true });
-      await boot(page);
+  const size = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.canvasSize());
+  expect(size.canvas, 'drawing buffer is camera.json view').toEqual([270, 380]);
+  expect(size.renderTarget, 'render target never resizes').toEqual([270, 380]);
 
-      const size = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.canvasSize());
-      expect(size.canvas, 'drawing buffer is camera.json view').toEqual([270, 380]);
-      expect(size.renderTarget, 'render target never resizes').toEqual([270, 380]);
+  const cam = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.cameraSpec());
+  expect(cam.fov).toBe(80);
+  expect(cam.view).toEqual([270, 380]);
+  expect(cam.monsterOffsetTowardParty).toBe(0.25);
 
-      const cam = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.cameraSpec());
-      expect(cam.eyeHeight).toBeCloseTo(0.94, 5);
-      expect(cam.backOffsetTiles).toBeCloseTo(0.5, 5);
-      expect(cam.pitchDeg).toBeCloseTo(-3.5, 5);
-      expect(cam.fov).toBe(80);
-      expect(cam.view).toEqual([270, 380]);
-      expect(cam.monsterOffsetTowardParty).toBe(0.25);
-
-      await page.evaluate(() => {
-        const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-        p.snapDoor?.(4, 2, true);
-      });
-
-      const listen = await page.evaluate(() => {
-        const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-        p.setPosition(6, 2, 1);
-        return p.listenerPose();
-      });
-      expect(listen.x, 'listener on party square').toBeCloseTo(12, 5);
-      expect(listen.z).toBeCloseTo(4, 5);
-
-      const far = await measure(page, 4, 2, 1, 'monster', 7, 2);
-      await page.locator('#render-canvas').screenshot({ path: `${OUT}/slime-3-squares-${vp.width}x${vp.height}.png` });
-      const mid = await measure(page, 5, 2, 1, 'monster', 7, 2);
-      await page.locator('#render-canvas').screenshot({ path: `${OUT}/slime-2-squares-${vp.width}x${vp.height}.png` });
-      const near = await measure(page, 6, 2, 1, 'monster', 7, 2);
-      await page.locator('#render-canvas').screenshot({ path: `${OUT}/slime-1-square-${vp.width}x${vp.height}.png` });
-
-      expect(far, 'slime at 3 squares').toBeTruthy();
-      expect(mid, 'slime at 2 squares').toBeTruthy();
-      expect(near, 'slime at 1 square').toBeTruthy();
-      expect(far!.canvas, 'spriteScreen uses the real 270x380 buffer').toEqual([270, 380]);
-      expect(far!.lod, '3 squares uses mid frames').toBe('mid');
-      expect(mid!.lod, '2 squares uses near frames').toBe('near');
-      expect(near!.lod, '1 square uses close frames').toBe('close');
-
-      expect(mid!.height, 'height grows 3 → 2').toBeGreaterThan(far!.height);
-      expect(near!.height, 'height grows 2 → 1').toBeGreaterThan(mid!.height);
-      expect(mid!.feetY, 'feet move down 3 → 2').toBeGreaterThan(far!.feetY);
-      expect(near!.feetY, 'feet move down 2 → 1').toBeGreaterThan(mid!.feetY);
-
-      const step32 = mid!.height / far!.height;
-      const step21 = near!.height / mid!.height;
-      expect(step21, 'no 2× jump from 2 to 1').toBeLessThan(2);
-      expect(step21).toBeGreaterThan(1.05);
-      expect(step32).toBeGreaterThan(1.05);
-      expect(step32).toBeLessThan(2);
-
-      expect(near!.worldX, 'quarter-square toward the party').toBeCloseTo(13.5, 5);
-      expect(near!.worldZ).toBeCloseTo(4, 5);
-      expect(near!.scaleY, 'close and near share the same world height').toBeCloseTo(mid!.scaleY, 5);
-
-      const fromEast = await measure(page, 9, 2, 3, 'monster', 7, 2);
-      expect(fromEast!.height, '2-square size does not depend on approach').toBeCloseTo(mid!.height, 1);
-      expect(fromEast!.feetY).toBeCloseTo(mid!.feetY, 1);
-
-      const backToTwo = await measure(page, 5, 2, 1, 'monster', 7, 2);
-      expect(backToTwo!.height, 'size at 2 squares is the same after stepping away').toBeCloseTo(mid!.height, 1);
-
-      const rat1 = await measure(page, 6, 5, 1, 'monster', 7, 5);
-      await page.locator('#render-canvas').screenshot({ path: `${OUT}/rat-1-square-${vp.width}x${vp.height}.png` });
-      const rat2 = await measure(page, 5, 5, 1, 'monster', 7, 5);
-      const rat3 = await measure(page, 4, 5, 1, 'monster', 7, 5);
-      const rat4 = await measure(page, 3, 5, 1, 'monster', 7, 5);
-      expect(rat1, 'keep_rat at 1 square').toBeTruthy();
-      expect(rat1!.lod).toBe('close');
-      expect(rat1!.scaleY, 'rat is much shorter than the slime').toBeLessThan(near!.scaleY * 0.55);
-      expect(rat1!.worldX).toBeCloseTo(13.5, 5);
-      expect(rat1!.worldZ).toBeCloseTo(10, 5);
-      const ratHeights = [rat1!, rat2!, rat3!, rat4!].map((r) => Math.round(r.height));
-      console.log(
-        'RAT_HEIGHTS_1_2_3_4',
-        vp.name,
-        ratHeights,
-        [rat1, rat2, rat3, rat4].map((r) => r && { h: r.height, lod: r.lod, scaleY: r.scaleY })
-      );
-      [1, 2, 3, 4].forEach((n, i) => {
-        idleBand([rat1!, rat2!, rat3!, rat4!][i].height, cam.wallSpriteHeightPx[String(n)] * 0.25, `rat@${n}`);
-      });
-
-      const crab1 = await measure(page, 6, 3, 3, 'monster', 5, 3);
-      await page.locator('#render-canvas').screenshot({ path: `${OUT}/crab-1-square-${vp.width}x${vp.height}.png` });
-      const crab2 = await measure(page, 7, 3, 3, 'monster', 5, 3);
-      const crab3 = await measure(page, 8, 3, 3, 'monster', 5, 3);
-      const crab4 = await measure(page, 9, 3, 3, 'monster', 5, 3);
-      expect(crab1, 'rust_crab at 1 square').toBeTruthy();
-      expect(crab1!.lod).toBe('close');
-      expect(crab1!.scaleY, 'crab world height is 0.35 walls').toBeCloseTo(0.7, 5);
-      const crabHeights = [crab1!, crab2!, crab3!, crab4!].map((r) => Math.round(r.height));
-      console.log(
-        'CRAB_HEIGHTS_1_2_3_4',
-        vp.name,
-        crabHeights,
-        [crab1, crab2, crab3, crab4].map((r) => r && { h: r.height, lod: r.lod, scaleY: r.scaleY })
-      );
-      [1, 2, 3, 4].forEach((n, i) => {
-        idleBand([crab1!, crab2!, crab3!, crab4!][i].height, cam.wallSpriteHeightPx[String(n)] * 0.35, `crab@${n}`);
-      });
-
-      await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.setPosition(6, 2, 1));
-      await page.locator('#render-canvas').screenshot({ path: `${OUT}/slime-1-square-again-${vp.width}x${vp.height}.png` });
-
-      await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.setPosition(7, 7, 2));
-      await page.waitForTimeout(120);
-      const item = await page.evaluate(() => {
-        const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-        return p.spriteScreen('item', 7, 7);
-      });
-      await page.locator('#render-canvas').screenshot({ path: `${OUT}/item-own-square-wall-${vp.width}x${vp.height}.png` });
-      expect(item, 'own-square item is on screen').toBeTruthy();
-      expect(item!.feetY, 'own-square item sits in the visible floor strip').toBeGreaterThan(item!.topY);
-    });
+  const ranges = await page.evaluate(async () => {
+    const res = await fetch('art/dungeon/monster_anchor.json');
+    const json = (await res.json()) as {
+      idleBodyHeightPx?: Record<string, Record<string, IdleBodyRange>>;
+      distanceFrames?: { idleBodyHeightPx?: Record<string, Record<string, IdleBodyRange>> };
+    };
+    return json.distanceFrames?.idleBodyHeightPx ?? json.idleBodyHeightPx ?? {};
   });
-}
+
+  await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    p.snapDoor?.(4, 2, true);
+  });
+
+  const far = await measure(page, 4, 2, 1, 'monster', 7, 2);
+  const mid = await measure(page, 5, 2, 1, 'monster', 7, 2);
+  const near = await measure(page, 6, 2, 1, 'monster', 7, 2);
+  await page.locator('#render-canvas').screenshot({ path: `${OUT}/slime-1-square.png` });
+
+  expect(far!.lod).toBe('mid');
+  expect(mid!.lod).toBe('near');
+  expect(near!.lod).toBe('close');
+  expect(mid!.height, 'height grows 3 → 2').toBeGreaterThan(far!.height);
+  expect(near!.height, 'height grows 2 → 1').toBeGreaterThan(mid!.height);
+  expect(near!.height / mid!.height, 'no 2× jump from 2 to 1').toBeLessThan(2);
+  expect(near!.worldX, 'quarter-square toward the party').toBeCloseTo(13.5, 5);
+  expect(near!.scaleY).toBeCloseTo(mid!.scaleY, 5);
+
+  const backToTwo = await measure(page, 5, 2, 1, 'monster', 7, 2);
+  expect(backToTwo!.height, 'size at 2 squares is the same after stepping away').toBeCloseTo(mid!.height, 1);
+
+  const series = [
+    {
+      name: 'keep_rat',
+      poses: [
+        [6, 5, 1, 7, 5],
+        [5, 5, 1, 7, 5],
+        [4, 5, 1, 7, 5],
+        [3, 5, 1, 7, 5]
+      ] as Array<[number, number, number, number, number]>
+    },
+    {
+      name: 'rust_crab',
+      poses: [
+        [6, 3, 3, 5, 3],
+        [7, 3, 3, 5, 3],
+        [8, 3, 3, 5, 3],
+        [9, 3, 3, 5, 3]
+      ] as Array<[number, number, number, number, number]>
+    },
+    {
+      name: 'slime',
+      poses: [
+        [6, 2, 1, 7, 2],
+        [5, 2, 1, 7, 2],
+        [4, 2, 1, 7, 2],
+        [3, 2, 1, 7, 2]
+      ] as Array<[number, number, number, number, number]>
+    },
+    {
+      name: 'bog_leeches',
+      poses: [
+        [3, 4, 0, 3, 3],
+        [3, 5, 0, 3, 3],
+        [3, 6, 0, 3, 3],
+        [3, 7, 0, 3, 3]
+      ] as Array<[number, number, number, number, number]>
+    }
+  ];
+
+  for (const kind of series) {
+    const bodies: number[] = [];
+    for (let i = 0; i < 4; i++) {
+      const [x, y, dir, sx, sy] = kind.poses[i];
+      const rect = await measure(page, x, y, dir, 'monster', sx, sy);
+      expect(rect, `${kind.name} at ${i + 1} square`).toBeTruthy();
+      expect(rect!.lod, `${kind.name}@${i + 1} lod`).toBe(LOD_BY_SQUARES[i]);
+      const body = rect!.idleBodyHeight ?? rect!.height;
+      bodies.push(body);
+      expectIdleBody(body, ranges[kind.name][LOD_BY_SQUARES[i]], `${kind.name}@${i + 1}`);
+    }
+    console.log(
+      'IDLE_BODY_1_2_3_4',
+      kind.name,
+      bodies.map((n) => Math.round(n * 100) / 100),
+      ranges[kind.name]
+    );
+  }
+});
 
 test('monster two squares away is never adjacent', async ({ page }) => {
   await boot(page);

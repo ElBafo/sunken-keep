@@ -3560,6 +3560,97 @@
     "gapBelow": 0,
     "topRow": 5
    }
-  }
+  },
+  "idleBodyHeightPx": {
+   "keep_rat": {
+    "close": {
+     "min": 39,
+     "max": 42,
+     "frameH": 45
+    },
+    "near": {
+     "min": 21,
+     "max": 23,
+     "frameH": 25
+    },
+    "mid": {
+     "min": 15,
+     "max": 16,
+     "frameH": 17
+    },
+    "far": {
+     "min": 11,
+     "max": 12,
+     "frameH": 13
+    }
+   },
+   "rust_crab": {
+    "close": {
+     "min": 54,
+     "max": 58,
+     "frameH": 63
+    },
+    "near": {
+     "min": 30,
+     "max": 32,
+     "frameH": 35
+    },
+    "mid": {
+     "min": 21,
+     "max": 21,
+     "frameH": 24
+    },
+    "far": {
+     "min": 16,
+     "max": 17,
+     "frameH": 19
+    }
+   },
+   "slime": {
+    "close": {
+     "min": 86,
+     "max": 92,
+     "frameH": 100
+    },
+    "near": {
+     "min": 47,
+     "max": 50,
+     "frameH": 55
+    },
+    "mid": {
+     "min": 32,
+     "max": 35,
+     "frameH": 38
+    },
+    "far": {
+     "min": 25,
+     "max": 27,
+     "frameH": 29
+    }
+   },
+   "bog_leeches": {
+    "close": {
+     "min": 25,
+     "max": 25,
+     "frameH": 27
+    },
+    "near": {
+     "min": 13,
+     "max": 13,
+     "frameH": 15
+    },
+    "mid": {
+     "min": 9,
+     "max": 9,
+     "frameH": 10
+    },
+    "far": {
+     "min": 7,
+     "max": 7,
+     "frameH": 8
+    }
+   }
+  },
+  "idleNote": "Opaque height of the idle frames per set (min/max over idle_1..4) vs the shared frame height. Measure idle monsters against min..max, not frameH. Camera: camera.json with monsterOffsetTowardParty 0.25."
  }
 }

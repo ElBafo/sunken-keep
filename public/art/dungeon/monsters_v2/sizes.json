@@ -1,0 +1,266 @@
+{
+ "camera": "../../camera_pr19_px.json",
+ "geometry": {
+  "cellSize": 2,
+  "wallHeight": 2,
+  "backOffsetTiles": 0.5,
+  "eyeHeight": 0.94,
+  "pitchDeg": -3.5,
+  "fovDeg": 80.0,
+  "viewW": 270,
+  "viewH": 380,
+  "feetY": 0.04
+ },
+ "wallPx": {
+  "1": 181.15,
+  "2": 100.64,
+  "3": 69.67,
+  "4": 53.28
+ },
+ "monsters": {
+  "keep_rat": {
+   "worldHeight": 0.25,
+   "worldHeightSource": "levels/monsters.json",
+   "close": {
+    "squares": 1,
+    "px": [
+     53,
+     45
+    ],
+    "exactPx": 45.29,
+    "quadWorld": [
+     0.5889,
+     0.5
+    ],
+    "feetShifted": {},
+    "rimLight": false
+   },
+   "near": {
+    "squares": 2,
+    "px": [
+     29,
+     25
+    ],
+    "exactPx": 25.16,
+    "quadWorld": [
+     0.58,
+     0.5
+    ],
+    "feetShifted": {},
+    "rimLight": false
+   },
+   "mid": {
+    "squares": 3,
+    "px": [
+     22,
+     17
+    ],
+    "exactPx": 17.42,
+    "quadWorld": [
+     0.6471,
+     0.5
+    ],
+    "feetShifted": {},
+    "rimLight": true
+   },
+   "far": {
+    "squares": 4,
+    "px": [
+     17,
+     13
+    ],
+    "exactPx": 13.32,
+    "quadWorld": [
+     0.6538,
+     0.5
+    ],
+    "feetShifted": {},
+    "rimLight": true
+   }
+  },
+  "rust_crab": {
+   "worldHeight": 0.35,
+   "worldHeightSource": "levels/monsters.json",
+   "close": {
+    "squares": 1,
+    "px": [
+     95,
+     63
+    ],
+    "exactPx": 63.4,
+    "quadWorld": [
+     1.0556,
+     0.7
+    ],
+    "feetShifted": {},
+    "rimLight": false
+   },
+   "near": {
+    "squares": 2,
+    "px": [
+     53,
+     35
+    ],
+    "exactPx": 35.22,
+    "quadWorld": [
+     1.06,
+     0.7
+    ],
+    "feetShifted": {},
+    "rimLight": false
+   },
+   "mid": {
+    "squares": 3,
+    "px": [
+     38,
+     24
+    ],
+    "exactPx": 24.38,
+    "quadWorld": [
+     1.1083,
+     0.7
+    ],
+    "feetShifted": {
+     "idle_4": 1
+    },
+    "rimLight": false
+   },
+   "far": {
+    "squares": 4,
+    "px": [
+     31,
+     19
+    ],
+    "exactPx": 18.65,
+    "quadWorld": [
+     1.1421,
+     0.7
+    ],
+    "feetShifted": {
+     "hurt_1": 1
+    },
+    "rimLight": true
+   }
+  },
+  "bog_leeches": {
+   "worldHeight": 0.15,
+   "worldHeightSource": "levels/monsters.json",
+   "close": {
+    "squares": 1,
+    "px": [
+     47,
+     27
+    ],
+    "exactPx": 27.17,
+    "quadWorld": [
+     0.5222,
+     0.3
+    ],
+    "feetShifted": {},
+    "rimLight": false
+   },
+   "near": {
+    "squares": 2,
+    "px": [
+     25,
+     15
+    ],
+    "exactPx": 15.1,
+    "quadWorld": [
+     0.5,
+     0.3
+    ],
+    "feetShifted": {},
+    "rimLight": true
+   },
+   "mid": {
+    "squares": 3,
+    "px": [
+     17,
+     10
+    ],
+    "exactPx": 10.45,
+    "quadWorld": [
+     0.51,
+     0.3
+    ],
+    "feetShifted": {},
+    "rimLight": true
+   },
+   "far": {
+    "squares": 4,
+    "px": [
+     13,
+     8
+    ],
+    "exactPx": 7.99,
+    "quadWorld": [
+     0.4875,
+     0.3
+    ],
+    "feetShifted": {},
+    "rimLight": true
+   }
+  },
+  "slime": {
+   "worldHeight": 0.55,
+   "worldHeightSource": "levels/monsters.json",
+   "close": {
+    "squares": 1,
+    "px": [
+     144,
+     100
+    ],
+    "exactPx": 99.63,
+    "quadWorld": [
+     1.584,
+     1.1
+    ],
+    "feetShifted": {},
+    "rimLight": false
+   },
+   "near": {
+    "squares": 2,
+    "px": [
+     79,
+     55
+    ],
+    "exactPx": 55.35,
+    "quadWorld": [
+     1.58,
+     1.1
+    ],
+    "feetShifted": {},
+    "rimLight": false
+   },
+   "mid": {
+    "squares": 3,
+    "px": [
+     55,
+     38
+    ],
+    "exactPx": 38.32,
+    "quadWorld": [
+     1.5921,
+     1.1
+    ],
+    "feetShifted": {},
+    "rimLight": false
+   },
+   "far": {
+    "squares": 4,
+    "px": [
+     43,
+     29
+    ],
+    "exactPx": 29.3,
+    "quadWorld": [
+     1.631,
+     1.1
+    ],
+    "feetShifted": {},
+    "rimLight": false
+   }
+  }
+ }
+}

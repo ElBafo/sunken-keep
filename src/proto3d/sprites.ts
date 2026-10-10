@@ -681,10 +681,16 @@ export class SpriteManager {
     const top = toScreen(0, 1);
     const left = toScreen(-0.5, 0.5);
     const right = toScreen(0.5, 0.5);
+    const height = feet.y - top.y;
+    const file = this.frameFile(sprite);
+    const a = file ? this.anchors.get(file) : undefined;
+    const imageH = a?.imageH || sprite.imageH || 1;
+    const bodyRows = a ? Math.max(1, a.footRow - a.topRow + 1) : imageH;
     return {
       feetY: feet.y,
       topY: top.y,
-      height: feet.y - top.y,
+      height,
+      idleBodyHeight: height * (bodyRows / imageH),
       width: Math.abs(right.x - left.x),
       worldX: obj.position.x,
       worldY: obj.position.y,
