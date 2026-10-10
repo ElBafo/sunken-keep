@@ -378,7 +378,9 @@ export class TitleScreen {
     });
     const area = this.story.titleText(`areas.${save.floor}`) || '';
     const line1 = this.story.titleText('slot.line1', { n: save.floor, area });
-    const line2 = this.story.titleText('slot.line2', { time: formatPlayTime(save.playTimeMs) });
+    const line2 = this.story.titleText('slot.line2', {
+      time: formatPlayTime(save.playTimeMs, (key, vars) => this.story.uiText(key, vars))
+    });
     ctx.fillStyle = '#c8c0a8';
     ctx.font = '11px monospace';
     ctx.textAlign = 'left';

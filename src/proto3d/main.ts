@@ -122,6 +122,7 @@ class Game {
   private escapeRunActive = false;
   private phase: 'title' | 'intro' | 'play' = 'play';
   private skipTitle = false;
+  private pendingStartSnapshot = false;
   private title!: TitleScreen;
   private intro: IntroPlayer | null = null;
   private bubble: SpeechBubble | null = null;
@@ -159,7 +160,10 @@ class Game {
     document.documentElement.lang = locale;
     await this.story.load(locale);
     await this.storyProgress.load(import.meta.env.BASE_URL);
-    if (this.skipTitle) this.storyProgress.startNewGame();
+    if (this.skipTitle) {
+      this.storyProgress.startNewGame();
+      this.pendingStartSnapshot = true;
+    }
     this.applyStoryLabels();
 
     const layout = await loadLayout585();
@@ -856,7 +860,7 @@ class Game {
           this.hud.lastHand = { hero: e.hero, hand: e.hand };
           this.hud.handTapCount += 1;
           if (e.hero === 'ilsevar' && (e.item === 'wand' || e.item === 'scroll')) {
-            this.hud.dismissFrostHint();
+            this.markFrostHintDismissed();
           }
           break;
         case 'out_of_reach':
@@ -917,12 +921,14 @@ class Game {
   }
 
   loadAutosave() {
+    this.audioManager?.fadeGameOver(300);
     const save = newestAutosave();
     if (save) this.applySave(save);
     else this.restartFloor();
   }
 
   restartFloor() {
+    this.audioManager?.fadeGameOver(300);
     const snap = loadFloorSnapshot(FLOOR_NUMBER);
     if (snap) {
       this.applySave(snap);
@@ -959,7 +965,9 @@ class Game {
     this.restoreLoot();
     this.restoreTiles();
     this.flags.clear();
+    this.hud.resetFrostHint();
     this.closeBag();
+    this.audioManager?.fadeGameOver(300);
     this.audioManager?.updateListener(this.player.x, this.player.y, this.player.dir);
   }
 
@@ -1387,6 +1395,7 @@ class Game {
   }
 
   applySave(save: SavePayload) {
+    this.audioManager?.fadeGameOver(300);
     document.getElementById('gameover')?.classList.remove('show');
     this.hud?.clearLog();
     this.lastMessage = '';
@@ -1463,6 +1472,7 @@ class Game {
     this.inventory?.redraw();
     this.lastHitType = null;
     this.hud.hideFrostHint();
+    this.hud.setFrostHintDismissed(this.flags.has('frost_hint_dismissed'));
     this.clearFlankFlash();
     this.closeBag();
     this.rebuildAudioFromState();
@@ -1619,6 +1629,7 @@ class Game {
       }
       if (action.type === 'continue' || action.type === 'load') {
         this.title.hide();
+        this.audioManager.markPlayStarted();
         this.applySave(action.payload);
         this.beginPlay();
         return;
@@ -1632,7 +1643,7 @@ class Game {
       document.getElementById('tap-to-start')?.classList.add('hidden');
       this.title.show('title');
       void this.audioManager.loadSounds(this.renderer.scene, floor1Sconces).then(() => {
-        this.audioManager.playMenu();
+        if (this.phase === 'title') this.audioManager.playMenu();
       });
     }
   }
@@ -1657,6 +1668,7 @@ class Game {
 
   private startNewGame() {
     this.title.hide();
+    this.audioManager.markPlayStarted();
     this.restoreSconceDefaults();
     this.resetFloorState();
     this.flags.clear();
@@ -1666,7 +1678,8 @@ class Game {
     this.journalPages.clear();
     this.dialogue.clear();
     this.floorStates = {};
-    this.takeFloorSnapshot();
+    this.hud.resetFrostHint();
+    this.pendingStartSnapshot = true;
     this.phase = 'intro';
     this.audioManager.crossfadeToIntro();
     const overlay = document.getElementById('intro-overlay');
@@ -1687,10 +1700,20 @@ class Game {
   private beginPlay() {
     this.phase = 'play';
     if (!this.playStartedAt) this.playStartedAt = performance.now();
+    this.audioManager.markPlayStarted();
     if (this.storyProgress.fire('enter_floor1')) this.showMessage(this.storyLog('enter_floor1'));
     this.storyProgress.fire('f1_start');
+    if (this.pendingStartSnapshot) {
+      this.takeFloorSnapshot();
+      this.pendingStartSnapshot = false;
+    }
     this.audioManager.crossfadeToAct1();
     this.startLoop();
+  }
+
+  private markFrostHintDismissed() {
+    this.hud.dismissFrostHint();
+    this.flags.add('frost_hint_dismissed');
   }
 
   private startLoop() {
@@ -1737,6 +1760,7 @@ class Game {
       this.syncKeyFlag();
       tile.doorLocked = false;
       this.audioManager.playDoor('door_unlock', x, y);
+      if (this.storyProgress.fire('door_unlocked')) this.showMessage(this.storyLog('door_unlocked'));
       this.pendingUnlock = { x, y };
       this.doorUnlockTimer = performance.now() + DOOR_UNLOCK_LEAD_MS;
       return;
@@ -1923,6 +1947,14 @@ class Game {
       hitFxPlaying: () => this.spriteManager.hitFxPlaying(),
       hostTint: (id: string) => this.spriteManager.hostTint(id),
       frostHint: () => this.hud.frostHintState(),
+      armFrostHint: () => this.hud.armFrostHint(),
+      dismissFrostHint: () => this.markFrostHintDismissed(),
+      playStarted: () => this.audioManager.playStarted,
+      menuPlaying: () => this.audioManager.isMenuPlaying(),
+      gameOverPlaying: () => this.audioManager.isGameOverPlaying(),
+      playingLoopNames: () => this.audioManager.loopKit(true).names.slice(),
+      handleDoor: (x: number, y: number) => this.handleDoor(x, y),
+      floorSnapshotGoals: () => loadFloorSnapshot(FLOOR_NUMBER)?.goals ?? {},
       lastFlank: () => this.lastFlank,
       flashFlank: (side: 'left' | 'right' | 'behind') => this.flashFlank(side),
       partyState: () => this.combat.partyState(),

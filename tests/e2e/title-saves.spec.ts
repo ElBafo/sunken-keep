@@ -75,6 +75,16 @@ type Proto3d = {
   persistCalled: () => boolean;
   killKind: (kind: string) => boolean;
   carriedTorch: () => { hero: string; hand: string; lit: boolean } | null;
+  frostHint: () => { armed: boolean; dismissed: boolean };
+  armFrostHint: () => void;
+  dismissFrostHint: () => void;
+  playStarted: () => boolean;
+  menuPlaying: () => boolean;
+  gameOverPlaying: () => boolean;
+  playingLoopNames: () => string[];
+  handleDoor: (x: number, y: number) => void;
+  floorSnapshotGoals: () => Record<string, string>;
+  startNewGame: () => void;
 };
 
 test.use(devices['iPhone 15']);
@@ -287,14 +297,20 @@ test.describe('proto3d step4 title and saves', () => {
     await expect(page.locator('#btn-go-autosave')).toBeVisible();
     await expect(page.locator('#btn-go-floor')).toContainText(/Floor 1|Όροφος 1/i);
     await page.locator('#btn-go-autosave').tap();
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(400);
     expect(await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.gameOverVisible())).toBe(
+      false
+    );
+    expect(await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.gameOverPlaying())).toBe(
       false
     );
     await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.forceWipe());
     await page.waitForTimeout(150);
     await page.locator('#btn-go-floor').tap();
-    await page.waitForTimeout(200);
+    await page.waitForTimeout(400);
+    expect(await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.gameOverPlaying())).toBe(
+      false
+    );
     const floorRestored = await page.evaluate(() => {
       const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
       return { over: p.gameOverVisible(), pos: p.getPosition(), logs: p.logLines() };
@@ -514,5 +530,152 @@ test.describe('proto3d step4 title and saves', () => {
     expect(afterFlags.sconces.find((s) => s.x === 6 && s.y === 4)?.empty).toBe(true);
     expect(afterFlags.monsters.filter((m) => m.kind === 'keep_rat').some((m) => !m.alive)).toBe(true);
     expect(afterFlags.oil).toBe(3);
+  });
+
+  test('frost hint dismissed survives reload and resets on New Game', async ({ page }) => {
+    mkdirSync(OUT, { recursive: true });
+    await keepSavesAcrossReload(page);
+    await bootPlay(page, 'test=1&persist=1&debug=1');
+    await page.evaluate(() => {
+      const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+      p.dismissFrostHint();
+    });
+    expect(
+      await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.frostHint().dismissed)
+    ).toBe(true);
+    await saveReloadLoad(page);
+    expect(
+      await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.frostHint().dismissed)
+    ).toBe(true);
+    await page.evaluate(() => {
+      const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+      p.startNewGame();
+      p.skipIntro();
+    });
+    await page.waitForTimeout(200);
+    expect(
+      await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.frostHint().dismissed)
+    ).toBe(false);
+  });
+
+  test('title music never starts after play and Continue goes to act1', async ({ page }) => {
+    mkdirSync(OUT, { recursive: true });
+    await keepSavesAcrossReload(page);
+    await page.goto(`${BASE_URL}/proto3d.html`);
+    await page.waitForFunction(
+      () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
+      null,
+      { timeout: 30000 }
+    );
+    await page.locator('.title-hit[data-id="New Game"]').tap();
+    await page.waitForTimeout(150);
+    if (await page.locator('#intro-overlay').evaluate((el) => el.classList.contains('show'))) {
+      await page.locator('#intro-overlay').tap();
+    }
+    await page.waitForTimeout(1600);
+    const afterNew = await page.evaluate(() => {
+      const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+      return { started: p.playStarted(), menu: p.menuPlaying(), loops: p.playingLoopNames() };
+    });
+    expect(afterNew.started).toBe(true);
+    expect(afterNew.menu).toBe(false);
+    expect(afterNew.loops).not.toContain('menu');
+
+    await page.evaluate(() => {
+      const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+      p.saveToSlot(1);
+    });
+    await rememberSaves(page);
+    await page.reload();
+    await page.waitForFunction(
+      () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
+      null,
+      { timeout: 30000 }
+    );
+    await page.waitForTimeout(2200);
+    await page.locator('.title-hit[data-id="Continue"]').tap();
+    await page.waitForTimeout(1200);
+    const afterContinue = await page.evaluate(() => {
+      const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+      return { started: p.playStarted(), menu: p.menuPlaying(), loops: p.playingLoopNames() };
+    });
+    expect(afterContinue.started).toBe(true);
+    expect(afterContinue.menu).toBe(false);
+    expect(afterContinue.loops).not.toContain('menu');
+  });
+
+  test('unlocking the locked door completes g_f1_door', async ({ page }) => {
+    mkdirSync(OUT, { recursive: true });
+    await keepSavesAcrossReload(page);
+    await bootPlay(page, 'test=1&persist=1&debug=1');
+    const unlocked = await page.evaluate(() => {
+      const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+      p.setPosition(5, 2, 3);
+      p.giveItem('key');
+      p.fireOnce('door_locked');
+      p.handleDoor(4, 2);
+      return { fired: p.firedOnce(), goals: p.goals() };
+    });
+    expect(unlocked.fired).toEqual(expect.arrayContaining(['door_unlocked']));
+    expect(unlocked.goals.g_f1_door).toBe('done');
+  });
+
+  test('start-of-floor snapshot keeps arrival goals after Floor 1 restart', async ({ page }) => {
+    mkdirSync(OUT, { recursive: true });
+    await keepSavesAcrossReload(page);
+    await bootPlay(page, 'test=1&persist=1&debug=1');
+    const snap = await page.evaluate(() => {
+      const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+      return p.floorSnapshotGoals();
+    });
+    expect(snap.g_why).toBe('active');
+    expect(snap.g_tam).toBe('active');
+    expect(snap.g_f1_down).toBe('active');
+    await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.forceWipe());
+    await page.waitForTimeout(200);
+    await page.locator('#btn-go-floor').tap();
+    await page.waitForTimeout(250);
+    const restored = await page.evaluate(() => {
+      const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+      return { over: p.gameOverVisible(), goals: p.goals(), gameOver: p.gameOverPlaying() };
+    });
+    expect(restored.over).toBe(false);
+    expect(restored.goals.g_why).toBe('active');
+    expect(restored.goals.g_tam).toBe('active');
+    expect(restored.goals.g_f1_down).toBe('active');
+    expect(restored.gameOver).toBe(false);
+  });
+
+  test('non-JSON slot is wet and needs overwrite confirm', async ({ page }) => {
+    mkdirSync(OUT, { recursive: true });
+    await keepSavesAcrossReload(page);
+    await page.goto(`${BASE_URL}/proto3d.html`);
+    await page.waitForFunction(
+      () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
+      null,
+      { timeout: 30000 }
+    );
+    await rememberSaves(page);
+    await page.evaluate(() => {
+      localStorage.setItem('proto3d.save.v1.slot.3', 'not-json{{{');
+    });
+    await page.reload();
+    await page.waitForFunction(
+      () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
+      null,
+      { timeout: 30000 }
+    );
+    await page.locator('.title-hit[data-id="Load"]').tap();
+    await page.waitForTimeout(250);
+    await page.screenshot({ path: `${OUT}/corrupt-nonjson-slot.png`, fullPage: false });
+    await page.locator('.title-hit[data-id="slot-3"]').tap();
+    await expect(page.locator('#title-toast')).toContainText(/got wet|βράχηκε/i);
+
+    await bootPlay(page, 'test=1&persist=1&debug=1');
+    await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.requestManualSave());
+    await page.waitForTimeout(200);
+    await page.locator('.title-hit[data-id="slot-3"]').tap();
+    await expect(page.locator('.title-hit[data-id="Overwrite"]')).toBeVisible();
+    await page.screenshot({ path: `${OUT}/corrupt-overwrite-confirm.png`, fullPage: false });
   });
 });

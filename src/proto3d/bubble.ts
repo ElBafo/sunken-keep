@@ -3,7 +3,7 @@ import { drawFont5x7, type FontGlyphs } from './font5x7';
 
 const VIEW_W = 270;
 const BUBBLE_H = 28;
-const CANVAS_H = 34;
+const CANVAS_H = 32;
 const PAD_X = 6;
 const PAD_Y = 4;
 const CHAR_W = 6;

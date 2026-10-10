@@ -118,14 +118,27 @@ function floorKey(floor: number): string {
   return `${PREFIX}floor.${floor}`;
 }
 
-function readRaw(key: string): unknown | null {
+type StoredItem = { kind: 'missing' } | { kind: 'ok'; value: unknown } | { kind: 'corrupt' };
+
+function readItem(key: string): StoredItem {
+  let raw: string | null;
   try {
-    const raw = localStorage.getItem(key);
-    if (!raw) return null;
-    return JSON.parse(raw);
+    raw = localStorage.getItem(key);
   } catch {
-    return null;
+    return { kind: 'missing' };
   }
+  if (raw == null) return { kind: 'missing' };
+  try {
+    return { kind: 'ok', value: JSON.parse(raw) };
+  } catch {
+    return { kind: 'corrupt' };
+  }
+}
+
+function readRaw(key: string): unknown | null {
+  const item = readItem(key);
+  if (item.kind !== 'ok') return null;
+  return item.value;
 }
 
 function writeRaw(key: string, value: unknown): boolean {
@@ -154,13 +167,14 @@ export function parseSave(raw: unknown): SavePayload | null {
 }
 
 export function slotOccupied(slot: number): boolean {
-  return readRaw(slotKey(slot)) != null;
+  return loadSlot(slot) != null;
 }
 
 export function loadSlot(slot: number): SavePayload | 'corrupt' | null {
-  const raw = readRaw(slotKey(slot));
-  if (raw == null) return null;
-  return parseSave(raw) ?? 'corrupt';
+  const item = readItem(slotKey(slot));
+  if (item.kind === 'missing') return null;
+  if (item.kind === 'corrupt') return 'corrupt';
+  return parseSave(item.value) ?? 'corrupt';
 }
 
 export function writeSlot(slot: number, payload: SavePayload): boolean {
@@ -222,12 +236,14 @@ export function floorState(save: SavePayload, floor = save.floor): SavedFloor | 
   return save.floors?.[String(floor)];
 }
 
-export function formatPlayTime(ms: number): string {
+export type PlayTimeFill = (key: string, vars?: Record<string, string | number>) => string;
+
+export function formatPlayTime(ms: number, fill?: PlayTimeFill): string {
   const totalMin = Math.max(0, Math.floor(ms / 60000));
   const h = Math.floor(totalMin / 60);
   const m = totalMin % 60;
-  if (h <= 0) return `${m}m`;
-  return `${h}h ${m}m`;
+  if (h <= 0) return fill?.('slot.time_m', { m }) || `${m}m`;
+  return fill?.('slot.time_hm', { h, m }) || `${h}h ${m}m`;
 }
 
 export function snapshotHero(h: HeroState, armour?: string): SavedHero {

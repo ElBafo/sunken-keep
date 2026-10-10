@@ -67,9 +67,12 @@ export class AudioManager {
   private lastHeroHurt: Record<string, string> = {};
   private nextHeroHurtAt = 0;
   lastHeroVoice: string | null = null;
+  playStarted = false;
   private windups = new Map<string, PositionalVoice>();
   private combatPool: PositionalVoice[] = [];
   private resumeWired = false;
+  private gameOverSound: THREE.Audio | null = null;
+  private fading = new WeakSet<THREE.Audio>();
 
   constructor(quality: QualityLevel) {
     this.listener = new THREE.AudioListener();
@@ -621,6 +624,7 @@ export class AudioManager {
   }
 
   playMenu() {
+    if (this.playStarted) return;
     this.unlock();
     this.stopFloorLoops();
     this.stopIntro();
@@ -628,6 +632,11 @@ export class AudioManager {
       this.menuSound.setVolume(0.7);
       this.menuSound.play();
     }
+  }
+
+  markPlayStarted() {
+    this.playStarted = true;
+    this.fadeOut(this.menuSound, 1000);
   }
 
   crossfadeToIntro(ms = 1000) {
@@ -723,7 +732,8 @@ export class AudioManager {
   }
 
   private stopMenuBeds() {
-    if (this.menuSound?.isPlaying) this.menuSound.stop();
+    if (this.playStarted) this.fadeOut(this.menuSound, 1000);
+    else if (this.menuSound?.isPlaying) this.menuSound.stop();
   }
 
   private stopIntro() {
@@ -741,6 +751,8 @@ export class AudioManager {
 
   private fadeOut(sound: THREE.Audio | null, ms: number) {
     if (!sound?.isPlaying) return;
+    if (this.fading.has(sound)) return;
+    this.fading.add(sound);
     const start = sound.getVolume();
     const t0 = performance.now();
     const tick = () => {
@@ -748,11 +760,24 @@ export class AudioManager {
       sound.setVolume(start * (1 - t));
       if (t >= 1) {
         sound.stop();
+        this.fading.delete(sound);
         return;
       }
       requestAnimationFrame(tick);
     };
     requestAnimationFrame(tick);
+  }
+
+  fadeGameOver(ms = 300) {
+    this.fadeOut(this.gameOverSound, ms);
+  }
+
+  isGameOverPlaying() {
+    return !!this.gameOverSound?.isPlaying;
+  }
+
+  isMenuPlaying() {
+    return !!this.menuSound?.isPlaying;
   }
 
   private fadeIn(sound: THREE.Audio, target: number, ms: number) {
@@ -854,6 +879,7 @@ export class AudioManager {
     sound.setPlaybackRate(rate);
     sound.setVolume(Math.min(1, Math.max(0, volume)));
     sound.play();
+    if (name === 'game_over') this.gameOverSound = sound;
   }
 
   private pickStepVariant(kind: 'step' | 'step_water_shallow' | 'step_water_deep'): string {

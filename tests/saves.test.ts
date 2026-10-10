@@ -6,7 +6,8 @@ import {
   loadSlot,
   parseSave,
   persistStorage,
-  SAVE_VERSION
+  SAVE_VERSION,
+  slotOccupied
 } from '../src/proto3d/saves';
 
 function validV2(over: Record<string, unknown> = {}) {
@@ -72,9 +73,28 @@ describe('save version', () => {
     vi.unstubAllGlobals();
   });
 
+  it('treats unparseable non-JSON slot data as corrupt, not empty', () => {
+    const store = new Map<string, string>();
+    vi.stubGlobal('localStorage', {
+      getItem: (k: string) => store.get(k) ?? null,
+      setItem: (k: string, v: string) => store.set(k, v),
+      removeItem: (k: string) => store.delete(k)
+    });
+    store.set('proto3d.save.v1.slot.3', 'not-json{{{');
+    expect(loadSlot(3)).toBe('corrupt');
+    expect(listSlots()[2]).toEqual({ slot: 3, status: 'corrupt' });
+    expect(slotOccupied(3)).toBe(true);
+    expect(loadSlot(1)).toBeNull();
+    vi.unstubAllGlobals();
+  });
+
   it('formats play time', () => {
     expect(formatPlayTime(90_000)).toBe('1m');
     expect(formatPlayTime(3_600_000 + 120_000)).toBe('1h 2m');
+    expect(formatPlayTime(90_000, (key, vars) => (key === 'slot.time_m' ? `${vars?.m}λ` : ''))).toBe('1λ');
+    expect(
+      formatPlayTime(3_600_000 + 120_000, (key, vars) => (key === 'slot.time_hm' ? `${vars?.h}ώ ${vars?.m}λ` : ''))
+    ).toBe('1ώ 2λ');
   });
 });
 

@@ -548,6 +548,20 @@ export class PartyHud {
     this.draw(performance.now());
   }
 
+  setFrostHintDismissed(on: boolean) {
+    this.frostHintDismissed = on;
+    if (on) this.frostHintArmed = false;
+    this.syncFrostHintAttr();
+    this.draw(performance.now());
+  }
+
+  resetFrostHint() {
+    this.frostHintDismissed = false;
+    this.frostHintArmed = false;
+    this.syncFrostHintAttr();
+    this.draw(performance.now());
+  }
+
   hideFrostHint() {
     this.frostHintArmed = false;
     this.syncFrostHintAttr();
