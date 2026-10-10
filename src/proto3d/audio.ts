@@ -4,6 +4,7 @@ import {
   DARK_AMB_DUCK_DB,
   FACE_INTO_ROOM,
   SCONCE_FRONT_OFFSET_TILES,
+  STEP_VOLUME,
   WATER_SURFACE_Y,
   isWaterTile
 } from './constants';
@@ -50,6 +51,9 @@ export class AudioManager {
   private nextLoopId = 1;
   private readonly ambVolume = 0.32;
   private readonly musicVolume = 0.3;
+  private torchVoices = new Map<string, PositionalVoice>();
+  private lastStepVariant: Record<string, string> = {};
+  private lastStepName: string | null = null;
 
   constructor(camera: THREE.Camera, quality: QualityLevel) {
     this.listener = new THREE.AudioListener();
@@ -103,8 +107,21 @@ export class AudioManager {
       ['music_act1', 'audio/music_act1_loop.mp3'],
       ['leech_idle', 'audio/sfx_bog_leeches_idle_loop.mp3'],
       ['step', 'audio/sfx_step.mp3'],
+      ['step_1', 'audio/sfx_step_1.mp3'],
+      ['step_2', 'audio/sfx_step_2.mp3'],
+      ['step_3', 'audio/sfx_step_3.mp3'],
+      ['step_4', 'audio/sfx_step_4.mp3'],
       ['step_water_shallow', 'audio/sfx_step_water_shallow.mp3'],
+      ['step_water_shallow_1', 'audio/sfx_step_water_shallow_1.mp3'],
+      ['step_water_shallow_2', 'audio/sfx_step_water_shallow_2.mp3'],
+      ['step_water_shallow_3', 'audio/sfx_step_water_shallow_3.mp3'],
+      ['step_water_shallow_4', 'audio/sfx_step_water_shallow_4.mp3'],
       ['step_water_deep', 'audio/sfx_step_water_deep.mp3'],
+      ['step_water_deep_1', 'audio/sfx_step_water_deep_1.mp3'],
+      ['step_water_deep_2', 'audio/sfx_step_water_deep_2.mp3'],
+      ['step_water_deep_3', 'audio/sfx_step_water_deep_3.mp3'],
+      ['step_water_deep_4', 'audio/sfx_step_water_deep_4.mp3'],
+      ['torch_extinguish', 'audio/sfx_torch_extinguish.mp3'],
       ['water_lap', 'audio/sfx_water_lap_loop.mp3'],
       ['torch_ignite', 'audio/sfx_torch_ignite.mp3'],
       ['oil_pickup', 'audio/sfx_oil_pickup.mp3'],
@@ -119,11 +136,18 @@ export class AudioManager {
 
     const results = await Promise.all(
       files.map(async ([name, path]) => {
-        const buf = await this.loadBuffer(loader, path);
-        return [name, buf] as const;
+        try {
+          const buf = await this.loadBuffer(loader, path);
+          return [name, buf] as const;
+        } catch (err) {
+          console.warn('Failed to load', path, err);
+          return null;
+        }
       })
     );
-    for (const [name, buf] of results) this.buffers.set(name, buf);
+    for (const pair of results) {
+      if (pair) this.buffers.set(pair[0], pair[1]);
+    }
 
     const amb = this.buffers.get('ambience');
     if (amb) {
@@ -299,11 +323,27 @@ export class AudioManager {
     sound.play();
   }
 
-  playStep(name: 'step' | 'step_water_shallow' | 'step_water_deep') {
-    const rate = 0.96 + Math.random() * 0.08;
-    const db = -2 + Math.random() * 4;
-    const volume = 10 ** (db / 20);
+  private pickStepVariant(kind: 'step' | 'step_water_shallow' | 'step_water_deep'): string {
+    const names = [`${kind}_1`, `${kind}_2`, `${kind}_3`, `${kind}_4`];
+    const available = names.filter((n) => this.buffers.has(n));
+    const pool = available.length > 0 ? available : [kind];
+    const last = this.lastStepVariant[kind];
+    const choices = pool.length > 1 ? pool.filter((n) => n !== last) : pool;
+    const pick = choices[(Math.random() * choices.length) | 0];
+    this.lastStepVariant[kind] = pick;
+    this.lastStepName = pick;
+    return pick;
+  }
+
+  playStep(kind: 'step' | 'step_water_shallow' | 'step_water_deep') {
+    const name = this.pickStepVariant(kind);
+    const volume = STEP_VOLUME * (0.92 + Math.random() * 0.16);
+    const rate = 0.95 + Math.random() * 0.1;
     this.playUi(name, volume, rate);
+  }
+
+  lastStep(): string | null {
+    return this.lastStepName;
   }
 
   setTrueDark(on: boolean) {
@@ -361,7 +401,19 @@ export class AudioManager {
     this.lanternMode = mode;
   }
 
+  private sconceKey(sconce: Sconce): string {
+    return `${sconce.x},${sconce.y},${sconce.face}`;
+  }
+
   startTorchLoop(sconce: Sconce) {
+    if (!sconce.lit) return;
+    const key = this.sconceKey(sconce);
+    const existing = this.torchVoices.get(key);
+    if (existing) {
+      if (!existing.audio.isPlaying) existing.audio.play();
+      existing.audio.setVolume(existing.baseVolume);
+      return;
+    }
     const buf = this.buffers.get('torch');
     const scene = this.scene;
     if (!buf || !scene) return;
@@ -384,7 +436,16 @@ export class AudioManager {
     object.add(audio);
     scene.add(object);
     audio.play();
-    this.voices.push({ audio, object, loop: true, baseVolume: 0.42, kind: 'torch' });
+    const voice: PositionalVoice = { audio, object, loop: true, baseVolume: 0.42, kind: 'torch' };
+    this.voices.push(voice);
+    this.torchVoices.set(key, voice);
+  }
+
+  stopTorchLoop(sconce: Sconce) {
+    const voice = this.torchVoices.get(this.sconceKey(sconce));
+    if (!voice) return;
+    if (voice.audio.isPlaying) voice.audio.stop();
+    voice.audio.setVolume(0);
   }
 
   playPositional(name: string, x: number, y: number, z: number, volume = 0.5) {

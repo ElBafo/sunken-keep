@@ -4,10 +4,14 @@ import {
   CUTOUT_ALPHA_TEST,
   FACE_INTO_ROOM,
   FLARE_ANIM_FPS,
+  hideWallProp,
   SCONCE_ANIM_FPS,
   SCONCE_FRONT_OFFSET_TILES,
   SCONCE_HEIGHT_TILES,
-  SCONCE_WIDTH_TILES
+  SCONCE_WIDTH_TILES,
+  TORCH_IGNITE_FLARE_MS,
+  TORCH_SNUFF_FPS,
+  TORCH_TAP_GUARD_MS
 } from './constants';
 import { Sconce } from './types';
 
@@ -21,8 +25,10 @@ interface TorchVisual {
   flame: THREE.Mesh;
   flameMat: THREE.MeshBasicMaterial;
   lighting: boolean;
+  snuffing: boolean;
   flameFrame: number;
   lastFrameTime: number;
+  tapLockedUntil: number;
 }
 
 function configureTex(tex: THREE.Texture) {
@@ -80,8 +86,12 @@ export class TorchSystem {
   };
   private flameFrames: THREE.Texture[] = [];
   private flareFrames: THREE.Texture[] = [];
+  private snuffFrames: THREE.Texture[] = [];
   private camera: THREE.Camera;
   private look = new THREE.Vector3();
+  private partyX = 0;
+  private partyY = 0;
+  private partyDir = 0;
 
   constructor(camera: THREE.Camera) {
     this.camera = camera;
@@ -116,10 +126,13 @@ export class TorchSystem {
     });
 
     this.flameFrames = await Promise.all(
-      [1, 2, 3].map((n) => loadTex(`proto3d/tex3d/torch/flame_${n}.png`))
+      [1, 2, 3, 4].map((n) => loadTex(`proto3d/tex3d/torch/flame_calm_${n}.png`))
     );
     this.flareFrames = await Promise.all(
       [1, 2, 3, 4, 5, 6].map((n) => loadTex(`proto3d/tex3d/torch/flare_${n}.png`))
+    );
+    this.snuffFrames = await Promise.all(
+      [1, 2, 3, 4, 5].map((n) => loadTex(`proto3d/tex3d/torch/snuff_${n}.png`))
     );
 
     const w = SCONCE_WIDTH_TILES * CELL_SIZE;
@@ -181,8 +194,10 @@ export class TorchSystem {
         flame,
         flameMat,
         lighting: false,
+        snuffing: false,
         flameFrame: 0,
-        lastFrameTime: 0
+        lastFrameTime: 0,
+        tapLockedUntil: 0
       });
     }
   }
@@ -202,15 +217,56 @@ export class TorchSystem {
     sconce.capped = false;
     this.applyBracket(visual, 'lit');
     visual.lighting = true;
+    visual.snuffing = false;
     visual.flameFrame = 0;
     visual.lastFrameTime = now;
+    visual.tapLockedUntil = now + TORCH_IGNITE_FLARE_MS + TORCH_TAP_GUARD_MS;
     visual.flame.visible = true;
     visual.flameMat.map = this.flareFrames[0];
     visual.flameMat.needsUpdate = true;
   }
 
+  snuff(sconce: Sconce, now: number) {
+    const visual = this.visuals.find((v) => v.sconce === sconce);
+    sconce.lit = false;
+    if (!visual) return;
+    this.applyBracket(visual, 'dead');
+    visual.lighting = false;
+    visual.snuffing = true;
+    visual.flameFrame = 0;
+    visual.lastFrameTime = now;
+    visual.tapLockedUntil = now + (1000 / TORCH_SNUFF_FPS) * this.snuffFrames.length + TORCH_TAP_GUARD_MS;
+    visual.flame.visible = true;
+    visual.flameMat.map = this.snuffFrames[0];
+    visual.flameMat.needsUpdate = true;
+  }
+
+  isTapLocked(sconce: Sconce, now = performance.now()): boolean {
+    const visual = this.visuals.find((v) => v.sconce === sconce);
+    if (!visual) return false;
+    return visual.snuffing || visual.lighting || now < visual.tapLockedUntil;
+  }
+
+  snapshot() {
+    return this.visuals.map((v) => {
+      const hide = hideWallProp(v.sconce.x, v.sconce.y, v.sconce.face, this.partyX, this.partyY, this.partyDir);
+      return {
+        x: v.sconce.x,
+        y: v.sconce.y,
+        face: v.sconce.face,
+        lit: v.sconce.lit,
+        capped: !!v.sconce.capped,
+        snuffing: v.snuffing,
+        lighting: v.lighting,
+        bracketVisible: !hide,
+        flameVisible: !hide && v.flame.visible,
+        tapLocked: this.isTapLocked(v.sconce)
+      };
+    });
+  }
+
   flameFrame(): number {
-    const lit = this.visuals.find((v) => v.sconce.lit && !v.lighting);
+    const lit = this.visuals.find((v) => v.sconce.lit && !v.lighting && !v.snuffing);
     return lit?.flameFrame ?? 0;
   }
 
@@ -232,16 +288,51 @@ export class TorchSystem {
     return null;
   }
 
-  update(now: number) {
+  setParty(x: number, y: number, dir: number) {
+    this.partyX = x;
+    this.partyY = y;
+    this.partyDir = dir;
+  }
+
+  update(now: number, partyX?: number, partyY?: number, dir?: number) {
+    if (partyX !== undefined && partyY !== undefined && dir !== undefined) {
+      this.setParty(partyX, partyY, dir);
+    }
     const cam = this.camera.position;
     for (const visual of this.visuals) {
+      const hide = hideWallProp(
+        visual.sconce.x,
+        visual.sconce.y,
+        visual.sconce.face,
+        this.partyX,
+        this.partyY,
+        this.partyDir
+      );
+      visual.group.visible = !hide;
       const dx = cam.x - visual.flame.position.x;
       const dz = cam.z - visual.flame.position.z;
       const nearCam = Math.hypot(dx, dz) < 0.8;
-      visual.flame.visible = (visual.sconce.lit || visual.lighting) && !nearCam;
-      if (!visual.flame.visible) continue;
+      const showFlame = !hide && (visual.sconce.lit || visual.lighting || visual.snuffing) && !nearCam;
+      visual.flame.visible = showFlame;
+      if (!showFlame && !visual.snuffing && !visual.lighting) continue;
       this.look.set(dx, 0, dz);
       visual.flame.rotation.y = Math.atan2(this.look.x, this.look.z);
+
+      if (visual.snuffing) {
+        const frameMs = 1000 / TORCH_SNUFF_FPS;
+        if (now - visual.lastFrameTime < frameMs) continue;
+        visual.lastFrameTime = now;
+        visual.flameFrame += 1;
+        if (visual.flameFrame >= this.snuffFrames.length) {
+          visual.snuffing = false;
+          visual.flameFrame = 0;
+          visual.flame.visible = false;
+        } else {
+          visual.flameMat.map = this.snuffFrames[visual.flameFrame];
+          visual.flameMat.needsUpdate = true;
+        }
+        continue;
+      }
 
       const frames = visual.lighting ? this.flareFrames : this.flameFrames;
       const fps = visual.lighting ? FLARE_ANIM_FPS : SCONCE_ANIM_FPS;

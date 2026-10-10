@@ -197,8 +197,7 @@ export class WaterSystem {
     }
 
     for (const g of this.glints) {
-      const pulse = 0.78 + 0.22 * Math.sin(now * 0.0024 + g.phase);
-      (g.mesh.material as THREE.MeshBasicMaterial).opacity = g.base * pulse;
+      (g.mesh.material as THREE.MeshBasicMaterial).opacity = g.base;
     }
   }
 }

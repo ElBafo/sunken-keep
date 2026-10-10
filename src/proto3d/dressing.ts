@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CELL_SIZE, FACE_INTO_ROOM, tileBedY } from './constants';
+import { CELL_SIZE, FACE_INTO_ROOM, hideWallProp, tileBedY } from './constants';
 import { faceHash } from './texture-variants';
 import { FloorData, Sconce, Tile } from './types';
 
@@ -162,12 +162,25 @@ export class Dressing {
     this.scatterWear(floorData);
   }
 
-  update(now: number) {
-    const pulse = 0.9 + 0.1 * Math.sin(now * 0.00126);
+  update(now: number, partyX?: number, partyY?: number, dir?: number) {
+    void now;
     for (const shaft of this.shafts) {
       const mat = shaft.material as THREE.MeshBasicMaterial;
-      mat.opacity = pulse;
+      mat.opacity = 0.88;
     }
+    if (partyX !== undefined && partyY !== undefined && dir !== undefined) {
+      this.cullOwnSquareDecals(partyX, partyY, dir);
+    }
+  }
+
+  private cullOwnSquareDecals(partyX: number, partyY: number, dir: number) {
+    this.group.traverse((obj) => {
+      if (!(obj instanceof THREE.Mesh)) return;
+      const face = obj.userData.face;
+      if (face !== 'N' && face !== 'E' && face !== 'S' && face !== 'W') return;
+      if (typeof obj.userData.wallX !== 'number' || typeof obj.userData.wallY !== 'number') return;
+      obj.visible = !hideWallProp(obj.userData.wallX, obj.userData.wallY, face, partyX, partyY, dir);
+    });
   }
 
   private collectReserved(floor: FloorDressing) {
@@ -369,7 +382,10 @@ export class Dressing {
     );
     mesh.position.set(wallX * CELL_SIZE + nx * dist, CELL_SIZE / 2, wallY * CELL_SIZE + nz * dist);
     mesh.rotation.y = rotY;
-    this.tagDecal(mesh, wallX, wallY);
+    this.tagDecal(mesh, wallX + Math.round(nx), wallY + Math.round(nz));
+    mesh.userData.wallX = wallX;
+    mesh.userData.wallY = wallY;
+    mesh.userData.face = face;
     this.reserved.add(`${wallX},${wallY}`);
     if (fogReadable) {
       mesh.userData.skipVertexLighting = true;

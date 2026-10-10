@@ -13,6 +13,8 @@ import {
   LANTERN_HEIGHT,
   LANTERN_INTENSITY,
   LANTERN_RADIUS_TILES,
+  LIGHT_FLICKER_AMPLITUDE,
+  LIGHT_FLICKER_PERIOD_MS,
   SCONCE_FLICKER,
   SCONCE_FRONT_OFFSET_TILES,
   SCONCE_RADIUS_TILES,
@@ -21,6 +23,7 @@ import {
   TORCH_INTENSITY
 } from './constants';
 import { DressingMark } from './dressing';
+import { LightReach, partyReach, reachAt, sconceOrigin, sconceReach } from './light-grid';
 import { FloorData, Sconce } from './types';
 
 interface CachedFace {
@@ -29,6 +32,8 @@ interface CachedFace {
   colors: THREE.BufferAttribute;
   isDark: boolean;
   nearSconce: boolean;
+  tileX: number;
+  tileY: number;
 }
 
 interface SconceWorld {
@@ -37,6 +42,7 @@ interface SconceWorld {
   z: number;
   tileX: number;
   tileY: number;
+  reach: LightReach;
 }
 
 const TORCH_RGB: [number, number, number] = [1.0, 0.86, 0.58];
@@ -45,15 +51,16 @@ const EMBER_RGB: [number, number, number] = [0.55, 0.72, 1.0];
 const SUNBEAM_RGB: [number, number, number] = [0.7, 0.84, 1.0];
 const AMBIENT_RGB: [number, number, number] = [0.82, 0.86, 0.9];
 
-function sconceWorldPos(s: Sconce): SconceWorld {
+function sconceWorldPos(s: Sconce): Omit<SconceWorld, 'reach'> {
   const { nx, nz } = FACE_INTO_ROOM[s.face];
   const dist = CELL_SIZE / 2 + SCONCE_FRONT_OFFSET_TILES * CELL_SIZE;
+  const origin = sconceOrigin(s);
   return {
     x: s.x * CELL_SIZE + nx * dist,
     y: CELL_SIZE / 2 + 0.1 * CELL_SIZE,
     z: s.y * CELL_SIZE + nz * dist,
-    tileX: s.x,
-    tileY: s.y
+    tileX: origin.x,
+    tileY: origin.y
   };
 }
 
@@ -98,8 +105,10 @@ export class VertexLightingManager {
   private partyY = 0;
   private faces: CachedFace[] = [];
   private sconceWorld: SconceWorld[] = [];
+  private partyCells: LightReach = new Map();
   private sunbeams: DressingMark[] = [];
   private flickerFrame = 0;
+  private flicker = 1;
   private scratch = new THREE.Vector3();
   private floor = 1;
   private bright = 1;
@@ -127,6 +136,7 @@ export class VertexLightingManager {
   setPartyPosition(x: number, y: number) {
     this.partyX = x;
     this.partyY = y;
+    this.rebuildPartyReach();
   }
 
   setBright(value: number) {
@@ -218,20 +228,27 @@ export class VertexLightingManager {
         worldPos,
         colors: geometry.attributes.color as THREE.BufferAttribute,
         isDark,
-        nearSconce: this.nearAnySconce(tileX, tileY, radiusTiles)
+        nearSconce: this.nearAnySconce(tileX, tileY, radiusTiles),
+        tileX,
+        tileY
       });
     });
   }
 
   private rebuildSconceWorld() {
-    this.sconceWorld = this.sconces.filter((s) => s.lit).map(sconceWorldPos);
+    this.sconceWorld = this.sconces
+      .filter((s) => s.lit)
+      .map((s) => ({ ...sconceWorldPos(s), reach: sconceReach(this.floorData, s) }));
+    this.rebuildPartyReach();
   }
 
-  private nearAnySconce(tileX: number, tileY: number, radiusTiles: number): boolean {
+  private rebuildPartyReach() {
+    this.partyCells = partyReach(this.floorData, this.partyX, this.partyY, this.lanternSpec().radius);
+  }
+
+  private nearAnySconce(tileX: number, tileY: number, _radiusTiles: number): boolean {
     for (const s of this.sconceWorld) {
-      const dx = tileX - s.tileX;
-      const dy = tileY - s.tileY;
-      if (Math.sqrt(dx * dx + dy * dy) <= radiusTiles) return true;
+      if (reachAt(s.reach, tileX, tileY) !== undefined) return true;
     }
     return false;
   }
@@ -255,9 +272,13 @@ export class VertexLightingManager {
     const wz = tileY * CELL_SIZE;
     const lantern = this.lanternSpec();
     const partyDist = partyDistTiles(wx, wy, wz, this.partyX, this.partyY);
-    let maxW = lantern.intensity * partyFalloff(partyDist, lantern.radius);
+    let maxW = 0;
+    if (reachAt(this.partyCells, tileX, tileY) !== undefined) {
+      maxW = lantern.intensity * partyFalloff(partyDist, lantern.radius);
+    }
     const radius = SCONCE_RADIUS_TILES * CELL_SIZE;
     for (const s of this.sconceWorld) {
+      if (reachAt(s.reach, tileX, tileY) === undefined) continue;
       const dx = wx - s.x;
       const dy = wy - s.y;
       const dz = wz - s.z;
@@ -275,7 +296,7 @@ export class VertexLightingManager {
   calculateBrightness(tileX: number, tileY: number, isDark: boolean): number {
     const wx = tileX * CELL_SIZE;
     const wz = tileY * CELL_SIZE;
-    const [r, g, b] = this.shadeVertex(wx, 0.08, wz, isDark, 1);
+    const [r, g, b] = this.shadeVertex(wx, 0.08, wz, tileX, tileY, isDark, 1);
     return (r + g + b) / 3;
   }
 
@@ -301,6 +322,8 @@ export class VertexLightingManager {
     wx: number,
     wy: number,
     wz: number,
+    tileX: number,
+    tileY: number,
     isDark: boolean,
     flick: number
   ): [number, number, number] {
@@ -313,11 +336,14 @@ export class VertexLightingManager {
 
     const lantern = this.lanternSpec();
     const partyDist = partyDistTiles(wx, wy, wz, this.partyX, this.partyY);
-    this.accum(rgb, lantern.intensity * partyFalloff(partyDist, lantern.radius), lantern.rgb);
+    if (reachAt(this.partyCells, tileX, tileY) !== undefined) {
+      this.accum(rgb, lantern.intensity * partyFalloff(partyDist, lantern.radius), lantern.rgb);
+    }
 
     if (!isDark) {
       const radius = SCONCE_RADIUS_TILES * CELL_SIZE;
       for (const s of this.sconceWorld) {
+        if (reachAt(s.reach, tileX, tileY) === undefined) continue;
         const dx = wx - s.x;
         const dy = wy - s.y;
         const dz = wz - s.z;
@@ -351,6 +377,8 @@ export class VertexLightingManager {
         worldPos[i * 3],
         worldPos[i * 3 + 1],
         worldPos[i * 3 + 2],
+        face.tileX,
+        face.tileY,
         face.isDark,
         flick
       );
@@ -360,20 +388,33 @@ export class VertexLightingManager {
   }
 
   updateAllMeshes(_scene?: THREE.Scene) {
-    const flick = SCONCE_FLICKER[this.flickerFrame % SCONCE_FLICKER.length];
+    this.rebuildPartyReach();
     for (const face of this.faces) {
-      this.bakeFace(face, flick);
+      this.bakeFace(face, this.flicker);
     }
   }
 
-  /** Rebake only faces near lit sconces (flame-frame flicker). */
+  /** Pin a flame-frame multiplier for e2e measurement. */
   setFlickerFrame(frame: number) {
     const wrapped = ((frame % SCONCE_FLICKER.length) + SCONCE_FLICKER.length) % SCONCE_FLICKER.length;
-    if (wrapped === this.flickerFrame) return;
+    const next = SCONCE_FLICKER[wrapped];
+    if (wrapped === this.flickerFrame && next === this.flicker) return;
     this.flickerFrame = wrapped;
-    const flick = SCONCE_FLICKER[this.flickerFrame];
+    this.flicker = next;
     for (const face of this.faces) {
-      if (face.nearSconce) this.bakeFace(face, flick);
+      if (face.nearSconce) this.bakeFace(face, this.flicker);
+    }
+  }
+
+  /** Slow ±3% sine on torch warmth; skip if the quantized value has not moved. */
+  setFlickerTime(now: number) {
+    const wave = Math.sin((now * 2 * Math.PI) / LIGHT_FLICKER_PERIOD_MS);
+    const next = 1 + LIGHT_FLICKER_AMPLITUDE * wave;
+    const q = Math.round(next * 200) / 200;
+    if (q === this.flicker) return;
+    this.flicker = q;
+    for (const face of this.faces) {
+      if (face.nearSconce) this.bakeFace(face, this.flicker);
     }
   }
 }
