@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
-import { CombatEngine, parseRules, Rng, simulateFloor1 } from '../../src/core';
+import { CombatEngine, ITEM_ACT_SFX, openGrid, parseRules, Rng, simulateFloor1 } from '../../src/core';
 import type { CombatEvent, HeroId } from '../../src/core';
 import { HERO_HURT_VOICE_GAP, HERO_VOICES } from '../../src/proto3d/constants';
 
@@ -43,6 +43,13 @@ describe('hero voices and perk hook flags', () => {
 });
 
 describe('src/core combat rules', () => {
+  it('shares torch and hammer swing sounds with the HUD map', () => {
+    expect(ITEM_ACT_SFX.torch_burnt).toBe('act_torch');
+    expect(ITEM_ACT_SFX.ashmantle_hammer).toBe('act_axe');
+    expect(ITEM_ACT_SFX.torch_lit).toBe('act_torch');
+    expect(ITEM_ACT_SFX.empty_hand).toBe('act_punch');
+  });
+
   it('parses habits from monsters.json', () => {
     expect(rules.monsters.keep_rat.behavior.habit).toBe('dart');
     expect(rules.monsters.keep_rat.behavior.every).toBe(3);
@@ -312,12 +319,78 @@ describe('src/core combat rules', () => {
     expect(logs(ev, 'party_dead').length).toBe(1);
   });
 
-  it('empty hand uses the punch log key', () => {
+  it('empty hand with a foe logs hit or miss, not punch', () => {
     const e = engine();
     e.setEquipment('brannoc', 'main', 'empty_hand');
     fight(e, 'keep_rat');
     const ev = e.useHand('brannoc', 'main', 0, 'empty_hand');
-    expect(logs(ev, 'punch').length).toBe(1);
+    expect(logs(ev, 'punch').length).toBe(0);
+    expect(logs(ev, 'punch_air').length).toBe(0);
+    expect(logs(ev, 'hit').length + logs(ev, 'miss').length + logs(ev, 'crit').length).toBe(1);
+  });
+
+  it('empty hand with nothing in front logs punch_air', () => {
+    const e = engine();
+    e.setEquipment('brannoc', 'main', 'empty_hand');
+    const ev = e.useHand('brannoc', 'main', 0, 'empty_hand');
+    expect(logs(ev, 'punch_air').length).toBe(1);
+    expect(logs(ev, 'punch').length).toBe(0);
+  });
+
+  it('dry kills use monster_dies_dry; water tiles use monster_dies', () => {
+    const forced = new CombatEngine(rules, {
+      d20: () => 20,
+      int: () => 8,
+      next: () => 0,
+      pick: <T>(xs: T[]) => xs[0],
+      chance: () => false
+    } as unknown as Rng);
+    const target = fight(forced, 'keep_rat');
+    target.hp = 1;
+    const dryEv = forced.useHand('brannoc', 'main', 0);
+    expect(logs(dryEv, 'monster_dies_dry').length).toBe(1);
+    expect(logs(dryEv, 'monster_dies').length).toBe(0);
+
+    const wet = new CombatEngine(rules, {
+      d20: () => 20,
+      int: () => 8,
+      next: () => 0,
+      pick: <T>(xs: T[]) => xs[0],
+      chance: () => false
+    } as unknown as Rng);
+    wet.setOccupancy(openGrid(() => false, 8, 8, () => true));
+    const leech = fight(wet, 'bog_leeches');
+    leech.hp = 1;
+    const wetEv = wet.useHand('brannoc', 'main', 0);
+    expect(logs(wetEv, 'monster_dies').length).toBe(1);
+    expect(logs(wetEv, 'monster_dies_dry').length).toBe(0);
+  });
+
+  it('webbed and downed taps log their own lines; pocket sand misses as sand_miss', () => {
+    const e = engine();
+    fight(e, 'keep_rat');
+    e.heroes.brannoc.webbedUntil = 10;
+    const web = e.useHand('brannoc', 'main', 1);
+    expect(logs(web, 'webbed').length).toBe(1);
+
+    e.debugSetHp('wren', 0);
+    const down = e.useHand('wren', 'main', 1);
+    expect(logs(down, 'hero_down').length).toBe(1);
+
+    const sand = new CombatEngine(rules, {
+      d20: () => 18,
+      int: (a: number, b: number) => a,
+      next: () => 0,
+      pick: <T>(xs: T[]) => xs[0],
+      chance: () => false
+    } as unknown as Rng);
+    const rat = fight(sand, 'keep_rat', 0);
+    sand.heroes.mags.formation = 'front';
+    sand.useHand('mags', 'off', 0.2);
+    expect(rat.missNext).toBe(true);
+    const miss = sand.tick(0.5);
+    expect(logs(miss, 'sand_miss').length).toBe(1);
+    expect(logs(miss, 'dodge').length).toBe(0);
   });
 
   it('monsters swing first about 0.5s into a fight', () => {
@@ -344,5 +417,24 @@ describe('floor 1 scripted playthrough', () => {
     expect(result.kills.length).toBe(5);
     expect(result.hpLost).toBeGreaterThan(8);
     expect(result.hpLost).toBeLessThan(50);
+  });
+
+  it('summarises 20 seeds for balance', () => {
+    const runs = Array.from({ length: 20 }, (_, i) => simulateFloor1(actions, monsters, i + 1));
+    const lost = runs.map((r) => r.hpLost);
+    const avg = lost.reduce((s, n) => s + n, 0) / lost.length;
+    const worst = runs.reduce((a, b) => (b.hpLost > a.hpLost ? b : a));
+    const wipes = runs.filter((r) => r.wipe);
+    console.log(
+      'FLOOR1_SIM_20',
+      JSON.stringify({
+        avg: Math.round(avg * 10) / 10,
+        min: Math.min(...lost),
+        max: Math.max(...lost),
+        wipes: wipes.map((r) => r.seed),
+        worst: { seed: worst.seed, hpLost: worst.hpLost, remaining: worst.remaining }
+      })
+    );
+    expect(runs).toHaveLength(20);
   });
 });

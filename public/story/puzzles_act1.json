@@ -2,8 +2,8 @@
   "_note": "Texts for Levie's Act 1 puzzles. Log lines <=41 chars. Barks are speaker/text/face/tier like barks.json and follow bark_rules.json. When each one fires: story/triggers_act1.json.",
   "floor2_vents": {
     "lever_plate": "LEFT: STORES. RIGHT: CISTERN.",
-    "lever_pulled_dry": "Air roars. Somewhere, water drains.",
-    "lever_pulled_flood": "Air roars. Somewhere, water rises.",
+    "lever_pulled_left": "Air roars. Stores drain. Cistern floods.",
+    "lever_pulled_right": "Air roars. Cistern drains. Stores flood.",
     "barks": [
       {"trigger":"vent_lever_first","tier":"tutorial","speaker":"brannoc","face":"smirk","text":"Air's a river too. You just steer it."},
       {"trigger":"vent_page_flooded","tier":"story","speaker":"mags","face":"wince","text":"Great. We drowned the one thing we wanted."}
@@ -12,6 +12,7 @@
   "floor3_offering": {
     "lantern_carving": ["Fire to the bowl,", "and the water bows."],
     "bowl_examine": "A stone bowl, black with old soot.",
+    "bowl_lantern": "The bowl wants fire it can keep.",
     "bowl_lit": "The water in the doorway parts.",
     "room_dark": "Behind you, the mess hall goes dark.",
     "barks": [
@@ -38,6 +39,7 @@
     "tile_symbols": ["shield", "hammer", "oath"],
     "order": ["shield", "hammer", "hammer", "oath"],
     "step_ok": "The tile clicks and holds.",
+    "step_off_hammer": "The hammer tile springs back up.",
     "step_wrong": "The tiles reset with a grinding sigh.",
     "solved": "A hidden rack slides open.",
     "barks": [

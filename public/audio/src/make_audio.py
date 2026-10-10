@@ -92,7 +92,7 @@ save('sfx_tide_sigh',sigh(),0.9)
 L=24; n=int(SR*L); amb=np.zeros(n+SR*2)
 amb+=lp(noise(L+2),0.02)*0.5                       # low wet air
 amb+=np.sin(2*np.pi*48*t(L+2))*0.06*(1+0.5*np.sin(2*np.pi*t(L+2)/12))
-for _ in range(40): at(amb,drip(rng.uniform(900,2200))*rng.uniform(0.15,0.5),rng.uniform(0,L))
+pass
 for _ in range(9):  # frogs
     s=rng.uniform(0,L-1); f=rng.uniform(140,260)
     for k in range(rng.integers(2,5)):

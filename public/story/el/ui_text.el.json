@@ -86,7 +86,7 @@
    "body": "Το κάστρο σας κρατά. Προς το παρόν.",
    "load_last": "Πρόσφατη",
    "title_screen": "Αρχική",
-   "load_floor": "Σκάλες"
+   "load_floor": "Όροφος {n}"
   }
  },
  "step3_inventory": {
@@ -163,8 +163,8 @@
    "captain_key": {
     "name": "Κλειδί του λοχαγού",
     "short": "Κλειδί",
-    "desc": "Του Ντούραλ. Τώρα ανοίγει μόνο αναμνήσεις.",
-    "effect": "Ενθύμιο."
+    "desc": "Του Ντούραλ. Ανοίγει την πόρτα των κελιών.",
+    "effect": "Ανοίγει τα κελιά. Μετά, ενθύμιο."
    },
    "iron_shield": {
     "name": "Σιδερένια ασπίδα",
@@ -289,5 +289,36 @@
    "ambience_short": "Ατμόσφ."
   },
   "tap_to_start": "Πάτα για να αρχίσεις"
+ },
+ "journal": {
+  "_about": "Journal screen: tabs Goals / Map / Pages (pages = story/journal_act1.json). Goals text: story/goals_act1.json.",
+  "title": "Ημερολόγιο",
+  "tab_goals": "Στόχοι",
+  "tab_map": "Χάρτης",
+  "tab_pages": "Σελίδες",
+  "empty": "Τίποτα επείγον. Εξερευνήστε.",
+  "done": "Έγινε",
+  "failed": "Χάθηκε",
+  "optional": "Προαιρετικό",
+  "optional_short": "Προαιρ.",
+  "floor": "Όροφος {n}",
+  "map_unseen": "Δεν έχει χαρτογραφηθεί.",
+  "open": "Ημερολ.",
+  "close": "Κλείσιμο"
+ },
+ "act1_end_card": {
+  "_about": "End card after log act1_end. One recap line per flag, then the teaser picked by saved_tam, then the button. Hobb: freed / drowned / left (met_hobb, neither flag) / unmet.",
+  "title": "Τέλος Πράξης 1: Οι Πνιγμένες Αίθουσες.",
+  "tam_saved": "Ταμ: βγήκε μαζί σας.",
+  "tam_left": "Ταμ: έμεινε στο κελί.",
+  "dural_spared": "Ντούραλ: τον λυπηθήκατε.",
+  "dural_fought": "Ντούραλ: πολεμήσατε.",
+  "hobb_freed": "Χομπ: ελεύθερος. Χρέος ξοφλημένο.",
+  "hobb_drowned": "Χομπ: πνίγηκε.",
+  "hobb_left": "Χομπ: ακόμα κάτω από το ράφι.",
+  "hobb_unmet": "Χομπ: δεν τον βρήκατε.",
+  "teaser_saved": "Ο Ταμ τρέμει, αλλά περπατά. Από κάτω: τα Σπίτια.",
+  "teaser_left": "Η Μαγκς δεν έχει μιλήσει από τα κελιά. Από κάτω: τα Σπίτια.",
+  "continue": "Συνέχεια"
  }
 }

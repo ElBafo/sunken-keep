@@ -5,6 +5,7 @@ import {
   type HeroId,
   type ItemType
 } from '../constants';
+import { ITEM_ACT_SFX } from '../core/types';
 import { HAND_COOLDOWN_MS, OIL_MAX } from './constants';
 import { StoryText } from './i18n';
 import {
@@ -39,23 +40,7 @@ const HERO_STATS: Record<HeroId, { maxHp: number; maxMana: number }> = {
   mags: { maxHp: 28, maxMana: 0 }
 };
 
-const ACT_SFX: Record<string, string> = {
-  axe: 'act_axe',
-  shield: 'act_shield',
-  iron_shield: 'act_shield',
-  mace: 'act_mace',
-  prayer_lantern: 'act_prayer',
-  prayer_lantern_ember: 'act_prayer',
-  wand: 'act_wand',
-  scroll: 'act_scroll',
-  dagger: 'act_dagger',
-  tricks_pouch: 'act_tricks',
-  empty_hand: 'act_punch',
-  fist: 'act_punch',
-  torch_lit: 'act_torch',
-  torch_burnt: 'act_torch',
-  ashmantle_hammer: 'act_axe'
-};
+const ACT_SFX = ITEM_ACT_SFX;
 
 function healthState(hp: number, maxHp: number): 'healthy' | 'wounded' | 'near_death' {
   const pct = maxHp <= 0 ? 0 : hp / maxHp;
@@ -92,6 +77,7 @@ export class PartyHud {
   private playUi: (name: string) => void;
   private onCancel: () => void;
   private levelFlash: { id: HeroId; started: number } | null = null;
+  private readyArmed: Record<string, boolean> = {};
 
   constructor(
     story: StoryText,
@@ -276,10 +262,17 @@ export class PartyHud {
 
   pushLog(text: string) {
     if (!text) return;
-    this.logLines.push(text);
+    for (const line of text.split('\n')) {
+      if (!line) continue;
+      this.logLines.push(line);
+      this.onLog(line);
+    }
     if (this.logLines.length > 12) this.logLines.splice(0, this.logLines.length - 12);
-    this.onLog(text);
     this.draw(performance.now());
+  }
+
+  clearReadyArmed() {
+    this.readyArmed = {};
   }
 
   setHeroHp(id: HeroId, hp: number) {
@@ -388,10 +381,6 @@ export class PartyHud {
     this.handTapCount += 1;
     const action = this.story.handLabel(item) || this.story.handLabel('fist');
     this.pushLog(`${this.story.heroName(heroId)}: ${action}`);
-    window.setTimeout(() => {
-      this.playUi('act_ready');
-      this.draw(performance.now());
-    }, HAND_COOLDOWN_MS);
     this.draw(now);
     return true;
   }
@@ -426,6 +415,7 @@ export class PartyHud {
   }
 
   draw(now: number) {
+    this.tickReadySounds(now);
     const ctx = this.ctx;
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, this.designWidth, this.designHeight);
@@ -455,6 +445,20 @@ export class PartyHud {
     }
     this.drawOilGauge();
     this.drawLog();
+  }
+
+  private tickReadySounds(now: number) {
+    for (const id of HERO_ORDER) {
+      const hero = this.heroes[id];
+      for (const hand of ['main', 'off'] as const) {
+        const key = `${id}:${hand}`;
+        if (hero.recovery[hand] > now) this.readyArmed[key] = true;
+        else if (this.readyArmed[key]) {
+          this.readyArmed[key] = false;
+          this.playUi('act_ready');
+        }
+      }
+    }
   }
 
   private drawPortrait(ctx: CanvasRenderingContext2D, hero: HeroHud, rect: Rect) {

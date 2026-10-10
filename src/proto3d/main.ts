@@ -21,7 +21,7 @@ import { Dressing } from './dressing';
 import { floor1, floor1Sconces } from './floor-data';
 import { InputManager } from './input';
 import { MoveResult, Player } from './player';
-import { loadProgress, persistEnabled, saveProgress } from './progress';
+import { hasSavedProgress, loadProgress, persistEnabled, saveProgress } from './progress';
 import { qualityFromSearch, QualityLevel } from './quality';
 import { PixelRenderer } from './renderer';
 import { SceneBuilder } from './scene-builder';
@@ -42,6 +42,9 @@ export interface BagEntry {
   count: number;
   from?: { hero: HeroId; hand: HandSlot };
 }
+
+const FLOOR_NUMBER = 1;
+const FLOOR_SCONCE_DEFAULTS = floor1Sconces.map((s) => ({ ...s }));
 
 class Game {
   renderer!: PixelRenderer;
@@ -288,10 +291,19 @@ class Game {
     if (door) door.textContent = this.story.uiText('controls.door');
     const goTitle = document.getElementById('gameover-title');
     if (goTitle) goTitle.textContent = this.story.uiText('game_over.title');
+    const goBody = document.getElementById('gameover-body');
+    if (goBody) goBody.textContent = this.story.uiText('game_over.body');
+    this.refreshGameOverButtons();
+  }
+
+  private refreshGameOverButtons() {
     const goSave = document.getElementById('btn-go-autosave');
-    if (goSave) goSave.textContent = this.story.uiText('game_over.load_last');
+    if (goSave) {
+      goSave.textContent = this.story.uiText('game_over.load_last');
+      goSave.hidden = !hasSavedProgress();
+    }
     const goFloor = document.getElementById('btn-go-floor');
-    if (goFloor) goFloor.textContent = this.story.uiText('game_over.load_floor');
+    if (goFloor) goFloor.textContent = this.story.uiText('game_over.load_floor', { n: FLOOR_NUMBER });
   }
 
   private nowSec() {
@@ -311,14 +323,22 @@ class Game {
     const combatOn = params.get('combat') === '1';
     this.combat.setChaseEnabled(!testMode || combatOn);
     this.combat.setOccupancy(
-      openGrid((x, y) => {
-        const tile = floor1.tiles[y]?.[x];
-        if (!tile || tile.wall) return true;
-        if (tile.secret && !tile.secretOpen) return true;
-        if (tile.door && !tile.doorOpen) return true;
-        if (tile.prop === 'beams_fallen' || tile.prop === 'desk') return true;
-        return false;
-      }, floor1.width, floor1.height)
+      openGrid(
+        (x, y) => {
+          const tile = floor1.tiles[y]?.[x];
+          if (!tile || tile.wall) return true;
+          if (tile.secret && !tile.secretOpen) return true;
+          if (tile.door && !tile.doorOpen) return true;
+          if (tile.prop === 'beams_fallen' || tile.prop === 'desk') return true;
+          return false;
+        },
+        floor1.width,
+        floor1.height,
+        (x, y) => {
+          const tile = floor1.tiles[y]?.[x];
+          return !!(tile?.deepWater || tile?.shallowWater);
+        }
+      )
     );
     this.player.isOccupiedByMonster = (x, y) => !!this.combat.monsterAt(x, y);
     this.spawnFloorMonsters();
@@ -382,10 +402,10 @@ class Game {
           break;
         case 'sfx':
           if (e.name === 'hero_down') break;
-          this.audioManager?.playCombat(e.name, e.volume ?? 1);
+          this.audioManager?.playCombat(e.name, e.volume ?? 1, e.x, e.y, e.id);
           break;
         case 'sfx_stop':
-          this.audioManager?.stopWindup();
+          this.audioManager?.stopWindup(e.id);
           break;
         case 'monster_anim':
           this.spriteManager.playAnimId(e.id, e.anim, nowMs);
@@ -397,7 +417,7 @@ class Game {
         case 'monster_dead':
           this.spriteManager.playAnimId(e.id, 'death', nowMs);
           this.darkFx.hideEye(e.x, e.y, this.audioManager);
-          this.audioManager?.stopWindup();
+          this.audioManager?.stopWindup(e.id);
           break;
         case 'hero':
         case 'hero_revive':
@@ -444,23 +464,43 @@ class Game {
   }
 
   private wireGameOver() {
-    const reload = () => this.restartFloor();
-    document.getElementById('btn-go-autosave')?.addEventListener('click', reload);
-    document.getElementById('btn-go-floor')?.addEventListener('click', reload);
+    document.getElementById('btn-go-autosave')?.addEventListener('click', () => this.loadAutosave());
+    document.getElementById('btn-go-floor')?.addEventListener('click', () => this.restartFloor());
   }
 
   private showGameOver() {
-    this.audioManager?.setFightDuck(false);
+    this.audioManager?.stopFloorLoops();
     this.audioManager?.stopWindup();
     this.audioManager?.playUi('game_over');
+    this.refreshGameOverButtons();
     const el = document.getElementById('gameover');
     if (el) el.classList.add('show');
   }
 
+  private restoreSconceDefaults() {
+    for (const s of floor1Sconces) {
+      const def = FLOOR_SCONCE_DEFAULTS.find((d) => d.x === s.x && d.y === s.y && d.face === s.face);
+      if (!def || s.capped) continue;
+      s.lit = def.lit;
+    }
+    this.oil = OIL_START;
+  }
+
+  loadAutosave() {
+    this.oil = loadProgress(floor1Sconces, true);
+    this.resetFloorState();
+  }
+
   restartFloor() {
+    this.restoreSconceDefaults();
+    this.resetFloorState();
+  }
+
+  private resetFloorState() {
     document.getElementById('gameover')?.classList.remove('show');
     this.perkHooks = [];
     this.perkScreenOpen = false;
+    this.hud?.clearReadyArmed();
     this.combat.resetParty();
     this.spriteManager.resetMonsters(floor1);
     this.darkFx.resetEyes(this.audioManager);
@@ -471,7 +511,15 @@ class Game {
     this.syncPartyHud();
     this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
     this.torches.setParty(this.player.x, this.player.y, this.player.dir);
+    this.syncCarriedLight();
+    this.vertexLighting.relight();
+    this.updateOilHud();
     this.updateDoorButton();
+    this.audioManager?.startFloorLoops(this.oil > 0);
+    for (const sconce of floor1Sconces) {
+      if (sconce.lit) this.audioManager?.startTorchLoop(sconce);
+      else this.audioManager?.stopTorchLoop(sconce);
+    }
   }
 
   updateOilHud() {
@@ -848,6 +896,8 @@ class Game {
           x: s.x,
           y: s.y,
           kind: s.kind,
+          monsterKind: s.monsterKind,
+          visible: s.object.visible && !s.hidden,
           world: s.object.position.toArray(),
           scale: s.object.scale.toArray(),
           renderOrder: s.object.renderOrder,

@@ -29,6 +29,14 @@ function fill(text: string, vars?: Record<string, string | number>): string {
   return out;
 }
 
+function capitalizeLine(text: string): string {
+  return text.replace(/^(\s*)(\S)/, (_m, ws: string, ch: string) => ws + ch.toUpperCase());
+}
+
+function capitalizeLog(text: string): string {
+  return text.split('\n').map(capitalizeLine).join('\n');
+}
+
 export class StoryText {
   locale: Locale = 'en';
   private logs = new Map<string, string>();
@@ -49,7 +57,12 @@ export class StoryText {
     ]);
     this.logs.clear();
     for (const entry of log ?? []) {
-      if (entry?.key && typeof entry.text === 'string') this.logs.set(entry.key, entry.text);
+      if (!entry?.key) continue;
+      if (typeof entry.text === 'string') {
+        this.logs.set(entry.key, entry.text);
+      } else if (Array.isArray(entry.lines) && entry.lines.length) {
+        this.logs.set(entry.key, entry.lines.join('\n'));
+      }
     }
     this.names = names ?? {};
     this.ui = ui ?? {};
@@ -83,7 +96,7 @@ export class StoryText {
   log(key: string, vars?: Record<string, string | number>): string {
     const raw = this.logs.get(key);
     if (!raw) return '';
-    return fill(raw, vars);
+    return capitalizeLog(fill(raw, vars));
   }
 
   uiText(path: string, vars?: Record<string, string | number>): string {

@@ -1,5 +1,5 @@
 {
- "_note": "When each Act 1 story trigger fires (Storie). Keys are bark triggers, log keys, dialogue ids, puzzle text paths (<puzzle>.<key>) and notes. A key used for two types is listed twice as id#type. at = step onto that square; on_facing = tap or first view while facing that square (from = squares you face it from). repeat: once = once per save; once_per_floor; every = every time; pool = repeating flavour (unused line each time until the pool is spent, per bark_rules.json); until_freed = see fire. Coordinates are (x,y) from levels/src/act1.py.",
+ "_note": "When each Act 1 story trigger fires (Storie). Keys are bark triggers, log keys, dialogue ids, puzzle text paths (<puzzle>.<key>) and notes. A key used for two types is listed twice as id#type. at = step onto that square; on_facing = tap or first view while facing that square (from = squares you face it from). repeat: once = once per save; once_per_floor; every = every time; pool = repeating flavour (unused line each time until the pool is spent, per bark_rules.json); until_freed = see fire. Coordinates are (x,y) from levels/src/act1.py. needs: what is missing before it can fire (\"hook: ...\" = Gamie code, \"level: ...\" = Levie map); see STORY_HOOKUP.md \"Review fixes: hooks needed\".",
  "triggers": {
   "enter_floor1": {
    "type": "log",
@@ -384,7 +384,7 @@
   "door_locked": {
    "type": "log",
    "system": "interaction",
-   "fire": "tap or bump the locked door (4,2) without the key",
+   "fire": "tap or bump the locked door (4,2) without the key. First bump sets goal g_f1_door",
    "floor": 1,
    "repeat": "every",
    "on_facing": [
@@ -578,7 +578,7 @@
   "torch_dunk": {
    "type": "log",
    "system": "lighting",
-   "fire": "drop a held torch into water; it goes out",
+   "fire": "Stepping into deep water while holding a lit torch puts it out. Shallow water never does.",
    "floor": "any",
    "repeat": "every"
   },
@@ -720,14 +720,16 @@
    "system": "combat",
    "fire": "first rust crab in view; suppresses new_monster",
    "floor": 1,
-   "repeat": "once"
+   "repeat": "once",
+   "tier": "flavour"
   },
   "first_sight_bog_leeches": {
    "type": "bark",
    "system": "combat",
    "fire": "first bog leeches in view; suppresses new_monster",
    "floor": 1,
-   "repeat": "once"
+   "repeat": "once",
+   "tier": "flavour"
   },
   "first_sight_drowned_dwarf": {
    "type": "bark",
@@ -905,7 +907,7 @@
   "f2_frogcatcher": {
    "type": "dialogue",
    "system": "dialogue",
-   "fire": "step onto (3,10) facing E. First visit starts at node \"a\". Every later visit (re-arms when you leave the square) starts at node \"return\", while frogcatcher_freed and frogcatcher_drowned are both unset. Sets met_hobb.",
+   "fire": "step onto (3,10) facing E. First visit starts at node \"a\" (6 taps to freedom: a, b, c, free|free_mw, free2, free3). Every later visit (re-arms when you leave the square) starts at node \"return\", while frogcatcher_freed and frogcatcher_drowned are both unset. Lift choice: Brannoc if he is up, else Mags and Wren (requires hero_up/hero_down). Sets met_hobb; freeing gives potion_red (the \"seven coppers\").",
    "floor": 2,
    "repeat": "until_freed",
    "at": [
@@ -927,7 +929,7 @@
   "f4_captain": {
    "type": "dialogue",
    "system": "dialogue",
-   "fire": "step onto (9,4); fight branch runs start_fight:captain_dural",
+   "fire": "step onto (9,4). Brannoc's \"Stonevow\" needs him up; if he is down, Wren vouches for him instead. spare2 gives captain_key; the fight branch runs start_fight:captain_dural and Dural drops captain_key. Either way the key opens (13,5)",
    "floor": 4,
    "repeat": "once",
    "at": [
@@ -938,7 +940,7 @@
   "f4_tam_cell": {
    "type": "dialogue",
    "system": "dialogue",
-   "fire": "step onto (12,11) facing W; then f4_tide_wakes",
+   "fire": "step onto (12,11) facing W; then f4_tide_wakes. Choices in d: oil (needs oil_min 1), Brannoc dives (needs him up), Mags picks the lock (only if Brannoc is down, costs Mags 50% HP), leave. At least one save choice is always visible",
    "floor": 4,
    "repeat": "once",
    "at": [
@@ -949,7 +951,7 @@
   "f4_tide_wakes": {
    "type": "dialogue",
    "system": "dialogue",
-   "fire": "right after f4_tam_cell; ends with start_escape",
+   "fire": "right after f4_tam_cell; node a goes to b_left when saved_tam == false (next_if), else b; ends with start_escape",
    "floor": 4,
    "repeat": "once",
    "at": [
@@ -981,20 +983,6 @@
     4,
     6
    ]
-  },
-  "floor2_vents.lever_pulled_dry": {
-   "type": "puzzle_text",
-   "system": "puzzle",
-   "fire": "a lever pull drains a zone",
-   "floor": 2,
-   "repeat": "every"
-  },
-  "floor2_vents.lever_pulled_flood": {
-   "type": "puzzle_text",
-   "system": "puzzle",
-   "fire": "a lever pull floods a zone (shown after _dry; each pull does both)",
-   "floor": 2,
-   "repeat": "every"
   },
   "vent_lever_first": {
    "type": "puzzle_bark",
@@ -1489,17 +1477,330 @@
    "fire": "Take a torch or equip with both hands full",
    "floor": "any",
    "repeat": "every"
+  },
+  "f1_start": {
+   "type": "bark",
+   "system": "movement",
+   "fire": "on arriving on floor 1 for the first time, after enter_floor1 (queued, 8 s rule). Sets goal g_tam",
+   "floor": 1,
+   "repeat": "once",
+   "needs": "hook: new"
+  },
+  "hobb_shout": {
+   "type": "bark",
+   "system": "movement",
+   "fire": "first step onto the F2 corridor row y=5, any of (1,5)-(6,5). Both routes from the start reach it before the vent levers (4,6)/(5,6) can be faced from (4,5)/(5,5), so it always plays before any pull. Off-screen voice, no portrait. Sets goal g_f2_hobb. Skipped if frogcatcher_freed or frogcatcher_drowned is set",
+   "floor": 2,
+   "repeat": "once",
+   "at": [
+    [
+     1,
+     5
+    ],
+    [
+     2,
+     5
+    ],
+    [
+     3,
+     5
+    ],
+    [
+     4,
+     5
+    ],
+    [
+     5,
+     5
+    ],
+    [
+     6,
+     5
+    ]
+   ],
+   "needs": "hook: new trigger squares + NPC off-screen bark"
+  },
+  "enter_stores": {
+   "type": "log",
+   "system": "movement",
+   "fire": "first step onto a stores-zone square ((1,9) is the way in from (1,8))",
+   "floor": 2,
+   "repeat": "once",
+   "at": [
+    1,
+    9
+   ],
+   "needs": "hook: new"
+  },
+  "stores_frogs": {
+   "type": "bark",
+   "system": "movement",
+   "fire": "right after enter_stores (flavour; skipped if the gap rules say no)",
+   "floor": 2,
+   "repeat": "once",
+   "at": [
+    1,
+    9
+   ],
+   "needs": "hook: new"
+  },
+  "blocked_cistern": {
+   "type": "log",
+   "system": "movement",
+   "fire": "bump the flooded cistern: facing (9,4) from the doorway (9,3) while the cistern zone is flooded. First bump sets goal g_f2_flood",
+   "floor": 2,
+   "repeat": "every",
+   "on_facing": [
+    9,
+    4
+   ],
+   "from": [
+    [
+     9,
+     3
+    ]
+   ],
+   "needs": "hook: bump on flooded/blocked tile"
+  },
+  "enter_cistern": {
+   "type": "log",
+   "system": "movement",
+   "fire": "first step onto a cistern-zone square (x8-10, y4-7) after it is drained. Clears goal g_f2_flood",
+   "floor": 2,
+   "repeat": "once",
+   "at": [
+    9,
+    4
+   ],
+   "needs": "hook: new"
+  },
+  "lever_far_click": {
+   "type": "log",
+   "system": "puzzle",
+   "fire": "pull the hidden lever (3,2); the secret wall (10,8) opens across the map",
+   "floor": 2,
+   "repeat": "once",
+   "on_facing": [
+    3,
+    2
+   ],
+   "from": [
+    [
+     4,
+     2
+    ]
+   ],
+   "needs": "hook: lever pull event"
+  },
+  "floor2_vents.lever_pulled_left": {
+   "type": "puzzle_text",
+   "system": "puzzle",
+   "fire": "pull the LEFT lever (5,6) when it changes the state (stores drain, cistern floods)",
+   "floor": 2,
+   "repeat": "every",
+   "on_facing": [
+    5,
+    6
+   ],
+   "from": [
+    [
+     5,
+     5
+    ]
+   ]
+  },
+  "floor2_vents.lever_pulled_right": {
+   "type": "puzzle_text",
+   "system": "puzzle",
+   "fire": "pull the RIGHT lever (4,6) when it changes the state (cistern drains, stores flood)",
+   "floor": 2,
+   "repeat": "every",
+   "on_facing": [
+    4,
+    6
+   ],
+   "from": [
+    [
+     4,
+     5
+    ]
+   ]
+  },
+  "blocked_waterdoor": {
+   "type": "log",
+   "system": "movement",
+   "fire": "bump the water doorway (4,8) from (5,8) before f3_bowl_lit. First bump sets goal g_f3_armoury",
+   "floor": 3,
+   "repeat": "every",
+   "on_facing": [
+    4,
+    8
+   ],
+   "from": [
+    [
+     5,
+     8
+    ]
+   ],
+   "needs": "hook: bump on waterDoor"
+  },
+  "floor3_offering.bowl_lantern": {
+   "type": "puzzle_text",
+   "system": "puzzle",
+   "fire": "use Wren's lantern on the bowl (5,7) (hand action or lantern lift while facing it)",
+   "floor": 3,
+   "repeat": "every",
+   "on_facing": [
+    5,
+    7
+   ],
+   "needs": "hook: lantern use on bowl"
+  },
+  "floor4_drill_tiles.step_off_hammer": {
+   "type": "puzzle_text",
+   "system": "puzzle",
+   "fire": "step off the hammer plate (1,12) after the first correct hammer step, while the sequence still needs the second hammer",
+   "floor": 4,
+   "repeat": "every",
+   "at": [
+    1,
+    12
+   ],
+   "needs": "hook: plate step-off event"
+  },
+  "blocked_cellgate": {
+   "type": "log",
+   "system": "movement",
+   "fire": "bump the cell-wing door (13,5) from (12,5) without captain_key. First bump sets goal g_f4_cellgate",
+   "floor": 4,
+   "repeat": "every",
+   "on_facing": [
+    13,
+    5
+   ],
+   "from": [
+    [
+     12,
+     5
+    ]
+   ],
+   "needs": "hook: door needs item captain_key"
+  },
+  "gate_unlocked": {
+   "type": "log",
+   "system": "interaction",
+   "fire": "tap the cell-wing door (13,5) with captain_key in the bag; the door opens (key stays as a keepsake)",
+   "floor": 4,
+   "repeat": "once",
+   "on_facing": [
+    13,
+    5
+   ],
+   "from": [
+    [
+     12,
+     5
+    ]
+   ],
+   "needs": "level: gate opensWith captain_key"
+  },
+  "blocked_stairs_f4": {
+   "type": "log",
+   "system": "movement",
+   "fire": "bump the flooded stairs (5,9) from (5,10) before start_escape",
+   "floor": 4,
+   "repeat": "every",
+   "on_facing": [
+    5,
+    9
+   ],
+   "from": [
+    [
+     5,
+     10
+    ]
+   ],
+   "needs": "hook: bump on gated stairs"
+  },
+  "escape_tam_saved": {
+   "type": "bark",
+   "system": "dialogue",
+   "fire": "first escape checkpoint (12,13), only if saved_tam == true (tam_left plays there when false). Tam is the listener",
+   "floor": 4,
+   "repeat": "once",
+   "at": [
+    12,
+    13
+   ],
+   "condition": {
+    "saved_tam": true
+   },
+   "needs": "hook: NPC listener"
+  },
+  "escape_tam_saved_2": {
+   "type": "bark",
+   "system": "dialogue",
+   "fire": "second escape checkpoint (8,13), only if saved_tam == true. Tam speaks",
+   "floor": 4,
+   "repeat": "once",
+   "at": [
+    8,
+    13
+   ],
+   "condition": {
+    "saved_tam": true
+   },
+   "needs": "hook: NPC speaker"
+  },
+  "act1_end_card": {
+   "type": "ui",
+   "system": "saves",
+   "fire": "after log act1_end: end card from ui_text act1_end_card (one recap line per flag, teaser by saved_tam, Continue)",
+   "floor": 4,
+   "repeat": "once",
+   "at": [
+    5,
+    9
+   ],
+   "needs": "code: end card screen"
+  },
+  "goal_new": {
+   "type": "log",
+   "system": "ui",
+   "fire": "whenever a goal in story/goals_act1.json becomes active (not for g_why at new game)",
+   "floor": 0,
+   "repeat": "every",
+   "needs": "code: goals tab"
+  },
+  "goals": {
+   "type": "note",
+   "system": "ui",
+   "fire": "goal set/done/fail events: see story/goals_act1.json (set_on/done_on/fail_on)",
+   "floor": 0,
+   "repeat": "every",
+   "needs": "code: goals tab + save state"
+  },
+  "mags_cold": {
+   "type": "note",
+   "system": "bark",
+   "fire": "act 2+: if saved_tam == false, Mags flavour lines without a condition are skipped; her condition {saved_tam:false} lines (idle, loot, low_health) play instead (bark_rules.json condition)",
+   "floor": 5,
+   "repeat": "pool",
+   "condition": {
+    "saved_tam": false
+   },
+   "act": 2
   }
  },
  "flags": {
   "met_hobb": {
-   "set": "any choice in f2_frogcatcher (node c, ask2, return)",
+   "set": "any choice in f2_frogcatcher (node c or return)",
    "read": "frogcatcher_drowned line condition",
    "persist": true
   },
   "frogcatcher_freed": {
    "set": "f2_frogcatcher lift choice",
-   "read": "vent puzzle (Hobb drowns or not); f2_frogcatcher re-entry; Hobb removed",
+   "read": "vent puzzle (Hobb drowns or not); f2_frogcatcher re-entry; Hobb removed; end card recap (ui_text act1_end_card.hobb_freed); goals g_f2_hobb done",
    "persist": true
   },
   "frogcatcher_drowned": {
@@ -1509,12 +1810,12 @@
   },
   "saved_tam": {
    "set": "f4_tam_cell (true or false, store false explicitly)",
-   "read": "tam_left (false), F8, f12_final",
+   "read": "tam_left (false), F8, f12_final; escape barks escape_tam_saved(_2) / tam_left; f4_tide_wakes b vs b_left; end card recap + teaser; Mags-cold rule in act 2",
    "persist": true
   },
   "captain_spared": {
    "set": "f4_captain spare choice",
-   "read": "f4_captain_done, f11_throne",
+   "read": "f4_captain_done, f11_throne; end card recap (dural_spared / dural_fought)",
    "persist": true
   },
   "f3_bowl_lit": {

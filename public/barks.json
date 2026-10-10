@@ -104,7 +104,7 @@
  {
   "trigger": "deep_water",
   "speaker": "ilsevar",
-  "text": "It's... warm? Never mind.",
+  "text": "Warm. You soft ones would call this a bath.",
   "face": "neutral",
   "tier": "flavour"
  },
@@ -389,7 +389,7 @@
   "face": "shocked",
   "listener": "mags",
   "listenerFace": "smirk",
-  "tier": "story"
+  "tier": "flavour"
  },
  {
   "trigger": "first_sight_rust_crab",
@@ -398,35 +398,35 @@
   "face": "smirk",
   "listener": "brannoc",
   "listenerFace": "wince",
-  "tier": "story"
+  "tier": "flavour"
  },
  {
   "trigger": "first_sight_rust_crab",
   "speaker": "ilsevar",
   "text": "Hermit behaviour. Dwarven hermit.",
   "face": "neutral",
-  "tier": "story"
+  "tier": "flavour"
  },
  {
   "trigger": "first_sight_bog_leeches",
   "speaker": "wren",
   "text": "Leeches. Ember preserve us.",
   "face": "wince",
-  "tier": "story"
+  "tier": "flavour"
  },
  {
   "trigger": "first_sight_bog_leeches",
   "speaker": "mags",
   "text": "Nobody's sucking anything of mine.",
   "face": "shocked",
-  "tier": "story"
+  "tier": "flavour"
  },
  {
   "trigger": "first_sight_bog_leeches",
   "speaker": "ilsevar",
   "text": "Medicinal, technically. Still no.",
   "face": "wince",
-  "tier": "story"
+  "tier": "flavour"
  },
  {
   "trigger": "leech_latch",
@@ -452,7 +452,7 @@
  {
   "trigger": "leech_latch",
   "speaker": "ilsevar",
-  "text": "It likes me. That's worse.",
+  "text": "It can't get through scales. It's trying, though.",
   "face": "wince",
   "tier": "flavour"
  },
@@ -756,5 +756,88 @@
   "listenerFace": "smirk",
   "listenerText": "Your grandfather should've charged rent.",
   "tier": "flavour"
+ },
+ {
+  "trigger": "f1_start",
+  "speaker": "mags",
+  "text": "Tam went in last spring. If he's in here, I'm finding him.",
+  "face": "neutral",
+  "tier": "story",
+  "listener": "brannoc",
+  "listenerText": "And if the keep's dry, I'm finding out why."
+ },
+ {
+  "trigger": "hobb_shout",
+  "speaker": "hobb",
+  "text": "Oi! Anyone up there? I'm stuck in the stores! Mind the levers!",
+  "face": "neutral",
+  "tier": "story",
+  "offscreen": true
+ },
+ {
+  "trigger": "stores_frogs",
+  "speaker": "mags",
+  "text": "Frog nets. Empty. Every frog in the swamp went quiet this spring.",
+  "face": "wince",
+  "tier": "flavour",
+  "listener": "ilsevar",
+  "listenerText": "They went down. They heard it too."
+ },
+ {
+  "trigger": "escape_tam_saved",
+  "speaker": "mags",
+  "text": "Keep up, Tam! Swim if you have to!",
+  "face": "shocked",
+  "tier": "story",
+  "listener": "tam",
+  "listenerText": "Is it supper yet?",
+  "condition": {
+   "saved_tam": true
+  }
+ },
+ {
+  "trigger": "escape_tam_saved_2",
+  "speaker": "tam",
+  "text": "Maggie, the water's talking again.",
+  "face": "neutral",
+  "tier": "story",
+  "listener": "mags",
+  "listenerText": "Don't listen to it. Listen to me.",
+  "condition": {
+   "saved_tam": true
+  }
+ },
+ {
+  "trigger": "idle",
+  "speaker": "mags",
+  "text": "Don't. I'm counting stairs. It helps.",
+  "face": "neutral",
+  "tier": "flavour",
+  "condition": {
+   "saved_tam": false
+  },
+  "act": 2
+ },
+ {
+  "trigger": "loot",
+  "speaker": "mags",
+  "text": "Take it. I don't want it.",
+  "face": "neutral",
+  "tier": "flavour",
+  "condition": {
+   "saved_tam": false
+  },
+  "act": 2
+ },
+ {
+  "trigger": "low_health",
+  "speaker": "mags",
+  "text": "I'm fine. Keep walking.",
+  "face": "wince",
+  "tier": "flavour",
+  "condition": {
+   "saved_tam": false
+  },
+  "act": 2
  }
 ]

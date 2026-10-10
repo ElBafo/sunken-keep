@@ -6,7 +6,7 @@ amb+=lp(noise(T),0.006)*0.9                                   # still, heavy air
 lap=band(noise(T),120,900)*(0.5+0.5*np.sin(2*np.pi*tt/2.7))**3*(0.6+0.4*np.sin(2*np.pi*tt/7.1))
 amb+=lap*0.25                                                  # slow lapping
 amb+=np.sin(2*np.pi*41*tt)*0.05*(1+0.4*np.sin(2*np.pi*tt/11))  # deep drone
-for _ in range(28): at(amb,drip(rng.uniform(700,1600))*rng.uniform(0.1,0.35),rng.uniform(0,L))
+pass  # drips now separate sfx_drip_1..4, triggered with visuals
 for _ in range(4):                                              # stone creaks / settling
     s=rng.uniform(1,L-3); d=rng.uniform(0.8,1.6); u=t(d)
     c=band(np.sin(2*np.pi*np.cumsum(rng.uniform(60,110)+15*np.sin(2*np.pi*2*u))/SR)+0.5*noise(d),40,500)*np.sin(np.pi*u/d)*0.35

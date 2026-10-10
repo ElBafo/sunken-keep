@@ -294,7 +294,8 @@ export class DarkFx {
         }
         continue;
       }
-      const lit = lighting.isSquareLit(eye.x, eye.y);
+      const adjacent = Math.abs(eye.x - partyX) + Math.abs(eye.y - partyY) <= 1;
+      const lit = adjacent || lighting.isSquareLit(eye.x, eye.y);
       sprites.setLitVisible(eye.x, eye.y, 'monster', lit);
       eye.sprite.visible = !lit;
       if (lit) {

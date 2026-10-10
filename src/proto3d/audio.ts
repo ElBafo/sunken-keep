@@ -61,12 +61,15 @@ export class AudioManager {
   private lastHeroHurt: Record<string, string> = {};
   private nextHeroHurtAt = 0;
   lastHeroVoice: string | null = null;
-  private windupSound: THREE.Audio | null = null;
+  private windups = new Map<string, PositionalVoice>();
+  private combatPool: PositionalVoice[] = [];
+  private resumeWired = false;
 
   constructor(camera: THREE.Camera, quality: QualityLevel) {
     this.listener = new THREE.AudioListener();
     camera.add(this.listener);
     this.quality = quality;
+    this.wireResume();
   }
 
   async init() {
@@ -75,9 +78,22 @@ export class AudioManager {
 
   unlock() {
     const ctx = this.listener.context;
-    if (ctx && ctx.state === 'suspended') {
-      ctx.resume();
+    if (ctx && ctx.state !== 'running') {
+      void ctx.resume();
     }
+  }
+
+  private wireResume() {
+    if (this.resumeWired || typeof document === 'undefined') return;
+    this.resumeWired = true;
+    const resume = () => this.unlock();
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') resume();
+    });
+    window.addEventListener('pageshow', resume);
+    document.addEventListener('pointerdown', resume, true);
+    document.addEventListener('touchstart', resume, true);
+    document.addEventListener('click', resume, true);
   }
 
   private async loadBuffer(loader: THREE.AudioLoader, path: string): Promise<AudioBuffer> {
@@ -192,9 +208,19 @@ export class AudioManager {
       ['bog_leeches_attack', 'audio/sfx_bog_leeches_attack.mp3'],
       ['bog_leeches_hurt', 'audio/sfx_bog_leeches_hurt.mp3'],
       ['bog_leeches_death', 'audio/sfx_bog_leeches_death.mp3'],
+      ['drowned_dwarf_alert', 'audio/sfx_drowned_dwarf_alert.mp3'],
+      ['drowned_dwarf_hurt', 'audio/sfx_drowned_dwarf_hurt.mp3'],
+      ['drowned_dwarf_death', 'audio/sfx_drowned_dwarf_death.mp3'],
       ['drowned_dwarf_windup', 'audio/sfx_drowned_dwarf_windup.mp3'],
-      ['dural_windup', 'audio/sfx_dural_windup.mp3'],
       ['drowned_dwarf_attack', 'audio/sfx_drowned_dwarf_attack.mp3'],
+      ['tide_spawn_alert', 'audio/sfx_tide_spawn_alert.mp3'],
+      ['tide_spawn_attack', 'audio/sfx_tide_spawn_attack.mp3'],
+      ['tide_spawn_hurt', 'audio/sfx_tide_spawn_hurt.mp3'],
+      ['tide_spawn_death', 'audio/sfx_tide_spawn_death.mp3'],
+      ['captain_dural_alert', 'audio/sfx_drowned_dwarf_alert.mp3'],
+      ['captain_dural_hurt', 'audio/sfx_drowned_dwarf_hurt.mp3'],
+      ['captain_dural_death', 'audio/sfx_drowned_dwarf_death.mp3'],
+      ['dural_windup', 'audio/sfx_dural_windup.mp3'],
       ['vox_brannoc_hurt_1', 'audio/vox_brannoc_hurt_1.mp3'],
       ['vox_brannoc_hurt_2', 'audio/vox_brannoc_hurt_2.mp3'],
       ['vox_brannoc_down', 'audio/vox_brannoc_down.mp3'],
@@ -279,6 +305,17 @@ export class AudioManager {
     this.nextFarAt = performance.now() + 8000 + Math.random() * 10000;
     this.nextChainAt = performance.now() + 8000 + Math.random() * 12000;
     this.nextBannerAt = performance.now() + 10000 + Math.random() * 15000;
+
+    for (let i = 0; i < 8; i++) {
+      const object = new THREE.Object3D();
+      const audio = new THREE.PositionalAudio(this.listener);
+      audio.setRefDistance(2.4);
+      audio.setMaxDistance(12);
+      audio.setRolloffFactor(1);
+      object.add(audio);
+      scene.add(object);
+      this.combatPool.push({ audio, object, loop: false, baseVolume: 1, kind: 'presence' });
+    }
 
     this.loaded = true;
   }
@@ -399,27 +436,95 @@ export class AudioManager {
     hit_crit: ['hit_crit', 'hit_crit_2', 'hit_crit_3']
   };
 
-  playCombat(name: string, volume = 1) {
+  playCombat(name: string, volume = 1, x?: number, y?: number, id?: string) {
     const family = this.combatFamilies[name];
     const pick = family ? this.pickVariant(name, family) : name;
     const rate = 0.95 + Math.random() * 0.1;
     if (name.endsWith('_windup')) {
-      this.stopWindup();
+      const key = id ?? name;
+      this.stopWindup(key);
       const buf = this.buffers.get(pick);
-      if (!buf) return;
-      const sound = new THREE.Audio(this.listener);
-      sound.setBuffer(buf);
-      sound.setVolume(1);
-      sound.play();
-      this.windupSound = sound;
+      const scene = this.scene;
+      if (!buf || !scene) return;
+      const object = new THREE.Object3D();
+      const wx = x != null ? x * CELL_SIZE : 0;
+      const wz = y != null ? y * CELL_SIZE : 0;
+      object.position.set(wx, 0.8, wz);
+      const audio = new THREE.PositionalAudio(this.listener);
+      audio.setBuffer(buf);
+      audio.setRefDistance(2.4);
+      audio.setMaxDistance(14);
+      audio.setRolloffFactor(1);
+      audio.setVolume(1);
+      object.add(audio);
+      scene.add(object);
+      audio.play();
+      this.windups.set(key, { audio, object, loop: false, baseVolume: 1, kind: 'presence' });
+      return;
+    }
+    if (x != null && y != null) {
+      this.playCombatAt(pick, x, y, volume);
       return;
     }
     this.playUi(pick, volume, rate);
   }
 
-  stopWindup() {
-    if (this.windupSound?.isPlaying) this.windupSound.stop();
-    this.windupSound = null;
+  stopWindup(id?: string) {
+    if (id) {
+      const voice = this.windups.get(id);
+      if (!voice) return;
+      if (voice.audio.isPlaying) voice.audio.stop();
+      voice.object.parent?.remove(voice.object);
+      this.windups.delete(id);
+      return;
+    }
+    for (const key of [...this.windups.keys()]) this.stopWindup(key);
+  }
+
+  private playCombatAt(name: string, x: number, y: number, volume: number) {
+    const buf = this.buffers.get(name);
+    if (!buf) return;
+    let voice = this.combatPool.find((v) => !v.audio.isPlaying);
+    if (!voice) voice = this.combatPool[0];
+    if (!voice) {
+      this.playUi(name, volume);
+      return;
+    }
+    if (voice.audio.isPlaying) voice.audio.stop();
+    voice.object.position.set(x * CELL_SIZE, 0.8, y * CELL_SIZE);
+    voice.audio.setBuffer(buf);
+    voice.baseVolume = volume;
+    voice.audio.setVolume(Math.min(1, Math.max(0, volume)));
+    voice.audio.play();
+  }
+
+  /** Stop music and looping ambience without cutting one-shot voices (downed, UI). */
+  stopFloorLoops() {
+    this.ambientSound?.stop();
+    this.musicSound?.stop();
+    this.lanternSound?.stop();
+    this.lanternMode = 'off';
+    for (const v of this.voices) {
+      if (v.loop && v.audio.isPlaying) v.audio.stop();
+    }
+  }
+
+  startFloorLoops(hasOil: boolean) {
+    if (this.ambientSound && !this.ambientSound.isPlaying) {
+      this.ambientSound.setVolume(this.trueDark ? this.ambVolume * 10 ** (-DARK_AMB_DUCK_DB / 20) : this.ambVolume);
+      this.ambientSound.play();
+    }
+    if (this.musicSound && !this.musicSound.isPlaying) {
+      this.musicSound.setVolume(this.musicVolume);
+      this.musicSound.play();
+    }
+    this.startLanternLoop(hasOil);
+    for (const v of this.voices) {
+      if (v.loop && !v.audio.isPlaying) {
+        v.audio.setVolume(v.baseVolume);
+        v.audio.play();
+      }
+    }
   }
 
   private pickVariant(family: string, names: string[]): string {
@@ -726,11 +831,10 @@ export class AudioManager {
 
   stopAll() {
     this.stopWindup();
-    this.ambientSound?.stop();
-    this.musicSound?.stop();
-    this.lanternSound?.stop();
+    this.stopFloorLoops();
     for (const sound of this.uiPool) sound.stop();
     for (const v of this.voices) v.audio.stop();
+    for (const v of this.combatPool) v.audio.stop();
     this.namedLoops.clear();
   }
 }

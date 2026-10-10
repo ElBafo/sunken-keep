@@ -15,6 +15,7 @@ import {
   DAMAGE_TYPE,
   FIRST_SWING_SEC,
   HERO_IDS,
+  itemActSfx,
   MANA_STEPS,
   NOTICE_RANGE,
   WINDUP_SOUND,
@@ -362,14 +363,14 @@ export class CombatEngine {
     m.hp = 0;
     m.deadAt = now;
     if (m.windup) {
-      this.emit({ type: 'sfx_stop', name: m.windup.sound });
+      this.emit({ type: 'sfx_stop', name: m.windup.sound, id: m.id });
       m.windup = null;
     }
     this.emit({ type: 'monster_anim', id: m.id, anim: 'death' });
     this.emit({ type: 'monster_dead', id: m.id, x: m.x, y: m.y, kind: m.kind });
-    this.emit({ type: 'sfx', name: `${m.kind}_death`, x: m.x, y: m.y, combat: true });
-    const waterKey = 'monster_dies';
-    this.emit({ type: 'log', key: waterKey, vars: { monster: m.kind } });
+    this.emit({ type: 'sfx', name: `${m.kind}_death`, x: m.x, y: m.y, combat: true, id: m.id });
+    const inWater = !!this.openMap?.water?.(m.x, m.y);
+    this.emit({ type: 'log', key: inWater ? 'monster_dies' : 'monster_dies_dry', vars: { monster: m.kind } });
     for (const id of HERO_IDS) {
       const h = this.heroes[id];
       if (h.latched && m.kind === 'bog_leeches') this.clearLatch(h);
@@ -432,10 +433,12 @@ export class CombatEngine {
     if (this.gameOver) return this.flush();
     if (hero.downed || hero.hp <= 0) {
       this.emit({ type: 'denied', hero: heroId, reason: 'downed' });
+      this.emit({ type: 'log', key: 'hero_down', vars: { hero: heroId } });
       return this.flush();
     }
     if (now < hero.webbedUntil) {
       this.emit({ type: 'denied', hero: heroId, reason: 'webbed' });
+      this.emit({ type: 'log', key: 'webbed', vars: { hero: heroId } });
       return this.flush();
     }
     if (now < hero.recovery[hand]) {
@@ -508,7 +511,7 @@ export class CombatEngine {
       if (foe) {
         foe.missNext = true;
         if (foe.windup) {
-          this.emit({ type: 'sfx_stop', name: foe.windup.sound });
+          this.emit({ type: 'sfx_stop', name: foe.windup.sound, id: foe.id });
           foe.windup = null;
           foe.nextAttackAt = now + (this.def(foe.kind)?.interval ?? 2);
         }
@@ -518,31 +521,14 @@ export class CombatEngine {
     }
 
     const target = this.fightMonster();
-    if (item === 'empty_hand' || item === 'fist') {
-      this.emit({ type: 'log', key: 'punch', vars: { hero: heroId, monster: target?.kind ?? '' } });
-    }
-
-    const actSfx =
-      item === 'empty_hand' || item === 'fist'
-        ? 'act_punch'
-        : item === 'torch_lit'
-          ? 'act_torch'
-          : item === 'scroll'
-            ? 'act_scroll'
-            : item === 'wand'
-              ? 'act_wand'
-              : item === 'axe'
-                ? 'act_axe'
-                : item === 'mace'
-                  ? 'act_mace'
-                  : item === 'dagger'
-                    ? 'act_dagger'
-                    : 'act_punch';
+    const actSfx = itemActSfx(item);
+    const isPunch = item === 'empty_hand' || item === 'fist';
 
     if (!target) {
       hero.recovery[hand] = now + (rules.recovery ?? 1.5);
       this.emit({ type: 'hand_used', hero: heroId, hand, item });
       this.emit({ type: 'sfx', name: actSfx, combat: true });
+      if (isPunch) this.emit({ type: 'log', key: 'punch_air', vars: { hero: heroId } });
       return this.flush();
     }
 
@@ -742,7 +728,7 @@ export class CombatEngine {
 
     if (m.missNext) {
       m.missNext = false;
-      this.emit({ type: 'log', key: 'dodge', vars: { hero: this.living()[0]?.id ?? 'brannoc' } });
+      this.emit({ type: 'log', key: 'sand_miss' });
       this.emit({ type: 'sfx', name: 'act_miss', combat: true });
       return;
     }
@@ -768,7 +754,7 @@ export class CombatEngine {
     const dur = WINDUP_SOUND_SEC[m.kind] ?? this.def(m.kind)?.behavior.windup ?? 1;
     m.windup = { until: now + dur, kind, sound };
     this.emit({ type: 'monster_anim', id: m.id, anim: 'windup' });
-    this.emit({ type: 'sfx', name: sound, x: m.x, y: m.y, combat: true, volume: 1 });
+    this.emit({ type: 'sfx', name: sound, x: m.x, y: m.y, combat: true, volume: 1, id: m.id });
   }
 
   private resolveMonsterStrike(
@@ -876,12 +862,18 @@ export class CombatEngine {
   }
 }
 
-export function openGrid(blocked: (x: number, y: number) => boolean, w: number, h: number): Occupancy {
+export function openGrid(
+  blocked: (x: number, y: number) => boolean,
+  w: number,
+  h: number,
+  water?: (x: number, y: number) => boolean
+): Occupancy {
   const inBounds = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h;
   return {
     inBounds,
     blocked: (x, y) => !inBounds(x, y) || blocked(x, y),
     walkable: (x, y) => inBounds(x, y) && !blocked(x, y),
+    water: water ? (x, y) => !!water(x, y) : undefined,
     los(x0, y0, x1, y1) {
       let x = x0;
       let y = y0;

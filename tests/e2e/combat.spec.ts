@@ -61,20 +61,25 @@ test('proto3d combat: block square, first swing, voices, perks, game over', asyn
   expect(await page.locator('#perk-screen').count(), 'no perk screen in the document').toBe(0);
 
   const slimeBump = await page.evaluate(() => {
-    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    const p = (window as unknown as { __proto3d: Proto3d & { sprites?: () => Array<{ kind: string; x: number; y: number; visible: boolean; monsterKind?: string }> } }).__proto3d;
     p.setPosition(6, 2, 1);
     const moved = p.tryMoveForward();
+    const sprites = p.sprites?.() ?? [];
     return {
       result: moved.result,
       after: moved.after,
       fighting: p.inCombat(),
-      slime: p.combatMonsters().find((m) => m.kind === 'slime')
+      slime: p.combatMonsters().find((m) => m.kind === 'slime'),
+      slimeSprite: sprites.find((s) => s.kind === 'monster' && s.x === 7 && s.y === 2)
     };
   });
   expect(slimeBump.result, 'slime square is blocked').toBe('monster');
   expect(slimeBump.after).toMatchObject({ x: 6, y: 2 });
   expect(slimeBump.fighting, 'bump starts the fight').toBe(true);
   expect(slimeBump.slime?.alive).toBe(true);
+  expect(slimeBump.slime?.x).toBe(7);
+  expect(slimeBump.slime?.y).toBe(2);
+  expect(slimeBump.slimeSprite?.visible, 'slime is lit and visible one square ahead').toBe(true);
 
   const startHp = await page.evaluate(() =>
     (window as unknown as { __proto3d: Proto3d }).__proto3d.combatHeroes().reduce((s, h) => s + h.hp, 0)
@@ -165,6 +170,9 @@ test('proto3d combat: block square, first swing, voices, perks, game over', asyn
   await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.forceWipe());
   await page.waitForTimeout(200);
   await expect(page.locator('#gameover')).toHaveClass(/show/);
+  await expect(page.locator('#gameover-body')).toContainText(/keep/i);
+  await expect(page.locator('#btn-go-floor')).toHaveText(/Floor 1/);
+  await expect(page.locator('#btn-go-autosave')).toBeHidden();
   await page.screenshot({ path: `${OUT}/combat-game-over.png`, fullPage: false });
 
   await page.locator('#btn-go-floor').tap();

@@ -1,0 +1,93 @@
+{
+ "_format": "Goals page of the journal (Act 1). One line per goal, shown while active: where/what, never how (no lever sides, riddle answers or plate orders). Fields: id, floor (0 = whole act), optional (shown in grey, never blocks), text, set_on, done_on, fail_on (struck through as lost), replaces (hides that goal when this one is set). Events are trigger keys from story/triggers_act1.json (log/bark/dialogue/puzzle keys) or flags. Done goals tick and move to the bottom; they clear at the next floor. Tapping a goal opens the Map tab on that floor (not the square). Goal state lives in the save slot. New goal: log goal_new. UI labels: ui_text journal. Greek: story/el/goals_act1.el.json, same ids. Greek copy: same ids and events; only text changed.",
+ "goals": [
+  {
+   "id": "g_why",
+   "floor": 0,
+   "text": "Μάθετε γιατί το φρούριο μένει στεγνό.",
+   "set_on": "new game",
+   "done_on": "f4_tide_wakes ends (start_escape)"
+  },
+  {
+   "id": "g_tam",
+   "floor": 1,
+   "text": "Ο Ταμ, ο αδερφός της Μαγκς, ήρθε εδώ την άνοιξη. Βρείτε τον.",
+   "set_on": "bark f1_start (F1 arrival)",
+   "done_on": "replaced by g_tam_below"
+  },
+  {
+   "id": "g_f1_down",
+   "floor": 1,
+   "text": "Βρείτε δρόμο κάτω από τις πάνω αίθουσες.",
+   "set_on": "log enter_floor1",
+   "done_on": "log enter_floor2"
+  },
+  {
+   "id": "g_f1_door",
+   "floor": 1,
+   "text": "Μια κλειδωμένη πόρτα στις πάνω αίθουσες. Το κλειδί είναι κοντά.",
+   "set_on": "log door_locked (first bump)",
+   "done_on": "log door_unlocked"
+  },
+  {
+   "id": "g_f2_hobb",
+   "floor": 2,
+   "text": "Κάποιος φωνάζει από την αποθήκη.",
+   "set_on": "bark hobb_shout",
+   "done_on": "flag frogcatcher_freed",
+   "fail_on": "flag frogcatcher_drowned"
+  },
+  {
+   "id": "g_f2_flood",
+   "floor": 2,
+   "text": "Η στέρνα πλημμύρισε. Η σκάλα είναι πέρα από αυτήν.",
+   "set_on": "log blocked_cistern (first bump)",
+   "done_on": "log enter_cistern"
+  },
+  {
+   "id": "g_tam_below",
+   "floor": 3,
+   "text": "Η φωνή του Ταμ ήρθε από κάτω από τους στρατώνες.",
+   "set_on": "dialogue f3_grate_tam",
+   "done_on": "log enter_floor4 (replaced by g_tam_cell)",
+   "replaces": "g_tam"
+  },
+  {
+   "id": "g_f3_armoury",
+   "floor": 3,
+   "text": "Νερό κλείνει την πόρτα του οπλοστασίου.",
+   "set_on": "log blocked_waterdoor (first bump)",
+   "done_on": "puzzle floor3_offering.bowl_lit",
+   "optional": true
+  },
+  {
+   "id": "g_tam_cell",
+   "floor": 4,
+   "text": "Ο Ταμ είναι κάπου στους βαθιούς στρατώνες. Βρείτε τα κελιά.",
+   "set_on": "log enter_floor4",
+   "done_on": "dialogue f4_tam_cell ends (saved or left)",
+   "replaces": "g_tam_below"
+  },
+  {
+   "id": "g_f4_riddle",
+   "floor": 4,
+   "text": "Η αίθουσα του λοχαγού είναι σφραγισμένη με γρίφο.",
+   "set_on": "bark riddle_first_sight",
+   "done_on": "puzzle floor4_riddle_door.solved"
+  },
+  {
+   "id": "g_f4_cellgate",
+   "floor": 4,
+   "text": "Η πτέρυγα των κελιών είναι κλειδωμένη. Το κλειδί το έχει ο λοχαγός.",
+   "set_on": "log blocked_cellgate or dialogue f4_captain starts",
+   "done_on": "log gate_unlocked"
+  },
+  {
+   "id": "g_escape",
+   "floor": 4,
+   "text": "Το νερό ανεβαίνει. Στη σκάλα!",
+   "set_on": "f4_tide_wakes ends (start_escape)",
+   "done_on": "log act1_end"
+  }
+ ]
+}

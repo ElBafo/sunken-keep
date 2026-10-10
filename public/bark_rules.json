@@ -10,9 +10,14 @@
   "dialogue",
   "combat_round_with_story_bark"
  ],
- "first_sight": "first_sight_<monster> is story tier: one random line from its pool, once per save, the first time that monster type is in view. When it fires, new_monster is suppressed for that sighting; new_monster only covers types with no first_sight_ lines (slime, cellar_spider, tide_spawn, captain_dural).",
- "condition": "A line may carry condition {flag: value}. Only lines whose flags match the save are eligible (unset counts as false).",
+ "first_sight": "first_sight_<monster>: one random line from its pool, once per save, the first time that monster type is in view. Tier: story only for first_sight_keep_rat (the first monster of the game) and first_sight_drowned_dwarf (F3 reveal); the others are flavour, so on floor 1 only the rat is guaranteed. When a first_sight_ line plays, new_monster is suppressed for that sighting; new_monster only covers types with no first_sight_ lines (slime, cellar_spider, tide_spawn, captain_dural).",
+ "condition": "A line may carry condition {flag: value}. Only lines whose flags match the save are eligible (unset counts as false). Mags goes cold: in act 2+ with saved_tam == false, Mags's flavour lines WITHOUT a condition are skipped, so only her condition {saved_tam:false} lines play.",
  "act": "A line with act: N is ignored before act N (torch_draws_monster is act 2).",
  "puzzle_barks": "Barks under <puzzle>.barks in story/puzzles_act1.json use the same tiers and must be merged with barks.json by the loader.",
- "fire_rules": "When each trigger fires: story/triggers_act1.json."
+ "fire_rules": "When each trigger fires: story/triggers_act1.json.",
+ "min_gap_s": 8,
+ "queue": "Every bark of every tier goes through one queue: never two barks less than 8 s apart (min_gap_s), counted from the end of the previous bark (listener reply included). Tutorial and story barks wait in the queue (max 3; a story bark older than 20 s is dropped if its moment has passed, e.g. the player left the floor). Flavour barks are never queued: if the gap or flavour rules say no, they are skipped. A tutorial bark is dropped if the player already did the thing it teaches (tut_potion after a drink, tut_inventory after opening the bag, tut_hand after a hand action, tut_sheet after opening a sheet).",
+ "floor1_cap": "Target: floor 1 plays at most about 8 non-tutorial barks; the queue plus flavour gaps keep it there. Test: log bark timestamps on a scripted F1 run.",
+ "downed": "A bark whose speaker is down (0 HP) is skipped. If only the listener is down, the line plays without the reply.",
+ "npc_speakers": "Speakers can be NPCs (hobb, tam). offscreen: true (hobb_shout) means no portrait: show the name tag only and play it as a voice from off-screen. listener can be an NPC too (tam in escape_tam_saved)."
 }

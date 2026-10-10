@@ -1,5 +1,5 @@
 {
- "_format": "Each dialogue is a list of nodes. Node: id, speaker (hero id | npc id | 'tide' | 'narrator'), face, text, optional next, optional choices [{text, next, set:{flag:value}, requires:{flag:value}, cost:{...}}]. Tile hooks: put dialogue:'<id>' on a tile. 'tide' text renders cold blue-green, lowercase, no portrait. Greek copy: same ids/flags; only text changed. Re-entry: a dialogue may be started at a node other than the first (f2_frogcatcher starts at 'return' on later visits); see story/triggers_act1.json.",
+ "_format": "Each dialogue is a list of nodes. Node: id, speaker (hero id | npc id | 'tide' | 'narrator'), face, text, optional next, optional choices [{text, next, set:{flag:value}, requires:{flag:value}, cost:{...}}]. Tile hooks: put dialogue:'<id>' on a tile. 'tide' text renders cold blue-green, lowercase, no portrait. Greek copy: same ids/flags; only text changed. Re-entry: a dialogue may be started at a node other than the first (f2_frogcatcher starts at 'return' on later visits); see story/triggers_act1.json. requires keys: a flag name (true/false, unset = false); oil_min: N (lantern oil plus oil flasks carried >= N); hero_up: <hero> (that hero has HP > 0); hero_down: <hero> (that hero is at 0 HP). A choice whose requires fail is hidden; every choice list keeps at least one choice visible in every state. Optional node field next_if: [{requires, next}] is checked in order before next (f4_tide_wakes node a). Optional node field action: give:<item> | start_fight:<monster> | start_escape. A node spoken by a hero who is down is voiced by the first other hero who is up (order wren, mags, ilsevar, brannoc); lines that only fit one hero are already gated by requires. Bubble limit: every text and choice text <= 80 chars (2 lines x 40) in EN and EL.",
  "dialogues": {
   "f2_singing": [
    {
@@ -85,7 +85,17 @@
     "choices": [
      {
       "text": "Μπράννοκ: \"Στόουνβοου.\"",
-      "next": "stonevow"
+      "next": "stonevow",
+      "requires": {
+       "hero_up": "brannoc"
+      }
+     },
+     {
+      "text": "Ρεν: \"Είναι Στόουνβοου. Απλώς... ξεκουράζεται.\"",
+      "next": "stonevow",
+      "requires": {
+       "hero_down": "brannoc"
+      }
      },
      {
       "text": "Μαγκς: \"Φυλή Κοίτα-τη-Δουλειά-Σου.\"",
@@ -130,7 +140,8 @@
    {
     "id": "spare2",
     "speaker": "dural",
-    "text": "Αν ζει, πες του πως ο Ντούραλ κράτησε σκοπιά."
+    "text": "Αν ζει, πες του πως ο Ντούραλ κράτησε σκοπιά.",
+    "action": "give:captain_key"
    },
    {
     "id": "rude",
@@ -178,6 +189,9 @@
       },
       "cost": {
        "lantern": "guttering_for_floor"
+      },
+      "requires": {
+       "oil_min": 1
       }
      },
      {
@@ -189,6 +203,23 @@
       "cost": {
        "hero": "brannoc",
        "hp_pct": 50
+      },
+      "requires": {
+       "hero_up": "brannoc"
+      }
+     },
+     {
+      "text": "Η Μαγκς βουτάει και ανοίγει την κλειδαριά.",
+      "next": "save_pick",
+      "set": {
+       "saved_tam": true
+      },
+      "cost": {
+       "hero": "mags",
+       "hp_pct": 50
+      },
+      "requires": {
+       "hero_down": "brannoc"
       }
      },
      {
@@ -212,6 +243,13 @@
     "speaker": "brannoc",
     "face": "wince",
     "text": "Κράτα μου τα γένια. Όχι κυριολεκτικά.",
+    "next": "saved"
+   },
+   {
+    "id": "save_pick",
+    "speaker": "mags",
+    "face": "wince",
+    "text": "Κράτα την ανάσα σου, Ταμ. Και τη γλώσσα σου.",
     "next": "saved"
    },
    {
@@ -244,12 +282,26 @@
     "id": "a",
     "speaker": "tide",
     "text": "φέρατε φως. τι ευγενικό.",
-    "next": "b"
+    "next": "b",
+    "next_if": [
+     {
+      "requires": {
+       "saved_tam": false
+      },
+      "next": "b_left"
+     }
+    ]
    },
    {
     "id": "b",
     "speaker": "tide",
     "text": "μα παίρνετε ό,τι είναι δικό μας. γι' αυτό παίρνουμε πίσω.",
+    "next": "c"
+   },
+   {
+    "id": "b_left",
+    "speaker": "tide",
+    "text": "τον αφήνετε σε μας. καλώς. μα και πάλι παίρνετε.",
     "next": "c"
    },
    {
@@ -651,20 +703,20 @@
    {
     "id": "a",
     "speaker": "hobb",
-    "text": "Ε! Εδώ κάτω! Κάτω απ' το ράφι! Προσοχή στους βατράχους.",
+    "text": "Ε! Κάτω απ' το ράφι! Μαγκς; Η Μαγκς η Ρίντλι;",
     "next": "b"
    },
    {
     "id": "b",
     "speaker": "mags",
     "face": "shocked",
-    "text": "Χομπ Ράσγουικ; Μου χρωστάς έξι χάλκινα.",
+    "text": "Χομπ Ράσγουικ. Μου χρωστάς έξι χάλκινα.",
     "next": "c"
    },
    {
     "id": "c",
     "speaker": "hobb",
-    "text": "Σήκωσέ το και θα σου χρωστάω εφτά.",
+    "text": "Σήκωσέ το και γίνονται εφτά. Ο Ταμ κατέβηκε. Του τραγουδούσε το νερό, λέει.",
     "choices": [
      {
       "text": "Ο Μπράννοκ σηκώνει το ράφι.",
@@ -672,41 +724,20 @@
       "set": {
        "met_hobb": true,
        "frogcatcher_freed": true
+      },
+      "requires": {
+       "hero_up": "brannoc"
       }
      },
      {
-      "text": "\"Είδες τον αδερφό μου τον Ταμ;\"",
-      "next": "ask",
-      "set": {
-       "met_hobb": true
-      }
-     },
-     {
-      "text": "\"Θα γυρίσουμε για σένα.\"",
-      "next": "later",
-      "set": {
-       "met_hobb": true
-      }
-     }
-    ]
-   },
-   {
-    "id": "ask",
-    "speaker": "hobb",
-    "text": "Τον Ταμ; Κατέβηκε για τους μεγάλους βατράχους. Είπε πως το νερό του τραγουδούσε.",
-    "next": "ask2"
-   },
-   {
-    "id": "ask2",
-    "speaker": "hobb",
-    "text": "Τώρα ΣΗΚΩΣΤΕ ΤΟ ΡΑΦΙ, παρακαλώ.",
-    "choices": [
-     {
-      "text": "Ο Μπράννοκ σηκώνει το ράφι.",
-      "next": "free",
+      "text": "Η Μαγκς κι η Ρεν σπρώχνουν το ράφι.",
+      "next": "free_mw",
       "set": {
        "met_hobb": true,
        "frogcatcher_freed": true
+      },
+      "requires": {
+       "hero_down": "brannoc"
       }
      },
      {
@@ -726,29 +757,24 @@
     "next": "free2"
    },
    {
+    "id": "free_mw",
+    "speaker": "mags",
+    "face": "wince",
+    "text": "Χμφ! Ποιος φτιάχνει ράφια από αμόνια;",
+    "next": "free2"
+   },
+   {
     "id": "free2",
     "speaker": "hobb",
-    "text": "Να 'χεις χαΐρι στα γένια σου! Ορίστε, ένα φίλτρο. Σχεδόν αγλείφωτο.",
+    "text": "Να 'στε καλά! Ένα φίλτρο. Σχεδόν αγλείφωτο. Πες το εφτά χάλκινα.",
     "action": "give:potion_red",
     "next": "free3"
    },
    {
     "id": "free3",
-    "speaker": "hobb",
-    "text": "Ο Ταμ κατέβηκε. Είπε πως το νερό του τραγουδούσε. Βρες τον, Μαγκς.",
-    "next": "free4"
-   },
-   {
-    "id": "free4",
-    "speaker": "hobb",
-    "text": "Εκείνος ο μοχλός πλημμυρίζει τη γωνιά. Τυχερός που ήρθατε εδώ πρώτα.",
-    "next": "free5"
-   },
-   {
-    "id": "free5",
     "speaker": "mags",
     "face": "smirk",
-    "text": "Έξι χάλκινα, Χομπ. Θα σε βρω."
+    "text": "Σχεδόν. Καλά, πάτσι. Τώρα χάσου από δω."
    },
    {
     "id": "later",
@@ -766,13 +792,20 @@
       "set": {
        "met_hobb": true,
        "frogcatcher_freed": true
+      },
+      "requires": {
+       "hero_up": "brannoc"
       }
      },
      {
-      "text": "\"Είδες τον αδερφό μου τον Ταμ;\"",
-      "next": "ask",
+      "text": "Η Μαγκς κι η Ρεν σπρώχνουν το ράφι.",
+      "next": "free_mw",
       "set": {
-       "met_hobb": true
+       "met_hobb": true,
+       "frogcatcher_freed": true
+      },
+      "requires": {
+       "hero_down": "brannoc"
       }
      },
      {

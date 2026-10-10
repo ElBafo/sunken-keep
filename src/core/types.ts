@@ -128,8 +128,8 @@ export interface FightState {
 
 export type CombatEvent =
   | { type: 'log'; key: string; vars?: Record<string, string | number> }
-  | { type: 'sfx'; name: string; x?: number; y?: number; volume?: number; combat?: boolean }
-  | { type: 'sfx_stop'; name: string }
+  | { type: 'sfx'; name: string; x?: number; y?: number; volume?: number; combat?: boolean; id?: string }
+  | { type: 'sfx_stop'; name: string; id?: string }
   | { type: 'monster_anim'; id: string; anim: MonsterAnim }
   | { type: 'monster_move'; id: string; from: { x: number; y: number }; to: { x: number; y: number } }
   | { type: 'monster_dead'; id: string; x: number; y: number; kind: string }
@@ -156,6 +156,30 @@ export interface Occupancy {
   blocked(x: number, y: number): boolean;
   inBounds(x: number, y: number): boolean;
   los(x0: number, y0: number, x1: number, y1: number): boolean;
+  water?(x: number, y: number): boolean;
+}
+
+/** Shared hand-item → combat SFX map. Burnt torch swings like a torch; the hammer like an axe. */
+export const ITEM_ACT_SFX: Record<string, string> = {
+  axe: 'act_axe',
+  shield: 'act_shield',
+  iron_shield: 'act_shield',
+  mace: 'act_mace',
+  prayer_lantern: 'act_prayer',
+  prayer_lantern_ember: 'act_prayer',
+  wand: 'act_wand',
+  scroll: 'act_scroll',
+  dagger: 'act_dagger',
+  tricks_pouch: 'act_tricks',
+  empty_hand: 'act_punch',
+  fist: 'act_punch',
+  torch_lit: 'act_torch',
+  torch_burnt: 'act_torch',
+  ashmantle_hammer: 'act_axe'
+};
+
+export function itemActSfx(item: string): string {
+  return ITEM_ACT_SFX[item] ?? 'act_punch';
 }
 
 export const HERO_IDS: HeroId[] = ['brannoc', 'wren', 'ilsevar', 'mags'];

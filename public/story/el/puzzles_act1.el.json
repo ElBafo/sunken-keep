@@ -2,8 +2,8 @@
  "_note": "Greek copy of puzzles_act1.json. Same keys; log lines <=41 chars.",
  "floor2_vents": {
   "lever_plate": "ΑΡΙΣΤΕΡΑ: ΑΠΟΘΗΚΗ. ΔΕΞΙΑ: ΣΤΕΡΝΑ.",
-  "lever_pulled_dry": "Ο αέρας βρυχάται. Κάπου, νερό στραγγίζει.",
-  "lever_pulled_flood": "Ο αέρας βρυχάται. Κάπου, νερό ανεβαίνει.",
+  "lever_pulled_left": "Η αποθήκη αδειάζει. Η στέρνα γεμίζει.",
+  "lever_pulled_right": "Η στέρνα αδειάζει. Η αποθήκη γεμίζει.",
   "barks": [
    {
     "trigger": "vent_lever_first",
@@ -27,20 +27,21 @@
    "και το νερό υποκλίνεται."
   ],
   "bowl_examine": "Πέτρινο μπολ, μαύρο από παλιά κάπνα.",
+  "bowl_lantern": "Το μπολ θέλει φωτιά για να την κρατήσει.",
   "bowl_lit": "Το νερό στην πόρτα ανοίγει.",
   "room_dark": "Πίσω σας, η τραπεζαρία σκοτεινιάζει.",
   "barks": [
    {
     "trigger": "bowl_first_sight",
     "speaker": "wren",
-    "text": "Ένα μπολ προσφορών. Της έδιναν φωτιά.",
+    "text": "Ένα μπολ προσφορών. Του έδιναν φωτιά.",
     "face": "neutral",
     "tier": "tutorial"
    },
    {
     "trigger": "bowl_lit",
     "speaker": "ilsevar",
-    "text": "Πήρε τον δαυλό. Του άρεσε ο δαυλός.",
+    "text": "Πήρε τη δάδα. Του άρεσε η δάδα.",
     "face": "neutral",
     "tier": "story"
    },
@@ -113,6 +114,7 @@
    "oath"
   ],
   "step_ok": "Η πλάκα κάνει κλικ και κρατά.",
+  "step_off_hammer": "Η πλάκα του σφυριού ξαναπετάγεται.",
   "step_wrong": "Οι πλάκες επανέρχονται με ένα βογκητό.",
   "solved": "Ένα κρυφό ράφι ανοίγει.",
   "barks": [
