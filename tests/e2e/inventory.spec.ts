@@ -142,10 +142,11 @@ test('proto3d step3 inventory: pickup, chest loot-all, bag, potions, key, oil, g
   expect(shieldIndex, 'iron_shield in bag').toBeGreaterThanOrEqual(0);
   await page.locator(`.inv-slot[data-name="slot-${shieldIndex}"]`).tap();
   await page.waitForTimeout(80);
-  const compare = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.lastCompare());
-  expect(compare === 'Better' || compare === 'Worse' || compare === 'Same').toBe(true);
+  expect(
+    await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.lastCompare()),
+    'shield vs pouch/scroll shows no compare word'
+  ).toBeNull();
   await page.screenshot({ path: `${OUT}/step3-item-selected.png`, fullPage: false });
-  await page.screenshot({ path: `${OUT}/step3-equip-compare.png`, fullPage: false });
 
   await page.locator('.inv-doll[data-hero="mags"][data-slot="off"]').tap();
   await page.waitForTimeout(80);
@@ -318,4 +319,38 @@ test('proto3d ?lang=el renders a Greek log line', async ({ page }) => {
   expect(lines.some((l) => /[Α-ω]/.test(l)), 'Greek log line present').toBe(true);
   expect(lines.some((l) => l.includes('κλειδί') || l.includes('Βρήκες'))).toBe(true);
   await page.screenshot({ path: `${OUT}/step3-greek-log.png`, fullPage: false });
+});
+
+test('equip compare: better, worse, same, and no word for the shield', async ({ page }) => {
+  test.setTimeout(90000);
+  mkdirSync(OUT, { recursive: true });
+  await boot(page);
+
+  const selectItem = async (id: string) => {
+    await page.evaluate((item) => {
+      const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+      proto.giveItem(item, 1);
+      proto.openBag();
+    }, id);
+    const index = await page.evaluate((item) => {
+      const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+      return proto.getBag().findIndex((s) => s.item === item);
+    }, id);
+    expect(index, `${id} in bag`).toBeGreaterThanOrEqual(0);
+    await page.locator(`.inv-slot[data-name="slot-${index}"]`).tap();
+    await page.waitForTimeout(60);
+    return page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.lastCompare());
+  };
+
+  expect(await selectItem('ashmantle_hammer'), 'weapon vs better weapon').toBe('+Better');
+  await page.screenshot({ path: `${OUT}/step3-equip-compare.png`, fullPage: false });
+  await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.closeBag());
+
+  expect(await selectItem('torch_lit'), 'weapon vs worse weapon').toBe('-Worse');
+  await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.closeBag());
+
+  expect(await selectItem('axe'), 'weapon vs same weapon').toBe('Same');
+  await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.closeBag());
+
+  expect(await selectItem('iron_shield'), 'shield vs pouch shows no word').toBeNull();
 });

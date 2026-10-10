@@ -1,7 +1,15 @@
 import type { HeroId } from '../core/types';
 import { StoryText } from './i18n';
 import { drawFont5x7, type FontGlyphs } from './font5x7';
-import { canEquip, compareEquip, equippable, preferredHand, STACK_MAX, usable } from './items';
+import {
+  canEquip,
+  compareEquip,
+  equippable,
+  preferredHand,
+  sameEquipJob,
+  STACK_MAX,
+  usable
+} from './items';
 import type { PartyBag } from './bag';
 import { panelArtPath, type InventoryScreenLayout, type LayoutRect } from './layout585';
 
@@ -13,6 +21,7 @@ const CANVAS_W = 270;
 const CANVAS_H = 585;
 const NAME_COLOUR = '#ffbe5a';
 const BODY_COLOUR = '#d8ccb0';
+const COMPARE_COLOUR = { better: '#8fc46a', worse: '#d8664e', same: '#918d7d' } as const;
 const SHADOW = { colour: '#1a1210', dx: 1, dy: 1 };
 const PORTRAIT_SIZE = 32;
 const PORTRAIT_Y = 44;
@@ -52,6 +61,7 @@ export class InventoryUi {
   selected = -1;
   pickHero: 'potion_red' | 'potion_blue' | 'potion_green' | null = null;
   lastCompare: string | null = null;
+  lastCompareKind: 'better' | 'worse' | 'same' | null = null;
   private host: HTMLElement;
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -287,6 +297,7 @@ export class InventoryUi {
     this.selected = index;
     this.pickHero = null;
     this.lastCompare = null;
+    this.lastCompareKind = null;
     const slot = this.bag.slots[index];
     if (slot && equippable(slot.item)) {
       const hero = HEROES.find((h) => canEquip(slot.item, h));
@@ -294,9 +305,11 @@ export class InventoryUi {
         const eq = this.equipment()[hero];
         const hand = slot.item === 'chain_mail' ? undefined : preferredHand(slot.item);
         const held = slot.item === 'chain_mail' ? eq?.armour : hand ? eq?.[hand] : undefined;
-        const cmp = compareEquip(slot.item, held);
-        const key = cmp === 'better' ? 'compare_better' : cmp === 'worse' ? 'compare_worse' : 'compare_same';
-        this.lastCompare = this.story.uiText(`bag.${key}`);
+        if (sameEquipJob(slot.item, held)) {
+          const cmp = compareEquip(slot.item, held);
+          this.lastCompareKind = cmp;
+          this.lastCompare = this.story.uiText(`bag.compare_${cmp}`);
+        }
       }
     }
     this.draw();
@@ -316,6 +329,8 @@ export class InventoryUi {
     this.open = false;
     this.pickHero = null;
     this.selected = -1;
+    this.lastCompare = null;
+    this.lastCompareKind = null;
     this.closePressed = false;
     this.host.classList.remove('show');
     this.host.hidden = true;
@@ -441,11 +456,16 @@ export class InventoryUi {
         this.drawFont(this.story.uiText('bag.empty_bag'), lines[0][0], lines[0][1], BODY_COLOUR);
       }
     } else {
-      const maxChars = Math.max(8, Math.floor(lines[0][2] / this.fontCellW));
-      this.drawFont(this.story.itemName(slot.item).slice(0, maxChars), lines[0][0], lines[0][1], NAME_COLOUR);
-      const body = [this.story.itemDesc(slot.item), this.story.itemEffect(slot.item), this.lastCompare ?? '']
-        .filter(Boolean)
-        .join(' ');
+      const [nx, ny, nw] = lines[0];
+      const maxChars = Math.max(8, Math.floor(nw / this.fontCellW));
+      const compare = this.lastCompare ?? '';
+      const reserved = compare ? compare.length + 1 : 0;
+      this.drawFont(this.story.itemName(slot.item).slice(0, Math.max(4, maxChars - reserved)), nx, ny, NAME_COLOUR);
+      if (compare && this.lastCompareKind) {
+        const textX = nx + nw - (compare.length * this.fontCellW - 1);
+        this.drawFont(compare, textX, ny, COMPARE_COLOUR[this.lastCompareKind]);
+      }
+      const body = [this.story.itemDesc(slot.item), this.story.itemEffect(slot.item)].filter(Boolean).join(' ');
       const wrapped = wrapText(body, maxChars);
       wrapped.slice(0, Math.max(0, lines.length - 1)).forEach((line, i) => {
         const dest = lines[i + 1];

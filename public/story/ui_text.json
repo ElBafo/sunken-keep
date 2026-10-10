@@ -110,9 +110,10 @@
    "slot_hand": "Hand",
    "slot_body": "Body",
    "slot_bag": "Bag",
-   "compare_better": "Better",
-   "compare_worse": "Worse",
-   "compare_same": "Same"
+   "compare_better": "+Better",
+   "compare_worse": "-Worse",
+   "compare_same": "Same",
+   "_compare_note": "Name line, right-aligned. Only compare items with the same job (weapon vs weapon, armour vs armour); show nothing for trades like shield vs pouch/scroll."
   },
   "items": {
    "key": {

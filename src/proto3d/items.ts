@@ -270,6 +270,26 @@ export function usable(id: string): boolean {
   return itemDef(id).usable;
 }
 
+export type EquipJob = 'weapon' | 'armour';
+
+/** Weapon (main hand, including fist) or armour. Shields, pouches, scrolls, lanterns have no job. */
+export function equipJob(id: string | undefined): EquipJob | null {
+  if (!id) return null;
+  if (id === 'empty_hand' || id === 'fist') return 'weapon';
+  const def = itemDef(id);
+  if (def.slot === 'body') return 'armour';
+  if (def.slot === 'hand' && preferredHand(id) === 'main') return 'weapon';
+  return null;
+}
+
+/** Only compare weapon-vs-weapon in that slot, or armour-vs-armour. */
+export function sameEquipJob(nextId: string, heldId: string | undefined): boolean {
+  const next = equipJob(nextId);
+  if (!next) return false;
+  if (next === 'armour') return !heldId || equipJob(heldId) === 'armour';
+  return equipJob(heldId || 'empty_hand') === 'weapon';
+}
+
 export function compareEquip(nextId: string, heldId: string | undefined): 'better' | 'worse' | 'same' {
   const next = itemDef(nextId).score;
   const held = itemDef(heldId || 'empty_hand').score;
