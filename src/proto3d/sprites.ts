@@ -178,6 +178,8 @@ interface SpriteInfo {
   animOnce: boolean;
   pickedUp?: boolean;
   hidden?: boolean;
+  /** Debug: stay drawn even when the square is unlit (eye-glint hide). */
+  forceLit?: boolean;
   itemId?: string;
   frostAmount?: number;
 }
@@ -379,7 +381,7 @@ export class SpriteManager {
           sprite.object.visible = false;
           continue;
         }
-        sprite.object.visible = lit;
+        sprite.object.visible = sprite.forceLit || lit;
       }
     }
   }
@@ -546,12 +548,12 @@ export class SpriteManager {
     const camZ = playerY * CELL_SIZE + oz;
 
     for (const sprite of this.sprites) {
-      if (!sprite.object.visible) continue;
-      if (sprite.kind === 'item') {
-        this.placeItem(sprite, playerX, playerY, camX, camZ, fx, fz);
+      if (sprite.hidden || sprite.pickedUp) continue;
+      if (sprite.kind === 'monster') {
+        this.placeMonster(sprite, playerX, playerY);
         continue;
       }
-      if (sprite.kind === 'monster') this.placeMonster(sprite, playerX, playerY);
+      if (sprite.kind === 'item') this.placeItem(sprite, playerX, playerY, camX, camZ, fx, fz);
     }
   }
 

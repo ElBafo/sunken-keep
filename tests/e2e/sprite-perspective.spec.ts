@@ -7,6 +7,7 @@ const OUT = '/opt/cursor/artifacts/screenshots';
 type ScreenRect = {
   height: number;
   feetY: number;
+  topY: number;
   width: number;
   worldX: number;
   worldZ: number;
@@ -22,12 +23,13 @@ type Proto3d = {
   cameraSpec: () => { eyeHeight: number; backOffsetTiles: number; pitchDeg: number; fov: number; view: [number, number] };
   listenerPose: () => { x: number; y: number; z: number };
   snapDoor?: (x: number, y: number, open: boolean) => void;
+  showMonster?: (x: number, y: number) => void;
 };
 
 test.use(devices['iPhone 15']);
 
 async function boot(page: import('@playwright/test').Page) {
-  await page.goto(`${BASE_URL}/proto3d.html?test=1&debug=1`);
+  await page.goto(`${BASE_URL}/proto3d.html?test=1&debug=1&bright=1.6`);
   await page.waitForFunction(
     () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
     null,
@@ -50,6 +52,7 @@ async function measure(
     ({ x, y, dir, kind, sx, sy }) => {
       const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
       p.setPosition(x, y, dir);
+      if (kind === 'monster') p.showMonster?.(sx, sy);
       return p.spriteScreen(kind, sx, sy);
     },
     { x, y, dir, kind, sx, sy }
@@ -67,6 +70,11 @@ test('slime size grows smoothly at 3 / 2 / 1 squares; approach-independent', asy
   expect(cam.pitchDeg).toBeCloseTo(-3.5, 5);
   expect(cam.fov).toBe(80);
   expect(cam.view).toEqual([270, 380]);
+
+  await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    p.snapDoor?.(4, 2, true);
+  });
 
   const listen = await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;

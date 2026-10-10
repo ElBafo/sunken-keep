@@ -1267,15 +1267,35 @@ class Game {
           frames: s.frames?.length ?? 0,
           currentFrame: s.currentFrame,
           lod: s.currentLod ?? null,
+          lods: s.lodSets ? Object.keys(s.lodSets) : [],
           v2: !!s.v2
         })),
       spriteScreen: (kind: 'monster' | 'item', x: number, y: number) => {
+        this.spriteManager.layoutBillboards(this.player.x, this.player.y, this.player.dir);
         this.renderer.render();
         const s = this.spriteManager.sprites.find((sp) => sp.kind === kind && sp.x === x && sp.y === y && !sp.hidden);
         if (!s) return null;
-        return this.spriteManager.screenRect(s, this.renderer.canvas.width, this.renderer.canvas.height);
+        return {
+          ...this.spriteManager.screenRect(s, this.renderer.canvas.width, this.renderer.canvas.height),
+          gridX: s.x,
+          gridY: s.y,
+          player: { x: this.player.x, y: this.player.y, dir: this.player.dir },
+          lods: s.lodSets ? Object.keys(s.lodSets) : []
+        };
       },
       cameraSpec: () => CAMERA_SPEC,
+      showMonster: (x: number, y: number) => {
+        for (const s of this.spriteManager.sprites) {
+          if (s.kind === 'monster' && s.x === x && s.y === y) {
+            s.hidden = false;
+            s.forceLit = true;
+            s.object.visible = true;
+          }
+        }
+        this.darkFx.hideEye(x, y, this.audioManager);
+        this.spriteManager.layoutBillboards(this.player.x, this.player.y, this.player.dir);
+        this.renderer.render();
+      },
       regionStats: (x0: number, y0: number, x1: number, y1: number) => {
         this.renderer.render();
         const gl = this.renderer.renderer.getContext();
