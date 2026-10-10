@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {
   CELL_SIZE,
+  MONSTER_OFFSET_TOWARD_PARTY,
   SPRITE_SURFACE_LIFT,
   WATER_SURFACE_Y,
   cameraOffsetXZ,
@@ -100,8 +101,26 @@ const OWN_SQUARE_SCALE = 0.72;
 const OWN_SQUARE_FORWARD = 1.18;
 /** Items on other squares sit in the front half (toward the camera). */
 const ITEM_FRONT_HALF = CELL_SIZE * 0.25;
-const SPRITE_RENDER_ORDER = 10;
+const ITEM_RENDER_ORDER = 9;
+const SPRITE_RENDER_ORDER = 11;
 const HITFX_RENDER_ORDER = 12;
+
+/** Visual-only offset from a monster's grid centre toward the party's square centre. */
+export function monsterVisualOffset(
+  monsterX: number,
+  monsterY: number,
+  partyX: number,
+  partyY: number,
+  offsetTiles = MONSTER_OFFSET_TOWARD_PARTY,
+  cellSize = CELL_SIZE
+): { ox: number; oz: number } {
+  const dx = partyX - monsterX;
+  const dy = partyY - monsterY;
+  const len = Math.hypot(dx, dy);
+  if (len < 1e-8) return { ox: 0, oz: 0 };
+  const dist = offsetTiles * cellSize;
+  return { ox: (dx / len) * dist, oz: (dy / len) * dist };
+}
 const MONSTER_TEXEL_W = 80;
 const MONSTER_TEXEL_H = 60;
 const FROST_HOLD_FRAMES = 2;
@@ -195,14 +214,14 @@ function configureSpriteTexture(tex: THREE.Texture) {
   tex.needsUpdate = true;
 }
 
-function makeSpriteMaterial(map: THREE.Texture) {
+function makeSpriteMaterial(map: THREE.Texture, depthWrite = false) {
   const mat = new THREE.SpriteMaterial({
     map,
     color: 0xffffff,
     transparent: true,
     alphaTest: 0.15,
     depthTest: true,
-    depthWrite: false,
+    depthWrite,
     sizeAttenuation: true,
     fog: false,
     toneMapped: false
@@ -447,8 +466,9 @@ export class SpriteManager {
           if (!frames.length) continue;
           const size = lodSize[startLod] ?? quadForWorldHeight(worldHeight, CELL_SIZE, 80, 60);
           const feet = this.feetFor(`${kind}_idle_1_${startLod}.png`, size.h, feetY);
-          const mat = makeSpriteMaterial(frames[0]);
+          const mat = makeSpriteMaterial(frames[0], true);
           const sprite = makeBillboard(mat, x * CELL_SIZE, feet, y * CELL_SIZE, size.w, size.h);
+          sprite.renderOrder = SPRITE_RENDER_ORDER;
           scene.add(sprite);
 
           this.sprites.push({
@@ -499,6 +519,7 @@ export class SpriteManager {
           const size = billboardSize(def.h);
           const mat = makeSpriteMaterial(tex);
           const sprite = makeBillboard(mat, x * CELL_SIZE, feetY, y * CELL_SIZE, size.w, size.h);
+          sprite.renderOrder = ITEM_RENDER_ORDER;
           sprite.userData.item = itemName === 'oil_flask' ? 'oil' : itemName;
           scene.add(sprite);
 
@@ -566,8 +587,14 @@ export class SpriteManager {
     const file = this.frameFile(sprite);
     const floor = sprite.tileFloorY ?? sprite.floorY;
     const feet = file ? this.feetFor(file, size.h, floor) : floor;
-    sprite.object.position.set(sprite.x * CELL_SIZE, feet, sprite.y * CELL_SIZE);
+    const { ox, oz } = monsterVisualOffset(sprite.x, sprite.y, playerX, playerY);
+    sprite.object.position.set(sprite.x * CELL_SIZE + ox, feet, sprite.y * CELL_SIZE + oz);
     sprite.object.scale.set(size.w, size.h, 1);
+    sprite.object.renderOrder = SPRITE_RENDER_ORDER;
+  }
+
+  private livingMonsterOn(x: number, y: number): boolean {
+    return this.sprites.some((s) => s.kind === 'monster' && s.x === x && s.y === y && !s.hidden);
   }
 
   private placeItem(
@@ -579,6 +606,18 @@ export class SpriteManager {
     fx: number,
     fz: number
   ) {
+    sprite.object.renderOrder = ITEM_RENDER_ORDER;
+    if (this.livingMonsterOn(sprite.x, sprite.y)) {
+      sprite.object.position.set(sprite.x * CELL_SIZE, sprite.floorY, sprite.y * CELL_SIZE);
+      sprite.object.scale.set(sprite.baseW, sprite.baseH, 1);
+      if (sprite.lod) {
+        const dist = Math.max(Math.abs(sprite.x - playerX), Math.abs(sprite.y - playerY));
+        const lodIndex = dist <= 1 ? 0 : dist === 2 ? 1 : 2;
+        sprite.material.map = sprite.lod[lodIndex];
+        sprite.material.needsUpdate = true;
+      }
+      return;
+    }
     const onOwn = sprite.x === playerX && sprite.y === playerY;
     if (onOwn) {
       sprite.object.position.set(

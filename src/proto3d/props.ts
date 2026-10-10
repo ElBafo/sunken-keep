@@ -234,9 +234,10 @@ export class PropBuilder {
     });
     const sprite = new THREE.Sprite(mat);
     sprite.center.set(0.5, 0);
-    const baseX = x * CELL_SIZE;
+    // Stand by the desk — slightly west of cell centre, on the floor. Emits no light.
+    const baseX = x * CELL_SIZE - 0.55;
     const baseY = 0.02;
-    const baseZ = y * CELL_SIZE;
+    const baseZ = y * CELL_SIZE + 0.15;
     sprite.position.set(baseX, baseY, baseZ);
     sprite.scale.set(LAMP_W, LAMP_H, 1);
     sprite.frustumCulled = false;

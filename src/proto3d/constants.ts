@@ -16,6 +16,9 @@ export const CAMERA_NEAR = cameraSpec.near;
 export const CAMERA_FAR = cameraSpec.far;
 /** Logical 3D view size in pixels [width, height]. */
 export const CAMERA_VIEW = cameraSpec.view as [number, number];
+/** Visual-only: draw monsters this many tiles toward the party from square centre. */
+export const MONSTER_OFFSET_TOWARD_PARTY =
+  typeof cameraSpec.monsterOffsetTowardParty === 'number' ? cameraSpec.monsterOffsetTowardParty : 0.25;
 export const STEP_BOB_AMPLITUDE = 0.038;
 
 /** Shallow flooded bed. Deep lane sinks further; the translucent surface sits at y 0. */

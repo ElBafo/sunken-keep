@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { monsterLodName, quadForWorldHeight } from '../src/proto3d/sprites';
+import { MONSTER_OFFSET_TOWARD_PARTY } from '../src/proto3d/constants';
+import { monsterLodName, monsterVisualOffset, quadForWorldHeight } from '../src/proto3d/sprites';
 
 describe('monster billboard sizing', () => {
   it('picks close/near/mid/far by Chebyshev squares', () => {
@@ -27,5 +28,13 @@ describe('monster billboard sizing', () => {
     const leechClose = quadForWorldHeight(0.15, 2, 37, 22);
     expect(leechClose.h).toBeCloseTo(0.3, 5);
     expect(leechClose.w).toBeCloseTo(0.3 * (37 / 22), 5);
+  });
+
+  it('offsets a quarter square toward the party at every distance', () => {
+    expect(MONSTER_OFFSET_TOWARD_PARTY).toBe(0.25);
+    expect(monsterVisualOffset(7, 2, 6, 2)).toEqual({ ox: -0.5, oz: 0 });
+    expect(monsterVisualOffset(7, 2, 5, 2)).toEqual({ ox: -0.5, oz: 0 });
+    expect(monsterVisualOffset(7, 2, 4, 2)).toEqual({ ox: -0.5, oz: 0 });
+    expect(monsterVisualOffset(5, 3, 6, 3)).toEqual({ ox: 0.5, oz: 0 });
   });
 });

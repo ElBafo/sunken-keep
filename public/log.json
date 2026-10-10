@@ -572,5 +572,10 @@
   "key": "chest_loot_one",
   "text": "Chest: {item}. Into the bag.",
   "when": "one tap loots a chest with exactly 1 item"
+ },
+ {
+  "key": "item_guarded",
+  "text": "{monster}: in the way. Fight first.",
+  "when": "tap to pick up an item on a square with a living monster; nothing is picked up"
  }
 ]

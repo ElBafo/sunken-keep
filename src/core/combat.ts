@@ -489,6 +489,14 @@ export class CombatEngine {
     return this.flush();
   }
 
+  debugKillAt(x: number, y: number, now: number): CombatEvent[] {
+    this.events = [];
+    const m = this.monsters.find((mm) => mm.alive && mm.x === x && mm.y === y);
+    if (!m) return [];
+    this.killMonster(m, now);
+    return this.flush();
+  }
+
   useHand(heroId: HeroId, hand: HandSlot, now: number, itemOverride?: string): CombatEvent[] {
     this.events = [];
     const hero = this.heroes[heroId];

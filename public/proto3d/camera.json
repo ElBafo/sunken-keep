@@ -1,5 +1,5 @@
 {
-  "what": "Proto3d first-person camera. The eye sits at the back of the party's square, looking forward with a fixed vertical FOV. Pixelartie: size close/near/mid/far frames from unitSpriteHeightPx (1 world-unit-tall floor-anchored billboard) or wallSpriteHeightPx (1 wall = cellSize world units). Monster worldHeight in levels/monsters.json is a fraction of one wall.",
+  "what": "Proto3d first-person camera. The eye sits at the back of the party's square, looking forward with a fixed vertical FOV. Monsters are drawn monsterOffsetTowardParty tiles in front of their square centre, toward the party (Eye of the Beholder style). Pixelartie: size close/near/mid/far frames from unitSpriteHeightPx (1 world-unit-tall floor-anchored billboard) or wallSpriteHeightPx (1 wall = cellSize world units). wallPx = 2 * f / z with f = (viewH/2)/tan(fov/2) and z = (squares + backOffsetTiles - monsterOffsetTowardParty) * cellSize. Monster worldHeight in levels/monsters.json is a fraction of one wall. Idle poses share the tallest pose's canvas, so they measure about 86–95% of these targets — do not scale sprites up to compensate.",
   "cellSize": 2,
   "wallHeight": 2,
   "eyeHeight": 0.94,
@@ -10,16 +10,17 @@
   "far": 32,
   "view": [270, 380],
   "spriteSurfaceLift": 0.04,
+  "monsterOffsetTowardParty": 0.25,
   "unitSpriteHeightPx": {
-    "1": 74.26,
-    "2": 44.88,
-    "3": 32.16,
-    "4": 25.05
+    "1": 90.57,
+    "2": 50.32,
+    "3": 34.84,
+    "4": 26.64
   },
   "wallSpriteHeightPx": {
-    "1": 148.51,
-    "2": 89.75,
-    "3": 64.31,
-    "4": 50.11
+    "1": 181.15,
+    "2": 100.64,
+    "3": 69.67,
+    "4": 53.28
   }
 }

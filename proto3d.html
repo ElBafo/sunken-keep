@@ -26,33 +26,44 @@
       overscroll-behavior: none;
     }
     body {
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-      justify-content: flex-start;
+      padding: 0;
+    }
+    #game-letterbox {
+      position: absolute;
+      inset: 0;
       padding-top: env(safe-area-inset-top, 0);
-      padding-left: 0;
-      padding-right: 0;
-      padding-bottom: 0;
+      background: #000 url('%BASE_URL%art/ui/layout585/stone_strip_tile.png') repeat;
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
+      overflow: hidden;
+    }
+    #game-stage {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 270px;
+      height: 585px;
+      transform-origin: top left;
     }
     #canvas-container {
       position: relative;
-      width: 100%;
-      flex: 0 0 auto;
+      width: 270px;
+      height: 380px;
       line-height: 0;
       background: #000;
     }
     #party-hud {
       position: relative;
-      width: 100%;
-      flex: 0 0 auto;
+      width: 270px;
+      height: 205px;
       line-height: 0;
       background: #000;
     }
     #party-canvas {
       display: block;
-      width: 100%;
-      height: auto;
+      width: 270px;
+      height: 205px;
       image-rendering: pixelated;
       image-rendering: -moz-crisp-edges;
       image-rendering: crisp-edges;
@@ -80,11 +91,10 @@
       background: rgba(240, 208, 96, 0.28);
     }
     #inventory-screen {
-      position: fixed;
-      top: env(safe-area-inset-top, 0);
-      left: 0;
-      width: 100vw;
-      aspect-ratio: 270 / 585;
+      position: absolute;
+      inset: 0;
+      width: 270px;
+      height: 585px;
       z-index: 90;
       display: none;
       background: #000;
@@ -183,7 +193,8 @@
     }
     #render-canvas {
       display: block;
-      width: 100%;
+      width: 270px;
+      height: 380px;
       image-rendering: pixelated;
       image-rendering: -moz-crisp-edges;
       image-rendering: crisp-edges;
@@ -389,20 +400,24 @@
     <div id="tap-to-start-text"></div>
     <div style="font-size: 12px; color: #888;">3D Prototype</div>
   </div>
-  <div id="canvas-container">
-    <canvas id="render-canvas"></canvas>
-    <div id="flank-flash" aria-hidden="true"></div>
-    <div id="torch-choice">
-      <button id="btn-torch-take" class="hud-choice-btn" type="button"></button>
-      <button id="btn-torch-snuff" class="hud-choice-btn" type="button"></button>
+  <div id="game-letterbox">
+    <div id="game-stage">
+      <div id="canvas-container">
+        <canvas id="render-canvas"></canvas>
+        <div id="flank-flash" aria-hidden="true"></div>
+        <div id="torch-choice">
+          <button id="btn-torch-take" class="hud-choice-btn" type="button"></button>
+          <button id="btn-torch-snuff" class="hud-choice-btn" type="button"></button>
+        </div>
+        <button id="btn-door" class="control-btn" type="button"></button>
+      </div>
+      <div id="party-hud">
+        <canvas id="party-canvas"></canvas>
+      </div>
+      <div id="inventory-screen" hidden>
+        <canvas id="inventory-canvas"></canvas>
+      </div>
     </div>
-    <button id="btn-door" class="control-btn" type="button"></button>
-  </div>
-  <div id="party-hud">
-    <canvas id="party-canvas"></canvas>
-  </div>
-  <div id="inventory-screen" hidden>
-    <canvas id="inventory-canvas"></canvas>
   </div>
   <div id="message-toast"></div>
   <div id="note-overlay">

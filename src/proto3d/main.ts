@@ -34,6 +34,7 @@ import { WaterSystem } from './water';
 import { DarkFx } from './dark-fx';
 import { isFloorProp, PropBuilder } from './props';
 import { resolveLocale, StoryText } from './i18n';
+import { fitGameStage } from './game-stage';
 import { loadLayout585 } from './layout585';
 import { PartyHud, type GearId, type HandSlot } from './party-hud';
 import type { HeroId } from '../constants';
@@ -76,6 +77,7 @@ class Game {
   private pendingPotion: 'potion_red' | 'potion_blue' | 'potion_green' | null = null;
   private lootSnap: Array<{ x: number; y: number; item?: string; chest?: boolean; chestItems?: string[]; chestOpen?: boolean }> = [];
   lastMessage = '';
+  private lastGuardedAt = 0;
   lastHitType: string | null = null;
   lastFlank: 'left' | 'right' | 'behind' | null = null;
   private flankTimer: ReturnType<typeof setTimeout> | null = null;
@@ -113,6 +115,8 @@ class Game {
 
     const layout = await loadLayout585();
     this.renderer = new PixelRenderer(canvas, layout.view[2], layout.view[3]);
+    fitGameStage();
+    window.addEventListener('resize', () => fitGameStage());
     await this.renderer.loadPalette();
     if (params.get('palette') === '0') this.renderer.setPaletteEnabled(false);
     const fpsEl = document.getElementById('fps-counter');
@@ -287,6 +291,15 @@ class Game {
     this.showMessage(text, true);
   }
 
+  private blockGuardedPickup(kind: string) {
+    const text = this.storyLog('item_guarded', { monster: this.story.monsterName(kind) });
+    const now = performance.now();
+    if (text && this.lastMessage === text && now - this.lastGuardedAt < 1500) return;
+    this.lastGuardedAt = now;
+    this.showPrompt(text);
+    this.audioManager.playUi('item_use_fail');
+  }
+
   private storyLog(key: string, vars?: Record<string, string | number>): string {
     return this.story.log(key, vars);
   }
@@ -347,6 +360,11 @@ class Game {
   pickupItemAt(x: number, y: number): boolean {
     const tile = this.player.tileAt(x, y);
     if (!tile) return false;
+    const guard = this.combat?.monsterAt(x, y);
+    if (guard && (tile.item || (tile.chest && !tile.chestOpen))) {
+      this.blockGuardedPickup(guard.kind);
+      return true;
+    }
     if (tile.chest && !tile.chestOpen) return this.lootChest(x, y, tile);
     if (!tile.item) return false;
     const id = tile.item === 'oil' ? 'oil_flask' : tile.item;
@@ -1266,6 +1284,7 @@ class Game {
           baseH: s.baseH,
           renderOrder: s.object.renderOrder,
           depthTest: (s.material as THREE.Material).depthTest,
+          depthWrite: (s.material as THREE.Material).depthWrite,
           item: s.object.userData.item,
           frames: s.frames?.length ?? 0,
           currentFrame: s.currentFrame,
@@ -1276,9 +1295,9 @@ class Game {
       spriteScreen: (kind: 'monster' | 'item', x: number, y: number) => {
         this.spriteManager.layoutBillboards(this.player.x, this.player.y, this.player.dir);
         const cam = this.renderer.camera;
-        const [vw, vh] = CAMERA_SPEC.view as [number, number];
-        const prevAspect = cam.aspect;
-        cam.aspect = vw / vh;
+        const vw = this.renderer.canvas.width;
+        const vh = this.renderer.canvas.height;
+        cam.aspect = vw / Math.max(1, vh);
         cam.updateProjectionMatrix();
         const s = this.spriteManager.sprites.find((sp) => sp.kind === kind && sp.x === x && sp.y === y && !sp.hidden);
         const rect = s
@@ -1288,15 +1307,34 @@ class Game {
               gridY: s.y,
               player: { x: this.player.x, y: this.player.y, dir: this.player.dir },
               lods: s.lodSets ? Object.keys(s.lodSets) : [],
-              view: [vw, vh] as [number, number]
+              view: [vw, vh] as [number, number],
+              canvas: [vw, vh] as [number, number],
+              renderTarget: [this.renderer.renderTarget.width, this.renderer.renderTarget.height] as [number, number]
             }
           : null;
-        cam.aspect = prevAspect;
-        cam.updateProjectionMatrix();
         this.renderer.render();
         return rect;
       },
       cameraSpec: () => CAMERA_SPEC,
+      canvasSize: () => ({
+        canvas: [this.renderer.canvas.width, this.renderer.canvas.height] as [number, number],
+        renderTarget: [this.renderer.renderTarget.width, this.renderer.renderTarget.height] as [number, number],
+        css: [this.renderer.canvas.clientWidth, this.renderer.canvas.clientHeight] as [number, number]
+      }),
+      adjacentMonster: () => {
+        const m = this.combat.adjacentMonster();
+        return m ? { id: m.id, kind: m.kind, x: m.x, y: m.y, alive: m.alive } : null;
+      },
+      facingMonster: () => {
+        const m = this.combat.facingMonster();
+        return m ? { id: m.id, kind: m.kind, x: m.x, y: m.y, alive: m.alive } : null;
+      },
+      killMonsterAt: (x: number, y: number) => {
+        this.applyEvents(this.combat.debugKillAt(x, y, this.nowSec()));
+        this.spriteManager.hideMonster(x, y);
+        this.spriteManager.layoutBillboards(this.player.x, this.player.y, this.player.dir);
+        this.renderer.render();
+      },
       showMonster: (x: number, y: number) => {
         for (const s of this.spriteManager.sprites) {
           if (s.kind === 'monster' && s.x === x && s.y === y) {
