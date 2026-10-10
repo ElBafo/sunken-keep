@@ -188,13 +188,9 @@ test.describe('proto3d step4 title and saves', () => {
     await expect(page.locator('#title-overlay')).toHaveClass(/show/);
     await page.screenshot({ path: `${OUT}/load-slots.png`, fullPage: false });
     await page.locator('.title-hit[data-id="slot-1"]').tap();
-    await page.waitForTimeout(200);
-    await expect(page.locator('#title-toast, #message-toast, #title-overlay')).toBeVisible();
-    const overwriteVisible = await page.locator('.title-hit[data-id="Overwrite"]').count();
-    if (overwriteVisible) {
-      await page.screenshot({ path: `${OUT}/overwrite-confirm.png`, fullPage: false });
-      await page.locator('.title-hit[data-id="Overwrite"]').tap();
-    }
+    await expect(page.locator('.title-hit[data-id="Overwrite"]')).toBeVisible();
+    await page.screenshot({ path: `${OUT}/overwrite-confirm.png`, fullPage: false });
+    await page.locator('.title-hit[data-id="Overwrite"]').tap();
 
     await page.reload();
     await page.waitForFunction(
