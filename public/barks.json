@@ -3,43 +3,50 @@
   "trigger": "secret_wall",
   "speaker": "brannoc",
   "text": "Dwarven work. You'd never find it without a dwarf.",
-  "face": "smirk"
+  "face": "smirk",
+  "tier": "flavour"
  },
  {
   "trigger": "secret_wall",
   "speaker": "brannoc",
   "text": "Hollow. Like Mags's promises.",
-  "face": "smirk"
+  "face": "smirk",
+  "tier": "flavour"
  },
  {
   "trigger": "secret_wall",
   "speaker": "mags",
   "text": "Ooh, someone's been hiding the good stuff.",
-  "face": "smirk"
+  "face": "smirk",
+  "tier": "flavour"
  },
  {
   "trigger": "secret_wall",
   "speaker": "wren",
   "text": "The Ember reveals what is hidden.",
-  "face": "neutral"
+  "face": "neutral",
+  "tier": "flavour"
  },
  {
   "trigger": "secret_wall",
   "speaker": "wren",
   "text": "Even walls have secrets. Let's hope theirs are nicer than ours.",
-  "face": "neutral"
+  "face": "neutral",
+  "tier": "flavour"
  },
  {
   "trigger": "secret_wall",
   "speaker": "ilsevar",
   "text": "There's a draught behind it. It smells like the sea.",
-  "face": "neutral"
+  "face": "neutral",
+  "tier": "flavour"
  },
  {
   "trigger": "secret_wall",
   "speaker": "ilsevar",
   "text": "Fascinating masonry. Mags, stop licking it.",
-  "face": "wince"
+  "face": "wince",
+  "tier": "flavour"
  },
  {
   "trigger": "secret_wall",
@@ -47,7 +54,8 @@
   "text": "Push it, Brannoc. Harder. ...See? Was that so difficult?",
   "face": "smirk",
   "listener": "brannoc",
-  "listenerFace": "wince"
+  "listenerFace": "wince",
+  "tier": "flavour"
  },
  {
   "trigger": "secret_wall",
@@ -55,49 +63,57 @@
   "text": "You could help, you know.",
   "face": "neutral",
   "listener": "mags",
-  "listenerFace": "smirk"
+  "listenerFace": "smirk",
+  "tier": "flavour"
  },
  {
   "trigger": "deep_water",
   "speaker": "brannoc",
   "text": "Up to my beard. Not up to my dignity.",
-  "face": "neutral"
+  "face": "neutral",
+  "tier": "flavour"
  },
  {
   "trigger": "deep_water",
   "speaker": "brannoc",
   "text": "Dwarves don't float. We sink with style.",
-  "face": "smirk"
+  "face": "smirk",
+  "tier": "flavour"
  },
  {
   "trigger": "deep_water",
   "speaker": "mags",
   "text": "It's up to my everything, thanks for asking.",
-  "face": "wince"
+  "face": "wince",
+  "tier": "flavour"
  },
  {
   "trigger": "deep_water",
   "speaker": "wren",
   "text": "Keep the lantern dry!",
-  "face": "shocked"
+  "face": "shocked",
+  "tier": "flavour"
  },
  {
   "trigger": "deep_water",
   "speaker": "wren",
   "text": "Cold. So cold. Ember, give me strength.",
-  "face": "wince"
+  "face": "wince",
+  "tier": "flavour"
  },
  {
   "trigger": "deep_water",
   "speaker": "ilsevar",
   "text": "It's... warm? Never mind.",
-  "face": "neutral"
+  "face": "neutral",
+  "tier": "flavour"
  },
  {
   "trigger": "deep_water",
   "speaker": "ilsevar",
   "text": "The water's listening. Don't say anything rude.",
-  "face": "neutral"
+  "face": "neutral",
+  "tier": "flavour"
  },
  {
   "trigger": "deep_water",
@@ -105,7 +121,8 @@
   "text": "Someone carry me. Brannoc. Not like that.",
   "face": "shocked",
   "listener": "brannoc",
-  "listenerFace": "smirk"
+  "listenerFace": "smirk",
+  "tier": "flavour"
  },
  {
   "trigger": "deep_water",
@@ -113,43 +130,50 @@
   "text": "Sit on my shoulders and stop wriggling.",
   "face": "neutral",
   "listener": "mags",
-  "listenerFace": "smirk"
+  "listenerFace": "smirk",
+  "tier": "flavour"
  },
  {
   "trigger": "loot",
   "speaker": "brannoc",
   "text": "My grandfather's. Probably. Hand it over.",
-  "face": "neutral"
+  "face": "neutral",
+  "tier": "flavour"
  },
  {
   "trigger": "loot",
   "speaker": "mags",
   "text": "Mine.",
-  "face": "smirk"
+  "face": "smirk",
+  "tier": "flavour"
  },
  {
   "trigger": "loot",
   "speaker": "wren",
   "text": "A tenth of that goes to the Ember.",
-  "face": "neutral"
+  "face": "neutral",
+  "tier": "flavour"
  },
  {
   "trigger": "loot",
   "speaker": "wren",
   "text": "Is it stealing if they're dead? ...Don't answer that.",
-  "face": "wince"
+  "face": "wince",
+  "tier": "flavour"
  },
  {
   "trigger": "loot",
   "speaker": "ilsevar",
   "text": "Careful, it could be cursed. ...Fine, I'll hold it.",
-  "face": "neutral"
+  "face": "neutral",
+  "tier": "flavour"
  },
  {
   "trigger": "loot",
   "speaker": "ilsevar",
   "text": "The runes say 'property of'. The rest is barnacles.",
-  "face": "neutral"
+  "face": "neutral",
+  "tier": "flavour"
  },
  {
   "trigger": "loot",
@@ -157,7 +181,8 @@
   "text": "That's dwarven. Technically, that's mine.",
   "face": "neutral",
   "listener": "mags",
-  "listenerFace": "smirk"
+  "listenerFace": "smirk",
+  "tier": "flavour"
  },
  {
   "trigger": "loot",
@@ -165,49 +190,57 @@
   "text": "Finders keepers, losers weepers, dwarves grumpers.",
   "face": "smirk",
   "listener": "brannoc",
-  "listenerFace": "wince"
+  "listenerFace": "wince",
+  "tier": "flavour"
  },
  {
   "trigger": "low_health",
   "speaker": "brannoc",
   "text": "Just a scratch. A big, gushing scratch.",
-  "face": "wince"
+  "face": "wince",
+  "tier": "flavour"
  },
  {
   "trigger": "low_health",
   "speaker": "brannoc",
   "text": "Tell my beard I loved it.",
-  "face": "wince"
+  "face": "wince",
+  "tier": "flavour"
  },
  {
   "trigger": "low_health",
   "speaker": "mags",
   "text": "I'd like a refund on this dungeon.",
-  "face": "wince"
+  "face": "wince",
+  "tier": "flavour"
  },
  {
   "trigger": "low_health",
   "speaker": "wren",
   "text": "Physician, heal thyself... quickly, please.",
-  "face": "wince"
+  "face": "wince",
+  "tier": "flavour"
  },
  {
   "trigger": "low_health",
   "speaker": "wren",
   "text": "My flame is guttering.",
-  "face": "wince"
+  "face": "wince",
+  "tier": "flavour"
  },
  {
   "trigger": "low_health",
   "speaker": "ilsevar",
   "text": "The water says it can make the pain stop. ...I'm fine.",
-  "face": "neutral"
+  "face": "neutral",
+  "tier": "flavour"
  },
  {
   "trigger": "low_health",
   "speaker": "ilsevar",
   "text": "Not now. I haven't finished my notes.",
-  "face": "wince"
+  "face": "wince",
+  "tier": "flavour"
  },
  {
   "trigger": "low_health",
@@ -215,43 +248,50 @@
   "text": "Wren, I need your hands on me. Healing hands. HEALING.",
   "face": "wince",
   "listener": "wren",
-  "listenerFace": "shocked"
+  "listenerFace": "shocked",
+  "tier": "flavour"
  },
  {
   "trigger": "new_monster",
   "speaker": "brannoc",
   "text": "Ugly. Shall we?",
-  "face": "neutral"
+  "face": "neutral",
+  "tier": "flavour"
  },
  {
   "trigger": "new_monster",
   "speaker": "mags",
   "text": "Big, slimy and coming straight at me. Story of my love life.",
-  "face": "smirk"
+  "face": "smirk",
+  "tier": "flavour"
  },
  {
   "trigger": "new_monster",
   "speaker": "wren",
   "text": "Abomination! ...Do we have a plan?",
-  "face": "shocked"
+  "face": "shocked",
+  "tier": "flavour"
  },
  {
   "trigger": "new_monster",
   "speaker": "wren",
   "text": "Ember, burn bright.",
-  "face": "neutral"
+  "face": "neutral",
+  "tier": "flavour"
  },
  {
   "trigger": "new_monster",
   "speaker": "ilsevar",
   "text": "I want to study it. Preferably dead.",
-  "face": "smirk"
+  "face": "smirk",
+  "tier": "flavour"
  },
  {
   "trigger": "new_monster",
   "speaker": "ilsevar",
   "text": "It knows my name. Why does it know my name?",
-  "face": "shocked"
+  "face": "shocked",
+  "tier": "flavour"
  },
  {
   "trigger": "new_monster",
@@ -259,7 +299,8 @@
   "text": "Brannoc, your cousin's here.",
   "face": "smirk",
   "listener": "brannoc",
-  "listenerFace": "wince"
+  "listenerFace": "wince",
+  "tier": "flavour"
  },
  {
   "trigger": "new_monster",
@@ -267,31 +308,36 @@
   "text": "I've seen worse. I've kissed worse.",
   "face": "smirk",
   "listener": "mags",
-  "listenerFace": "shocked"
+  "listenerFace": "shocked",
+  "tier": "flavour"
  },
  {
   "trigger": "idle",
   "speaker": "brannoc",
   "text": "Are we waiting for the water to drain?",
-  "face": "neutral"
+  "face": "neutral",
+  "tier": "flavour"
  },
  {
   "trigger": "idle",
   "speaker": "wren",
   "text": "Ember, grant me patience. And a chair.",
-  "face": "neutral"
+  "face": "neutral",
+  "tier": "flavour"
  },
  {
   "trigger": "idle",
   "speaker": "ilsevar",
   "text": "Yes... I hear you. Wait, did someone speak?",
-  "face": "shocked"
+  "face": "shocked",
+  "tier": "flavour"
  },
  {
   "trigger": "idle",
   "speaker": "ilsevar",
   "text": "Fine. More time for notes.",
-  "face": "neutral"
+  "face": "neutral",
+  "tier": "flavour"
  },
  {
   "trigger": "idle",
@@ -299,7 +345,8 @@
   "text": "If we're stopping, I'm checking everyone's pockets.",
   "face": "smirk",
   "listener": "brannoc",
-  "listenerFace": "wince"
+  "listenerFace": "wince",
+  "tier": "flavour"
  },
  {
   "trigger": "idle",
@@ -307,7 +354,8 @@
   "text": "Stop snoring, halfling. Wait, that was me.",
   "face": "wince",
   "listener": "mags",
-  "listenerFace": "smirk"
+  "listenerFace": "smirk",
+  "tier": "flavour"
  },
  {
   "trigger": "first_sight_keep_rat",
@@ -315,7 +363,8 @@
   "text": "Aww, look at his little bread!",
   "face": "smirk",
   "listener": "brannoc",
-  "listenerFace": "wince"
+  "listenerFace": "wince",
+  "tier": "story"
  },
  {
   "trigger": "first_sight_keep_rat",
@@ -323,13 +372,15 @@
   "text": "That's my ancestors' bread, thief.",
   "face": "wince",
   "listener": "mags",
-  "listenerFace": "smirk"
+  "listenerFace": "smirk",
+  "tier": "story"
  },
  {
   "trigger": "first_sight_keep_rat",
   "speaker": "wren",
   "text": "It's eaten better than we have.",
-  "face": "neutral"
+  "face": "neutral",
+  "tier": "story"
  },
  {
   "trigger": "first_sight_rust_crab",
@@ -337,7 +388,8 @@
   "text": "Is that crab wearing my uncle's helm?",
   "face": "shocked",
   "listener": "mags",
-  "listenerFace": "smirk"
+  "listenerFace": "smirk",
+  "tier": "story"
  },
  {
   "trigger": "first_sight_rust_crab",
@@ -345,61 +397,71 @@
   "text": "Suits him better, honestly.",
   "face": "smirk",
   "listener": "brannoc",
-  "listenerFace": "wince"
+  "listenerFace": "wince",
+  "tier": "story"
  },
  {
   "trigger": "first_sight_rust_crab",
   "speaker": "ilsevar",
   "text": "Hermit behaviour. Dwarven hermit.",
-  "face": "neutral"
+  "face": "neutral",
+  "tier": "story"
  },
  {
   "trigger": "first_sight_bog_leeches",
   "speaker": "wren",
   "text": "Leeches. Ember preserve us.",
-  "face": "wince"
+  "face": "wince",
+  "tier": "story"
  },
  {
   "trigger": "first_sight_bog_leeches",
   "speaker": "mags",
   "text": "Nobody's sucking anything of mine.",
-  "face": "shocked"
+  "face": "shocked",
+  "tier": "story"
  },
  {
   "trigger": "first_sight_bog_leeches",
   "speaker": "ilsevar",
   "text": "Medicinal, technically. Still no.",
-  "face": "wince"
+  "face": "wince",
+  "tier": "story"
  },
  {
   "trigger": "leech_latch",
   "speaker": "brannoc",
   "text": "Get it off! Not the beard!",
-  "face": "wince"
+  "face": "wince",
+  "tier": "flavour"
  },
  {
   "trigger": "leech_latch",
   "speaker": "mags",
   "text": "It's on my— don't look!",
-  "face": "shocked"
+  "face": "shocked",
+  "tier": "flavour"
  },
  {
   "trigger": "leech_latch",
   "speaker": "wren",
   "text": "Hold still. I'll burn it off.",
-  "face": "wince"
+  "face": "wince",
+  "tier": "flavour"
  },
  {
   "trigger": "leech_latch",
   "speaker": "ilsevar",
   "text": "It likes me. That's worse.",
-  "face": "wince"
+  "face": "wince",
+  "tier": "flavour"
  },
  {
   "trigger": "pantry",
   "speaker": "brannoc",
   "text": "The old larder. Gods, the smell.",
-  "face": "wince"
+  "face": "wince",
+  "tier": "flavour"
  },
  {
   "trigger": "pantry",
@@ -407,7 +469,8 @@
   "text": "Mine now. All of it. Even the mould.",
   "face": "smirk",
   "listener": "wren",
-  "listenerFace": "wince"
+  "listenerFace": "wince",
+  "tier": "flavour"
  },
  {
   "trigger": "swap_front",
@@ -416,7 +479,8 @@
   "face": "smirk",
   "listener": "brannoc",
   "listenerFace": "neutral",
-  "listenerText": "Charming."
+  "listenerText": "Charming.",
+  "tier": "flavour"
  },
  {
   "trigger": "lantern_gutter",
@@ -425,19 +489,22 @@
   "face": "wince",
   "listener": "ilsevar",
   "listenerFace": "neutral",
-  "listenerText": "Then don't give it any."
+  "listenerText": "Then don't give it any.",
+  "tier": "story"
  },
  {
   "trigger": "first_punch",
   "speaker": "mags",
   "text": "Ow. Who keeps a fist where the knives go?",
-  "face": "wince"
+  "face": "wince",
+  "tier": "flavour"
  },
  {
   "trigger": "first_punch",
   "speaker": "brannoc",
   "text": "Fists are free. Axes are better.",
-  "face": "smirk"
+  "face": "smirk",
+  "tier": "flavour"
  },
  {
   "trigger": "first_sight_drowned_dwarf",
@@ -446,19 +513,25 @@
   "face": "shocked",
   "listener": "mags",
   "listenerFace": "smirk",
-  "listenerText": "Family reunion. Lovely."
+  "listenerText": "Family reunion. Lovely.",
+  "tier": "story"
  },
  {
   "trigger": "first_vent",
   "speaker": "brannoc",
   "text": "Feel that draught? Something's still breathing for this place.",
-  "face": "neutral"
+  "face": "neutral",
+  "tier": "story"
  },
  {
   "trigger": "first_singing",
-  "speaker": "mags",
-  "text": "Tell me that's one of you humming.",
-  "face": "shocked"
+  "speaker": "ilsevar",
+  "text": "It hums louder when I'm standing in it.",
+  "face": "neutral",
+  "listener": "mags",
+  "listenerFace": "wince",
+  "listenerText": "Then stop standing in it.",
+  "tier": "story"
  },
  {
   "trigger": "tut_hand",
@@ -467,37 +540,43 @@
   "face": "smirk",
   "listener": "brannoc",
   "listenerFace": "neutral",
-  "listenerText": "I know which end is pointy."
+  "listenerText": "I know which end is pointy.",
+  "tier": "tutorial"
  },
  {
   "trigger": "tut_potion",
   "speaker": "wren",
   "text": "Red's for blood, blue's for magic. Tap and drink.",
-  "face": "neutral"
+  "face": "neutral",
+  "tier": "tutorial"
  },
  {
   "trigger": "tut_inventory",
   "speaker": "mags",
   "text": "Bag's on the bottom. Tap a thing to use it.",
-  "face": "smirk"
+  "face": "smirk",
+  "tier": "tutorial"
  },
  {
   "trigger": "tut_sheet",
   "speaker": "ilsevar",
   "text": "Tap my face if you want my numbers. Gently.",
-  "face": "smirk"
+  "face": "smirk",
+  "tier": "tutorial"
  },
  {
   "trigger": "tut_front",
   "speaker": "brannoc",
   "text": "Only the front two can swing. Drag a face to swap.",
-  "face": "neutral"
+  "face": "neutral",
+  "tier": "tutorial"
  },
  {
   "trigger": "tam_left",
   "speaker": "mags",
   "text": "Don't. Just... don't talk to me for a bit.",
-  "face": "wince"
+  "face": "wince",
+  "tier": "story"
  },
  {
   "trigger": "stairs_dead_lamp",
@@ -506,7 +585,8 @@
   "face": "neutral",
   "listener": "wren",
   "listenerFace": "wince",
-  "listenerText": "Someone who needed the fire more."
+  "listenerText": "Someone who needed the fire more.",
+  "tier": "story"
  },
  {
   "trigger": "singing_louder",
@@ -515,7 +595,8 @@
   "face": "wince",
   "listener": "ilsevar",
   "listenerFace": "neutral",
-  "listenerText": "It's singing to us now."
+  "listenerText": "It's singing to us now.",
+  "tier": "story"
  },
  {
   "trigger": "barracks_enter",
@@ -524,16 +605,18 @@
   "face": "neutral",
   "listener": "mags",
   "listenerFace": "smirk",
-  "listenerText": "Whoever's in them is very quiet."
+  "listenerText": "Whoever's in them is very quiet.",
+  "tier": "story"
  },
  {
   "trigger": "tam_below",
   "speaker": "mags",
-  "text": "That's my brother. He came for the frogs.",
+  "text": "Hang on, Tam. I'm coming, you idiot.",
   "face": "shocked",
   "listener": "brannoc",
   "listenerFace": "neutral",
-  "listenerText": "Then we go down. Quickly."
+  "listenerText": "Stairs first. Heroics after.",
+  "tier": "story"
  },
  {
   "trigger": "deep_enter",
@@ -542,6 +625,136 @@
   "face": "wince",
   "listener": "mags",
   "listenerFace": "shocked",
-  "listenerText": "Please stop saying breathing."
+  "listenerText": "Please stop saying breathing.",
+  "tier": "story"
+ },
+ {
+  "trigger": "tam_tally",
+  "speaker": "mags",
+  "text": "He counted the days. Course he did. He always counts.",
+  "face": "wince",
+  "listener": "wren",
+  "listenerFace": "neutral",
+  "listenerText": "Then he was waiting for someone.",
+  "tier": "story"
+ },
+ {
+  "trigger": "frogcatcher_drowned",
+  "speaker": "mags",
+  "text": "Hobb? ...Hobb. Oh, no. We did that.",
+  "face": "wince",
+  "listener": "wren",
+  "listenerFace": "wince",
+  "listenerText": "The lever. We should have looked first.",
+  "tier": "story",
+  "condition": {
+   "met_hobb": true
+  }
+ },
+ {
+  "trigger": "frogcatcher_drowned",
+  "speaker": "brannoc",
+  "text": "The nook's flooded. Whoever was in there...",
+  "face": "shocked",
+  "tier": "story",
+  "condition": {
+   "met_hobb": false
+  }
+ },
+ {
+  "trigger": "first_torch_lit",
+  "speaker": "wren",
+  "text": "There. Something of ours, given back.",
+  "face": "smirk",
+  "tier": "story"
+ },
+ {
+  "trigger": "torch_draws_monster",
+  "speaker": "ilsevar",
+  "text": "It's seen the light. It's coming to eat it.",
+  "face": "shocked",
+  "tier": "story",
+  "act": 2
+ },
+ {
+  "trigger": "oil_empty",
+  "speaker": "wren",
+  "text": "No oil to spare. But my ember won't go out. Not for this.",
+  "face": "neutral",
+  "tier": "story"
+ },
+ {
+  "trigger": "first_oil",
+  "speaker": "mags",
+  "text": "Lamp oil. Dwarves kept it like other folk keep wine.",
+  "face": "smirk",
+  "listener": "brannoc",
+  "listenerFace": "smirk",
+  "listenerText": "We kept the wine too. Hands off.",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "first_true_dark",
+  "speaker": "brannoc",
+  "text": "Down here the dark isn't empty. It's full.",
+  "face": "wince",
+  "listener": "wren",
+  "listenerFace": "neutral",
+  "listenerText": "Then stay in my light, and stop leaning on me.",
+  "tier": "story"
+ },
+ {
+  "trigger": "lampkeeper_hooks_heard",
+  "speaker": "mags",
+  "text": "Something's clinking in there. Could be treasure.",
+  "face": "smirk",
+  "listener": "ilsevar",
+  "listenerFace": "wince",
+  "listenerText": "Could be teeth.",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "lampkeeper_enter",
+  "speaker": "brannoc",
+  "text": "A lamp room with no lamps. That's not thrift. That's a robbery.",
+  "face": "wince",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "lampkeeper_note_read",
+  "speaker": "wren",
+  "text": "Handed over on purpose. Who takes a keep's light?",
+  "face": "shocked",
+  "listener": "brannoc",
+  "listenerFace": "neutral",
+  "listenerText": "Someone who needed it more than us.",
+  "tier": "story"
+ },
+ {
+  "trigger": "lampkeeper_capped_lamp",
+  "speaker": "brannoc",
+  "text": "He capped the last one himself. Brave little thief.",
+  "face": "smirk",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "guard_hall_enter",
+  "speaker": "ilsevar",
+  "text": "Sunlight. I'd forgotten it was free.",
+  "face": "smirk",
+  "listener": "mags",
+  "listenerFace": "smirk",
+  "listenerText": "Nothing's free. Check under the beams.",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "first_torch_snuffed",
+  "speaker": "brannoc",
+  "text": "My grandfather lit that. You just pinched it out like a candle.",
+  "face": "wince",
+  "listener": "mags",
+  "listenerFace": "smirk",
+  "listenerText": "Your grandfather should've charged rent.",
+  "tier": "flavour"
  }
 ]

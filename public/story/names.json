@@ -1,0 +1,29 @@
+{
+ "_note": "English names used in {hero}/{monster} and speaker labels. Same ids as story/el/names.el.json; monster ids match levels/monsters.json.",
+ "heroes": {
+  "brannoc": "Brannoc",
+  "wren": "Wren",
+  "ilsevar": "Ilsevar",
+  "mags": "Mags"
+ },
+ "npcs": {
+  "tam": "Tam",
+  "hessa": "Hessa",
+  "orrun": "Orrun",
+  "elda": "Elda",
+  "tide": "The Hollow Tide",
+  "hobb": "Hobb Rushwick",
+  "dural": "Captain Dural",
+  "pell": "Pell"
+ },
+ "monsters": {
+  "keep_rat": "keep rat",
+  "rust_crab": "rust crab",
+  "bog_leeches": "bog leeches",
+  "slime": "slime",
+  "cellar_spider": "cellar spider",
+  "drowned_dwarf": "drowned dwarf",
+  "captain_dural": "captain",
+  "tide_spawn": "tide spawn"
+ }
+}

@@ -72,7 +72,7 @@ export class IntroPlayer {
     
     // Define captions
     this.captions = [
-      { text: 'Karak Durn sank in a single night.', start: 7.0, end: 11.5 },
+      { text: 'Stonevow Keep sank in a single night.', start: 7.0, end: 11.5 },
       { text: 'Its forges went cold.', start: 13.0, end: 17.5 },
       { text: 'Its people did not leave.', start: 19.5, end: 23.5 },
       { text: 'Four fools have come to find out why.', start: 29.0, end: 32.5 }

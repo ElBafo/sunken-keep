@@ -124,6 +124,11 @@ export const OIL_START = 2;
 export const OIL_MAX = 4;
 export const OIL_FLASK = 1;
 export const OIL_TORCH_COST = 1;
+/** Held wall-torch pool: small, follows the party square. */
+export const CARRIED_TORCH_RADIUS_TILES = 1.35;
+export const CARRIED_TORCH_INTENSITY = 1.05;
+export const HAND_COOLDOWN_MS = 900;
+/** 585-layout sizes live in art/ui/layout585/layout585.json (view, oilBar, hands, log). */
 export const FACE_SEGMENTS = 4;
 export const CUTOUT_ALPHA_TEST = 0.5;
 

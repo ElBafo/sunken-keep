@@ -15,6 +15,8 @@ import {
   LANTERN_RADIUS_TILES,
   LIGHT_FLICKER_AMPLITUDE,
   LIGHT_FLICKER_PERIOD_MS,
+  CARRIED_TORCH_INTENSITY,
+  CARRIED_TORCH_RADIUS_TILES,
   SCONCE_FLICKER,
   SCONCE_FRONT_OFFSET_TILES,
   SCONCE_RADIUS_TILES,
@@ -113,6 +115,7 @@ export class VertexLightingManager {
   private floor = 1;
   private bright = 1;
   private oilFn: () => number = () => 1;
+  private carriedTorch = false;
 
   constructor(
     floorData: FloorData,
@@ -137,6 +140,16 @@ export class VertexLightingManager {
     this.partyX = x;
     this.partyY = y;
     this.rebuildPartyReach();
+  }
+
+  setCarriedTorch(on: boolean) {
+    if (this.carriedTorch === on) return;
+    this.carriedTorch = on;
+    this.rebuildPartyReach();
+  }
+
+  hasCarriedTorch(): boolean {
+    return this.carriedTorch;
   }
 
   setBright(value: number) {
@@ -243,7 +256,11 @@ export class VertexLightingManager {
   }
 
   private rebuildPartyReach() {
-    this.partyCells = partyReach(this.floorData, this.partyX, this.partyY, this.lanternSpec().radius);
+    const radius = Math.max(
+      this.lanternSpec().radius,
+      this.carriedTorch ? CARRIED_TORCH_RADIUS_TILES : 0
+    );
+    this.partyCells = partyReach(this.floorData, this.partyX, this.partyY, radius);
   }
 
   private nearAnySconce(tileX: number, tileY: number, _radiusTiles: number): boolean {
@@ -275,6 +292,9 @@ export class VertexLightingManager {
     let maxW = 0;
     if (reachAt(this.partyCells, tileX, tileY) !== undefined) {
       maxW = lantern.intensity * partyFalloff(partyDist, lantern.radius);
+      if (this.carriedTorch) {
+        maxW = Math.max(maxW, CARRIED_TORCH_INTENSITY * partyFalloff(partyDist, CARRIED_TORCH_RADIUS_TILES));
+      }
     }
     const radius = SCONCE_RADIUS_TILES * CELL_SIZE;
     for (const s of this.sconceWorld) {
@@ -338,6 +358,13 @@ export class VertexLightingManager {
     const partyDist = partyDistTiles(wx, wy, wz, this.partyX, this.partyY);
     if (reachAt(this.partyCells, tileX, tileY) !== undefined) {
       this.accum(rgb, lantern.intensity * partyFalloff(partyDist, lantern.radius), lantern.rgb);
+      if (this.carriedTorch) {
+        this.accum(
+          rgb,
+          CARRIED_TORCH_INTENSITY * partyFalloff(partyDist, CARRIED_TORCH_RADIUS_TILES),
+          TORCH_RGB
+        );
+      }
     }
 
     if (!isDark) {

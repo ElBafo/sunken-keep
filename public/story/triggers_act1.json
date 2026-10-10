@@ -1,0 +1,1284 @@
+{
+ "_note": "When each Act 1 story trigger fires (Storie). Keys are bark triggers, log keys, dialogue ids, puzzle text paths (<puzzle>.<key>) and notes. A key used for two types is listed twice as id#type. at = step onto that square; on_facing = tap or first view while facing that square (from = squares you face it from). repeat: once = once per save; once_per_floor; every = every time; pool = repeating flavour (unused line each time until the pool is spent, per bark_rules.json); until_freed = see fire. Coordinates are (x,y) from levels/src/act1.py.",
+ "triggers": {
+  "enter_floor1": {
+   "type": "log",
+   "system": "movement",
+   "fire": "on arriving on floor 1 for the first time",
+   "floor": 1,
+   "repeat": "once"
+  },
+  "enter_floor2": {
+   "type": "log",
+   "system": "movement",
+   "fire": "on arriving on floor 2 for the first time",
+   "floor": 2,
+   "repeat": "once"
+  },
+  "enter_floor3": {
+   "type": "log",
+   "system": "movement",
+   "fire": "on arriving on floor 3 for the first time",
+   "floor": 3,
+   "repeat": "once"
+  },
+  "enter_floor4": {
+   "type": "log",
+   "system": "movement",
+   "fire": "on arriving on floor 4 for the first time",
+   "floor": 4,
+   "repeat": "once"
+  },
+  "water_shallow": {
+   "type": "log",
+   "system": "movement",
+   "fire": "first step into shallow water",
+   "floor": "any",
+   "repeat": "once"
+  },
+  "water_deep": {
+   "type": "log",
+   "system": "movement",
+   "fire": "first step into deep water",
+   "floor": "any",
+   "repeat": "once"
+  },
+  "water_dry": {
+   "type": "log",
+   "system": "movement",
+   "fire": "stepping from water onto dry stone",
+   "floor": "any",
+   "repeat": "once_per_floor"
+  },
+  "deep_water": {
+   "type": "bark",
+   "system": "movement",
+   "fire": "each step into deep water (flavour, rate-limited)",
+   "floor": "any",
+   "repeat": "pool"
+  },
+  "bump_wall": {
+   "type": "log",
+   "system": "movement",
+   "fire": "walking into a wall; at most once per 2 s, alongside the bump sound",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "pantry": {
+   "type": "bark",
+   "system": "movement",
+   "fire": "first step onto the pantry doorway (4,5), the gap in the west wall of the pantry room (x5-7, y5-7). Needs bark:\"pantry\" added on (4,5) in levels/src/act1.py (Levie)",
+   "floor": 1,
+   "repeat": "once",
+   "at": [
+    4,
+    5
+   ]
+  },
+  "enter_pantry": {
+   "type": "log",
+   "system": "movement",
+   "fire": "same step as the pantry bark: first step onto (4,5)",
+   "floor": 1,
+   "repeat": "once",
+   "at": [
+    4,
+    5
+   ]
+  },
+  "guard_hall_enter": {
+   "type": "bark",
+   "system": "movement",
+   "fire": "first step onto (9,2), the arch into the guard hall",
+   "floor": 1,
+   "repeat": "once",
+   "at": [
+    9,
+    2
+   ]
+  },
+  "enter_guard_hall": {
+   "type": "log",
+   "system": "movement",
+   "fire": "same step as guard_hall_enter",
+   "floor": 1,
+   "repeat": "once",
+   "at": [
+    9,
+    2
+   ]
+  },
+  "lampkeeper_hooks_heard": {
+   "type": "bark",
+   "system": "movement",
+   "fire": "first step onto (8,6), mouth of the dark corridor (hook clinks start)",
+   "floor": 1,
+   "repeat": "once",
+   "at": [
+    8,
+    6
+   ]
+  },
+  "lampkeeper_enter": {
+   "type": "bark",
+   "system": "movement",
+   "fire": "first step onto (11,8), Pell's room",
+   "floor": 1,
+   "repeat": "once",
+   "at": [
+    11,
+    8
+   ]
+  },
+  "enter_lampkeeper": {
+   "type": "log",
+   "system": "movement",
+   "fire": "same step as lampkeeper_enter",
+   "floor": 1,
+   "repeat": "once",
+   "at": [
+    11,
+    8
+   ]
+  },
+  "first_true_dark": {
+   "type": "bark",
+   "system": "lighting",
+   "fire": "first step, on floor 3 or deeper, onto a square lit only by Wren's lantern (in floorNDark, or a square no torch reaches, e.g. the F3 mess hall after the bowl). In practice F3 lower bunk room (x5-12, y11-12)",
+   "floor": "3+",
+   "repeat": "once"
+  },
+  "stairs_dead_lamp": {
+   "type": "bark",
+   "system": "movement",
+   "fire": "on arriving on floor 2 at (7,1)",
+   "floor": 2,
+   "repeat": "once",
+   "at": [
+    7,
+    1
+   ]
+  },
+  "first_singing": {
+   "type": "bark",
+   "system": "movement",
+   "fire": "first step into water (shallow or deep) on floor 2 after f2_singing has played",
+   "floor": 2,
+   "repeat": "once",
+   "after": "f2_singing"
+  },
+  "first_vent": {
+   "type": "bark",
+   "system": "movement",
+   "fire": "first time the vent (9,10) is in view: standing on (10,8) or (10,9) facing S, or on (10,10) facing W",
+   "floor": 2,
+   "repeat": "once",
+   "on_facing": [
+    9,
+    10
+   ],
+   "from": [
+    [
+     10,
+     8
+    ],
+    [
+     10,
+     9
+    ],
+    [
+     10,
+     10
+    ]
+   ]
+  },
+  "vent_room": {
+   "type": "log",
+   "system": "movement",
+   "fire": "same moment as first_vent",
+   "floor": 2,
+   "repeat": "once",
+   "on_facing": [
+    9,
+    10
+   ]
+  },
+  "singing_louder": {
+   "type": "bark",
+   "system": "movement",
+   "fire": "on stepping onto the stairs down (10,10); play before the floor transition",
+   "floor": 2,
+   "repeat": "once",
+   "at": [
+    10,
+    10
+   ]
+  },
+  "lever_found": {
+   "type": "log",
+   "system": "puzzle",
+   "fire": "first time facing the hidden lever (3,2) from (4,2)",
+   "floor": 2,
+   "repeat": "once",
+   "on_facing": [
+    3,
+    2
+   ],
+   "from": [
+    [
+     4,
+     2
+    ]
+   ]
+  },
+  "glass_door": {
+   "type": "log",
+   "system": "dialogue",
+   "fire": "same step as f2_glass_door, just before it opens: (6,7)",
+   "floor": 2,
+   "repeat": "once",
+   "at": [
+    6,
+    7
+   ]
+  },
+  "barracks_enter": {
+   "type": "bark",
+   "system": "movement",
+   "fire": "on arriving on floor 3 at (10,10)",
+   "floor": 3,
+   "repeat": "once",
+   "at": [
+    10,
+    10
+   ]
+  },
+  "grate_voice": {
+   "type": "log",
+   "system": "dialogue",
+   "fire": "same step as f3_grate_tam, just before it opens: (9,9)",
+   "floor": 3,
+   "repeat": "once",
+   "at": [
+    9,
+    9
+   ]
+  },
+  "mess_hall": {
+   "type": "log",
+   "system": "movement",
+   "fire": "first step into the mess hall (x1-5, y1-5); in practice (5,3) through the door (6,3)",
+   "floor": 3,
+   "repeat": "once",
+   "at": [
+    5,
+    3
+   ]
+  },
+  "armoury": {
+   "type": "log",
+   "system": "movement",
+   "fire": "first step into the armoury through the parted water door: (4,8) or (3,8)",
+   "floor": 3,
+   "repeat": "once",
+   "at": [
+    4,
+    8
+   ]
+  },
+  "tam_below": {
+   "type": "bark",
+   "system": "movement",
+   "fire": "on stepping onto the stairs down (3,11); play before the floor transition",
+   "floor": 3,
+   "repeat": "once",
+   "at": [
+    3,
+    11
+   ]
+  },
+  "deep_enter": {
+   "type": "bark",
+   "system": "movement",
+   "fire": "on arriving on floor 4 at (3,11)",
+   "floor": 4,
+   "repeat": "once",
+   "at": [
+    3,
+    11
+   ]
+  },
+  "tam_tally": {
+   "type": "bark",
+   "system": "movement",
+   "fire": "first step onto (12,10), first view of the cell",
+   "floor": 4,
+   "repeat": "once",
+   "at": [
+    12,
+    10
+   ]
+  },
+  "cell_found": {
+   "type": "log",
+   "system": "movement",
+   "fire": "same step as tam_tally",
+   "floor": 4,
+   "repeat": "once",
+   "at": [
+    12,
+    10
+   ]
+  },
+  "carving_start": {
+   "type": "log",
+   "system": "interaction",
+   "fire": "tap the carving at (1,6); you face it from the start square",
+   "floor": 1,
+   "repeat": "every",
+   "on_facing": [
+    1,
+    6
+   ]
+  },
+  "carving_door": {
+   "type": "log",
+   "system": "interaction",
+   "fire": "tap the carving on the locked door (4,2) from (5,2)",
+   "floor": 1,
+   "repeat": "every",
+   "on_facing": [
+    4,
+    2
+   ]
+  },
+  "carving_secret": {
+   "type": "log",
+   "system": "interaction",
+   "fire": "tap the glowing plate at (5,1) once the secret wall is open",
+   "floor": 1,
+   "repeat": "every",
+   "on_facing": [
+    5,
+    1
+   ]
+  },
+  "secret_found": {
+   "type": "log",
+   "system": "interaction",
+   "fire": "tap/push the secret wall (5,1) from (5,2); it opens",
+   "floor": 1,
+   "repeat": "once",
+   "on_facing": [
+    5,
+    1
+   ]
+  },
+  "secret_wall": {
+   "type": "bark",
+   "system": "interaction",
+   "fire": "any secret wall opens (flavour)",
+   "floor": "any",
+   "repeat": "pool"
+  },
+  "door_locked": {
+   "type": "log",
+   "system": "interaction",
+   "fire": "tap or bump the locked door (4,2) without the key",
+   "floor": 1,
+   "repeat": "every",
+   "on_facing": [
+    4,
+    2
+   ]
+  },
+  "door_unlocked": {
+   "type": "log",
+   "system": "interaction",
+   "fire": "tap the locked door with the key",
+   "floor": 1,
+   "repeat": "once",
+   "on_facing": [
+    4,
+    2
+   ]
+  },
+  "chest_open": {
+   "type": "log",
+   "system": "interaction",
+   "fire": "open a chest (F1 5,7; F2 3,3; F3 12,1)",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "chest_empty": {
+   "type": "log",
+   "system": "interaction",
+   "fire": "open a chest with nothing in it. Chest contents are not defined yet (Levie)",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "read_lampkeeper_note": {
+   "type": "log",
+   "system": "interaction",
+   "fire": "tap the desk (12,9) while facing it; then show note_lampkeeper",
+   "floor": 1,
+   "repeat": "every",
+   "on_facing": [
+    12,
+    9
+   ]
+  },
+  "lampkeeper_note_read": {
+   "type": "bark",
+   "system": "interaction",
+   "fire": "after the note closes the first time",
+   "floor": 1,
+   "repeat": "once",
+   "on_facing": [
+    12,
+    9
+   ]
+  },
+  "note_lampkeeper": {
+   "type": "note",
+   "system": "interaction",
+   "fire": "tap the desk (12,9); a second tap closes it",
+   "floor": 1,
+   "repeat": "every",
+   "on_facing": [
+    12,
+    9
+   ]
+  },
+  "lampkeeper_capped_lamp": {
+   "type": "bark",
+   "system": "interaction",
+   "fire": "tap the capped lamp prop (13,9) while facing it",
+   "floor": 1,
+   "repeat": "once",
+   "on_facing": [
+    13,
+    9
+   ]
+  },
+  "pickup_scroll": {
+   "type": "log",
+   "system": "inventory",
+   "fire": "pick up a journal page (F1 5,1 = page 1; F2 3,9 = page 2)",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "read_journal": {
+   "type": "log",
+   "system": "interaction",
+   "fire": "after pickup_scroll on F1: then journal_act1.json page 1, line by line",
+   "floor": 1,
+   "repeat": "once",
+   "at": [
+    5,
+    1
+   ]
+  },
+  "journal_f2": {
+   "type": "log",
+   "system": "interaction",
+   "fire": "after pickup_scroll on F2: then journal_act1.json page 2, line by line",
+   "floor": 2,
+   "repeat": "once",
+   "at": [
+    3,
+    9
+   ]
+  },
+  "journal_page_1": {
+   "type": "note",
+   "system": "interaction",
+   "fire": "see read_journal",
+   "floor": 1,
+   "repeat": "once",
+   "at": [
+    5,
+    1
+   ]
+  },
+  "journal_page_2": {
+   "type": "note",
+   "system": "interaction",
+   "fire": "see journal_f2",
+   "floor": 2,
+   "repeat": "once",
+   "at": [
+    3,
+    9
+   ]
+  },
+  "oil_pickup": {
+   "type": "log",
+   "system": "lighting",
+   "fire": "pick up an oil flask (unless oil was 0: then lantern_lit instead)",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "first_oil": {
+   "type": "bark",
+   "system": "lighting",
+   "fire": "first oil flask picked up",
+   "floor": "any",
+   "repeat": "once"
+  },
+  "torch_relit": {
+   "type": "log",
+   "system": "lighting",
+   "fire": "relight a dead torch (costs 1 oil)",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "first_torch_lit": {
+   "type": "bark",
+   "system": "lighting",
+   "fire": "first relight",
+   "floor": "any",
+   "repeat": "once"
+  },
+  "torch_snuffed": {
+   "type": "log",
+   "system": "lighting",
+   "fire": "snuff a lit wall torch (Take/Snuff choice: Snuff)",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "first_torch_snuffed": {
+   "type": "bark",
+   "system": "lighting",
+   "fire": "first snuff",
+   "floor": "any",
+   "repeat": "once"
+  },
+  "torch_capped": {
+   "type": "log",
+   "system": "lighting",
+   "fire": "tap a capped torch (replaces hardcoded \"Sealed.\")",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "torch_take": {
+   "type": "log",
+   "system": "lighting",
+   "fire": "Take a lit wall torch into a free hand",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "torch_place": {
+   "type": "log",
+   "system": "lighting",
+   "fire": "put a held torch into an empty bracket",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "torch_dunk": {
+   "type": "log",
+   "system": "lighting",
+   "fire": "drop a held torch into water; it goes out",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "oil_empty": {
+   "type": "bark",
+   "system": "lighting",
+   "fire": "first time a relight is tried with 0 oil (the toast stays \"No oil to spare.\" as a short log)",
+   "floor": "any",
+   "repeat": "once"
+  },
+  "lantern_out": {
+   "type": "log",
+   "system": "lighting",
+   "fire": "oil reaches 0; lantern falls to ember reach (never fully dark)",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "lantern_lit": {
+   "type": "log",
+   "system": "lighting",
+   "fire": "oil goes from 0 to 1 or more",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "lantern_gutter": {
+   "type": "log",
+   "system": "lighting",
+   "fire": "the f4_tam_cell oil choice is taken (cost lantern: guttering_for_floor): ember-only reach until you leave floor 4",
+   "floor": 4,
+   "repeat": "once"
+  },
+  "lantern_gutter#bark": {
+   "type": "bark",
+   "system": "lighting",
+   "fire": "same moment, first time only",
+   "floor": 4,
+   "repeat": "once"
+  },
+  "torch_draws_monster": {
+   "type": "bark",
+   "system": "lighting",
+   "fire": "ACT 2 ONLY (act:2): first time a light-drawn monster turns toward a lit torch. Ignored in Act 1",
+   "floor": "5+",
+   "repeat": "once"
+  },
+  "hit": {
+   "type": "log",
+   "system": "combat",
+   "fire": "a hero hits",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "miss": {
+   "type": "log",
+   "system": "combat",
+   "fire": "a hero misses",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "monster_hit": {
+   "type": "log",
+   "system": "combat",
+   "fire": "a monster hits a hero",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "monster_dies": {
+   "type": "log",
+   "system": "combat",
+   "fire": "a monster dies",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "leech_drain": {
+   "type": "log",
+   "system": "combat",
+   "fire": "a latched leech drains a hero (each tick)",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "hero_down": {
+   "type": "log",
+   "system": "combat",
+   "fire": "a hero reaches 0 HP",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "party_dead": {
+   "type": "log",
+   "system": "combat",
+   "fire": "all four heroes are down",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "punch": {
+   "type": "log",
+   "system": "combat",
+   "fire": "an empty-hand attack",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "leech_latch": {
+   "type": "log",
+   "system": "combat",
+   "fire": "a leech latches onto a hero",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "leech_latch#bark": {
+   "type": "bark",
+   "system": "combat",
+   "fire": "a leech latches onto a hero (flavour)",
+   "floor": "any",
+   "repeat": "pool"
+  },
+  "first_punch": {
+   "type": "bark",
+   "system": "combat",
+   "fire": "first empty-hand attack",
+   "floor": "any",
+   "repeat": "once"
+  },
+  "floor_cleared": {
+   "type": "log",
+   "system": "combat",
+   "fire": "the last monster on the floor dies (not during the F4 escape)",
+   "floor": "any",
+   "repeat": "once_per_floor"
+  },
+  "first_sight_keep_rat": {
+   "type": "bark",
+   "system": "combat",
+   "fire": "first keep rat in view; suppresses new_monster",
+   "floor": 1,
+   "repeat": "once"
+  },
+  "first_sight_rust_crab": {
+   "type": "bark",
+   "system": "combat",
+   "fire": "first rust crab in view; suppresses new_monster",
+   "floor": 1,
+   "repeat": "once"
+  },
+  "first_sight_bog_leeches": {
+   "type": "bark",
+   "system": "combat",
+   "fire": "first bog leeches in view; suppresses new_monster",
+   "floor": 1,
+   "repeat": "once"
+  },
+  "first_sight_drowned_dwarf": {
+   "type": "bark",
+   "system": "combat",
+   "fire": "first drowned dwarf in view (F3 patrol); suppresses new_monster",
+   "floor": 3,
+   "repeat": "once"
+  },
+  "new_monster": {
+   "type": "bark",
+   "system": "combat",
+   "fire": "first sight of a monster type with no first_sight_ lines (slime, cellar_spider, captain_dural)",
+   "floor": "any",
+   "repeat": "pool"
+  },
+  "low_health": {
+   "type": "bark",
+   "system": "combat",
+   "fire": "a hero drops below 30% max HP; re-arms for that hero once healed above 30%",
+   "floor": "any",
+   "repeat": "pool"
+  },
+  "tut_hand": {
+   "type": "bark",
+   "system": "party_panel",
+   "fire": "first time a monster is next to the front row (first fight starts)",
+   "floor": "any",
+   "repeat": "once"
+  },
+  "tut_front": {
+   "type": "bark",
+   "system": "party_panel",
+   "fire": "first tap on a greyed back-row melee hand; if none by the end of the first fight, play then",
+   "floor": "any",
+   "repeat": "once"
+  },
+  "tut_sheet": {
+   "type": "bark",
+   "system": "party_panel",
+   "fire": "3 s after the first fight ends, once tut_hand and tut_front have played",
+   "floor": "any",
+   "repeat": "once"
+  },
+  "swap_front": {
+   "type": "bark",
+   "system": "party_panel",
+   "fire": "first front/back swap (drag a face)",
+   "floor": "any",
+   "repeat": "once"
+  },
+  "not_ready": {
+   "type": "log",
+   "system": "party_panel",
+   "fire": "tap a hand that is still recovering",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "out_of_reach": {
+   "type": "log",
+   "system": "party_panel",
+   "fire": "tap melee on a back-row hero",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "idle": {
+   "type": "bark",
+   "system": "party_panel",
+   "fire": "45 s with no input, not in combat or dialogue (flavour)",
+   "floor": "any",
+   "repeat": "pool"
+  },
+  "pickup_key": {
+   "type": "log",
+   "system": "inventory",
+   "fire": "pick up the key (2,5) (replaces hardcoded \"Key.\")",
+   "floor": 1,
+   "repeat": "once",
+   "at": [
+    2,
+    5
+   ]
+  },
+  "pickup_potion_red": {
+   "type": "log",
+   "system": "inventory",
+   "fire": "pick up a red potion (F1 at (6, 3))",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "desc_potion_red": {
+   "type": "log",
+   "system": "inventory",
+   "fire": "right after the first pickup_potion_red; also the bag description",
+   "floor": "any",
+   "repeat": "once"
+  },
+  "pickup_potion_blue": {
+   "type": "log",
+   "system": "inventory",
+   "fire": "pick up a blue potion (F1 at (5, 5))",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "desc_potion_blue": {
+   "type": "log",
+   "system": "inventory",
+   "fire": "right after the first pickup_potion_blue; also the bag description",
+   "floor": "any",
+   "repeat": "once"
+  },
+  "pickup_potion_green": {
+   "type": "log",
+   "system": "inventory",
+   "fire": "pick up a green potion (F1 at (7, 7))",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "desc_potion_green": {
+   "type": "log",
+   "system": "inventory",
+   "fire": "right after the first pickup_potion_green; also the bag description",
+   "floor": "any",
+   "repeat": "once"
+  },
+  "loot": {
+   "type": "bark",
+   "system": "inventory",
+   "fire": "any item pickup with no tutorial/story bark on the same pickup (flavour)",
+   "floor": "any",
+   "repeat": "pool"
+  },
+  "tut_inventory": {
+   "type": "bark",
+   "system": "inventory",
+   "fire": "first item into the bag (normally the key)",
+   "floor": "any",
+   "repeat": "once"
+  },
+  "tut_potion": {
+   "type": "bark",
+   "system": "inventory",
+   "fire": "first potion picked up",
+   "floor": "any",
+   "repeat": "once"
+  },
+  "drink_potion": {
+   "type": "log",
+   "system": "inventory",
+   "fire": "a hero drinks a potion",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "f2_singing": {
+   "type": "dialogue",
+   "system": "dialogue",
+   "fire": "step onto (6,3)",
+   "floor": 2,
+   "repeat": "once",
+   "at": [
+    6,
+    3
+   ]
+  },
+  "f2_glass_door": {
+   "type": "dialogue",
+   "system": "dialogue",
+   "fire": "step onto (6,7)",
+   "floor": 2,
+   "repeat": "once",
+   "at": [
+    6,
+    7
+   ]
+  },
+  "f2_frogcatcher": {
+   "type": "dialogue",
+   "system": "dialogue",
+   "fire": "step onto (3,10) facing E. First visit starts at node \"a\". Every later visit (re-arms when you leave the square) starts at node \"return\", while frogcatcher_freed and frogcatcher_drowned are both unset. Sets met_hobb.",
+   "floor": 2,
+   "repeat": "until_freed",
+   "at": [
+    3,
+    10
+   ]
+  },
+  "f3_grate_tam": {
+   "type": "dialogue",
+   "system": "dialogue",
+   "fire": "step onto (9,9) facing the grate (9,8)",
+   "floor": 3,
+   "repeat": "once",
+   "at": [
+    9,
+    9
+   ]
+  },
+  "f4_captain": {
+   "type": "dialogue",
+   "system": "dialogue",
+   "fire": "step onto (9,4); fight branch runs start_fight:captain_dural",
+   "floor": 4,
+   "repeat": "once",
+   "at": [
+    9,
+    4
+   ]
+  },
+  "f4_tam_cell": {
+   "type": "dialogue",
+   "system": "dialogue",
+   "fire": "step onto (12,11) facing W; then f4_tide_wakes",
+   "floor": 4,
+   "repeat": "once",
+   "at": [
+    12,
+    11
+   ]
+  },
+  "f4_tide_wakes": {
+   "type": "dialogue",
+   "system": "dialogue",
+   "fire": "right after f4_tam_cell; ends with start_escape",
+   "floor": 4,
+   "repeat": "once",
+   "at": [
+    12,
+    11
+   ]
+  },
+  "tam_left": {
+   "type": "bark",
+   "system": "dialogue",
+   "fire": "first escape checkpoint (12,13), only if saved_tam == false",
+   "floor": 4,
+   "repeat": "once",
+   "at": [
+    12,
+    13
+   ],
+   "condition": {
+    "saved_tam": false
+   }
+  },
+  "floor2_vents.lever_plate": {
+   "type": "puzzle_text",
+   "system": "puzzle",
+   "fire": "first time facing either vent lever (4,6)/(5,6) from (4,5)/(5,5); again on each tap",
+   "floor": 2,
+   "repeat": "every",
+   "on_facing": [
+    4,
+    6
+   ]
+  },
+  "floor2_vents.lever_pulled_dry": {
+   "type": "puzzle_text",
+   "system": "puzzle",
+   "fire": "a lever pull drains a zone",
+   "floor": 2,
+   "repeat": "every"
+  },
+  "floor2_vents.lever_pulled_flood": {
+   "type": "puzzle_text",
+   "system": "puzzle",
+   "fire": "a lever pull floods a zone (shown after _dry; each pull does both)",
+   "floor": 2,
+   "repeat": "every"
+  },
+  "vent_lever_first": {
+   "type": "puzzle_bark",
+   "system": "puzzle",
+   "fire": "first lever pull",
+   "floor": 2,
+   "repeat": "once"
+  },
+  "vent_page_flooded": {
+   "type": "puzzle_bark",
+   "system": "puzzle",
+   "fire": "a pull floods the stores nook while journal page 2 is still at (3,9). If Hobb is still trapped there, frogcatcher_drowned plays instead and this one is skipped",
+   "floor": 2,
+   "repeat": "once"
+  },
+  "frogcatcher_drowned": {
+   "type": "bark",
+   "system": "puzzle",
+   "fire": "a pull floods the stores nook before frogcatcher_freed is set; sets frogcatcher_drowned. Line picked by met_hobb",
+   "floor": 2,
+   "repeat": "once"
+  },
+  "floor3_offering.lantern_carving": {
+   "type": "puzzle_text",
+   "system": "puzzle",
+   "fire": "tap the carving (5,8) while it is inside lantern light; same text as log carving_bowl",
+   "floor": 3,
+   "repeat": "every",
+   "on_facing": [
+    5,
+    8
+   ]
+  },
+  "carving_bowl": {
+   "type": "log",
+   "system": "puzzle",
+   "fire": "same as floor3_offering.lantern_carving",
+   "floor": 3,
+   "repeat": "every",
+   "on_facing": [
+    5,
+    8
+   ]
+  },
+  "floor3_offering.bowl_examine": {
+   "type": "puzzle_text",
+   "system": "puzzle",
+   "fire": "tap the bowl (5,7) without a lit torch in hand",
+   "floor": 3,
+   "repeat": "every",
+   "on_facing": [
+    5,
+    7
+   ]
+  },
+  "bowl_first_sight": {
+   "type": "puzzle_bark",
+   "system": "puzzle",
+   "fire": "first time facing the bowl (5,7) from (6,7) or (5,8)",
+   "floor": 3,
+   "repeat": "once",
+   "on_facing": [
+    5,
+    7
+   ],
+   "from": [
+    [
+     6,
+     7
+    ],
+    [
+     5,
+     8
+    ]
+   ]
+  },
+  "floor3_offering.bowl_lit": {
+   "type": "puzzle_text",
+   "system": "puzzle",
+   "fire": "a held lit torch is placed in the bowl; sets f3_bowl_lit, water door (4,8) parts",
+   "floor": 3,
+   "repeat": "once",
+   "on_facing": [
+    5,
+    7
+   ]
+  },
+  "bowl_lit": {
+   "type": "puzzle_bark",
+   "system": "puzzle",
+   "fire": "same moment as floor3_offering.bowl_lit (one random line)",
+   "floor": 3,
+   "repeat": "once"
+  },
+  "floor3_offering.room_dark": {
+   "type": "puzzle_text",
+   "system": "puzzle",
+   "fire": "right after bowl_lit: the mess hall goes dark",
+   "floor": 3,
+   "repeat": "once"
+  },
+  "floor4_riddle_door.carving": {
+   "type": "puzzle_text",
+   "system": "puzzle",
+   "fire": "tap the riddle door (8,4) from (7,4)",
+   "floor": 4,
+   "repeat": "every",
+   "on_facing": [
+    8,
+    4
+   ]
+  },
+  "riddle_first_sight": {
+   "type": "puzzle_bark",
+   "system": "puzzle",
+   "fire": "first time facing the riddle door (8,4) from (7,4) (both lines, in order)",
+   "floor": 4,
+   "repeat": "once",
+   "on_facing": [
+    8,
+    4
+   ],
+   "from": [
+    [
+     7,
+     4
+    ]
+   ]
+  },
+  "floor4_riddle_door.wrong_item": {
+   "type": "puzzle_text",
+   "system": "puzzle",
+   "fire": "anything but a lit torch or Wren's lantern used on the altar (7,5)",
+   "floor": 4,
+   "repeat": "every",
+   "on_facing": [
+    7,
+    5
+   ]
+  },
+  "riddle_wrong": {
+   "type": "puzzle_bark",
+   "system": "puzzle",
+   "fire": "first wrong item on the altar",
+   "floor": 4,
+   "repeat": "once"
+  },
+  "floor4_riddle_door.solved": {
+   "type": "puzzle_text",
+   "system": "puzzle",
+   "fire": "lit torch or Wren's lantern on the altar (7,5); door (8,4) opens",
+   "floor": 4,
+   "repeat": "once"
+  },
+  "riddle_solved": {
+   "type": "puzzle_bark",
+   "system": "puzzle",
+   "fire": "same moment as floor4_riddle_door.solved",
+   "floor": 4,
+   "repeat": "once"
+  },
+  "floor4_drill_tiles.wall_carving": {
+   "type": "puzzle_text",
+   "system": "puzzle",
+   "fire": "tap the carving (3,10); same text as log carving_drill",
+   "floor": 4,
+   "repeat": "every",
+   "on_facing": [
+    3,
+    10
+   ]
+  },
+  "carving_drill": {
+   "type": "log",
+   "system": "puzzle",
+   "fire": "same as floor4_drill_tiles.wall_carving",
+   "floor": 4,
+   "repeat": "every",
+   "on_facing": [
+    3,
+    10
+   ]
+  },
+  "floor4_drill_tiles.step_ok": {
+   "type": "puzzle_text",
+   "system": "puzzle",
+   "fire": "step on the next correct plate",
+   "floor": 4,
+   "repeat": "every"
+  },
+  "floor4_drill_tiles.step_wrong": {
+   "type": "puzzle_text",
+   "system": "puzzle",
+   "fire": "step on a wrong plate; sequence resets",
+   "floor": 4,
+   "repeat": "every"
+  },
+  "drill_wrong": {
+   "type": "puzzle_bark",
+   "system": "puzzle",
+   "fire": "first wrong plate",
+   "floor": 4,
+   "repeat": "once"
+  },
+  "floor4_drill_tiles.solved": {
+   "type": "puzzle_text",
+   "system": "puzzle",
+   "fire": "sequence shield, hammer, hammer, oath done; rack (2,12) opens",
+   "floor": 4,
+   "repeat": "once"
+  },
+  "drill_solved": {
+   "type": "puzzle_bark",
+   "system": "puzzle",
+   "fire": "same moment as floor4_drill_tiles.solved",
+   "floor": 4,
+   "repeat": "once"
+  },
+  "water_rising": {
+   "type": "log",
+   "system": "saves",
+   "fire": "start_escape (end of f4_tide_wakes)",
+   "floor": 4,
+   "repeat": "once"
+  },
+  "checkpoint": {
+   "type": "log",
+   "system": "saves",
+   "fire": "step onto (12,13) or (8,13) during the escape; autosave",
+   "floor": 4,
+   "repeat": "each_checkpoint_once"
+  },
+  "act1_end": {
+   "type": "log",
+   "system": "saves",
+   "fire": "step onto the stairs (5,9) after start_escape; end card",
+   "floor": 4,
+   "repeat": "once",
+   "at": [
+    5,
+    9
+   ]
+  }
+ },
+ "flags": {
+  "met_hobb": {
+   "set": "any choice in f2_frogcatcher (node c, ask2, return)",
+   "read": "frogcatcher_drowned line condition",
+   "persist": true
+  },
+  "frogcatcher_freed": {
+   "set": "f2_frogcatcher lift choice",
+   "read": "vent puzzle (Hobb drowns or not); f2_frogcatcher re-entry; Hobb removed",
+   "persist": true
+  },
+  "frogcatcher_drowned": {
+   "set": "vent puzzle: stores flooded before frogcatcher_freed",
+   "read": "frogcatcher_drowned bark; f2_frogcatcher never fires again",
+   "persist": true
+  },
+  "saved_tam": {
+   "set": "f4_tam_cell (true or false, store false explicitly)",
+   "read": "tam_left (false), F8, f12_final",
+   "persist": true
+  },
+  "captain_spared": {
+   "set": "f4_captain spare choice",
+   "read": "f4_captain_done, f11_throne",
+   "persist": true
+  },
+  "f3_bowl_lit": {
+   "set": "torch placed in the bowl (5,7)",
+   "read": "water door (4,8) opensOn; mess hall dark",
+   "persist": true
+  },
+  "f4_captain_done": {
+   "set": "f4_captain ends with captain_spared, or captain_dural dies",
+   "read": "gate (13,5) gateOpensOn",
+   "persist": true
+  },
+  "start_escape": {
+   "set": "f4_tide_wakes action",
+   "read": "stairs (5,9) gate, water timer, manual save off (title save_blocked)",
+   "persist": true
+  }
+ }
+}

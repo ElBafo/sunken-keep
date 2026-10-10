@@ -1,0 +1,77 @@
+{
+ "what": "Wren's lantern-oil gauge (max 4 oil). Sits in Wren's mana-bar slot of the party panel.",
+ "canvasPlacement": {
+  "x": 70,
+  "y": 442,
+  "w": 65,
+  "h": 4,
+  "space": "270x585 base canvas"
+ },
+ "placementNote": "Own row under Wren's mana bar (mana stays at y437). Because hand buttons used to start at y442, shift ALL eight hand buttons down 5 px to y447 (31x28 unchanged, now ending at y475; nothing else sits there before y508). Segment canvasOffsets below are relative to x70; add y442+1.",
+ "frame": "oil_gauge_frame.png",
+ "frameCold": "oil_gauge_frame_cold.png (used inside the ember look; not needed separately)",
+ "segments": {
+  "full": "oil_gauge_seg_full.png",
+  "empty": "oil_gauge_seg_empty.png",
+  "size": [
+   15,
+   2
+  ],
+  "offsets": [
+   [
+    1,
+    1
+   ],
+   [
+    17,
+    1
+   ],
+   [
+    33,
+    1
+   ],
+   [
+    49,
+    1
+   ]
+  ],
+  "canvasOffsets": [
+   [
+    71,
+    443
+   ],
+   [
+    87,
+    443
+   ],
+   [
+    103,
+    443
+   ],
+   [
+    119,
+    443
+   ]
+  ],
+  "rule": "draw frame, then for unit i (0..3) draw seg_full if i < oil else seg_empty at offsets[i] (relative to the frame)"
+ },
+ "oil0": {
+  "frames": [
+   "oil_gauge_ember_1.png",
+   "oil_gauge_ember_2.png"
+  ],
+  "fps": 1.5,
+  "mode": "pingpong",
+  "note": "At 0 oil replace the whole gauge with the ember look (cold frame, empty slots, blue-white ember at the left). Matches wren_lantern_ember portrait + hand_prayer_lantern_ember."
+ },
+ "composites": {
+  "0": "oil_gauge_0.png",
+  "1": "oil_gauge_1.png",
+  "2": "oil_gauge_2.png",
+  "3": "oil_gauge_3.png",
+  "4": "oil_gauge_4.png"
+ },
+ "compositesNote": "oil_gauge_N.png = ready-made gauge for N oil (0 = ember frame 1). Use these if simpler than assembling pieces.",
+ "flash": "optional: on +1 oil, flash the new segment 2 ticks white (code tint); on relight -1, blink the lost segment",
+ "open": "This replaces Wren's blue mana bar in that slot. If Wren keeps a mana bar too, the panel needs another 4 px row; tell Pixelartie and I'll re-cut it."
+}

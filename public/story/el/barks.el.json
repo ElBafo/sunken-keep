@@ -1,0 +1,760 @@
+[
+ {
+  "trigger": "secret_wall",
+  "speaker": "brannoc",
+  "text": "Νάνικη δουλειά. Χωρίς νάνο, ούτε που θα τη βρίσκατε.",
+  "face": "smirk",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "secret_wall",
+  "speaker": "brannoc",
+  "text": "Κούφιος. Σαν τις υποσχέσεις της Μαγκς.",
+  "face": "smirk",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "secret_wall",
+  "speaker": "mags",
+  "text": "Ωωω, κάποιος έκρυβε τα καλά.",
+  "face": "smirk",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "secret_wall",
+  "speaker": "wren",
+  "text": "Η Φλόγα φανερώνει τα κρυμμένα.",
+  "face": "neutral",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "secret_wall",
+  "speaker": "wren",
+  "text": "Και οι τοίχοι έχουν μυστικά. Ελπίζω πιο αθώα από τα δικά μας.",
+  "face": "neutral",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "secret_wall",
+  "speaker": "ilsevar",
+  "text": "Έχει ρεύμα από πίσω. Μυρίζει θάλασσα.",
+  "face": "neutral",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "secret_wall",
+  "speaker": "ilsevar",
+  "text": "Συναρπαστική τοιχοποιία. Μαγκς, σταμάτα να τη γλείφεις.",
+  "face": "wince",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "secret_wall",
+  "speaker": "mags",
+  "text": "Σπρώξ' τον, Μπράννοκ. Πιο δυνατά. ...Είδες; Τόσο δύσκολο ήταν;",
+  "face": "smirk",
+  "listener": "brannoc",
+  "listenerFace": "wince",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "secret_wall",
+  "speaker": "brannoc",
+  "text": "Θα μπορούσες και να βοηθήσεις, ξέρεις.",
+  "face": "neutral",
+  "listener": "mags",
+  "listenerFace": "smirk",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "deep_water",
+  "speaker": "brannoc",
+  "text": "Ως τα γένια. Όχι ως την αξιοπρέπεια.",
+  "face": "neutral",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "deep_water",
+  "speaker": "brannoc",
+  "text": "Οι νάνοι δεν επιπλέουν. Βουλιάζουμε με στιλ.",
+  "face": "smirk",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "deep_water",
+  "speaker": "mags",
+  "text": "Μου έφτασε μέχρι παντού, ευχαριστώ που ρωτάς.",
+  "face": "wince",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "deep_water",
+  "speaker": "wren",
+  "text": "Στεγνό το φανάρι!",
+  "face": "shocked",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "deep_water",
+  "speaker": "wren",
+  "text": "Κρύο. Πολύ κρύο. Φλόγα, δώσε μου δύναμη.",
+  "face": "wince",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "deep_water",
+  "speaker": "ilsevar",
+  "text": "Είναι... ζεστό; Άσ' το καλύτερα.",
+  "face": "neutral",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "deep_water",
+  "speaker": "ilsevar",
+  "text": "Το νερό ακούει. Μη λέτε βρισιές.",
+  "face": "neutral",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "deep_water",
+  "speaker": "mags",
+  "text": "Κάποιος να με κουβαλήσει. Μπράννοκ. Όχι έτσι!",
+  "face": "shocked",
+  "listener": "brannoc",
+  "listenerFace": "smirk",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "deep_water",
+  "speaker": "brannoc",
+  "text": "Κάτσε στους ώμους μου και μη στριφογυρίζεις.",
+  "face": "neutral",
+  "listener": "mags",
+  "listenerFace": "smirk",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "loot",
+  "speaker": "brannoc",
+  "text": "Του παππού μου. Μάλλον. Δώσ' το εδώ.",
+  "face": "neutral",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "loot",
+  "speaker": "mags",
+  "text": "Δικό μου.",
+  "face": "smirk",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "loot",
+  "speaker": "wren",
+  "text": "Το ένα δέκατο ανήκει στη Φλόγα.",
+  "face": "neutral",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "loot",
+  "speaker": "wren",
+  "text": "Είναι κλοπή αν είναι νεκροί; ...Μην απαντήσεις.",
+  "face": "wince",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "loot",
+  "speaker": "ilsevar",
+  "text": "Προσοχή, μπορεί να είναι καταραμένο. ...Καλά, θα το κρατήσω εγώ.",
+  "face": "neutral",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "loot",
+  "speaker": "ilsevar",
+  "text": "Οι ρούνοι λένε \"ιδιοκτησία του\". Τα υπόλοιπα είναι στρείδια.",
+  "face": "neutral",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "loot",
+  "speaker": "brannoc",
+  "text": "Αυτό είναι νάνικο. Τυπικά, είναι δικό μου.",
+  "face": "neutral",
+  "listener": "mags",
+  "listenerFace": "smirk",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "loot",
+  "speaker": "mags",
+  "text": "Όποιος το βρει, το κρατάει. Όποιος είναι νάνος, γκρινιάζει.",
+  "face": "smirk",
+  "listener": "brannoc",
+  "listenerFace": "wince",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "low_health",
+  "speaker": "brannoc",
+  "text": "Μια γρατζουνιά. Μια μεγάλη, ματωμένη γρατζουνιά.",
+  "face": "wince",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "low_health",
+  "speaker": "brannoc",
+  "text": "Πείτε στα γένια μου ότι τα αγάπησα.",
+  "face": "wince",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "low_health",
+  "speaker": "mags",
+  "text": "Θέλω τα λεφτά μου πίσω απ' αυτό το μπουντρούμι.",
+  "face": "wince",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "low_health",
+  "speaker": "wren",
+  "text": "Γιατρέ, θεράπευσε τον εαυτό σου... γρήγορα, παρακαλώ.",
+  "face": "wince",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "low_health",
+  "speaker": "wren",
+  "text": "Η φλόγα μου τρεμοσβήνει.",
+  "face": "wince",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "low_health",
+  "speaker": "ilsevar",
+  "text": "Το νερό λέει πως μπορεί να σταματήσει τον πόνο. ...Είμαι μια χαρά.",
+  "face": "neutral",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "low_health",
+  "speaker": "ilsevar",
+  "text": "Όχι τώρα. Δεν τελείωσα τις σημειώσεις μου.",
+  "face": "wince",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "low_health",
+  "speaker": "mags",
+  "text": "Ρεν, θέλω τα χέρια σου πάνω μου. Θεραπευτικά χέρια. ΘΕΡΑΠΕΥΤΙΚΑ.",
+  "face": "wince",
+  "listener": "wren",
+  "listenerFace": "shocked",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "new_monster",
+  "speaker": "brannoc",
+  "text": "Άσχημο. Πάμε;",
+  "face": "neutral",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "new_monster",
+  "speaker": "mags",
+  "text": "Μεγάλο, γλοιώδες και έρχεται κατευθείαν πάνω μου. Η ερωτική μου ζωή.",
+  "face": "smirk",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "new_monster",
+  "speaker": "wren",
+  "text": "Βδέλυγμα! ...Έχουμε σχέδιο;",
+  "face": "shocked",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "new_monster",
+  "speaker": "wren",
+  "text": "Φλόγα, κάψε δυνατά.",
+  "face": "neutral",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "new_monster",
+  "speaker": "ilsevar",
+  "text": "Θέλω να το μελετήσω. Κατά προτίμηση νεκρό.",
+  "face": "smirk",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "new_monster",
+  "speaker": "ilsevar",
+  "text": "Ξέρει το όνομά μου. Γιατί ξέρει το όνομά μου;",
+  "face": "shocked",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "new_monster",
+  "speaker": "mags",
+  "text": "Μπράννοκ, ήρθε ο ξάδερφός σου.",
+  "face": "smirk",
+  "listener": "brannoc",
+  "listenerFace": "wince",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "new_monster",
+  "speaker": "brannoc",
+  "text": "Έχω δει χειρότερα. Έχω φιλήσει χειρότερα.",
+  "face": "smirk",
+  "listener": "mags",
+  "listenerFace": "shocked",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "idle",
+  "speaker": "brannoc",
+  "text": "Περιμένουμε να στραγγίξει το νερό;",
+  "face": "neutral",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "idle",
+  "speaker": "wren",
+  "text": "Φλόγα, δώσε μου υπομονή. Και μια καρέκλα.",
+  "face": "neutral",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "idle",
+  "speaker": "ilsevar",
+  "text": "Ναι... σε ακούω. Στάσου, μίλησε κανείς;",
+  "face": "shocked",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "idle",
+  "speaker": "ilsevar",
+  "text": "Ωραία. Περισσότερος χρόνος για σημειώσεις.",
+  "face": "neutral",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "idle",
+  "speaker": "mags",
+  "text": "Αν κάνουμε στάση, ψάχνω τις τσέπες όλων.",
+  "face": "smirk",
+  "listener": "brannoc",
+  "listenerFace": "wince",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "idle",
+  "speaker": "brannoc",
+  "text": "Σταμάτα να ροχαλίζεις, κοντούλα. Α, εγώ ήμουν.",
+  "face": "wince",
+  "listener": "mags",
+  "listenerFace": "smirk",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "first_sight_keep_rat",
+  "speaker": "mags",
+  "text": "Ααα, κοίτα το ψωμάκι του!",
+  "face": "smirk",
+  "listener": "brannoc",
+  "listenerFace": "wince",
+  "tier": "story"
+ },
+ {
+  "trigger": "first_sight_keep_rat",
+  "speaker": "brannoc",
+  "text": "Το ψωμί των προγόνων μου είναι αυτό, κλέφτη.",
+  "face": "wince",
+  "listener": "mags",
+  "listenerFace": "smirk",
+  "tier": "story"
+ },
+ {
+  "trigger": "first_sight_keep_rat",
+  "speaker": "wren",
+  "text": "Έχει φάει καλύτερα από εμάς.",
+  "face": "neutral",
+  "tier": "story"
+ },
+ {
+  "trigger": "first_sight_rust_crab",
+  "speaker": "brannoc",
+  "text": "Φοράει ο κάβουρας το κράνος του θείου μου;",
+  "face": "shocked",
+  "listener": "mags",
+  "listenerFace": "smirk",
+  "tier": "story"
+ },
+ {
+  "trigger": "first_sight_rust_crab",
+  "speaker": "mags",
+  "text": "Του πάει καλύτερα, για να 'μαστε ειλικρινείς.",
+  "face": "smirk",
+  "listener": "brannoc",
+  "listenerFace": "wince",
+  "tier": "story"
+ },
+ {
+  "trigger": "first_sight_rust_crab",
+  "speaker": "ilsevar",
+  "text": "Συμπεριφορά ερημίτη. Νάνου ερημίτη.",
+  "face": "neutral",
+  "tier": "story"
+ },
+ {
+  "trigger": "first_sight_bog_leeches",
+  "speaker": "wren",
+  "text": "Βδέλλες. Φλόγα, φύλαξέ μας.",
+  "face": "wince",
+  "tier": "story"
+ },
+ {
+  "trigger": "first_sight_bog_leeches",
+  "speaker": "mags",
+  "text": "Κανείς δεν ρουφάει τίποτα δικό μου.",
+  "face": "shocked",
+  "tier": "story"
+ },
+ {
+  "trigger": "first_sight_bog_leeches",
+  "speaker": "ilsevar",
+  "text": "Θεραπευτικές, τυπικά. Και πάλι όχι.",
+  "face": "wince",
+  "tier": "story"
+ },
+ {
+  "trigger": "leech_latch",
+  "speaker": "brannoc",
+  "text": "Βγάλτε τη! Όχι από τα γένια!",
+  "face": "wince",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "leech_latch",
+  "speaker": "mags",
+  "text": "Είναι πάνω στο— μην κοιτάτε!",
+  "face": "shocked",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "leech_latch",
+  "speaker": "wren",
+  "text": "Ακίνητος. Θα την κάψω.",
+  "face": "wince",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "leech_latch",
+  "speaker": "ilsevar",
+  "text": "Με συμπαθεί. Αυτό είναι χειρότερο.",
+  "face": "wince",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "pantry",
+  "speaker": "brannoc",
+  "text": "Η παλιά αποθήκη. Θεοί, η μυρωδιά.",
+  "face": "wince",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "pantry",
+  "speaker": "mags",
+  "text": "Δικά μου τώρα. Όλα. Και η μούχλα.",
+  "face": "smirk",
+  "listener": "wren",
+  "listenerFace": "wince",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "swap_front",
+  "speaker": "mags",
+  "text": "Σειρά σου μπροστά, Μπράννοκ. Έχεις μούρη για ξόδεμα.",
+  "face": "smirk",
+  "listener": "brannoc",
+  "listenerFace": "neutral",
+  "listenerText": "Χαριτωμένο.",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "lantern_gutter",
+  "speaker": "wren",
+  "text": "Κάτι εδώ κάτω θέλει το φως μου.",
+  "face": "wince",
+  "listener": "ilsevar",
+  "listenerFace": "neutral",
+  "listenerText": "Τότε μην του δώσεις.",
+  "tier": "story"
+ },
+ {
+  "trigger": "first_punch",
+  "speaker": "mags",
+  "text": "Άου. Ποιος βάζει γροθιά εκεί που πάνε τα μαχαίρια;",
+  "face": "wince",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "first_punch",
+  "speaker": "brannoc",
+  "text": "Οι γροθιές είναι δωρεάν. Τα τσεκούρια καλύτερα.",
+  "face": "smirk",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "first_sight_drowned_dwarf",
+  "speaker": "brannoc",
+  "text": "Αυτός... φοράει το έμβλημα των Στόουνβοου.",
+  "face": "shocked",
+  "listener": "mags",
+  "listenerFace": "smirk",
+  "listenerText": "Οικογενειακό τραπέζι. Υπέροχα.",
+  "tier": "story"
+ },
+ {
+  "trigger": "first_vent",
+  "speaker": "brannoc",
+  "text": "Νιώθετε το ρεύμα; Κάτι ακόμα ανασαίνει γι' αυτό το μέρος.",
+  "face": "neutral",
+  "tier": "story"
+ },
+ {
+  "trigger": "first_singing",
+  "speaker": "ilsevar",
+  "text": "Βουίζει πιο δυνατά όταν στέκομαι μέσα του.",
+  "face": "neutral",
+  "listener": "mags",
+  "listenerFace": "wince",
+  "listenerText": "Τότε μη στέκεσαι μέσα του.",
+  "tier": "story"
+ },
+ {
+  "trigger": "tut_hand",
+  "speaker": "mags",
+  "text": "Πάτα τη μυτερή άκρη, Μπράννοκ.",
+  "face": "smirk",
+  "listener": "brannoc",
+  "listenerFace": "neutral",
+  "listenerText": "Ξέρω ποια άκρη είναι μυτερή.",
+  "tier": "tutorial"
+ },
+ {
+  "trigger": "tut_potion",
+  "speaker": "wren",
+  "text": "Κόκκινο για αίμα, μπλε για μαγεία. Πάτα και πιες.",
+  "face": "neutral",
+  "tier": "tutorial"
+ },
+ {
+  "trigger": "tut_inventory",
+  "speaker": "mags",
+  "text": "Ο σάκος είναι κάτω. Πάτα κάτι για να το χρησιμοποιήσεις.",
+  "face": "smirk",
+  "tier": "tutorial"
+ },
+ {
+  "trigger": "tut_sheet",
+  "speaker": "ilsevar",
+  "text": "Πάτα τη φάτσα μου για τα νούμερά μου. Απαλά.",
+  "face": "smirk",
+  "tier": "tutorial"
+ },
+ {
+  "trigger": "tut_front",
+  "speaker": "brannoc",
+  "text": "Μόνο οι δύο μπροστά χτυπάνε. Σύρε ένα πρόσωπο για αλλαγή.",
+  "face": "neutral",
+  "tier": "tutorial"
+ },
+ {
+  "trigger": "tam_left",
+  "speaker": "mags",
+  "text": "Μη. Απλώς... μη μου μιλάτε για λίγο.",
+  "face": "wince",
+  "tier": "story"
+ },
+ {
+  "trigger": "stairs_dead_lamp",
+  "speaker": "brannoc",
+  "text": "Αυτά τα φανάρια έκαιγαν για πάντα. Ποιος τα έσβησε;",
+  "face": "neutral",
+  "listener": "wren",
+  "listenerFace": "wince",
+  "listenerText": "Κάποιος που χρειαζόταν τη φωτιά περισσότερο.",
+  "tier": "story"
+ },
+ {
+  "trigger": "singing_louder",
+  "speaker": "mags",
+  "text": "Δυναμώνει. Και το χειρότερο, κολλάει στο μυαλό.",
+  "face": "wince",
+  "listener": "ilsevar",
+  "listenerFace": "neutral",
+  "listenerText": "Τώρα τραγουδάει σε εμάς.",
+  "tier": "story"
+ },
+ {
+  "trigger": "barracks_enter",
+  "speaker": "brannoc",
+  "text": "Στρατώνες. Στρωμένα κρεβάτια, αραδιασμένες μπότες. Όπως πρέπει.",
+  "face": "neutral",
+  "listener": "mags",
+  "listenerFace": "smirk",
+  "listenerText": "Όποιος κοιμάται εκεί, είναι πολύ ήσυχος.",
+  "tier": "story"
+ },
+ {
+  "trigger": "tam_below",
+  "speaker": "mags",
+  "text": "Κράτα, Ταμ. Έρχομαι, βλάκα.",
+  "face": "shocked",
+  "listener": "brannoc",
+  "listenerFace": "neutral",
+  "listenerText": "Πρώτα οι σκάλες. Μετά οι ηρωισμοί.",
+  "tier": "story"
+ },
+ {
+  "trigger": "deep_enter",
+  "speaker": "wren",
+  "text": "Το νερό είναι ζεστό εδώ. Σαν να ανασαίνει.",
+  "face": "wince",
+  "listener": "mags",
+  "listenerFace": "shocked",
+  "listenerText": "Σε παρακαλώ, σταμάτα να λες \"ανασαίνει\".",
+  "tier": "story"
+ },
+ {
+  "trigger": "tam_tally",
+  "speaker": "mags",
+  "text": "Μετρούσε τις μέρες. Φυσικά. Πάντα μετράει.",
+  "face": "wince",
+  "listener": "wren",
+  "listenerFace": "neutral",
+  "listenerText": "Τότε περίμενε κάποιον.",
+  "tier": "story"
+ },
+ {
+  "trigger": "frogcatcher_drowned",
+  "speaker": "mags",
+  "text": "Χομπ; ...Χομπ. Όχι. Εμείς το κάναμε αυτό.",
+  "face": "wince",
+  "listener": "wren",
+  "listenerFace": "wince",
+  "listenerText": "Ο μοχλός. Έπρεπε να κοιτάξουμε πρώτα.",
+  "tier": "story",
+  "condition": {
+   "met_hobb": true
+  }
+ },
+ {
+  "trigger": "frogcatcher_drowned",
+  "speaker": "brannoc",
+  "text": "Η γωνιά πλημμύρισε. Όποιος ήταν μέσα...",
+  "face": "shocked",
+  "tier": "story",
+  "condition": {
+   "met_hobb": false
+  }
+ },
+ {
+  "trigger": "first_torch_lit",
+  "speaker": "wren",
+  "text": "Ορίστε. Κάτι δικό μας, πίσω.",
+  "face": "smirk",
+  "tier": "story"
+ },
+ {
+  "trigger": "torch_draws_monster",
+  "speaker": "ilsevar",
+  "text": "Είδε το φως. Έρχεται να το φάει.",
+  "face": "shocked",
+  "tier": "story",
+  "act": 2
+ },
+ {
+  "trigger": "oil_empty",
+  "speaker": "wren",
+  "text": "Δεν περισσεύει λάδι. Αλλά η σπίθα μου δεν σβήνει. Όχι γι' αυτό.",
+  "face": "neutral",
+  "tier": "story"
+ },
+ {
+  "trigger": "first_oil",
+  "speaker": "mags",
+  "text": "Λάδι λυχναριού. Οι νάνοι το φύλαγαν σαν κρασί.",
+  "face": "smirk",
+  "listener": "brannoc",
+  "listenerFace": "smirk",
+  "listenerText": "Και το κρασί φυλάγαμε. Κάτω τα χέρια.",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "first_true_dark",
+  "speaker": "brannoc",
+  "text": "Εδώ κάτω το σκοτάδι δεν είναι άδειο. Είναι γεμάτο.",
+  "face": "wince",
+  "listener": "wren",
+  "listenerFace": "neutral",
+  "listenerText": "Τότε μείνε στο φως μου. Και μη μου ακουμπάς.",
+  "tier": "story"
+ },
+ {
+  "trigger": "lampkeeper_hooks_heard",
+  "speaker": "mags",
+  "text": "Κάτι κουδουνίζει εκεί μέσα. Ίσως θησαυρός.",
+  "face": "smirk",
+  "listener": "ilsevar",
+  "listenerFace": "wince",
+  "listenerText": "Ίσως δόντια.",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "lampkeeper_enter",
+  "speaker": "brannoc",
+  "text": "Λυχναράδικο χωρίς λυχνάρια. Δεν είναι οικονομία. Είναι ληστεία.",
+  "face": "wince",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "lampkeeper_note_read",
+  "speaker": "wren",
+  "text": "Το έδωσαν επίτηδες. Ποιος παίρνει το φως ενός κάστρου;",
+  "face": "shocked",
+  "listener": "brannoc",
+  "listenerFace": "neutral",
+  "listenerText": "Κάποιος που το χρειαζόταν πιο πολύ από εμάς.",
+  "tier": "story"
+ },
+ {
+  "trigger": "lampkeeper_capped_lamp",
+  "speaker": "brannoc",
+  "text": "Το τελευταίο το σφράγισε μόνος του. Γενναίος κλεφτάκος.",
+  "face": "smirk",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "guard_hall_enter",
+  "speaker": "ilsevar",
+  "text": "Ήλιος. Είχα ξεχάσει ότι είναι δωρεάν.",
+  "face": "smirk",
+  "listener": "mags",
+  "listenerFace": "smirk",
+  "listenerText": "Τίποτα δεν είναι δωρεάν. Ψάξε κάτω από τα δοκάρια.",
+  "tier": "flavour"
+ },
+ {
+  "trigger": "first_torch_snuffed",
+  "speaker": "brannoc",
+  "text": "Αυτή την άναψε ο παππούς μου. Κι εσύ τη σβήνεις σαν κεράκι.",
+  "face": "wince",
+  "listener": "mags",
+  "listenerFace": "smirk",
+  "listenerText": "Ο παππούς σου έπρεπε να ζητάει νοίκι.",
+  "tier": "flavour"
+ }
+]

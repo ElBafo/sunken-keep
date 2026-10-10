@@ -1,0 +1,31 @@
+{
+ "_note": "Orrun's journal pages, shown line by line after log read_journal (page 1) / journal_f2 (page 2). Lines <=41 chars. Greek: story/el/journal_act1.el.json.",
+ "pages": {
+  "1": {
+   "floor": 1,
+   "at": [
+    5,
+    1
+   ],
+   "where": "behind the secret wall, under the carving \"We gave much. We need more.\"",
+   "lines": [
+    "The Tide asks only for fire.",
+    "Floor by floor, we give it.",
+    "- O.S."
+   ]
+  },
+  "2": {
+   "floor": 2,
+   "at": [
+    3,
+    9
+   ],
+   "where": "SW stores nook (floods if the RIGHT vent lever is pulled first)",
+   "lines": [
+    "The lamps are gone. The oil next.",
+    "My people keep breathing. Mostly.",
+    "- O.S."
+   ]
+  }
+ }
+}

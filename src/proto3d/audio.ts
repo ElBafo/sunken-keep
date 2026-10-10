@@ -91,14 +91,14 @@ export class AudioManager {
       ['drip4', 'audio/sfx_drip_4.mp3'],
       ['bump', 'audio/sfx_bump.mp3'],
       ['key', 'audio/sfx_key.mp3'],
-      ['door_open', 'proto3d/sfx_door_open.mp3'],
-      ['door_close', 'proto3d/sfx_door_close.mp3'],
-      ['door_locked', 'proto3d/sfx_door_locked.mp3'],
-      ['door_unlock', 'proto3d/sfx_door_unlock.mp3'],
-      ['far_draught', 'proto3d/sfx_far_draught.mp3'],
-      ['far_groan', 'proto3d/sfx_far_groan.mp3'],
-      ['far_pebbles', 'proto3d/sfx_far_pebbles.mp3'],
-      ['far_rumble', 'proto3d/sfx_far_rumble.mp3'],
+      ['door_open', 'audio/sfx_door_open.mp3'],
+      ['door_close', 'audio/sfx_door_close.mp3'],
+      ['door_locked', 'audio/sfx_door_locked.mp3'],
+      ['door_unlock', 'audio/sfx_door_unlock.mp3'],
+      ['far_draught', 'audio/sfx_far_draught.mp3'],
+      ['far_groan', 'audio/sfx_far_groan.mp3'],
+      ['far_pebbles', 'audio/sfx_far_pebbles.mp3'],
+      ['far_rumble', 'audio/sfx_far_rumble.mp3'],
       ['chain1', 'audio/sfx_chain_sway_1.mp3'],
       ['chain2', 'audio/sfx_chain_sway_2.mp3'],
       ['crack_wind', 'audio/sfx_crack_wind_loop.mp3'],
@@ -131,7 +131,23 @@ export class AudioManager {
       ['lantern_ember_loop', 'audio/sfx_lantern_ember_loop.mp3'],
       ['dark_presence', 'audio/sfx_dark_presence_loop.mp3'],
       ['glint', 'audio/sfx_glint.mp3'],
-      ['lamp_hooks', 'audio/sfx_lamp_hooks_loop.mp3']
+      ['lamp_hooks', 'audio/sfx_lamp_hooks_loop.mp3'],
+      ['act_axe', 'audio/sfx_act_axe.mp3'],
+      ['act_shield', 'audio/sfx_act_shield.mp3'],
+      ['act_mace', 'audio/sfx_act_mace.mp3'],
+      ['act_prayer', 'audio/sfx_act_prayer.mp3'],
+      ['act_wand', 'audio/sfx_act_wand.mp3'],
+      ['act_scroll', 'audio/sfx_act_scroll.mp3'],
+      ['act_dagger', 'audio/sfx_act_dagger.mp3'],
+      ['act_tricks', 'audio/sfx_act_tricks.mp3'],
+      ['act_punch', 'audio/sfx_act_punch.mp3'],
+      ['act_torch', 'audio/sfx_act_torch.mp3'],
+      ['act_ready', 'audio/sfx_act_ready.mp3'],
+      ['torch_take', 'audio/sfx_torch_take.mp3'],
+      ['torch_place', 'audio/sfx_torch_place.mp3'],
+      ['torch_dunk', 'audio/sfx_torch_dunk.mp3'],
+      ['ui_log_line', 'audio/sfx_ui_log_line.mp3'],
+      ['ui_button_denied', 'audio/sfx_ui_button_denied.mp3']
     ];
 
     const results = await Promise.all(
@@ -309,7 +325,7 @@ export class AudioManager {
     }
   }
 
-  playUi(name: string, volume = 0.7, rate = 1) {
+  playUi(name: string, volume = 1, rate = 1) {
     const buf = this.buffers.get(name);
     if (!buf) return;
     let sound = this.uiPool.find((a) => !a.isPlaying);
@@ -337,9 +353,8 @@ export class AudioManager {
 
   playStep(kind: 'step' | 'step_water_shallow' | 'step_water_deep') {
     const name = this.pickStepVariant(kind);
-    const volume = STEP_VOLUME * (0.92 + Math.random() * 0.16);
     const rate = 0.95 + Math.random() * 0.1;
-    this.playUi(name, volume, rate);
+    this.playUi(name, STEP_VOLUME, rate);
   }
 
   lastStep(): string | null {
@@ -448,7 +463,7 @@ export class AudioManager {
     voice.audio.setVolume(0);
   }
 
-  playPositional(name: string, x: number, y: number, z: number, volume = 0.5) {
+  playPositional(name: string, x: number, y: number, z: number, volume = 1) {
     const buf = this.buffers.get(name);
     if (!buf) return;
     let voice = this.dripPool.find((v) => !v.audio.isPlaying);
@@ -465,11 +480,11 @@ export class AudioManager {
   playDrip(x: number, y: number, z: number) {
     const names = ['drip1', 'drip2', 'drip3', 'drip4'];
     const name = names[(Math.random() * names.length) | 0];
-    this.playPositional(name, x, y, z, 0.35 + Math.random() * 0.25);
+    this.playPositional(name, x, y, z, 1);
   }
 
   playDoor(name: 'door_open' | 'door_close' | 'door_locked' | 'door_unlock', x: number, z: number) {
-    this.playPositional(name, x * CELL_SIZE, 1.0, z * CELL_SIZE, name === 'door_locked' ? 0.55 : 0.7);
+    this.playPositional(name, x * CELL_SIZE, 1.0, z * CELL_SIZE, 1);
   }
 
   private playFar(camX: number, camZ: number, now: number) {
@@ -488,7 +503,7 @@ export class AudioManager {
     this.farVoice.object.position.set(camX + Math.cos(ang) * dist, 1.2, camZ + Math.sin(ang) * dist);
     if (this.farVoice.audio.isPlaying) this.farVoice.audio.stop();
     this.farVoice.audio.setBuffer(buf);
-    const vol = 0.25 + Math.random() * 0.2;
+    const vol = 1;
     this.farVoice.baseVolume = vol;
     this.farVoice.audio.setVolume(vol);
     this.farVoice.audio.play();
@@ -514,7 +529,7 @@ export class AudioManager {
       if (this.heardBones.has(key)) continue;
       if (Math.abs(partyX - bone.x) + Math.abs(partyY - bone.y) <= 1) {
         this.heardBones.add(key);
-        this.playPositional('bones', bone.wx, bone.wy, bone.wz, 0.55);
+        this.playPositional('bones', bone.wx, bone.wy, bone.wz, 1);
       }
     }
   }
@@ -527,11 +542,11 @@ export class AudioManager {
       this.nextFarAt = now + 20000 + Math.random() * 25000;
     }
     if (now >= this.nextChainAt) {
-      this.playAtMark(this.chainMarks, ['chain1', 'chain2'], 0.4);
+      this.playAtMark(this.chainMarks, ['chain1', 'chain2'], 1);
       this.nextChainAt = now + 8000 + Math.random() * 12000;
     }
     if (now >= this.nextBannerAt) {
-      this.playAtMark(this.bannerMarks, ['banner'], 0.32);
+      this.playAtMark(this.bannerMarks, ['banner'], 1);
       this.nextBannerAt = now + 12000 + Math.random() * 18000;
     }
 

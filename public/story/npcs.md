@@ -40,3 +40,9 @@
 - The swamp's hunger. Not evil, just endless. Speaks through water: every puddle, drip, and the drowned.
 - Text shown in a cold blue-green, lowercase, no speaker portrait.
 - Voice: soft, plural, patient. "warm ones. you brought light. how kind."
+
+## Hobb Rushwick (F2)
+- Halfling frog-catcher from Mags's swamp town, owes her six coppers. Pinned under a fallen dwarven shelf in the stores nook.
+- Voice: loud, cheerful, aggrieved. Knows Tam went down after the big frogs and that "the water was singing to him".
+- Freed (`frogcatcher_freed`): gives a red potion and warns which lever floods his nook.
+- Drowned (`frogcatcher_drowned`): the drain lever floods the nook first. Teaches early that actions have costs.

@@ -226,6 +226,18 @@ export class TorchSystem {
     visual.flameMat.needsUpdate = true;
   }
 
+  /** Leave a dead bracket with no snuff animation (Take). */
+  takeOffWall(sconce: Sconce) {
+    const visual = this.visuals.find((v) => v.sconce === sconce);
+    sconce.lit = false;
+    if (!visual) return;
+    this.applyBracket(visual, 'dead');
+    visual.lighting = false;
+    visual.snuffing = false;
+    visual.flame.visible = false;
+    visual.flameFrame = 0;
+  }
+
   snuff(sconce: Sconce, now: number) {
     const visual = this.visuals.find((v) => v.sconce === sconce);
     sconce.lit = false;

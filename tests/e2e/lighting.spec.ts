@@ -238,7 +238,7 @@ test('proto3d lighting: pools, relight, oil, no 404s', async ({ page }) => {
   });
   await page.waitForTimeout(200);
   expect(await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.lastMessage())).toBe(
-    'Sealed.'
+    'Sealed. Dwarves don\'t do "temporary".'
   );
   expect(
     await page.evaluate(
@@ -382,7 +382,7 @@ test('proto3d floor1v2: start-key-door-hall-stairs and pantry-lamp room', async 
   await pose(2, 5, 0);
   await tap();
   expect(await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.lastMessage())).toBe(
-    'Key.'
+    'Found a rusty key.'
   );
 
   await pose(2, 5, 0);

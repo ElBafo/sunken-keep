@@ -1,0 +1,480 @@
+[
+ {
+  "key": "enter_floor1",
+  "text": "Οι πάνω αίθουσες. Ο βάλτος σε γλείφει.",
+  "when": "on entering floor 1"
+ },
+ {
+  "key": "carving_start",
+  "text": "\"Ο Άρχων Όρρουν κρατά τη φυλή στεγνή.\"",
+  "when": "tap start plate"
+ },
+ {
+  "key": "carving_door",
+  "text": "\"Μια φλόγα δοσμένη. Ένας όροφος σώος.\"",
+  "when": "tap door plate"
+ },
+ {
+  "key": "carving_secret",
+  "text": "\"Δώσαμε πολλά. Θέλουμε κι άλλα.\"",
+  "when": "tap glowing plate"
+ },
+ {
+  "key": "secret_found",
+  "text": "Η πέτρα σέρνεται στο πλάι.",
+  "when": "secret wall opens"
+ },
+ {
+  "key": "door_locked",
+  "text": "Κλειδωμένη. Ένας κόκκινος ρούνος λάμπει.",
+  "when": "bump locked door"
+ },
+ {
+  "key": "door_unlocked",
+  "text": "Το κλειδί γυρίζει. Η κλειδαριά βογκά.",
+  "when": "use key"
+ },
+ {
+  "key": "pickup_key",
+  "text": "Βρήκες ένα σκουριασμένο κλειδί."
+ },
+ {
+  "key": "pickup_potion_red",
+  "text": "Βρήκες ένα κόκκινο φίλτρο."
+ },
+ {
+  "key": "pickup_potion_blue",
+  "text": "Βρήκες ένα μπλε φίλτρο."
+ },
+ {
+  "key": "pickup_potion_green",
+  "text": "Βρήκες ένα πράσινο φίλτρο."
+ },
+ {
+  "key": "pickup_scroll",
+  "text": "Βρήκες μια μουσκεμένη σελίδα."
+ },
+ {
+  "key": "read_journal",
+  "text": "Το ημερολόγιο του Όρρουν. Διαβάζεται.",
+  "when": "before the journal page text (story/journal_act1.json)"
+ },
+ {
+  "key": "chest_open",
+  "text": "Το σεντούκι ανοίγει τρίζοντας."
+ },
+ {
+  "key": "chest_empty",
+  "text": "Άδειο. Κάποιος πρόλαβε."
+ },
+ {
+  "key": "water_shallow",
+  "text": "Το νερό βαθαίνει.",
+  "when": "first step into shallow water"
+ },
+ {
+  "key": "water_deep",
+  "text": "Μαύρο νερό ως το στήθος. Παγωμένο.",
+  "when": "first step into deep water"
+ },
+ {
+  "key": "water_dry",
+  "text": "Στεγνή πέτρα, επιτέλους.",
+  "when": "leaving water onto stone"
+ },
+ {
+  "key": "enter_pantry",
+  "text": "Το παλιό κελάρι. Μούχλα και ψίχουλα.",
+  "when": "first step onto (4,5), the pantry doorway, floor 1"
+ },
+ {
+  "key": "bump_wall",
+  "text": "Συμπαγής πέτρα."
+ },
+ {
+  "key": "hit",
+  "text": "{hero} χτυπά για {n}."
+ },
+ {
+  "key": "miss",
+  "text": "{hero}: αστοχία."
+ },
+ {
+  "key": "monster_hit",
+  "text": "{monster}: χτυπά {hero} για {n}."
+ },
+ {
+  "key": "monster_dies",
+  "text": "{monster}: βουλιάζει στο νερό."
+ },
+ {
+  "key": "leech_latch",
+  "text": "Μια βδέλλα κολλάει πάνω σε {hero}!"
+ },
+ {
+  "key": "leech_drain",
+  "text": "{hero}: η βδέλλα ρουφάει. ({n})"
+ },
+ {
+  "key": "hero_down",
+  "text": "{hero}: σωριάζεται."
+ },
+ {
+  "key": "drink_potion",
+  "text": "{hero}: πίνει. +{n} ζωή."
+ },
+ {
+  "key": "not_ready",
+  "text": "{hero}: όχι ακόμα έτοιμος/η."
+ },
+ {
+  "key": "party_dead",
+  "text": "Το νερό σας παίρνει όλους."
+ },
+ {
+  "key": "floor_cleared",
+  "text": "Σιωπή στις αίθουσες. Μόνο σταγόνες."
+ },
+ {
+  "key": "enter_floor2",
+  "text": "Οι κάτω αίθουσες. Το φως λιγοστεύει."
+ },
+ {
+  "key": "enter_floor3",
+  "text": "Οι στρατώνες. Βήματα. Όχι δικά σας."
+ },
+ {
+  "key": "enter_floor4",
+  "text": "Βαθιοί στρατώνες. Το νερό είναι ζεστό."
+ },
+ {
+  "key": "journal_f2",
+  "text": "Σκισμένη σελίδα, γραφή του άρχοντα."
+ },
+ {
+  "key": "vent_room",
+  "text": "Ζεστός αέρας βγαίνει από τη σχάρα."
+ },
+ {
+  "key": "glass_door",
+  "text": "Το νερό στέκει στην πόρτα σαν γυαλί."
+ },
+ {
+  "key": "lever_found",
+  "text": "Ένας μοχλός, πίσω από τα βαρέλια."
+ },
+ {
+  "key": "armoury",
+  "text": "Ράφια με παλιό νάνικο ατσάλι."
+ },
+ {
+  "key": "mess_hall",
+  "text": "Πιάτα στρωμένα. Εξήντα χρόνια δείπνο."
+ },
+ {
+  "key": "grate_voice",
+  "text": "Μια φωνή ανεβαίνει από τη σχάρα."
+ },
+ {
+  "key": "cell_found",
+  "text": "Πλημμυρισμένο κελί. Κάποιος είναι μέσα."
+ },
+ {
+  "key": "water_rising",
+  "text": "Το νερό ανεβαίνει! Βρείτε τη σκάλα!"
+ },
+ {
+  "key": "checkpoint",
+  "text": "Παίρνετε ανάσα. Αποθηκεύτηκε."
+ },
+ {
+  "key": "act1_end",
+  "text": "Τέλος Πράξης 1: Οι Πνιγμένες Αίθουσες."
+ },
+ {
+  "key": "lantern_gutter",
+  "text": "Το φανάρι της Ρεν πέφτει στη σπίθα.",
+  "when": "the Tide takes Wren's oil light (f4_tam_cell oil choice): ember-only reach for the rest of the floor"
+ },
+ {
+  "key": "lantern_out",
+  "text": "Το λάδι τελείωσε. Η σπίθα της Ρεν κρατά.",
+  "when": "oil reaches 0: lantern drops to ember reach, never fully dark"
+ },
+ {
+  "key": "lantern_lit",
+  "text": "Φρέσκο λάδι. Το φανάρι της Ρεν φουντώνει.",
+  "when": "oil goes from 0 to 1+; replaces oil_pickup for that flask"
+ },
+ {
+  "key": "punch",
+  "text": "{hero} ρίχνει μπουνιά!"
+ },
+ {
+  "key": "out_of_reach",
+  "text": "{hero}: δεν φτάνει από πίσω."
+ },
+ {
+  "key": "oil_pickup",
+  "text": "Φλασκί λάδι. Το λυχνάρι της Ρεν πίνει.",
+  "when": "on picking up an oil flask"
+ },
+ {
+  "key": "enter_lampkeeper",
+  "text": "Γάντζοι για λυχνάρια. Όλοι άδειοι.",
+  "when": "on entering the lamp-keeper's room"
+ },
+ {
+  "key": "read_lampkeeper_note",
+  "text": "Το σημείωμα του λυχνά. Χέρι που τρέμει.",
+  "when": "on reading the lamp-keeper's note"
+ },
+ {
+  "key": "enter_guard_hall",
+  "text": "Θαμμένη αίθουσα φρουράς. Φως από πάνω.",
+  "when": "on entering the collapsed guard hall"
+ },
+ {
+  "key": "torch_snuffed",
+  "text": "Η δάδα σβήνει με ένα σφύριγμα.",
+  "when": "on snuffing a lit torch"
+ },
+ {
+  "key": "torch_capped",
+  "text": "Κλειστή. Οι νάνοι δεν κάνουν \"προσωρινά\".",
+  "when": "on tapping a capped torch"
+ },
+ {
+  "key": "torch_relit",
+  "text": "Η δάδα πιάνει. Το σκοτάδι κάνει πίσω.",
+  "when": "on relighting a dead torch (1 oil)"
+ },
+ {
+  "key": "torch_take",
+  "text": "{hero}: παίρνει τη δάδα. Φωτιά μπροστά.",
+  "when": "on taking a lit torch off its bracket"
+ },
+ {
+  "key": "torch_place",
+  "text": "{hero}: βάζει τη δάδα στη θήκη. Σφιχτά.",
+  "when": "on putting a held torch into an empty bracket"
+ },
+ {
+  "key": "torch_dunk",
+  "text": "{hero}: βουτά τη δάδα. Σσσ. Τέλος.",
+  "when": "on dropping a held torch into water"
+ },
+ {
+  "key": "carving_bowl",
+  "lines": [
+   "\"Φωτιά στο μπολ,",
+   "και το νερό υποκλίνεται.\""
+  ],
+  "ref": "story/puzzles_act1.json floor3_offering.lantern_carving",
+  "when": "on tapping the lantern-only carving (5,8), floor 3; one log line per entry in lines"
+ },
+ {
+  "key": "carving_drill",
+  "lines": [
+   "\"Η άσκηση της φρουράς Άσμαντλ:",
+   "Ασπίδα. Σφυρί. Σφυρί. Όρκος.\""
+  ],
+  "ref": "story/puzzles_act1.json floor4_drill_tiles.wall_carving",
+  "when": "on tapping the drill carving (3,10), floor 4; one log line per entry in lines"
+ },
+ {
+  "key": "desc_potion_red",
+  "text": "Ζουμί του καμινιού. Γεύση καυτού σίδερου.",
+  "when": "right after the first pickup_potion_red, and as its bag description"
+ },
+ {
+  "key": "desc_potion_blue",
+  "text": "Βαλτοτονωτικό. Μη ρωτάς τι έχει μέσα.",
+  "when": "right after the first pickup_potion_blue, and as its bag description"
+ },
+ {
+  "key": "desc_potion_green",
+  "text": "Μυρίζει Παλίρροια. Θα το πιεις πάντως;",
+  "when": "right after the first pickup_potion_green, and as its bag description"
+ },
+ {
+  "key": "crit",
+  "text": "{hero}: δυνατό χτύπημα! {n} ζημιά.",
+  "when": "a hero's attack crits (natural 20)"
+ },
+ {
+  "key": "dodge",
+  "text": "{hero}: ξεφεύγει. Μόλις.",
+  "when": "a monster's attack misses a hero"
+ },
+ {
+  "key": "block_raise",
+  "text": "{hero}: σηκώνει ασπίδα.",
+  "when": "a hero uses a shield (Block)"
+ },
+ {
+  "key": "block_hit",
+  "text": "Μπλοκ! Περνάει μόνο {n}.",
+  "when": "a hit lands while a block is up (halved)"
+ },
+ {
+  "key": "torch_hit",
+  "text": "{hero}: καίει για {n}.",
+  "when": "a lit torch swing hits"
+ },
+ {
+  "key": "leech_burned",
+  "text": "Η βδέλλα ξεκολλά. Μυρίζει φαγητό.",
+  "when": "a torch swing hits latched or attacking leeches"
+ },
+ {
+  "key": "torch_burns_out",
+  "text": "{hero}: η δάδα έσβησε.",
+  "when": "a held torch goes from lit to burnt"
+ },
+ {
+  "key": "frost_bolt",
+  "text": "Παγωμένο βέλος! {n} ζημιά.",
+  "when": "Ilsevar's scroll hand hits"
+ },
+ {
+  "key": "pocket_sand",
+  "text": "Άμμος στα μάτια! Θα αστοχήσει.",
+  "when": "Mags's tricks pouch used on a monster"
+ },
+ {
+  "key": "lock_picked",
+  "text": "Η Μαγκς ανοίγει την κλειδαριά. Καμαρώνει.",
+  "when": "tricks pouch used on a lock or locked chest"
+ },
+ {
+  "key": "heal",
+  "text": "Γιατρειά της Ρεν: {target} +{n}.",
+  "when": "Wren's lantern hand heals the most hurt hero"
+ },
+ {
+  "key": "heal_none",
+  "text": "Κανείς δεν πονάει. Η Ρεν ανακουφίζεται.",
+  "when": "Wren's heal used with everyone at full HP (no mana spent)"
+ },
+ {
+  "key": "no_mana",
+  "text": "{hero}: τέλειωσε η μαγεία.",
+  "when": "a mana hand is tapped without enough mana"
+ },
+ {
+  "key": "level_up",
+  "text": "{hero}: επίπεδο {n}!",
+  "when": "a hero levels up"
+ },
+ {
+  "key": "xp_gain",
+  "text": "+{n} εμπειρία για όλους.",
+  "when": "a monster dies (party XP)"
+ },
+ {
+  "key": "revive",
+  "text": "{hero}: σηκώνεται ξανά. Μόλις.",
+  "when": "a downed hero is revived (rule TBD)"
+ },
+ {
+  "key": "monster_dies_dry",
+  "text": "{monster}: δεν κουνιέται πια.",
+  "when": "a monster dies on a dry square (monster_dies is for water)"
+ },
+ {
+  "key": "monster_near",
+  "text": "Κάτι κινείται στο σκοτάδι.",
+  "when": "a monster starts approaching from out of sight"
+ },
+ {
+  "key": "drink_mana",
+  "text": "{hero}: πίνει. +{n} μαγεία.",
+  "when": "blue potion used"
+ },
+ {
+  "key": "drink_green",
+  "text": "{hero}: πίνει. Βδέλλες έξω, +{n} ζωή.",
+  "when": "green potion used"
+ },
+ {
+  "key": "leech_off",
+  "text": "{hero}: ξεκόλλησαν οι βδέλλες.",
+  "when": "leeches removed (green potion or torch)"
+ },
+ {
+  "key": "cured",
+  "text": "{hero}: θεραπεύτηκε.",
+  "when": "poison removed (green potion)"
+ },
+ {
+  "key": "full_health",
+  "text": "{hero}: είναι ήδη μια χαρά.",
+  "when": "red/green potion tapped on a hero at full HP and no leeches/poison; potion kept"
+ },
+ {
+  "key": "no_mana_pool",
+  "text": "{hero}: δεν έχει μαγεία να γεμίσει.",
+  "when": "blue potion tapped on Brannoc or Mags; potion kept"
+ },
+ {
+  "key": "oil_use",
+  "text": "Η Ρεν γεμίζει το φανάρι. Λάδι {n}/{max}.",
+  "when": "oil flask used from the bag"
+ },
+ {
+  "key": "oil_full",
+  "text": "Το φανάρι της Ρεν είναι ήδη γεμάτο.",
+  "when": "oil flask used at max oil; flask kept"
+ },
+ {
+  "key": "bag_full",
+  "text": "Ο σάκος γέμισε. Πέτα κάτι.",
+  "when": "pickup with no bag space"
+ },
+ {
+  "key": "pickup_item",
+  "text": "Βρήκες: {item}.",
+  "when": "pickup of any item without its own pickup_ key"
+ },
+ {
+  "key": "chest_item",
+  "text": "Μέσα: {item}.",
+  "when": "one line per chestItems entry after chest_open"
+ },
+ {
+  "key": "equip",
+  "text": "{hero} πιάνει: {item}.",
+  "when": "gear moved into a hero's hand/body"
+ },
+ {
+  "key": "unequip",
+  "text": "{hero} αφήνει: {item}.",
+  "when": "gear moved back to the bag"
+ },
+ {
+  "key": "give",
+  "text": "{hero} παίρνει: {item}.",
+  "when": "item given to a hero"
+ },
+ {
+  "key": "drop_item",
+  "text": "Πέταξες: {item}.",
+  "when": "item dropped on the square"
+ },
+ {
+  "key": "cant_use",
+  "text": "{hero}: δεν το χρησιμοποιεί.",
+  "when": "gear not allowed for that hero"
+ },
+ {
+  "key": "mail_no_cast",
+  "text": "Ο Ιλσεβάρ δεν κάνει μάγια με θώρακα.",
+  "when": "Ilsevar taps a spell hand while wearing chain mail"
+ },
+ {
+  "key": "hands_full",
+  "text": "{hero}: κανένα ελεύθερο χέρι.",
+  "when": "Take a torch or equip with both hands full"
+ }
+]

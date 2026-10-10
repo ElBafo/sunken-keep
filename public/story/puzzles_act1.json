@@ -1,0 +1,48 @@
+{
+  "_note": "Texts for Levie's Act 1 puzzles. Log lines <=41 chars. Barks are speaker/text/face/tier like barks.json and follow bark_rules.json. When each one fires: story/triggers_act1.json.",
+  "floor2_vents": {
+    "lever_plate": "LEFT: STORES. RIGHT: CISTERN.",
+    "lever_pulled_dry": "Air roars. Somewhere, water drains.",
+    "lever_pulled_flood": "Air roars. Somewhere, water rises.",
+    "barks": [
+      {"trigger":"vent_lever_first","tier":"tutorial","speaker":"brannoc","face":"smirk","text":"Air's a river too. You just steer it."},
+      {"trigger":"vent_page_flooded","tier":"story","speaker":"mags","face":"wince","text":"Great. We drowned the one thing we wanted."}
+    ]
+  },
+  "floor3_offering": {
+    "lantern_carving": ["Fire to the bowl,", "and the water bows."],
+    "bowl_examine": "A stone bowl, black with old soot.",
+    "bowl_lit": "The water in the doorway parts.",
+    "room_dark": "Behind you, the mess hall goes dark.",
+    "barks": [
+      {"trigger":"bowl_first_sight","tier":"tutorial","speaker":"wren","face":"neutral","text":"An offering bowl. They fed it fire."},
+      {"trigger":"bowl_lit","tier":"story","speaker":"ilsevar","face":"neutral","text":"It took the torch. It liked the torch."},
+      {"trigger":"bowl_lit","tier":"story","speaker":"mags","face":"wince","text":"So we're doing the pact now. Lovely."}
+    ]
+  },
+  "floor4_riddle_door": {
+    "carving": ["I am given and never returned.", "I am small, then I am all.", "The Tide never refuses me."],
+    "answer_item": "torch",
+    "answer_alternatives": ["Wren's lantern held to the altar also works"],
+    "wrong_item": "The altar stays cold.",
+    "solved": "The captain's hall unseals.",
+    "barks": [
+      {"trigger":"riddle_first_sight","tier":"story","speaker":"mags","face":"smirk","text":"A riddle door. Dwarves have no fun."},
+      {"trigger":"riddle_first_sight","tier":"story","speaker":"brannoc","face":"neutral","text":"We have plenty. It's just carved."},
+      {"trigger":"riddle_wrong","tier":"tutorial","speaker":"ilsevar","face":"neutral","text":"What does the water always want?"},
+      {"trigger":"riddle_solved","tier":"story","speaker":"wren","face":"wince","text":"Fire. Of course it's fire."}
+    ]
+  },
+  "floor4_drill_tiles": {
+    "wall_carving": ["The drill of the Ashmantle guard:", "Shield. Hammer. Hammer. Oath."],
+    "tile_symbols": ["shield", "hammer", "oath"],
+    "order": ["shield", "hammer", "hammer", "oath"],
+    "step_ok": "The tile clicks and holds.",
+    "step_wrong": "The tiles reset with a grinding sigh.",
+    "solved": "A hidden rack slides open.",
+    "barks": [
+      {"trigger":"drill_wrong","tier":"tutorial","speaker":"brannoc","face":"smirk","text":"Two hammers, lass. Dwarves always hit twice."},
+      {"trigger":"drill_solved","tier":"flavour","speaker":"mags","face":"smirk","text":"I'd salute, but my arms are tired."}
+    ]
+  }
+}

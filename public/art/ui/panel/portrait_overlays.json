@@ -1,0 +1,23 @@
+{
+ "downed": {
+  "file": "portrait_downed.png",
+  "size": [
+   64,
+   64
+  ],
+  "rule": "HP == 0: draw the hero portrait desaturated (luma, ~60% brightness), then portrait_downed.png on top at the same rect/scale (44x44 in the panel). Tap still opens the sheet."
+ },
+ "levelUp": {
+  "frames": [
+   "portrait_levelup_1.png",
+   "portrait_levelup_2.png",
+   "portrait_levelup_3.png"
+  ],
+  "size": [
+   64,
+   64
+  ],
+  "play": "12 fps, order 1-2-3-2-1, then off (about 0.4 s); pair with the level-up sound. Draw additively or normal alpha over the portrait."
+ },
+ "note": "Hand buttons stay icon-only (no action names on them)."
+}

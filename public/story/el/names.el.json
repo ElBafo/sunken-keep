@@ -1,0 +1,29 @@
+{
+ "_note": "Names used in {hero}/{monster}. Greek log lines are written so names never need declension. English: story/names.json, same ids. Monster ids match levels/monsters.json.",
+ "heroes": {
+  "brannoc": "Μπράννοκ",
+  "wren": "Ρεν",
+  "ilsevar": "Ιλσεβάρ",
+  "mags": "Μαγκς"
+ },
+ "npcs": {
+  "tam": "Ταμ",
+  "hessa": "Έσσα",
+  "orrun": "Όρρουν",
+  "elda": "Έλντα",
+  "tide": "Η Κούφια Παλίρροια",
+  "hobb": "Χομπ Ράσγουικ",
+  "dural": "Λοχαγός Ντούραλ",
+  "pell": "Πελ"
+ },
+ "monsters": {
+  "keep_rat": "Αρουραίος",
+  "rust_crab": "Σκουριοκάβουρας",
+  "bog_leeches": "Βδέλλες",
+  "slime": "Γλίτσα",
+  "cellar_spider": "Αράχνη",
+  "drowned_dwarf": "Πνιγμένος νάνος",
+  "captain_dural": "Ντούραλ",
+  "tide_spawn": "Γόνος της Παλίρροιας"
+ }
+}

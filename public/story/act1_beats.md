@@ -10,16 +10,17 @@ Monster tiers rise slowly; Act 1 = vermin and the first drowned.
   - "Thane Orrun keeps the clan dry." (start)
   - "One flame given. One floor spared." (by the locked door)
   - "We gave much. We need more." (behind the secret wall, in the dark)
-- Must-have: pantry (5,5), locked door + key, one secret wall, shallow/deep water.
+- Must-have: pantry (room x5-7, y5-7; entered through the doorway at (4,5)), locked door + key, one secret wall, shallow/deep water.
+- Orrun's journal page 1 lies behind the secret wall at (5,1): "The Tide asks only for fire. / Floor by floor, we give it. / - O.S." (story/journal_act1.json)
 - Monsters: keep rats, rust crab, bog leeches, slime (boss-ish, 40 HP).
-- Exit hook: stairs down; Brannoc spots a cold, dead dwarven lamp on the stair: "These used to burn forever. Who put them out?"
+- Exit hook: stairs down. On arrival at floor 2 (bark `stairs_dead_lamp`), Brannoc spots a cold, dead dwarven lamp on the stair: "These lamps burned forever. Who put them out?" / Wren: "Someone who needed the fire more."
 
 ## Floor 2 - Lower Halls
 - Mood: storerooms and guard corridors; the last daylight (one shaft at the stairs down).
 - Light: daylight fades; first glowing dwarven mechanism = an air vent near the stairs.
 - Story: the SINGING starts - faint, wordless, from below. Party barks on first hearing.
   - Vent bark (Brannoc, first time): "Feel that draught? Something's still breathing for this place."
-  - Orrun's journal page found here (not floor 1): "The Tide asks only for fire. / Floor by floor, we give it. / My people keep breathing. Mostly. / - O.S."
+  - Orrun's journal page 2 found here, in the SW stores nook (3,9): "The lamps are gone. The oil next. / My people keep breathing. Mostly. / - O.S." (page 1 is on floor 1; texts in story/journal_act1.json)
 - Must-have: vent room (glowing brass grille, warm air), a storeroom with a hidden lever, one "glass water" doorway glimpse (water standing upright in a doorframe, held back) - can't pass yet, just seen.
 - Monsters: rats packs, leeches, first spiders/frogs (Levie's pick).
 - Exit hook: the singing gets louder at the stairs.
@@ -32,13 +33,13 @@ Monster tiers rise slowly; Act 1 = vermin and the first drowned.
   - Tam Reedly is heard, not seen: a voice through a grate calling "Mags? Maggie, is that you?" Mags freezes.
 - Must-have: a grate/listening spot where Tam is heard; a mess hall with a long table (furniture); an armoury with the first real gear upgrade (shield or mail).
 - Monsters: drowned dwarf soldiers (slow, hit hard), leeches, crabs.
-- Exit hook: Tam's voice comes from below. Mags: "That's my brother. He went in after the frogs last spring."
+- Exit hook: Tam's voice comes from below (`f3_grate_tam`). Mags: "That's my brother. He came for the frogs." / Brannoc: "Then we go down. Quickly." On the stairs down (bark `tam_below`), Mags: "Hang on, Tam. I'm coming, you idiot." / Brannoc: "Stairs first. Heroics after."
 
 ## Floor 4 - Barracks Deep (Act 1 finale)
 - Mood: officers' quarters, flooded drill yard, the captain's post.
 - Light: dark rooms (lantern only, exit keeps a faint glow), drip zones begin softly.
 - Story: find TAM, half-drowned, chained in a flooded cell, being "kept" by the Tide. The honour-guard CAPTAIN (Captain Dural Ashmantle) guards him - drowned, but speaks.
-- CHOICE (flag `saved_tam`): free Tam (costs Wren's lantern oil OR a hero's turn under water - real cost), or leave him to keep moving. See dialogue.json `tam_cell`.
+- CHOICE (flag `saved_tam`): free Tam (costs Wren's lantern oil OR a hero's turn under water - real cost), or leave him to keep moving. See dialogue.json `f4_tam_cell`.
 - Cliffhanger: the Tide speaks for the first time (through the water itself). Water rises -> ESCAPE RUN to the stairs (manual save off; autosave at checkpoints).
 - Must-have: the cell, a drill-yard loop for the escape run with 2 checkpoints, captain fight or parley room.
 - Exit: party dives down the stair as the floor floods. Act 1 end card. Paywall here.

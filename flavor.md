@@ -1,6 +1,6 @@
 # First floor flavour text (from Storie)
 Intro screen (3 lines, shown in sequence):
-- "Karak Durn sank in a single night."
+- "Stonevow Keep sank in a single night."
 - "Its forges went cold. Its people did not leave."
 - "Four fools have come to find out why."
 

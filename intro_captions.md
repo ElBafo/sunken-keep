@@ -8,7 +8,7 @@ Shots (~35s, six shots; art is wide 854x480 at 2x pixel size, show a 270x480 win
 6. Party at the gate: pan across the four, then title.png fades in at 33s on the anvil hit (~6s).
 Effects in code: rain, lightning, screen shake, bubbles, sparks, fog.
 Captions:
-- 7.0-11.5s "Karak Durn sank in a single night."
+- 7.0-11.5s "Stonevow Keep sank in a single night."
 - 13.0-17.5s "Its forges went cold."
 - 19.5-23.5s "Its people did not leave."
 - 29.0-32.5s "Four fools have come to find out why."

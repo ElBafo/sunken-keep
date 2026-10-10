@@ -6,7 +6,10 @@ export interface InputHooks {
 }
 
 function isUiTarget(el: EventTarget | null): boolean {
-  return el instanceof HTMLElement && !!el.closest('.control-btn, #tap-to-start');
+  return (
+    el instanceof HTMLElement &&
+    !!el.closest('.control-btn, #tap-to-start, .hand-btn, .hud-choice-btn, #torch-choice, #party-hud')
+  );
 }
 
 function isCanvasTarget(el: EventTarget | null): boolean {

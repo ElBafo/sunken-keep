@@ -1,0 +1,287 @@
+{
+ "_note": "Player-facing UI strings for Gamie's overnight steps (party panel, combat, inventory, title/saves). Greek: story/el/ui_text.el.json, same keys. Button labels aim for <=8 chars; where one language runs over, a sibling '<key>_short' exists in both files. Placeholders: {hero} {target} {monster} {item} {n} {max} {date}; names come from story/names.json. Combat/inventory log lines live in log.json. Reuse, don't duplicate: title_text.json (title buttons, slots, overwrite, saved, save_blocked, areas, language), log.json (hit, miss, monster_hit, out_of_reach, not_ready, hero_down, party_dead, drink_potion, chest_open, chest_empty, pickup_*, oil_pickup, torch_*), barks.json (tut_*).",
+ "step1_party_panel": {
+  "_about": "Party panel, hand buttons, bars, Wren's oil gauge, wall-torch choice.",
+  "torch_choice": {
+   "prompt": "A lit torch.",
+   "take": "Take",
+   "snuff": "Snuff",
+   "take_hint": "Carry it. Swings for fire.",
+   "snuff_hint": "Put it out. Relight costs 1 oil.",
+   "hands_full": "No free hand. Tap a hand to swap."
+  },
+  "bars": {
+   "hp": "HP",
+   "mana": "Mana",
+   "oil": "Oil",
+   "oil_readout": "Oil {n}/{max}",
+   "ember": "Ember",
+   "hp_readout": "{n}/{max}"
+  },
+  "hands": {
+   "_about": "Action name shown on/under a hand button, by gear id (art/ui/hands/hands.json).",
+   "fist": "Punch",
+   "axe": "Chop",
+   "shield": "Block",
+   "iron_shield": "Block",
+   "mace": "Smite",
+   "prayer_lantern": "Heal",
+   "prayer_lantern_ember": "Heal",
+   "wand": "Zap",
+   "scroll": "Frost",
+   "dagger": "Stab",
+   "tricks_pouch": "Trick",
+   "torch_lit": "Burn",
+   "torch_burnt": "Bonk",
+   "ashmantle_hammer": "Smash"
+  },
+  "hand_state": {
+   "recovering": "Wait",
+   "no_mana": "No mana",
+   "back_row": "Too far",
+   "empty": "Empty"
+  },
+  "sheet": {
+   "_about": "Hero sheet (tap a portrait).",
+   "level": "Level {n}",
+   "level_short": "Lv {n}",
+   "xp": "XP {n}/{max}",
+   "ac": "AC",
+   "ac_long": "Armour",
+   "to_hit": "To hit",
+   "damage": "Damage",
+   "recovery": "Recovery {n}s",
+   "row_front": "Front",
+   "row_back": "Back",
+   "swap_hint": "Drag a face to swap places.",
+   "close": "Close",
+   "down": "Out"
+  }
+ },
+ "step2_combat": {
+  "_about": "Combat floaters and short labels. Log lines are in log.json (see STORY_HOOKUP.md).",
+  "float": {
+   "miss": "Miss",
+   "crit": "Crit!",
+   "block": "Block",
+   "dodge": "Dodge",
+   "level_up": "Level up!",
+   "xp_gain": "+{n} XP",
+   "burn": "Burn!",
+   "heal": "+{n}",
+   "level_up_short": "Lv up!"
+  },
+  "level_up": {
+   "title": "{hero}: level {n}!",
+   "hp": "Max HP +{n}",
+   "to_hit": "To hit +1",
+   "damage": "Damage +10%",
+   "ok": "Onward"
+  },
+  "game_over": {
+   "title": "The water takes you all.",
+   "body": "The keep keeps you. For now.",
+   "load_last": "Load",
+   "title_screen": "Title"
+  }
+ },
+ "step3_inventory": {
+  "_about": "Bag UI, item names and descriptions. name = full name, short = <=8 for slots/buttons, desc = flavour, effect = rules line.",
+  "bag": {
+   "title": "Bag",
+   "use": "Use",
+   "drop": "Drop",
+   "give": "Give",
+   "equip": "Equip",
+   "unequip": "Remove",
+   "close": "Close",
+   "empty_slot": "Empty",
+   "empty_bag": "Nothing but lint.",
+   "pick_hero": "Tap a hero.",
+   "who_drinks": "Who drinks?",
+   "count": "x{n}",
+   "drop_confirm": "Drop it here?",
+   "drop_yes": "Drop",
+   "drop_no": "Keep",
+   "slot_hand": "Hand",
+   "slot_body": "Body",
+   "slot_bag": "Bag"
+  },
+  "items": {
+   "key": {
+    "name": "Rusty key",
+    "short": "Key",
+    "desc": "Rusty. Like Brannoc's charm.",
+    "effect": "Opens a locked door nearby."
+   },
+   "potion_red": {
+    "name": "Red potion",
+    "short": "Red",
+    "desc_log": "desc_potion_red",
+    "effect": "Heals 15 HP."
+   },
+   "potion_blue": {
+    "name": "Blue potion",
+    "short": "Blue",
+    "desc_log": "desc_potion_blue",
+    "effect": "Restores 8 mana. Wren or Ilsevar."
+   },
+   "potion_green": {
+    "name": "Green potion",
+    "short": "Green",
+    "desc_log": "desc_potion_green",
+    "effect": "Pulls off leeches, cures poison, +5 HP."
+   },
+   "oil_flask": {
+    "name": "Oil flask",
+    "short": "Oil",
+    "desc": "Dwarves kept it like other folk keep wine.",
+    "effect": "+1 oil for Wren's lantern (max 4)."
+   },
+   "torch": {
+    "name": "Torch",
+    "short": "Torch",
+    "desc": "Hot end out. Hot end OUT, Brannoc.",
+    "effect": "Swings for fire damage. Fits an empty bracket."
+   },
+   "torch_burnt": {
+    "name": "Burnt torch",
+    "short": "Stick",
+    "desc": "A stick with a past.",
+    "effect": "Still swings. No fire."
+   },
+   "journal_page": {
+    "name": "Journal page",
+    "short": "Page",
+    "desc": "Orrun's hand. Soggy, still legible.",
+    "effect": "Tap to read."
+   },
+   "captain_key": {
+    "name": "Captain's key",
+    "short": "Key",
+    "desc": "Dural's. Opens nothing now but memories.",
+    "effect": "A keepsake."
+   },
+   "iron_shield": {
+    "name": "Iron shield",
+    "short": "Shield",
+    "desc": "Dented, heavy, honest.",
+    "effect": "Block: +3 AC, next hit on you halved. Mags or Ilsevar."
+   },
+   "chain_mail": {
+    "name": "Chain mail",
+    "short": "Mail",
+    "desc": "Sixty years in a damp barracks. Itchy.",
+    "effect": "+2 AC. Ilsevar can't cast in it."
+   },
+   "ashmantle_hammer": {
+    "name": "Ashmantle hammer",
+    "short": "Hammer",
+    "desc": "Two hammers, lass. This is one of them.",
+    "effect": "Brannoc only. Hits hard, swings slow."
+   },
+   "axe": {
+    "name": "Axe",
+    "short": "Axe",
+    "desc": "Brannoc's. Older than Mags, and sharper.",
+    "effect": "Front row. Solid hits."
+   },
+   "shield": {
+    "name": "Dwarven shield",
+    "short": "Shield",
+    "desc": "Oak and iron. Hides a whole dwarf.",
+    "effect": "Block: +4 AC, next hit on anyone halved."
+   },
+   "mace": {
+    "name": "Mace",
+    "short": "Mace",
+    "desc": "For the Ember's more direct sermons.",
+    "effect": "Front row. Steady hits."
+   },
+   "prayer_lantern": {
+    "name": "Prayer lantern",
+    "short": "Lantern",
+    "desc": "Wren's. The last fire she trusts.",
+    "effect": "Heals the most hurt hero 6-10. 4 mana."
+   },
+   "wand": {
+    "name": "Reed wand",
+    "short": "Wand",
+    "desc": "Swamp reed and patience. Mostly patience.",
+    "effect": "Ranged. Works from the back row."
+   },
+   "scroll": {
+    "name": "Frost scroll",
+    "short": "Scroll",
+    "desc": "Cold words. Ilsevar reads them slowly.",
+    "effect": "Frost bolt 8-14, ignores armour. 5 mana."
+   },
+   "dagger": {
+    "name": "Dagger",
+    "short": "Dagger",
+    "desc": "Mags's. Don't ask where it's been.",
+    "effect": "Front row. Quick."
+   },
+   "tricks_pouch": {
+    "name": "Tricks pouch",
+    "short": "Tricks",
+    "desc": "Sand, string and one mystery button.",
+    "effect": "Pocket sand: next attack misses. Picks locks."
+   },
+   "fist": {
+    "name": "Fist",
+    "short": "Fist",
+    "desc": "Free, and always handy.",
+    "effect": "1-2 damage. Better than nothing. Barely."
+   }
+  }
+ },
+ "step4_title_saves": {
+  "_about": "Adds to story/title_text.json (buttons, slot, overwrite, areas, saved, save_blocked already exist there).",
+  "buttons": {
+   "save": "Save",
+   "delete": "Delete",
+   "menu": "Menu",
+   "resume": "Resume",
+   "quit": "Title",
+   "yes": "Yes",
+   "no": "No",
+   "ok": "OK"
+  },
+  "slot": {
+   "label": "Slot {n}",
+   "autosave": "Autosave",
+   "autosave_tag": "Auto",
+   "date": "{date}",
+   "corrupt": "This save got wet.",
+   "corrupt_sub": "It can't be loaded."
+  },
+  "status": {
+   "saving": "Saving...",
+   "loading": "Loading...",
+   "autosaved": "Autosaved.",
+   "loaded": "Game loaded.",
+   "save_failed": "Couldn't save. Storage is full.",
+   "no_saves": "No saves yet."
+  },
+  "confirm": {
+   "new_game_title": "Start a new game?",
+   "new_game_body": "Pick a slot. The keep is patient.",
+   "load_title": "Load this save?",
+   "load_body": "Anything since your last save sinks.",
+   "delete_title": "Delete this save?",
+   "delete_body": "Gone for good. Like Brannoc's hairline.",
+   "quit_title": "Back to the title?",
+   "quit_body": "Progress since your last save is lost."
+  },
+  "settings": {
+   "title": "Settings",
+   "music": "Music",
+   "effects": "Effects",
+   "ambience": "Ambience",
+   "on": "On",
+   "off": "Off",
+   "ambience_short": "Ambience"
+  }
+ }
+}

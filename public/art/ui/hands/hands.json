@@ -34,6 +34,11 @@
   "wand": "hand_wand.png",
   "scroll": "hand_scroll.png",
   "dagger": "hand_dagger.png",
-  "tricks_pouch": "hand_tricks_pouch.png"
- }
+  "tricks_pouch": "hand_tricks_pouch.png",
+  "torch_lit": "hand_torch_lit.png",
+  "torch_burnt": "hand_torch_burnt.png",
+  "prayer_lantern_ember": "hand_prayer_lantern_ember.png"
+ },
+ "torch_note": "A carried torch swings for fire damage (tap). Burnt out = torch_burnt (still swings, no fire). Take/Snuff choice appears when tapping a lit WALL torch.",
+ "lantern_note": "Wren's lantern hand: prayer_lantern while oil>=1, prayer_lantern_ember at 0 oil (ember only)."
 }

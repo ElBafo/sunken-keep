@@ -42,6 +42,65 @@
       line-height: 0;
       background: #000;
     }
+    #party-hud {
+      position: relative;
+      width: 100%;
+      flex: 0 0 auto;
+      line-height: 0;
+      background: #000;
+    }
+    #party-canvas {
+      display: block;
+      width: 100%;
+      height: auto;
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
+    }
+    .hand-btn {
+      position: absolute;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+      touch-action: none;
+      -webkit-tap-highlight-color: transparent;
+      z-index: 20;
+    }
+    #torch-choice {
+      position: absolute;
+      left: 50%;
+      bottom: 10px;
+      transform: translateX(-50%);
+      display: none;
+      gap: 8px;
+      z-index: 80;
+      pointer-events: auto;
+    }
+    #torch-choice.show { display: flex; }
+    .hud-choice-btn {
+      min-width: 44px;
+      min-height: 44px;
+      width: max(44px, calc(52 * (100vw / 270)));
+      max-width: calc(56 * (100vw / 270));
+      height: max(44px, calc(31 * (100vw / 270)));
+      padding: 0 6px;
+      border: 0;
+      background: #2a2420 url('%BASE_URL%art/ui/panel/btn_choice.png') center / 100% 100% no-repeat;
+      color: #d8ccb0;
+      font-family: monospace;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      image-rendering: pixelated;
+      cursor: pointer;
+      touch-action: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .hud-choice-btn:active {
+      background-image: url('%BASE_URL%art/ui/panel/btn_choice_pressed.png');
+    }
     #render-canvas {
       display: block;
       width: 100%;
@@ -201,6 +260,13 @@
   </div>
   <div id="canvas-container">
     <canvas id="render-canvas"></canvas>
+    <div id="torch-choice">
+      <button id="btn-torch-take" class="hud-choice-btn" type="button"></button>
+      <button id="btn-torch-snuff" class="hud-choice-btn" type="button"></button>
+    </div>
+  </div>
+  <div id="party-hud">
+    <canvas id="party-canvas"></canvas>
   </div>
   <div id="controls">
     <button id="btn-forward" class="control-btn">↑</button>

@@ -3,7 +3,7 @@
   270,
   585
  ],
- "tapNote": "tap portrait = open character sheet. Two hand buttons under the bars show the equipped item icon (main hand left, off hand right), 31x28 px = 45x41pt on iPhone 15; tap to use, dim while recovering. Min tap target 28px = 41pt.",
+ "tapNote": "tap portrait = open character sheet. Two hand buttons under the bars show the equipped item icon (main hand left, off hand right), 31x31 px = 45x45pt on iPhone 15; tap to use, dim while recovering. Min tap target 31px = 45pt (44pt minimum). Wren has an oil gauge row (oilBar) between her mana bar and her hand buttons; see art/ui/oil/oil_gauge.json.",
  "note": "scale canvas to screen width; fill leftover height with stone_strip_tile.png tiled vertically (below panel). View renders at 270x380, horizon y 190.",
  "view": [
   0,
@@ -23,15 +23,15 @@
    ],
    "hand_main": [
     3,
-    442,
+    447,
     31,
-    28
+    31
    ],
    "hand_off": [
     36,
-    442,
+    447,
     31,
-    28
+    31
    ],
    "hpBar": [
     3,
@@ -51,15 +51,15 @@
    ],
    "hand_main": [
     70,
-    442,
+    447,
     31,
-    28
+    31
    ],
    "hand_off": [
     103,
-    442,
+    447,
     31,
-    28
+    31
    ],
    "hpBar": [
     70,
@@ -84,15 +84,15 @@
    ],
    "hand_main": [
     137,
-    442,
+    447,
     31,
-    28
+    31
    ],
    "hand_off": [
     170,
-    442,
+    447,
     31,
-    28
+    31
    ],
    "hpBar": [
     137,
@@ -117,15 +117,15 @@
    ],
    "hand_main": [
     204,
-    442,
+    447,
     31,
-    28
+    31
    ],
    "hand_off": [
     237,
-    442,
+    447,
     31,
-    28
+    31
    ],
    "hpBar": [
     204,
@@ -136,9 +136,15 @@
    "manaBar": null
   }
  ],
+ "oilBar": [
+  70,
+  442,
+  65,
+  4
+ ],
  "log": [
   4,
-  474,
+  479,
   262,
   28
  ],
