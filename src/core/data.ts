@@ -96,6 +96,7 @@ function parseBehavior(kind: string, raw: Record<string, unknown>): MonsterBehav
       : 0.5;
   }
   if (explicitSpecial) behavior.specialDamage = explicitSpecial;
+  if (b.stationary === true) behavior.stationary = true;
   void kind;
   return behavior;
 }

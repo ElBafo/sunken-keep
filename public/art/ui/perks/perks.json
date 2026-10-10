@@ -1,0 +1,473 @@
+{
+ "what": "Perk pick screen (levels 3 and 5). No text is baked in: title, sub, perk names/descs, button labels are drawn by code with font/font_5x7 from story/perks.json + story/el/perks.el.json.",
+ "canvas": [
+  270,
+  585
+ ],
+ "icons": {
+  "shield_wall": {
+   "icon": "perk_shield_wall.png",
+   "dim": "perk_shield_wall_dim.png"
+  },
+  "cleave": {
+   "icon": "perk_cleave.png",
+   "dim": "perk_cleave_dim.png"
+  },
+  "stubborn": {
+   "icon": "perk_stubborn.png",
+   "dim": "perk_stubborn_dim.png"
+  },
+  "heavy_swing": {
+   "icon": "perk_heavy_swing.png",
+   "dim": "perk_heavy_swing_dim.png"
+  },
+  "quick_hands": {
+   "icon": "perk_quick_hands.png",
+   "dim": "perk_quick_hands_dim.png"
+  },
+  "dirty_tricks": {
+   "icon": "perk_dirty_tricks.png",
+   "dim": "perk_dirty_tricks_dim.png"
+  },
+  "backstab": {
+   "icon": "perk_backstab.png",
+   "dim": "perk_backstab_dim.png"
+  },
+  "light_fingers": {
+   "icon": "perk_light_fingers.png",
+   "dim": "perk_light_fingers_dim.png"
+  },
+  "mercy": {
+   "icon": "perk_mercy.png",
+   "dim": "perk_mercy_dim.png"
+  },
+  "steady_flame": {
+   "icon": "perk_steady_flame.png",
+   "dim": "perk_steady_flame_dim.png"
+  },
+  "sanctuary": {
+   "icon": "perk_sanctuary.png",
+   "dim": "perk_sanctuary_dim.png"
+  },
+  "ember_ward": {
+   "icon": "perk_ember_ward.png",
+   "dim": "perk_ember_ward_dim.png"
+  },
+  "deep_frost": {
+   "icon": "perk_deep_frost.png",
+   "dim": "perk_deep_frost_dim.png"
+  },
+  "tidecaller": {
+   "icon": "perk_tidecaller.png",
+   "dim": "perk_tidecaller_dim.png"
+  },
+  "shatter": {
+   "icon": "perk_shatter.png",
+   "dim": "perk_shatter_dim.png"
+  },
+  "cold_blood": {
+   "icon": "perk_cold_blood.png",
+   "dim": "perk_cold_blood_dim.png"
+  }
+ },
+ "iconSize": [
+  24,
+  24
+ ],
+ "heroes": {
+  "brannoc": {
+   "3": [
+    "shield_wall",
+    "cleave"
+   ],
+   "5": [
+    "stubborn",
+    "heavy_swing"
+   ]
+  },
+  "mags": {
+   "3": [
+    "quick_hands",
+    "dirty_tricks"
+   ],
+   "5": [
+    "backstab",
+    "light_fingers"
+   ]
+  },
+  "wren": {
+   "3": [
+    "mercy",
+    "steady_flame"
+   ],
+   "5": [
+    "sanctuary",
+    "ember_ward"
+   ]
+  },
+  "ilsevar": {
+   "3": [
+    "deep_frost",
+    "tidecaller"
+   ],
+   "5": [
+    "shatter",
+    "cold_blood"
+   ]
+  }
+ },
+ "images": {
+  "bg": "perk_pick_bg.png",
+  "card": "perk_card.png",
+  "cardSelected": "perk_card_selected.png",
+  "cardPressed": "perk_card_pressed.png",
+  "confirm": "btn_confirm.png",
+  "confirmPressed": "btn_confirm_pressed.png",
+  "confirmDisabled": "btn_confirm_disabled.png",
+  "back": "btn_back.png",
+  "backPressed": "btn_back_pressed.png",
+  "buttonStretch": {
+   "normal": "../panel/button_9slice.png",
+   "pressed": "../panel/button_pressed_9slice.png",
+   "sliceMargin": 4
+  }
+ },
+ "rects": {
+  "bg": [
+   0,
+   0,
+   270,
+   585
+  ],
+  "panel": [
+   4,
+   66,
+   262,
+   315
+  ],
+  "portrait": [
+   103,
+   80,
+   64,
+   64
+  ],
+  "portraitWell": [
+   101,
+   78,
+   68,
+   68
+  ],
+  "title": [
+   12,
+   152,
+   246,
+   10
+  ],
+  "sub": [
+   [
+    12,
+    168,
+    246,
+    10
+   ],
+   [
+    12,
+    178,
+    246,
+    10
+   ]
+  ],
+  "cards": [
+   [
+    8,
+    196,
+    254,
+    60
+   ],
+   [
+    8,
+    264,
+    254,
+    60
+   ]
+  ],
+  "confirm": [
+   131,
+   338,
+   76,
+   31
+  ],
+  "back": [
+   63,
+   338,
+   60,
+   31
+  ]
+ },
+ "cardLayout": {
+  "note": "offsets inside a card (add the card x,y). Icon at 1x (24x24): ART_STYLE sec. 1 forbids mixing pixel sizes on one screen.",
+  "w": 254,
+  "h": 60,
+  "iconWell": [
+   4,
+   4,
+   28,
+   28
+  ],
+  "icon": [
+   6,
+   6,
+   24,
+   24
+  ],
+  "name": [
+   38,
+   13,
+   210,
+   10
+  ],
+  "desc": [
+   [
+    6,
+    37,
+    242,
+    10
+   ],
+   [
+    6,
+    47,
+    242,
+    10
+   ]
+  ],
+  "descMaxGlyphsPerLine": 40,
+  "pressedOffsetY": 1
+ },
+ "text": {
+  "font": "font/font_5x7.png via font_5x7.json glyphs (look Greek up by glyphs)",
+  "advance": 6,
+  "lineHeight": 10,
+  "colour": {
+   "title": "#ffbe5a",
+   "sub": "#bcb8a8",
+   "name": "#ffbe5a",
+   "nameDim": "#867961",
+   "desc": "#d8ccb0",
+   "button": "#d8ccb0"
+  },
+  "shadow": "#1a1210 at +1,+1",
+  "align": {
+   "title": "centre in rect",
+   "sub": "centre each line, word-wrap at 41 glyphs, max 2 lines",
+   "name": "left, y = rect y (glyph box top)",
+   "desc": "left, word-wrap at 40 glyphs, max 2 lines",
+   "button": "centre: x = (w - textWidth)//2 (+1 if even), y = 12; pressed +1"
+  },
+  "sources": {
+   "title": "screen.title",
+   "sub": "screen.sub ({hero} = hero display name)",
+   "confirm": "screen.confirm",
+   "back": "screen.back",
+   "name": "perks.<id>.name",
+   "desc": "perks.<id>.desc"
+  }
+ },
+ "states": {
+  "start": "both cards perk_card.png, both icons full colour, confirm = btn_confirm_disabled.png (ignore taps)",
+  "tapCard": "that card -> perk_card_selected.png; the OTHER card keeps perk_card.png but its icon swaps to perk_<id>_dim.png and its name to nameDim; confirm enabled",
+  "finger down on a card or button": "*_pressed.png and content +1 px down",
+  "hudLater": "character sheet: chosen perk = perk_<id>.png, the perk not taken = perk_<id>_dim.png; level 5 slots before level 5 = both _dim"
+ },
+ "tapTargets": "every tap rect >= 31 px tall (45 pt on iPhone 15)",
+ "wrapCheck": {
+  "en.shield_wall": {
+   "descLines": 2,
+   "nameWidthPx": 65,
+   "missingGlyphs": []
+  },
+  "en.cleave": {
+   "descLines": 2,
+   "nameWidthPx": 35,
+   "missingGlyphs": []
+  },
+  "en.stubborn": {
+   "descLines": 2,
+   "nameWidthPx": 47,
+   "missingGlyphs": []
+  },
+  "en.heavy_swing": {
+   "descLines": 2,
+   "nameWidthPx": 65,
+   "missingGlyphs": []
+  },
+  "en.quick_hands": {
+   "descLines": 1,
+   "nameWidthPx": 65,
+   "missingGlyphs": []
+  },
+  "en.dirty_tricks": {
+   "descLines": 2,
+   "nameWidthPx": 71,
+   "missingGlyphs": []
+  },
+  "en.backstab": {
+   "descLines": 2,
+   "nameWidthPx": 47,
+   "missingGlyphs": []
+  },
+  "en.light_fingers": {
+   "descLines": 2,
+   "nameWidthPx": 77,
+   "missingGlyphs": []
+  },
+  "en.mercy": {
+   "descLines": 2,
+   "nameWidthPx": 29,
+   "missingGlyphs": []
+  },
+  "en.steady_flame": {
+   "descLines": 2,
+   "nameWidthPx": 71,
+   "missingGlyphs": []
+  },
+  "en.sanctuary": {
+   "descLines": 2,
+   "nameWidthPx": 53,
+   "missingGlyphs": []
+  },
+  "en.ember_ward": {
+   "descLines": 2,
+   "nameWidthPx": 59,
+   "missingGlyphs": []
+  },
+  "en.deep_frost": {
+   "descLines": 2,
+   "nameWidthPx": 59,
+   "missingGlyphs": []
+  },
+  "en.tidecaller": {
+   "descLines": 2,
+   "nameWidthPx": 59,
+   "missingGlyphs": []
+  },
+  "en.shatter": {
+   "descLines": 2,
+   "nameWidthPx": 41,
+   "missingGlyphs": []
+  },
+  "en.cold_blood": {
+   "descLines": 2,
+   "nameWidthPx": 59,
+   "missingGlyphs": []
+  },
+  "el.shield_wall": {
+   "descLines": 2,
+   "nameWidthPx": 35,
+   "missingGlyphs": []
+  },
+  "el.cleave": {
+   "descLines": 2,
+   "nameWidthPx": 35,
+   "missingGlyphs": []
+  },
+  "el.stubborn": {
+   "descLines": 2,
+   "nameWidthPx": 65,
+   "missingGlyphs": []
+  },
+  "el.heavy_swing": {
+   "descLines": 2,
+   "nameWidthPx": 71,
+   "missingGlyphs": []
+  },
+  "el.quick_hands": {
+   "descLines": 2,
+   "nameWidthPx": 77,
+   "missingGlyphs": []
+  },
+  "el.dirty_tricks": {
+   "descLines": 2,
+   "nameWidthPx": 77,
+   "missingGlyphs": []
+  },
+  "el.backstab": {
+   "descLines": 2,
+   "nameWidthPx": 53,
+   "missingGlyphs": []
+  },
+  "el.light_fingers": {
+   "descLines": 2,
+   "nameWidthPx": 65,
+   "missingGlyphs": []
+  },
+  "el.mercy": {
+   "descLines": 1,
+   "nameWidthPx": 29,
+   "missingGlyphs": []
+  },
+  "el.steady_flame": {
+   "descLines": 2,
+   "nameWidthPx": 77,
+   "missingGlyphs": []
+  },
+  "el.sanctuary": {
+   "descLines": 2,
+   "nameWidthPx": 29,
+   "missingGlyphs": []
+  },
+  "el.ember_ward": {
+   "descLines": 2,
+   "nameWidthPx": 77,
+   "missingGlyphs": []
+  },
+  "el.deep_frost": {
+   "descLines": 2,
+   "nameWidthPx": 53,
+   "missingGlyphs": []
+  },
+  "el.tidecaller": {
+   "descLines": 2,
+   "nameWidthPx": 77,
+   "missingGlyphs": []
+  },
+  "el.shatter": {
+   "descLines": 2,
+   "nameWidthPx": 41,
+   "missingGlyphs": []
+  },
+  "el.cold_blood": {
+   "descLines": 2,
+   "nameWidthPx": 53,
+   "missingGlyphs": []
+  }
+ },
+ "pending": {
+  "what": "'Perk waiting' badge: the hero reached level 3/5 but closed the pick screen with Back. Shown until a perk is picked.",
+  "frames": [
+   "perk_pending_1.png",
+   "perk_pending_2.png",
+   "perk_pending_3.png",
+   "perk_pending_4.png"
+  ],
+  "size": [
+   11,
+   11
+  ],
+  "fps": 2,
+  "loop": "frames 1-2-3-4 then repeat (2 s cycle); frame 4 = frame 2 on purpose (rest, mid, peak, mid)",
+  "calm": "brightness change is gentle on purpose (Loukas: no flicker). Do not speed up, do not add alpha blinking or scaling.",
+  "offsetOnPortrait64": [
+   52,
+   1
+  ],
+  "offsetNote": "offset of the badge top-left from the 64x64 portrait top-left (hero sheet, pick screen). In the panel the portrait is shown at 44x44: draw the badge UNSCALED (1 art px = 1 canvas px, never resize it with the portrait) at offsetOnPanelPortrait44.",
+  "offsetOnPanelPortrait44": [
+   36,
+   -3
+  ],
+  "drawOrder": "portrait -> downed / level-up overlays -> badge (always on top)",
+  "tap": "tapping the portrait still opens the hero sheet (no separate tap target for the badge)",
+  "heroSheet": "while a perk is waiting, the hero sheet shows a 'Choose a gift' entry (story/perks.json screen.title, Greek 'Διάλεξε δώρο') with the badge next to it; tapping it reopens this pick screen for that hero and level.",
+  "stacking": "if both level 3 and level 5 picks are waiting (skipped twice), one badge only; the sheet shows two entries, level 3 first."
+ }
+}

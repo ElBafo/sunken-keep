@@ -211,6 +211,10 @@ export class PartyHud {
       cache('hint2', 'art/ui/hands/hand_glow_hint_2.png'),
       cache('hint3', 'art/ui/hands/hand_glow_hint_3.png'),
       cache('hint4', 'art/ui/hands/hand_glow_hint_4.png'),
+      cache('perk1', 'art/ui/perks/perk_pending_1.png'),
+      cache('perk2', 'art/ui/perks/perk_pending_2.png'),
+      cache('perk3', 'art/ui/perks/perk_pending_3.png'),
+      cache('perk4', 'art/ui/perks/perk_pending_4.png'),
       ...portraitFiles.map((name) => cache(name, `art/portraits/${name}.png`)),
       ...[...this.icons.values()].map((file) => cache(file, `art/ui/hands/${file}`))
     ]);
@@ -507,7 +511,7 @@ export class PartyHud {
       const hero = this.heroes[id];
       const layout = this.layoutHeroes.get(id);
       if (!layout) continue;
-      this.drawPortrait(ctx, hero, layout.portrait);
+      this.drawPortrait(ctx, hero, layout.portrait, now);
       this.drawBar(ctx, layout.hpBar, hero.hp / hero.maxHp, hero.hp > hero.maxHp * 0.3 ? '#4a8a3a' : '#8a3a3a', '#2a1a1a');
       if (layout.manaBar && hero.maxMana > 0) {
         this.drawBar(ctx, layout.manaBar, hero.mana / hero.maxMana, '#3a5a8a', '#1a1a2a');
@@ -533,7 +537,7 @@ export class PartyHud {
     }
   }
 
-  private drawPortrait(ctx: CanvasRenderingContext2D, hero: HeroHud, rect: Rect) {
+  private drawPortrait(ctx: CanvasRenderingContext2D, hero: HeroHud, rect: Rect, now: number) {
     const [x, y, w, h] = rect;
     const img = this.images.get(this.portraitKey(hero));
     if (img) ctx.drawImage(img, x, y, w, h);
@@ -559,13 +563,17 @@ export class PartyHud {
       if (flash) ctx.drawImage(flash, x, y, w, h);
       if (t >= 3) this.levelFlash = null;
     }
-    if (hero.pendingPerk) {
-      ctx.fillStyle = '#f0d060';
-      ctx.fillRect(x + w - 3, y + 1, 2, 2);
-    }
     ctx.lineWidth = hero.formation === 'front' ? 2 : 1;
     ctx.strokeStyle = hero.formation === 'front' ? '#cd7f32' : '#8a8a8a';
     ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    if (hero.pendingPerk) this.drawPerkBadge(ctx, x, y, now);
+  }
+
+  private drawPerkBadge(ctx: CanvasRenderingContext2D, portraitX: number, portraitY: number, now: number) {
+    const frame = (Math.floor((now / 1000) * 2) % 4) + 1;
+    const img = this.images.get(`perk${frame}`);
+    if (!img) return;
+    ctx.drawImage(img, portraitX + 36, portraitY - 3);
   }
 
   private drawBar(ctx: CanvasRenderingContext2D, rect: Rect, pct: number, fill: string, back: string) {

@@ -18,7 +18,9 @@
     "behavior": {
       "habit": "latch",
       "tell": "none, they just cling",
-      "counter": "green potion pulls them off; fire damage makes them let go"
+      "counter": "green potion pulls them off; fire damage makes them let go",
+      "stationary": true,
+      "stationary_note": "stay in their water; only fight when the party is next to them"
     }
   },
   "keep_rat": {
@@ -72,7 +74,9 @@
       "habit": "resist_blades",
       "detail": "axe and dagger deal half damage; mace and frost deal full, frost +25%",
       "tell": "blades sink in with a wet thunk",
-      "counter": "Ilsevar's frost, Wren swapping forward"
+      "counter": "Ilsevar's frost, Wren swapping forward",
+      "stationary": true,
+      "stationary_note": "never chases; it blocks the arch to the guard hall so the crab and slime are separate fights"
     }
   },
   "drowned_dwarf": {

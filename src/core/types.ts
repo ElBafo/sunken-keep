@@ -49,6 +49,7 @@ export interface MonsterBehavior {
   frostBonus?: number;
   phaseHpFrac?: number;
   block?: 'halve' | 'negate';
+  stationary?: boolean;
 }
 
 export interface MonsterDef {

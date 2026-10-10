@@ -287,12 +287,20 @@ export class CombatEngine {
   }
 
   private pickHeroTarget(preferBack = false): HeroState | null {
+    return this.pickStandingHero(preferBack);
+  }
+
+  private pickStandingHero(preferBack = false): HeroState | null {
     const back = this.living('back');
     const front = this.living('front');
     if (preferBack && back.length) return this.rng.pick(back);
     if (front.length) return this.rng.pick(front);
     if (back.length) return this.rng.pick(back);
     return null;
+  }
+
+  private isStationary(m: MonsterState): boolean {
+    return !!this.def(m.kind)?.behavior.stationary;
   }
 
   private heroAc(h: HeroState, now: number): number {
@@ -347,6 +355,7 @@ export class CombatEngine {
   }
 
   private applyDamageToHero(h: HeroState, raw: number, now: number, opts?: { ignoreHalf?: boolean }): number {
+    if (h.downed || h.hp <= 0) return 0;
     let n = Math.max(0, Math.floor(raw));
     if (!opts?.ignoreHalf && now < this.halfNextUntil && n > 0) {
       n = Math.max(1, Math.floor(n / 2));
@@ -486,7 +495,6 @@ export class CombatEngine {
     if (this.gameOver) return this.flush();
     if (hero.downed || hero.hp <= 0) {
       this.emit({ type: 'denied', hero: heroId, reason: 'downed' });
-      this.emit({ type: 'log', key: 'hero_down', vars: { hero: heroId } });
       return this.flush();
     }
     if (now < hero.webbedUntil) {
@@ -754,6 +762,7 @@ export class CombatEngine {
     if (now < this.chaseReadyAt) return;
     this.chaseReadyAt = now + 0.45;
     for (const m of this.livingMonsters()) {
+      if (this.isStationary(m)) continue;
       if (!m.noticed) continue;
       const dist = manhattan(m.x, m.y, this.partyX, this.partyY);
       if (dist <= 1) continue;
@@ -841,7 +850,7 @@ export class CombatEngine {
     if (!def) return;
     const side = this.monsterSide(m);
     if (side && side !== 'front') {
-      this.emit({ type: 'log', key: `attacked_${side}`, vars: { monster: m.kind } });
+      this.emit({ type: 'log', key: `monster_flank_${side}`, vars: { monster: m.kind } });
       this.emit({ type: 'flank', side });
     }
     const attackSfx = m.kind === 'captain_dural' ? 'drowned_dwarf_attack' : `${m.kind}_attack`;
@@ -859,7 +868,7 @@ export class CombatEngine {
     }
 
     const preferBack = kind === 'dart';
-    const target = this.pickHeroTarget(preferBack);
+    const target = this.pickStandingHero(preferBack);
     if (!target) return;
 
     if (kind === 'pinch' || kind === 'slam') {
@@ -894,6 +903,11 @@ export class CombatEngine {
   }
 
   private monsterHitHero(m: MonsterState, target: HeroState, now: number, dmg: number, canLatch: boolean) {
+    if (target.downed || target.hp <= 0) {
+      const other = this.pickStandingHero();
+      if (!other) return;
+      target = other;
+    }
     const dealt = this.applyDamageToHero(target, dmg, now);
     this.emit({ type: 'log', key: 'monster_hit', vars: { monster: m.kind, hero: target.id, n: dealt } });
     if (dealt > 0) this.emit({ type: 'sfx', name: 'hurt', combat: true });

@@ -60,7 +60,9 @@ describe('src/core combat rules', () => {
     expect(rules.monsters.rust_crab.behavior.block).toBe('halve');
     expect(rules.monsters.slime.behavior.habit).toBe('resist_blades');
     expect(rules.monsters.slime.behavior.frostBonus).toBe(0.25);
+    expect(rules.monsters.slime.behavior.stationary).toBe(true);
     expect(rules.monsters.bog_leeches.behavior.habit).toBe('latch');
+    expect(rules.monsters.bog_leeches.behavior.stationary).toBe(true);
     expect(rules.monsters.cellar_spider.behavior.habit).toBe('web');
     expect(rules.monsters.cellar_spider.behavior.chance).toBe(0.25);
     expect(rules.monsters.cellar_spider.behavior.duration).toBe(3);
@@ -364,7 +366,7 @@ describe('src/core combat rules', () => {
     const crab = flank.spawnMonster('rust_crab', 0, -1);
     flank.beginFight(crab, 0);
     const ev = flank.tick(0.5);
-    expect(logs(ev, 'attacked_left').length).toBe(1);
+    expect(logs(ev, 'monster_flank_left').length).toBe(1);
     expect(ev.some((x) => x.type === 'flank' && x.side === 'left')).toBe(true);
     expect(flank.partyDir).toBe(1);
   });
@@ -445,7 +447,8 @@ describe('src/core combat rules', () => {
 
     e.debugSetHp('wren', 0);
     const down = e.useHand('wren', 'main', 1);
-    expect(logs(down, 'hero_down').length).toBe(1);
+    expect(down.some((x) => x.type === 'denied' && x.reason === 'downed')).toBe(true);
+    expect(logs(down, 'hero_down').length).toBe(0);
 
     const sand = new CombatEngine(rules, {
       d20: () => 18,
@@ -476,6 +479,48 @@ describe('src/core combat rules', () => {
     expect(logs(early, 'monster_hit').length).toBe(0);
     const first = e.tick(0.5);
     expect(logs(first, 'monster_hit').length).toBe(1);
+  });
+
+  it('skips chase for stationary slime and leeches', () => {
+    const e = engine();
+    e.setChaseEnabled(true);
+    e.setPartyPos(0, 0, 1);
+    const slime = e.spawnMonster('slime', 4, 0);
+    const leech = e.spawnMonster('bog_leeches', 0, 4);
+    const rat = e.spawnMonster('keep_rat', 2, 3);
+    const ratStart = Math.abs(rat.x) + Math.abs(rat.y);
+    for (let t = 0; t <= 4; t += 0.5) e.tick(t);
+    expect(slime.x).toBe(4);
+    expect(slime.y).toBe(0);
+    expect(leech.x).toBe(0);
+    expect(leech.y).toBe(4);
+    expect(Math.abs(rat.x) + Math.abs(rat.y)).toBeLessThan(ratStart);
+  });
+
+  it('logs collapse and plays down sfx once, then retargets a standing hero', () => {
+    const e = new CombatEngine(rules, {
+      d20: () => 20,
+      int: () => 12,
+      next: () => 0,
+      pick: <T>(xs: T[]) => xs[0],
+      chance: () => false
+    } as unknown as Rng);
+    e.debugSetHp('brannoc', 1);
+    fight(e, 'keep_rat', 0);
+    const down = e.tick(0.5);
+    expect(logs(down, 'hero_down').length).toBe(1);
+    expect(down.filter((x) => x.type === 'hero_down' && x.hero === 'brannoc').length).toBe(1);
+    expect(down.filter((x) => x.type === 'sfx' && x.name === 'hero_down').length).toBe(1);
+    expect(e.heroes.brannoc.downed).toBe(true);
+
+    const interval = rules.monsters.keep_rat.interval;
+    const again = e.tick(0.5 + interval);
+    expect(logs(again, 'hero_down').length).toBe(0);
+    expect(again.some((x) => x.type === 'hero_down')).toBe(false);
+    expect(again.some((x) => x.type === 'sfx' && x.name === 'hero_down')).toBe(false);
+    const hits = again.filter((x) => x.type === 'log' && x.key === 'monster_hit');
+    expect(hits.length).toBeGreaterThan(0);
+    expect(hits.every((x) => x.type === 'log' && x.vars?.hero !== 'brannoc')).toBe(true);
   });
 });
 

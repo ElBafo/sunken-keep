@@ -549,18 +549,18 @@
   "when": "a monster misses because of pocket sand"
  },
  {
-  "key": "attacked_left",
-  "text": "{monster} attacks from the left!",
-  "when": "a monster strikes from the square to the party's left"
+  "key": "monster_flank_left",
+  "text": "{monster}: attacks from the left!",
+  "when": "a monster attacks the party from a side or behind it isn't facing (red edge flash)"
  },
  {
-  "key": "attacked_right",
-  "text": "{monster} attacks from the right!",
-  "when": "a monster strikes from the square to the party's right"
+  "key": "monster_flank_right",
+  "text": "{monster}: attacks from the right!",
+  "when": "a monster attacks the party from a side or behind it isn't facing (red edge flash)"
  },
  {
-  "key": "attacked_behind",
-  "text": "{monster} attacks from behind!",
-  "when": "a monster strikes from the square behind the party"
+  "key": "monster_flank_behind",
+  "text": "{monster}: attacks from behind!",
+  "when": "a monster attacks the party from a side or behind it isn't facing (red edge flash)"
  }
 ]

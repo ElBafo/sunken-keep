@@ -179,6 +179,8 @@ test('proto3d combat: block square, first swing, voices, perks, game over', asyn
   expect(perk.hooks.length, 'perk hook is not released mid-fight').toBe(0);
   expect(perk.screen, 'no perk screen mid-fight').toBe(false);
   expect(perk.overlay, 'no perk overlay node').toBe(false);
+  await page.waitForTimeout(80);
+  await page.screenshot({ path: `${OUT}/combat-perk-badge.png`, fullPage: false });
 
   await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.finishFight());
   const afterFight = await page.evaluate(() => {
