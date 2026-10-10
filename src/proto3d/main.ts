@@ -12,6 +12,7 @@ import {
   OIL_TORCH_COST,
   parseAmbientFloor,
   STEP_VOLUME,
+  SWAP_ARM_MS,
   TORCH_IGNITE_FLARE_MS
 } from './constants';
 import { Dressing } from './dressing';
@@ -31,8 +32,14 @@ import { DarkFx } from './dark-fx';
 import { PropBuilder } from './props';
 import { StoryText } from './i18n';
 import { loadLayout585 } from './layout585';
-import { PartyHud, type HandSlot } from './party-hud';
+import { PartyHud, type GearId, type HandSlot } from './party-hud';
 import type { HeroId } from '../constants';
+
+export interface BagEntry {
+  item: GearId;
+  count: number;
+  from?: { hero: HeroId; hand: HandSlot };
+}
 
 class Game {
   renderer!: PixelRenderer;
@@ -55,6 +62,10 @@ class Game {
   story = new StoryText();
   hud!: PartyHud;
   private torchChoice: { sconce: Sconce } | null = null;
+  private swapSconce: Sconce | null = null;
+  private swapUntil = 0;
+  private swapTimer: ReturnType<typeof setTimeout> | null = null;
+  bag: BagEntry[] = [];
   lastMessage = '';
   lampNote = { title: '', text: '' };
   noteOpen = false;
@@ -140,7 +151,10 @@ class Game {
       onUse: (hero, hand) => this.handleHandTap(hero, hand),
       onLog: () => this.audioManager?.playUi('ui_log_line'),
       playUi: (name) => this.audioManager?.playUi(name),
-      onCancel: () => this.hideTorchChoice()
+      onCancel: () => {
+        this.cancelSwap();
+        this.hideTorchChoice();
+      }
     });
     this.loadLampNote();
     this.updateOilHud();
@@ -154,6 +168,7 @@ class Game {
 
     this.inputManager = new InputManager(this.player, {
       onMove: (result) => {
+        this.cancelSwap();
         this.hideTorchChoice();
         this.handleMove(result);
       },
@@ -166,6 +181,7 @@ class Game {
   }
 
   handleMove(result: MoveResult) {
+    this.cancelSwap();
     if (result === 'ok') {
       this.playFootstep(this.player.moveToX, this.player.moveToY);
       this.maybeDunkTorch(this.player.moveToX, this.player.moveToY);
@@ -372,6 +388,7 @@ class Game {
 
   interact() {
     this.interactCount += 1;
+    if (this.cancelSwap()) return;
     if (this.torchChoice) {
       this.hideTorchChoice();
       return;
@@ -440,30 +457,83 @@ class Game {
     if (sconce) this.snuffTorch(sconce);
   }
 
-  private takeWallTorch(sconce: Sconce) {
-    if (!sconce.lit || sconce.capped) return;
-    const slot = this.hud.findFreeFrontHand();
-    if (!slot) {
-      this.showMessage(this.story.uiText('step1_party_panel.torch_choice.hands_full') || this.storyLog('hands_full'));
+  isSwapArmed(): boolean {
+    return this.swapSconce != null && performance.now() < this.swapUntil;
+  }
+
+  cancelSwap(): boolean {
+    const was = this.swapSconce != null;
+    if (this.swapTimer != null) {
+      clearTimeout(this.swapTimer);
+      this.swapTimer = null;
+    }
+    this.swapSconce = null;
+    this.swapUntil = 0;
+    this.hud?.setSwapHighlight(false);
+    return was;
+  }
+
+  private armSwap(sconce: Sconce) {
+    if (this.swapTimer != null) clearTimeout(this.swapTimer);
+    this.swapSconce = sconce;
+    this.swapUntil = performance.now() + SWAP_ARM_MS;
+    this.hud.setSwapHighlight(true);
+    this.swapTimer = setTimeout(() => {
+      this.swapTimer = null;
+      this.cancelSwap();
+    }, SWAP_ARM_MS);
+  }
+
+  private takeBagFrom(hero: HeroId, hand: HandSlot): GearId | null {
+    const i = this.bag.findIndex((slot) => slot.from?.hero === hero && slot.from?.hand === hand);
+    if (i < 0) return null;
+    const [slot] = this.bag.splice(i, 1);
+    return slot.item;
+  }
+
+  private giveTorchTo(sconce: Sconce, hero: HeroId, hand: HandSlot) {
+    if (!sconce.lit || sconce.capped) {
+      this.cancelSwap();
       return;
     }
-    const now = performance.now();
+    const current = this.hud.heroes[hero]?.equipment[hand];
+    if (current && current !== 'empty_hand') {
+      this.bag.push({ item: current, count: 1, from: { hero, hand } });
+      this.showMessage(
+        this.storyLog('unequip', {
+          hero: this.story.heroName(hero),
+          item: this.story.itemName(current)
+        })
+      );
+    }
     this.torches.takeOffWall(sconce);
     this.audioManager.stopTorchLoop(sconce);
-    this.hud.setHand(slot.hero, slot.hand, 'torch_lit');
+    this.hud.setHand(hero, hand, 'torch_lit');
+    this.cancelSwap();
     this.vertexLighting.relight();
     this.syncCarriedLight();
     saveProgress(floor1Sconces, this.oil, this.persist);
     this.audioManager.playUi('torch_take');
-    this.showMessage(this.storyLog('torch_take', { hero: this.story.heroName(slot.hero) }));
-    void now;
+    this.showMessage(this.storyLog('torch_take', { hero: this.story.heroName(hero) }));
+  }
+
+  private takeWallTorch(sconce: Sconce) {
+    if (!sconce.lit || sconce.capped) return;
+    const slot = this.hud.findFreeHand();
+    if (!slot) {
+      this.armSwap(sconce);
+      this.showMessage(this.story.uiText('torch_choice.hands_full') || this.storyLog('hands_full'));
+      return;
+    }
+    this.giveTorchTo(sconce, slot.hero, slot.hand);
   }
 
   private placeCarriedTorch(sconce: Sconce) {
     const held = this.hud.carriedTorch();
     if (!held || !held.lit || sconce.lit || sconce.capped) return;
     const now = performance.now();
-    this.hud.setHand(held.hero, held.hand, 'empty_hand');
+    const restored = this.takeBagFrom(held.hero, held.hand);
+    this.hud.setHand(held.hero, held.hand, restored ?? 'empty_hand');
     this.torches.ignite(sconce, now);
     this.vertexLighting.relight();
     this.syncCarriedLight();
@@ -492,6 +562,11 @@ class Game {
 
   handleHandTap(hero: HeroId, hand: HandSlot) {
     this.hideTorchChoice();
+    if (this.isSwapArmed() && this.swapSconce) {
+      this.giveTorchTo(this.swapSconce, hero, hand);
+      return;
+    }
+    this.cancelSwap();
     this.useHand(hero, hand);
   }
 
@@ -528,6 +603,7 @@ class Game {
     (window as unknown as { __proto3d: unknown }).__proto3d = {
       ready: true,
       setPosition: (x: number, y: number, dir: number) => {
+        this.cancelSwap();
         this.hideTorchChoice();
         this.player.setPosition(x, y, dir);
         this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
@@ -726,6 +802,9 @@ class Game {
       handTapCount: () => this.hud.handTapCount,
       carriedTorch: () => this.hud.carriedTorch(),
       hasCarriedTorchLight: () => this.vertexLighting.hasCarriedTorch(),
+      getBag: () => this.bag.map((slot) => ({ ...slot, from: slot.from ? { ...slot.from } : undefined })),
+      swapArmed: () => this.isSwapArmed(),
+      swapHighlightCount: () => document.querySelectorAll('.hand-btn.swap-armed').length,
       playLevelUp: (id: HeroId) => this.hud.playLevelUp(id),
       logLines: () => this.hud.logLines.slice(),
       layout: () => this.hud.layout,
@@ -738,8 +817,16 @@ class Game {
           : { x: this.player.x, y: this.player.y, dir: this.player.dir };
         return { result, before, after: dest };
       },
-      tryTurnLeft: () => this.player.turnLeft(),
-      tryTurnRight: () => this.player.turnRight(),
+      tryTurnLeft: () => {
+        this.cancelSwap();
+        this.hideTorchChoice();
+        return this.player.turnLeft();
+      },
+      tryTurnRight: () => {
+        this.cancelSwap();
+        this.hideTorchChoice();
+        return this.player.turnRight();
+      },
       doorOpen: (x: number, y: number) => !!this.sceneBuilder.doors.get(x, y)?.tile.doorOpen,
       openDoor: (x: number, y: number) => {
         const visual = this.sceneBuilder.doors.get(x, y);

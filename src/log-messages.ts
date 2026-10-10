@@ -2,11 +2,18 @@
 
 interface LogEntry {
   key: string;
-  text: string;
+  text?: string;
+  lines?: string[];
   when?: string;
 }
 
 let logEntries: Map<string, string> = new Map();
+
+function entryText(entry: LogEntry): string {
+  if (typeof entry.text === 'string' && entry.text) return entry.text;
+  if (Array.isArray(entry.lines) && entry.lines.length) return entry.lines.join(' ');
+  return '';
+}
 
 export async function loadLogMessages() {
   try {
@@ -14,7 +21,8 @@ export async function loadLogMessages() {
     const entries: LogEntry[] = await response.json();
     
     entries.forEach(entry => {
-      logEntries.set(entry.key, entry.text);
+      const text = entryText(entry);
+      if (entry.key && text) logEntries.set(entry.key, text);
     });
     
     console.log(`Loaded ${logEntries.size} log messages`);

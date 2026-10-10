@@ -32,6 +32,9 @@ type Proto3d = {
   tryMoveForward: () => { result: string; after: { x: number; y: number; dir: number } };
   getOil: () => number;
   setOil: (n: number) => void;
+  getBag: () => Array<{ item: string; count: number; from?: { hero: string; hand: string } }>;
+  swapArmed: () => boolean;
+  swapHighlightCount: () => number;
 };
 
 test.use(devices['iPhone 15']);
@@ -135,7 +138,6 @@ test('proto3d party panel: portraits, hands, take/snuff, dunk, 44pt targets', as
 
   await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-    p.setHand('brannoc', 'off', 'empty_hand');
     p.setPosition(1, 6, 3);
     p.interact();
   });
@@ -155,39 +157,203 @@ test('proto3d party panel: portraits, hands, take/snuff, dunk, 44pt targets', as
   expect(choiceSize.snuff!.h, 'Snuff height >= 44pt').toBeGreaterThanOrEqual(44);
   await page.screenshot({ path: `${OUT}/party-panel-take-snuff.png`, fullPage: false });
 
-  const interactBefore = await page.evaluate(() => {
-    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-    return { lit: p.torchLit(0, 6), count: (window as unknown as { __proto3d: { interactCount?: () => number } }).__proto3d };
-  });
-  void interactBefore;
+  const handsAtStart = await page.evaluate(() =>
+    (window as unknown as { __proto3d: Proto3d }).__proto3d.getHands()
+  );
+  expect(
+    handsAtStart.every((h) => h.main !== 'empty_hand' && h.off !== 'empty_hand'),
+    'every starting hand is full'
+  ).toBe(true);
+
   await take.tap();
-  await page.waitForTimeout(120);
-  const taken = await page.evaluate(() => {
+  await page.waitForTimeout(80);
+  const armed = await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
     return {
-      hands: p.getHands(),
+      armed: p.swapArmed(),
+      highlights: p.swapHighlightCount(),
       lit: p.torchLit(0, 6),
       carried: p.carriedTorch(),
-      pool: p.hasCarriedTorchLight(),
-      source: p.sourceLight(1, 6),
       choice: p.torchChoiceVisible(),
       msg: p.lastMessage()
     };
   });
-  expect(taken.choice, 'choice closes after Take').toBe(false);
-  expect(taken.lit, 'wall torch removed').toBe(false);
-  expect(taken.carried, 'torch in a hand').toMatchObject({ lit: true });
-  expect(taken.pool, 'carried torch lights the party square').toBe(true);
-  expect(taken.source, 'party square has a torch pool').toBeGreaterThan(0.2);
-  expect(taken.msg.toLowerCase(), 'take log line').toMatch(/takes the torch/);
-  await page.screenshot({ path: `${OUT}/party-panel-carried-torch.png`, fullPage: false });
+  expect(armed.choice, 'choice closes after Take with full hands').toBe(false);
+  expect(armed.lit, 'wall torch stays until a hand is chosen').toBe(true);
+  expect(armed.carried, 'no torch taken yet').toBeNull();
+  expect(armed.armed, 'swap mode armed').toBe(true);
+  expect(armed.highlights, 'all eight hands highlighted').toBe(8);
+  expect(armed.msg.toLowerCase(), 'hands-full prompt').toMatch(/no free hand|tap a hand to swap/);
+  await page.screenshot({ path: `${OUT}/party-panel-swap-armed.png`, fullPage: false });
+
+  await page.waitForTimeout(3200);
+  const timedOut = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    return { armed: p.swapArmed(), highlights: p.swapHighlightCount() };
+  });
+  expect(timedOut.armed, 'swap disarms after 3s').toBe(false);
+  expect(timedOut.highlights, 'hand highlight clears after 3s').toBe(0);
+
+  const tapsAfterTimeout = await page.evaluate(
+    () => (window as unknown as { __proto3d: Proto3d }).__proto3d.handTapCount()
+  );
+  await page.locator('.hand-btn[data-hero="brannoc"][data-hand="main"]').tap();
+  await page.waitForTimeout(80);
+  const usedAfterTimeout = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    return {
+      taps: p.handTapCount(),
+      last: p.lastHand(),
+      carried: p.carriedTorch(),
+      lit: p.torchLit(0, 6)
+    };
+  });
+  expect(usedAfterTimeout.taps, 'after 3s a hand tap uses the hand').toBe(tapsAfterTimeout + 1);
+  expect(usedAfterTimeout.last).toMatchObject({ hero: 'brannoc', hand: 'main' });
+  expect(usedAfterTimeout.carried, 'timeout tap does not swap').toBeNull();
+  expect(usedAfterTimeout.lit, 'wall torch still there after timeout').toBe(true);
+
+  await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.interact());
+  await expect(page.locator('#torch-choice')).toHaveClass(/show/);
+  await take.tap();
+  await page.waitForTimeout(80);
+  expect(
+    await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.swapArmed()),
+    'swap re-arms'
+  ).toBe(true);
+  const moved = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    const step = p.tryMoveForward();
+    return {
+      step,
+      armed: p.swapArmed(),
+      highlights: p.swapHighlightCount(),
+      carried: p.carriedTorch(),
+      lit: p.torchLit(0, 6)
+    };
+  });
+  expect(moved.armed, 'moving disarms swap').toBe(false);
+  expect(moved.highlights, 'move clears hand highlight').toBe(0);
+  expect(moved.carried, 'move does not complete a swap').toBeNull();
+  expect(moved.lit, 'wall torch still there after move-disarm').toBe(true);
 
   await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-    p.setHand('mags', 'off', 'empty_hand');
-    p.setPosition(1, 7, 0);
-    // restore a lit wall torch at (0,6) by placing? skip — snuff another lit torch
+    p.setPosition(1, 6, 3);
+    p.interact();
+  });
+  await expect(page.locator('#torch-choice')).toHaveClass(/show/);
+  await take.tap();
+  await page.waitForTimeout(80);
+  const tapsBeforeWren = await page.evaluate(
+    () => (window as unknown as { __proto3d: Proto3d }).__proto3d.handTapCount()
+  );
+  await page.locator('.hand-btn[data-hero="wren"][data-hand="off"]').tap();
+  await page.waitForTimeout(120);
+  const wrenSwap = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    return {
+      hands: p.getHands(),
+      bag: p.getBag(),
+      taps: p.handTapCount(),
+      last: p.lastHand(),
+      lit: p.torchLit(0, 6),
+      carried: p.carriedTorch(),
+      pool: p.hasCarriedTorchLight(),
+      source: p.sourceLight(1, 6),
+      armed: p.swapArmed(),
+      highlights: p.swapHighlightCount(),
+      msg: p.lastMessage()
+    };
+  });
+  expect(wrenSwap.taps, 'swap tap must not use the hand').toBe(tapsBeforeWren);
+  expect(wrenSwap.last, 'swap tap does not record a hand use').toMatchObject({
+    hero: 'brannoc',
+    hand: 'main'
+  });
+  expect(wrenSwap.lit, 'Wren take removes the wall torch').toBe(false);
+  expect(wrenSwap.carried, 'back-row Wren can carry the torch').toMatchObject({
+    hero: 'wren',
+    hand: 'off',
+    lit: true
+  });
+  expect(wrenSwap.hands.find((h) => h.id === 'wren')?.off).toBe('torch_lit');
+  expect(wrenSwap.bag, 'Wren lantern stowed in the bag').toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        item: 'prayer_lantern',
+        count: 1,
+        from: { hero: 'wren', hand: 'off' }
+      })
+    ])
+  );
+  expect(wrenSwap.pool, 'back-row torch still lights the party square').toBe(true);
+  expect(wrenSwap.source, 'party square has a torch pool').toBeGreaterThan(0.2);
+  expect(wrenSwap.armed, 'swap ends after the hand is chosen').toBe(false);
+  expect(wrenSwap.highlights).toBe(0);
+  expect(wrenSwap.msg.toLowerCase(), 'take log line').toMatch(/takes the torch/);
+  await page.screenshot({ path: `${OUT}/party-panel-carried-torch.png`, fullPage: false });
+
+  await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.interact());
+  await page.waitForTimeout(80);
+  const placed = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    return {
+      lit: p.torchLit(0, 6),
+      carried: p.carriedTorch(),
+      wrenOff: p.getHands().find((h) => h.id === 'wren')?.off,
+      bag: p.getBag()
+    };
+  });
+  expect(placed.lit, 'place puts the torch back').toBe(true);
+  expect(placed.carried).toBeNull();
+  expect(placed.wrenOff, 'place restores Wren lantern').toBe('prayer_lantern');
+  expect(placed.bag.find((s) => s.item === 'prayer_lantern')).toBeUndefined();
+
+  await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
     p.setPosition(6, 5, 0);
+    p.interact();
+  });
+  await expect(page.locator('#torch-choice')).toHaveClass(/show/);
+  await take.tap();
+  await page.waitForTimeout(80);
+  const tapsBeforeBrannoc = await page.evaluate(
+    () => (window as unknown as { __proto3d: Proto3d }).__proto3d.handTapCount()
+  );
+  await page.locator('.hand-btn[data-hero="brannoc"][data-hand="off"]').tap();
+  await page.waitForTimeout(120);
+  const brannocSwap = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    return {
+      hands: p.getHands(),
+      bag: p.getBag(),
+      taps: p.handTapCount(),
+      carried: p.carriedTorch(),
+      lit: p.torchLit(6, 4),
+      pool: p.hasCarriedTorchLight(),
+      msg: p.lastMessage()
+    };
+  });
+  expect(brannocSwap.taps, 'Brannoc swap does not use the hand').toBe(tapsBeforeBrannoc);
+  expect(brannocSwap.lit, 'Brannoc take removes the wall torch').toBe(false);
+  expect(brannocSwap.carried).toMatchObject({ hero: 'brannoc', hand: 'off', lit: true });
+  expect(brannocSwap.hands.find((h) => h.id === 'brannoc')?.off).toBe('torch_lit');
+  expect(brannocSwap.bag).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        item: 'shield',
+        count: 1,
+        from: { hero: 'brannoc', hand: 'off' }
+      })
+    ])
+  );
+  expect(brannocSwap.pool).toBe(true);
+  expect(brannocSwap.msg.toLowerCase()).toMatch(/takes the torch/);
+
+  await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    p.setPosition(3, 1, 1);
     p.interact();
   });
   await expect(page.locator('#torch-choice')).toHaveClass(/show/);
@@ -195,7 +361,7 @@ test('proto3d party panel: portraits, hands, take/snuff, dunk, 44pt targets', as
   await page.waitForTimeout(80);
   const snuffed = await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-    return { lit: p.torchLit(6, 4), msg: p.lastMessage() };
+    return { lit: p.torchLit(4, 1), msg: p.lastMessage() };
   });
   expect(snuffed.lit, 'Snuff still puts the wall torch out').toBe(false);
   expect(snuffed.msg, 'snuff names the acting hero, not always Wren').toMatch(/Brannoc snuffs the torch/i);

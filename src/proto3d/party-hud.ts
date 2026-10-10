@@ -308,16 +308,21 @@ export class PartyHud {
     return 'brannoc';
   }
 
-  findFreeFrontHand(): { hero: HeroId; hand: HandSlot } | null {
+  findFreeHand(): { hero: HeroId; hand: HandSlot } | null {
     for (const id of HERO_ORDER) {
       const hero = this.heroes[id];
-      if (hero.formation !== 'front') continue;
       for (const hand of ['main', 'off'] as const) {
         const item = hero.equipment[hand];
         if (item === 'empty_hand') return { hero: id, hand };
       }
     }
     return null;
+  }
+
+  setSwapHighlight(armed: boolean) {
+    document.querySelectorAll<HTMLElement>('.hand-btn').forEach((el) => {
+      el.classList.toggle('swap-armed', armed);
+    });
   }
 
   carriedTorch(): { hero: HeroId; hand: HandSlot; lit: boolean } | null {
