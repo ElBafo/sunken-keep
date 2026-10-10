@@ -167,6 +167,8 @@ test.describe('proto3d step4 title and saves', () => {
     await expect(page.locator('#title-hint')).toContainText(/Αφετηρίας|Home Screen/);
     const locale = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.locale());
     expect(locale).toBe('el');
+    await page.locator('#title-toast').evaluate((el) => el.classList.remove('show'));
+    await page.waitForTimeout(100);
     await page.screenshot({ path: `${OUT}/title-el.png`, fullPage: false });
     await page.locator('.title-hit[data-id="Settings"]').tap();
     await page.waitForTimeout(200);
@@ -300,12 +302,12 @@ test.describe('proto3d step4 title and saves', () => {
     expect(floorRestored.over).toBe(false);
     expect(floorRestored.pos).toMatchObject({ x: 1, y: 7 });
     expect(floorRestored.logs.some((l) => /water takes you|βράχ/i.test(l))).toBe(false);
-    await page.screenshot({ path: `${OUT}/log-after-restart.png`, fullPage: false });
 
     await bootPlay(page, 'test=1&persist=1');
     await expect(page.locator('#fps-counter')).toHaveCount(0);
     const freshLog = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.logLines());
     expect(freshLog.some((l) => /water takes you/i.test(l))).toBe(false);
+    await page.screenshot({ path: `${OUT}/log-after-restart.png`, fullPage: false });
     await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.speakBark('secret_wall', 'wren'));
     await page.waitForTimeout(100);
     const bark = await page.evaluate(() => {
