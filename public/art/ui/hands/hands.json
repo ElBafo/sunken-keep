@@ -35,6 +35,7 @@
   "scroll": "hand_scroll.png",
   "dagger": "hand_dagger.png",
   "tricks_pouch": "hand_tricks_pouch.png",
+  "iron_shield": "hand_shield.png",
   "torch_lit": "hand_torch_lit.png",
   "torch_burnt": "hand_torch_burnt.png",
   "prayer_lantern_ember": "hand_prayer_lantern_ember.png"

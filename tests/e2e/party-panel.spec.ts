@@ -69,10 +69,14 @@ test('proto3d party panel: portraits, hands, take/snuff, dunk, 44pt targets', as
 
   const hud = page.locator('#party-hud');
   const view = page.locator('#render-canvas');
-  const arrows = page.locator('#controls');
   await expect(hud).toBeVisible();
   await expect(view).toBeVisible();
-  await expect(arrows).toBeVisible();
+  await expect(page.locator('#controls')).toHaveCount(0);
+  await expect(page.locator('#bag-bar')).toHaveCount(0);
+  await expect(page.locator('#party-hud #btn-forward')).toBeVisible();
+  await expect(page.locator('#party-hud #btn-bag')).toBeVisible();
+  await expect(page.locator('#party-hud #btn-potion-health')).toBeVisible();
+  await expect(page.locator('#party-hud #btn-potion-mana')).toBeVisible();
 
   const boxes = await page.evaluate(() => {
     const box = (el: Element | null) => {
@@ -83,14 +87,17 @@ test('proto3d party panel: portraits, hands, take/snuff, dunk, 44pt targets', as
     return {
       view: box(document.getElementById('render-canvas')),
       hud: box(document.getElementById('party-hud')),
-      controls: box(document.getElementById('controls'))
+      forward: box(document.getElementById('btn-forward')),
+      bag: box(document.getElementById('btn-bag'))
     };
   });
   expect(boxes.view, '3D view present').toBeTruthy();
   expect(boxes.hud, 'party panel present').toBeTruthy();
-  expect(boxes.controls, 'arrows present').toBeTruthy();
   expect(boxes.hud!.top, 'panel sits below the view').toBeGreaterThanOrEqual(boxes.view!.bottom - 1);
-  expect(boxes.controls!.top, 'arrows sit below the panel').toBeGreaterThanOrEqual(boxes.hud!.bottom - 1);
+  expect(boxes.forward!.top, 'D-pad lives inside the panel').toBeGreaterThanOrEqual(boxes.hud!.top - 1);
+  expect(boxes.forward!.bottom, 'D-pad stays in the panel').toBeLessThanOrEqual(boxes.hud!.bottom + 1);
+  expect(boxes.bag!.top, 'bag well stays in the panel').toBeGreaterThanOrEqual(boxes.hud!.top - 1);
+  expect(boxes.forward!.top, 'arrows do not overlap the 3D view').toBeGreaterThanOrEqual(boxes.view!.bottom - 1);
 
   const handBoxes = await page.locator('.hand-btn').evaluateAll((els) =>
     els.map((el) => {
@@ -102,6 +109,18 @@ test('proto3d party panel: portraits, hands, take/snuff, dunk, 44pt targets', as
   for (const hand of handBoxes) {
     expect(hand.w, `${hand.hero} ${hand.hand} width >= 44pt`).toBeGreaterThanOrEqual(44);
     expect(hand.h, `${hand.hero} ${hand.hand} height >= 44pt`).toBeGreaterThanOrEqual(44);
+  }
+
+  const chromeBoxes = await page.locator('.hud-chrome-btn').evaluateAll((els) =>
+    els.map((el) => {
+      const r = el.getBoundingClientRect();
+      return { id: el.id, w: r.width, h: r.height };
+    })
+  );
+  expect(chromeBoxes.length, 'pad + potion + bag wells').toBeGreaterThanOrEqual(9);
+  for (const btn of chromeBoxes) {
+    expect(btn.w, `${btn.id} width >= 44pt`).toBeGreaterThanOrEqual(44);
+    expect(btn.h, `${btn.id} height >= 44pt`).toBeGreaterThanOrEqual(44);
   }
 
   const layout = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.layout());

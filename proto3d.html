@@ -57,7 +57,9 @@
       image-rendering: -moz-crisp-edges;
       image-rendering: crisp-edges;
     }
-    .hand-btn {
+    .hand-btn,
+    .portrait-btn,
+    .hud-chrome-btn {
       position: absolute;
       min-width: 44px;
       min-height: 44px;
@@ -68,6 +70,53 @@
       touch-action: none;
       -webkit-tap-highlight-color: transparent;
       z-index: 20;
+    }
+    .hud-chrome-btn {
+      transform: translate(-50%, -50%);
+    }
+    .portrait-btn.pick-hero {
+      outline: 2px solid #f0d060;
+      outline-offset: 1px;
+      background: rgba(240, 208, 96, 0.28);
+    }
+    #inventory-screen {
+      position: fixed;
+      top: env(safe-area-inset-top, 0);
+      left: 0;
+      width: 100vw;
+      aspect-ratio: 270 / 585;
+      z-index: 90;
+      display: none;
+      background: #000;
+      touch-action: none;
+    }
+    #inventory-screen.show { display: block; }
+    #inventory-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
+    }
+    .inv-slot,
+    .inv-action,
+    .inv-close,
+    .inv-doll,
+    .inv-hero {
+      position: absolute;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: #d8ccb0;
+      font-family: monospace;
+      font-size: 11px;
+      cursor: pointer;
+      touch-action: none;
+      -webkit-tap-highlight-color: transparent;
+      z-index: 91;
     }
     .hand-btn.swap-armed {
       outline: 2px solid #f0d060;
@@ -139,19 +188,6 @@
       image-rendering: -moz-crisp-edges;
       image-rendering: crisp-edges;
     }
-    #controls {
-      position: relative;
-      flex: 0 0 auto;
-      display: grid;
-      grid-template-columns: repeat(3, 44px);
-      grid-template-rows: repeat(2, 44px);
-      gap: 4px;
-      justify-content: center;
-      margin-top: 4px;
-      padding: 0 8px 4px;
-      padding-bottom: calc(4px + env(safe-area-inset-bottom, 0px));
-      z-index: 100;
-    }
     .control-btn {
       min-width: 44px;
       min-height: 44px;
@@ -173,18 +209,16 @@
       background: rgba(60, 60, 60, 0.9);
       border-color: #888;
     }
-    #btn-forward { grid-column: 2; grid-row: 1; }
     #btn-door {
-      grid-column: 3;
-      grid-row: 1;
+      position: absolute;
+      right: 8px;
+      bottom: 8px;
       display: none;
       font-size: 11px;
       letter-spacing: 0.04em;
+      z-index: 50;
     }
     #btn-door.visible { display: flex; }
-    #btn-left { grid-column: 1; grid-row: 2; }
-    #btn-back { grid-column: 2; grid-row: 2; }
-    #btn-right { grid-column: 3; grid-row: 2; }
     #message-toast {
       position: fixed;
       top: 28%;
@@ -301,6 +335,10 @@
       z-index: 200;
       display: none; /* Hidden by default, shown with ?debug=1 */
     }
+    body.bag-open #oil-readout,
+    body.bag-open #fps-counter {
+      visibility: hidden;
+    }
     #oil-readout {
       position: fixed;
       top: calc(10px + env(safe-area-inset-top, 0px));
@@ -358,16 +396,13 @@
       <button id="btn-torch-take" class="hud-choice-btn" type="button"></button>
       <button id="btn-torch-snuff" class="hud-choice-btn" type="button"></button>
     </div>
+    <button id="btn-door" class="control-btn" type="button"></button>
   </div>
   <div id="party-hud">
     <canvas id="party-canvas"></canvas>
   </div>
-  <div id="controls">
-    <button id="btn-forward" class="control-btn">↑</button>
-    <button id="btn-door" class="control-btn" type="button"></button>
-    <button id="btn-left" class="control-btn">←</button>
-    <button id="btn-back" class="control-btn">↓</button>
-    <button id="btn-right" class="control-btn">→</button>
+  <div id="inventory-screen" hidden>
+    <canvas id="inventory-canvas"></canvas>
   </div>
   <div id="message-toast"></div>
   <div id="note-overlay">

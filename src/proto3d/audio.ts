@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {
+  CAMERA_EYE_HEIGHT,
   CELL_SIZE,
   DARK_AMB_DUCK_DB,
   FACE_INTO_ROOM,
@@ -27,6 +28,7 @@ interface PositionalVoice {
 
 export class AudioManager {
   listener: THREE.AudioListener;
+  listenerRig: THREE.Object3D;
   quality: QualityLevel;
   private buffers = new Map<string, AudioBuffer>();
   private uiSound: THREE.Audio | null = null;
@@ -66,11 +68,36 @@ export class AudioManager {
   private combatPool: PositionalVoice[] = [];
   private resumeWired = false;
 
-  constructor(camera: THREE.Camera, quality: QualityLevel) {
+  constructor(quality: QualityLevel) {
     this.listener = new THREE.AudioListener();
-    camera.add(this.listener);
+    this.listenerRig = new THREE.Object3D();
+    this.listenerRig.name = 'audio-listener';
+    this.listenerRig.add(this.listener);
     this.quality = quality;
     this.wireResume();
+  }
+
+  attach(scene: THREE.Scene) {
+    scene.add(this.listenerRig);
+  }
+
+  /** Sit at the party's square centre, facing the party's direction — not the pulled-back camera. */
+  updateListener(gridX: number, gridY: number, dir: number) {
+    this.listenerRig.position.set(gridX * CELL_SIZE, CAMERA_EYE_HEIGHT, gridY * CELL_SIZE);
+    this.listenerRig.rotation.order = 'YXZ';
+    this.listenerRig.rotation.x = 0;
+    this.listenerRig.rotation.y = (-dir * Math.PI) / 2;
+    this.listenerRig.rotation.z = 0;
+    this.listenerRig.updateMatrixWorld();
+  }
+
+  listenerPose() {
+    return {
+      x: this.listenerRig.position.x,
+      y: this.listenerRig.position.y,
+      z: this.listenerRig.position.z,
+      rotationY: this.listenerRig.rotation.y
+    };
   }
 
   async init() {
@@ -174,6 +201,16 @@ export class AudioManager {
       ['ui_log_line', 'audio/sfx_ui_log_line.mp3'],
       ['ui_button_denied', 'audio/sfx_ui_button_denied.mp3'],
       ['ui_inventory_move', 'audio/sfx_ui_inventory_move.mp3'],
+      ['pickup', 'audio/sfx_pickup.mp3'],
+      ['chest', 'audio/sfx_chest.mp3'],
+      ['potion', 'audio/sfx_potion.mp3'],
+      ['equip_metal', 'audio/sfx_equip_metal.mp3'],
+      ['equip_leather', 'audio/sfx_equip_leather.mp3'],
+      ['equip_wood', 'audio/sfx_equip_wood.mp3'],
+      ['equip_cloth', 'audio/sfx_equip_cloth.mp3'],
+      ['item_use_fail', 'audio/sfx_item_use_fail.mp3'],
+      ['inventory_open', 'audio/sfx_inventory_open.mp3'],
+      ['inventory_close', 'audio/sfx_inventory_close.mp3'],
       ['hit', 'audio/sfx_hit.mp3'],
       ['hit_2', 'audio/sfx_hit_2.mp3'],
       ['hit_3', 'audio/sfx_hit_3.mp3'],

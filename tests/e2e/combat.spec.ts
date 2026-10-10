@@ -148,7 +148,7 @@ test('proto3d combat: block square, first swing, voices, perks, game over', asyn
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
     return { tint: p.hostTint(id), fx: p.hitFxPlaying() };
   }, frostShot.id);
-  expect(frostTint.tint, 'hold frames tint the slime pale blue').toBe(0xb8d8ff);
+  expect(frostTint.tint, 'hold frames mix 60% toward #6fa8e8').toBe(0x6fa8e8);
   await page.screenshot({ path: `${OUT}/combat-slime-frost.png`, fullPage: false });
 
   const hands = await page.evaluate(() => {

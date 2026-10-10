@@ -269,6 +269,7 @@ export class CombatEngine {
   }
 
   private emit(e: CombatEvent) {
+    if (this.gameOver && e.type === 'log' && e.key !== 'party_dead') return;
     this.events.push(e);
   }
 
@@ -878,8 +879,8 @@ export class CombatEngine {
       if (kind === 'pinch' && shielded && def.behavior.block === 'halve') {
         dmg = Math.max(1, Math.floor(dmg / 2));
         this.emit({ type: 'log', key: 'block_hit', vars: { n: dmg } });
+        this.emit({ type: 'log', key: 'monster_hit', vars: { monster: m.kind, hero: target.id, n: dmg } });
         const dealt = this.applyDamageToHero(target, dmg, now, { ignoreHalf: true });
-        this.emit({ type: 'log', key: 'monster_hit', vars: { monster: m.kind, hero: target.id, n: dealt } });
         if (dealt > 0) this.emit({ type: 'sfx', name: 'hurt', combat: true });
         return;
       }
@@ -908,8 +909,14 @@ export class CombatEngine {
       if (!other) return;
       target = other;
     }
-    const dealt = this.applyDamageToHero(target, dmg, now);
-    this.emit({ type: 'log', key: 'monster_hit', vars: { monster: m.kind, hero: target.id, n: dealt } });
+    let n = Math.max(0, Math.floor(dmg));
+    if (now < this.halfNextUntil && n > 0) {
+      n = Math.max(1, Math.floor(n / 2));
+      this.halfNextUntil = 0;
+      this.emit({ type: 'log', key: 'block_hit', vars: { n } });
+    }
+    this.emit({ type: 'log', key: 'monster_hit', vars: { monster: m.kind, hero: target.id, n } });
+    const dealt = this.applyDamageToHero(target, n, now, { ignoreHalf: true });
     if (dealt > 0) this.emit({ type: 'sfx', name: 'hurt', combat: true });
     const b = this.def(m.kind)?.behavior;
     if (canLatch && b?.habit === 'latch' && !target.downed && this.rng.chance(b.chance ?? 0.25)) {
@@ -926,8 +933,8 @@ export class CombatEngine {
       const drain = b.latchDrain ?? 1;
       target.latchTurnsLeft -= 1;
       if (drain > 0 && !target.downed) {
-        this.applyDamageToHero(target, drain, now, { ignoreHalf: true });
         this.emit({ type: 'log', key: 'leech_drain', vars: { hero: target.id, n: drain } });
+        this.applyDamageToHero(target, drain, now, { ignoreHalf: true });
         this.emit({ type: 'sfx', name: 'bog_leeches_attack', volume: 0.4, combat: true });
       }
       if (target.latchTurnsLeft <= 0) this.clearLatch(target);

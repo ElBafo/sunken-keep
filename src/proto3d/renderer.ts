@@ -4,8 +4,6 @@ import { CAMERA_FAR, CAMERA_FOV, CAMERA_NEAR, FOG_COLOR, FOG_FAR, FOG_NEAR } fro
 // Enable Three.js color management for proper sRGB handling
 THREE.ColorManagement.enabled = true;
 
-const MIN_BUTTON_PX = 44;
-
 export class PixelRenderer {
   scene: THREE.Scene;
   camera: THREE.PerspectiveCamera;
@@ -231,8 +229,8 @@ export class PixelRenderer {
 
     const controls = document.getElementById('controls');
     const hud = document.getElementById('party-hud');
-    let controlsSpace = MIN_BUTTON_PX * 2 + 16;
-    if (controls) {
+    let controlsSpace = 0;
+    if (controls && getComputedStyle(controls).display !== 'none') {
       const cs = getComputedStyle(controls);
       controlsSpace =
         controls.offsetHeight +

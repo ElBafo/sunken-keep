@@ -137,7 +137,7 @@ export class Player {
     } else if (tile.monster) {
       return 'monster';
     }
-    if (tile.prop === 'beams_fallen' || tile.prop === 'desk') return 'wall';
+    if (tile.prop) return 'wall';
     return 'ok';
   }
 
@@ -162,6 +162,28 @@ export class Player {
     const reason = this.blockReason(this.x - dx, this.y - dy);
     if (reason === 'ok') {
       this.startMove(this.x - dx, this.y - dy, this.dir);
+      return 'ok';
+    }
+    return reason;
+  }
+
+  strafeLeft(): MoveResult {
+    if (this.isMoving) return 'busy';
+    const [dx, dy] = DIRS[(this.dir + 3) % 4];
+    const reason = this.blockReason(this.x + dx, this.y + dy);
+    if (reason === 'ok') {
+      this.startMove(this.x + dx, this.y + dy, this.dir);
+      return 'ok';
+    }
+    return reason;
+  }
+
+  strafeRight(): MoveResult {
+    if (this.isMoving) return 'busy';
+    const [dx, dy] = DIRS[(this.dir + 1) % 4];
+    const reason = this.blockReason(this.x + dx, this.y + dy);
+    if (reason === 'ok') {
+      this.startMove(this.x + dx, this.y + dy, this.dir);
       return 'ok';
     }
     return reason;

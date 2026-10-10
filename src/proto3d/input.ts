@@ -2,13 +2,15 @@ import { MoveResult, Player } from './player';
 
 export interface InputHooks {
   onMove(result: MoveResult): void;
-  onInteract(): void;
+  onInteract(clientX?: number, clientY?: number): void;
 }
 
 function isUiTarget(el: EventTarget | null): boolean {
   return (
     el instanceof HTMLElement &&
-    !!el.closest('.control-btn, #tap-to-start, .hand-btn, .hud-choice-btn, #torch-choice, #party-hud')
+    !!el.closest(
+      '.control-btn, #tap-to-start, .hand-btn, .portrait-btn, .hud-chrome-btn, .hud-choice-btn, #torch-choice, #party-hud, #inventory-screen, .inv-slot, .inv-action, .inv-close, .inv-doll, .inv-hero'
+    )
   );
 }
 
@@ -50,6 +52,12 @@ export class InputManager {
     document.getElementById('btn-right')?.addEventListener('click', () => {
       this.emitMove(this.player.turnRight());
     });
+    document.getElementById('btn-strafe-left')?.addEventListener('click', () => {
+      this.emitMove(this.player.strafeLeft());
+    });
+    document.getElementById('btn-strafe-right')?.addEventListener('click', () => {
+      this.emitMove(this.player.strafeRight());
+    });
     document.getElementById('btn-door')?.addEventListener('click', (e) => {
       e.stopPropagation();
       this.hooks.onInteract();
@@ -74,7 +82,7 @@ export class InputManager {
         const dx = e.clientX - this.pointerStartX;
         const dy = e.clientY - this.pointerStartY;
         if (Math.abs(dx) < 18 && Math.abs(dy) < 18) {
-          this.hooks.onInteract();
+          this.hooks.onInteract(e.clientX, e.clientY);
           return;
         }
         if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > this.swipeThreshold) {

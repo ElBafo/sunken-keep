@@ -109,7 +109,11 @@
    "drop_no": "Κράτα",
    "slot_hand": "Χέρι",
    "slot_body": "Σώμα",
-   "slot_bag": "Σάκος"
+   "slot_bag": "Σάκος",
+   "compare_better": "+Καλύτερο",
+   "compare_worse": "-Χειρότερο",
+   "compare_same": "Ίδιο",
+   "_compare_note": "Name line, right-aligned. Only compare items with the same job (weapon vs weapon, armour vs armour); show nothing for trades like shield vs pouch/scroll."
   },
   "items": {
    "key": {

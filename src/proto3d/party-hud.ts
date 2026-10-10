@@ -8,15 +8,20 @@ import {
 import { ITEM_ACT_SFX } from '../core/types';
 import { HAND_COOLDOWN_MS, OIL_MAX } from './constants';
 import { StoryText } from './i18n';
+import { drawFont5x7, type FontGlyphs } from './font5x7';
 import {
+  PAD_KEYS,
+  panelArtPath,
   panelContentHeight,
   toPanelLocal,
   type Layout585,
-  type LayoutRect
+  type LayoutRect,
+  type PadKey,
+  type PanelIconSpec
 } from './layout585';
 
 export type HandSlot = 'main' | 'off';
-export type GearId = ItemType | 'torch_lit' | 'torch_burnt';
+export type GearId = ItemType | 'torch_lit' | 'torch_burnt' | 'iron_shield' | 'chain_mail' | 'ashmantle_hammer';
 type Rect = LayoutRect;
 
 export interface HeroHud {
@@ -27,6 +32,7 @@ export interface HeroHud {
   maxMana: number;
   formation: 'front' | 'back';
   equipment: { main: GearId; off: GearId };
+  armour?: string;
   recovery: { main: number; off: number };
   downed?: boolean;
   pendingPerk: number | null;
@@ -71,12 +77,20 @@ export class PartyHud {
   private fontReady = false;
   private fontImg: HTMLImageElement | null = null;
   private fontCellW = 6;
-  private fontCols = 16;
+  private fontGlyphs: FontGlyphs = {};
   private oilFn: () => number;
   private onUse: (hero: HeroId, hand: HandSlot) => void;
   private onLog: (text: string) => void;
   private playUi: (name: string) => void;
   private onCancel: () => void;
+  private onPortrait: ((hero: HeroId) => void) | null = null;
+  private onBag: (() => void) | null = null;
+  private onPotion: ((kind: 'health' | 'mana') => void) | null = null;
+  private potionCounts: () => { health: number; mana: number };
+  private pressed = new Set<string>();
+  private padRects = new Map<PadKey, Rect>();
+  private chromeSpecs = new Map<string, { spec: PanelIconSpec; local: Rect }>();
+  pickHero = false;
   private levelFlash: { id: HeroId; started: number } | null = null;
   private readyArmed: Record<string, boolean> = {};
   private notReadyAt: Partial<Record<HeroId, number>> = {};
@@ -94,6 +108,10 @@ export class PartyHud {
       onLog: (text: string) => void;
       playUi: (name: string) => void;
       onCancel: () => void;
+      onPortrait?: (hero: HeroId) => void;
+      onBag?: () => void;
+      onPotion?: (kind: 'health' | 'mana') => void;
+      potionCounts?: () => { health: number; mana: number };
     }
   ) {
     this.story = story;
@@ -103,12 +121,24 @@ export class PartyHud {
     this.onLog = hooks.onLog;
     this.playUi = hooks.playUi;
     this.onCancel = hooks.onCancel;
+    this.onPortrait = hooks.onPortrait ?? null;
+    this.onBag = hooks.onBag ?? null;
+    this.onPotion = hooks.onPotion ?? null;
+    this.potionCounts = hooks.potionCounts ?? (() => ({ health: 0, mana: 0 }));
     this.heroes = this.createHeroes();
     this.panelTop = layout.panelTop;
     this.designWidth = layout.canvas[0];
     this.designHeight = panelContentHeight(layout);
     this.oilBar = toPanelLocal(layout.oilBar, this.panelTop);
     this.logRect = toPanelLocal(layout.log, this.panelTop);
+    if (layout.pad) {
+      for (const key of PAD_KEYS) {
+        this.padRects.set(key, toPanelLocal(layout.pad[key], this.panelTop));
+      }
+    }
+    for (const [key, spec] of Object.entries(layout.panelIcons)) {
+      this.chromeSpecs.set(key, { spec, local: toPanelLocal(spec.rect, this.panelTop) });
+    }
     for (const hero of layout.heroes) {
       this.layoutHeroes.set(hero.name, {
         portrait: toPanelLocal(hero.portrait_opens_sheet, this.panelTop),
@@ -170,12 +200,13 @@ export class PartyHud {
       fetch(`${base}art/font/font_5x7.json`).then((r) => r.json()) as Promise<{
         columns?: number;
         cellWidth?: number;
+        glyphs?: FontGlyphs;
       }>
     ]);
 
     if (Array.isArray(hands.size) && Number.isFinite(hands.size[0])) this.iconSize = hands.size[0];
-    if (Number.isFinite(fontMeta.columns)) this.fontCols = fontMeta.columns!;
     if (Number.isFinite(fontMeta.cellWidth)) this.fontCellW = fontMeta.cellWidth!;
+    if (fontMeta.glyphs) this.fontGlyphs = fontMeta.glyphs;
     for (const [id, file] of Object.entries(hands.icons ?? {})) this.icons.set(id, file);
 
     const portraitFiles = [
@@ -216,12 +247,14 @@ export class PartyHud {
       cache('perk3', 'art/ui/perks/perk_pending_3.png'),
       cache('perk4', 'art/ui/perks/perk_pending_4.png'),
       ...portraitFiles.map((name) => cache(name, `art/portraits/${name}.png`)),
-      ...[...this.icons.values()].map((file) => cache(file, `art/ui/hands/${file}`))
+      ...[...this.icons.values()].map((file) => cache(file, `art/ui/hands/${file}`)),
+      ...this.panelArtJobs(cache)
     ]);
 
     this.fontImg = this.images.get('font') ?? null;
     this.fontReady = !!this.fontImg;
     this.mountHandButtons();
+    this.mountChromeButtons();
     this.mountChoiceLabels();
     this.draw(performance.now());
   }
@@ -242,16 +275,139 @@ export class PartyHud {
       host.addEventListener('pointerup', (e) => {
         if (!e.isPrimary) return;
         const target = e.target as HTMLElement | null;
-        if (target?.closest('.hand-btn')) return;
+        if (target?.closest('.hand-btn, .portrait-btn, .hud-chrome-btn')) return;
         this.onCancel();
       });
     }
     for (const id of HERO_ORDER) {
       const layout = this.layoutHeroes.get(id);
       if (!layout) continue;
+      this.placePortraitBtn(host, id, layout.portrait);
       this.placeHandBtn(host, id, 'main', layout.handMain);
       this.placeHandBtn(host, id, 'off', layout.handOff);
     }
+  }
+
+  private panelArtJobs(cache: (key: string, rel: string) => Promise<HTMLImageElement>) {
+    const paths = new Set<string>();
+    for (const spec of Object.values(this.layout.panelIcons)) {
+      if (spec.icon) paths.add(panelArtPath(spec.icon));
+      if (spec.iconEmpty) paths.add(panelArtPath(spec.iconEmpty));
+      if (spec.normal) paths.add(panelArtPath(spec.normal));
+      if (spec.pressed) paths.add(panelArtPath(spec.pressed));
+    }
+    for (const key of PAD_KEYS) {
+      paths.add(`art/ui/panel/icon_${key}.png`);
+    }
+    paths.add('art/ui/panel/well_28.png');
+    paths.add('art/ui/panel/well_pressed_28.png');
+    paths.add('art/ui/panel/well_60x28.png');
+    paths.add('art/ui/panel/well_pressed_60x28.png');
+    return [...paths].map((rel) => cache(rel, rel).catch(() => undefined as unknown as HTMLImageElement));
+  }
+
+  private mountChromeButtons() {
+    const host = document.getElementById('party-hud');
+    if (!host) return;
+    host.querySelectorAll('.hud-chrome-btn').forEach((el) => el.remove());
+
+    const pad = this.layout.pad;
+    if (pad) {
+      this.placeChromeBtn(host, 'btn-left', pad.turn_left, 'turn_left', 'turn_left');
+      this.placeChromeBtn(host, 'btn-forward', pad.forward, 'forward', 'forward');
+      this.placeChromeBtn(host, 'btn-right', pad.turn_right, 'turn_right', 'turn_right');
+      this.placeChromeBtn(host, 'btn-strafe-left', pad.strafe_left, 'strafe_left', 'strafe_left');
+      this.placeChromeBtn(host, 'btn-back', pad.back, 'back', 'back');
+      this.placeChromeBtn(host, 'btn-strafe-right', pad.strafe_right, 'strafe_right', 'strafe_right');
+    }
+    this.placeChromeBtn(
+      host,
+      'btn-potion-health',
+      this.layout.potionHealth,
+      'potion_health',
+      this.story.itemName('potion_red'),
+      () => this.onPotion?.('health')
+    );
+    this.placeChromeBtn(
+      host,
+      'btn-potion-mana',
+      this.layout.potionMana,
+      'potion_mana',
+      this.story.itemName('potion_blue'),
+      () => this.onPotion?.('mana')
+    );
+    this.placeChromeBtn(
+      host,
+      'btn-bag',
+      this.layout.inventory,
+      'inventory',
+      this.story.uiText('bag.title'),
+      () => this.onBag?.()
+    );
+  }
+
+  private placeChromeBtn(
+    host: HTMLElement,
+    id: string,
+    rect: Rect,
+    pressId: string,
+    label: string,
+    onTap?: () => void
+  ) {
+    const [x, y, w, h] = toPanelLocal(rect, this.panelTop);
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.id = id;
+    btn.className = 'hud-chrome-btn';
+    btn.dataset.press = pressId;
+    if (label) btn.setAttribute('aria-label', label);
+    btn.style.left = `${((x + w / 2) / this.designWidth) * 100}%`;
+    btn.style.top = `${((y + h / 2) / this.designHeight) * 100}%`;
+    btn.style.width = `${(w / this.designWidth) * 100}%`;
+    btn.style.height = `${(h / this.designHeight) * 100}%`;
+    btn.addEventListener('pointerdown', (e) => {
+      if (!e.isPrimary) return;
+      this.pressed.add(pressId);
+    });
+    const clearPress = () => this.pressed.delete(pressId);
+    btn.addEventListener('pointerup', (e) => {
+      if (!e.isPrimary) return;
+      clearPress();
+      if (!onTap) return;
+      e.preventDefault();
+      e.stopPropagation();
+      onTap();
+    });
+    btn.addEventListener('pointercancel', clearPress);
+    btn.addEventListener('pointerleave', clearPress);
+    host.appendChild(btn);
+  }
+
+  private placePortraitBtn(host: HTMLElement, hero: HeroId, rect: Rect) {
+    const [x, y, w, h] = rect;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'portrait-btn';
+    btn.dataset.hero = hero;
+    btn.setAttribute('aria-label', this.story.heroName(hero));
+    btn.style.left = `${(x / this.designWidth) * 100}%`;
+    btn.style.top = `${(y / this.designHeight) * 100}%`;
+    btn.style.width = `${(w / this.designWidth) * 100}%`;
+    btn.style.height = `${(h / this.designHeight) * 100}%`;
+    btn.addEventListener('pointerup', (e) => {
+      if (!e.isPrimary) return;
+      e.preventDefault();
+      e.stopPropagation();
+      this.onPortrait?.(hero);
+    });
+    host.appendChild(btn);
+  }
+
+  setPickHero(on: boolean) {
+    this.pickHero = on;
+    document.querySelectorAll<HTMLElement>('.portrait-btn').forEach((el) => {
+      el.classList.toggle('pick-hero', on);
+    });
   }
 
   private placeHandBtn(host: HTMLElement, hero: HeroId, hand: HandSlot, rect: Rect) {
@@ -301,6 +457,13 @@ export class PartyHud {
     const hero = this.heroes[id];
     if (!hero) return;
     hero.equipment[hand] = item;
+    this.draw(performance.now());
+  }
+
+  setArmour(id: HeroId, item: string | undefined) {
+    const hero = this.heroes[id];
+    if (!hero) return;
+    hero.armour = item;
     this.draw(performance.now());
   }
 
@@ -521,6 +684,7 @@ export class PartyHud {
     }
     this.drawOilGauge();
     this.drawLog();
+    this.drawPanelChrome();
   }
 
   private tickReadySounds(now: number) {
@@ -596,7 +760,10 @@ export class PartyHud {
     let item = hero.equipment[hand] as string;
     if (item === 'prayer_lantern' && this.oilFn() <= 0) item = 'prayer_lantern_ember';
     const iconKey = item === 'empty_hand' || item === 'fist' ? `fist_${hero.id}` : item;
-    const file = this.icons.get(iconKey) ?? `hand_${iconKey}.png`;
+    const file =
+      this.icons.get(iconKey) ??
+      (item === 'iron_shield' ? this.icons.get('shield') : undefined) ??
+      `hand_${iconKey}.png`;
     const img = this.images.get(file);
     const recovering = hero.recovery[hand] > now;
     const melee = MELEE_ITEMS.includes(item as ItemType) || item === 'torch_lit' || item === 'torch_burnt';
@@ -668,23 +835,78 @@ export class PartyHud {
     });
   }
 
-  private drawFont(text: string, x: number, y: number) {
-    const ctx = this.ctx;
-    if (!this.fontReady || !this.fontImg) {
-      ctx.fillStyle = '#d8ccb0';
-      ctx.font = '8px monospace';
-      ctx.textBaseline = 'top';
-      ctx.fillText(text, x, y);
-      return;
+  private drawFont(text: string, x: number, y: number, colour?: string, shadow?: { colour: string }) {
+    drawFont5x7(
+      this.ctx,
+      this.fontReady ? this.fontImg : null,
+      text,
+      x,
+      y,
+      this.fontGlyphs,
+      this.fontCellW,
+      colour,
+      shadow
+    );
+  }
+
+  private drawPanelChrome() {
+    this.drawPadPressed();
+    const counts = this.potionCounts();
+    this.drawPanelIcon('potion_health', counts.health);
+    this.drawPanelIcon('potion_mana', counts.mana);
+    this.drawPanelIcon('inventory');
+    this.drawPanelIcon('menu');
+    this.drawPanelIcon('save');
+  }
+
+  private drawPadPressed() {
+    for (const key of PAD_KEYS) {
+      if (!this.pressed.has(key)) continue;
+      const local = this.padRects.get(key);
+      if (!local) continue;
+      const [x, y, w, h] = local;
+      const plate = this.images.get('art/ui/panel/well_pressed_28.png');
+      if (plate) this.ctx.drawImage(plate, x, y, w, h);
+      const icon = this.images.get(`art/ui/panel/icon_${key}.png`);
+      if (!icon) continue;
+      const ix = x + Math.floor((w - icon.width) / 2);
+      const iy = y + Math.floor((h - icon.height) / 2) + 1;
+      this.ctx.drawImage(icon, ix, iy);
     }
-    const font = this.fontImg;
-    for (let i = 0; i < text.length; i++) {
-      const index = text.charCodeAt(i) - 32;
-      if (index < 0 || index > 94) continue;
-      const sx = (index % this.fontCols) * this.fontCellW;
-      const sy = Math.floor(index / this.fontCols) * 10;
-      ctx.drawImage(font, sx, sy, 5, 9, x + i * this.fontCellW, y, 5, 9);
+  }
+
+  private drawPanelIcon(key: string, count?: number) {
+    const entry = this.chromeSpecs.get(key);
+    if (!entry) return;
+    const { spec, local } = entry;
+    const [x, y, w, h] = local;
+    const pressed = this.pressed.has(key);
+    const platePath = panelArtPath((pressed ? spec.pressed : spec.normal) ?? '');
+    const plate = platePath ? this.images.get(platePath) : undefined;
+    if (plate) this.ctx.drawImage(plate, x, y, w, h);
+    const empty = count === 0;
+    const iconRel = empty && spec.iconEmpty ? spec.iconEmpty : spec.icon;
+    const icon = iconRel ? this.images.get(panelArtPath(iconRel)) : undefined;
+    const pressNudge = pressed ? 1 : 0;
+    if (icon) {
+      if (spec.iconPos) {
+        this.ctx.drawImage(icon, spec.iconPos[0], spec.iconPos[1] - this.panelTop + pressNudge);
+      } else {
+        this.ctx.drawImage(
+          icon,
+          x + Math.floor((w - icon.width) / 2),
+          y + Math.floor((h - icon.height) / 2) + pressNudge
+        );
+      }
     }
+    if (!spec.count) return;
+    const shown = Math.max(0, Math.min(9, Math.floor(count ?? 0)));
+    const digits = String(shown);
+    const textX = spec.rect[0] + spec.count.rightEdgeOffset - (digits.length * this.fontCellW - 1);
+    const textY = spec.rect[1] - this.panelTop + spec.count.glyphTopOffset + pressNudge;
+    const colour = empty ? spec.count.colourEmpty : spec.count.colour;
+    const shadowColour = spec.count.shadow.split(' ')[0] || '#1a1210';
+    this.drawFont(digits, textX, textY, colour, { colour: shadowColour });
   }
 }
 
