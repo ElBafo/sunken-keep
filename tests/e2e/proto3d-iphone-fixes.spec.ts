@@ -89,7 +89,7 @@ test('proto3d iPhone fixes: sorting, items, walls, water, doors, no 404s', async
   expect(key, 'key sprite').toBeTruthy();
   expect(leeches!.depthTest, 'leeches depthTest').toBe(true);
   expect(key!.depthTest, 'key depthTest').toBe(true);
-  expect(leeches!.renderOrder, 'leeches share sprite renderOrder').toBe(key!.renderOrder);
+  expect(leeches!.renderOrder, 'monster draws in front of items').toBeGreaterThan(key!.renderOrder);
 
   // --- 2. Items on own square vs ahead; every floor-1 item ---
   const itemTiles = [

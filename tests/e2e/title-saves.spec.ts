@@ -156,6 +156,17 @@ test.describe('proto3d step4 title and saves', () => {
     );
     await expect(page.locator('#title-overlay')).toHaveClass(/show/);
     await expect(page.locator('#fps-counter')).toHaveCount(0);
+    const chrome = await page.evaluate(() => {
+      const stage = document.getElementById('game-stage');
+      return {
+        titleInside: !!stage?.contains(document.getElementById('title-overlay')),
+        introInside: !!stage?.contains(document.getElementById('intro-overlay')),
+        bubbleInside: !!stage?.contains(document.getElementById('speech-bubble'))
+      };
+    });
+    expect(chrome.titleInside, 'title/load screens live in the 270×585 stage').toBe(true);
+    expect(chrome.introInside).toBe(true);
+    expect(chrome.bubbleInside, 'speech bubble lives in the 270×585 stage').toBe(true);
     await expect(page.locator('#title-hint')).toContainText(/Add to Home Screen first/i);
     await expect(page.locator('#title-hint')).toContainText(/Safari can lose saves/i);
     const persist = await page.evaluate(() => ({

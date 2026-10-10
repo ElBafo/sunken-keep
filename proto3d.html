@@ -26,33 +26,47 @@
       overscroll-behavior: none;
     }
     body {
-      display: flex;
-      flex-direction: column;
-      align-items: stretch;
-      justify-content: flex-start;
+      padding: 0;
+    }
+    #game-letterbox {
+      position: absolute;
+      inset: 0;
       padding-top: env(safe-area-inset-top, 0);
-      padding-left: 0;
-      padding-right: 0;
-      padding-bottom: 0;
+      background: #000 url('%BASE_URL%art/ui/layout585/stone_strip_tile.png') repeat;
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
+      overflow: hidden;
+    }
+    #game-stage {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 270px;
+      height: 585px;
+      transform-origin: top left;
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
     }
     #canvas-container {
       position: relative;
-      width: 100%;
-      flex: 0 0 auto;
+      width: 270px;
+      height: 380px;
       line-height: 0;
       background: #000;
     }
     #party-hud {
       position: relative;
-      width: 100%;
-      flex: 0 0 auto;
+      width: 270px;
+      height: 205px;
       line-height: 0;
       background: #000;
     }
     #party-canvas {
       display: block;
-      width: 100%;
-      height: auto;
+      width: 270px;
+      height: 205px;
       image-rendering: pixelated;
       image-rendering: -moz-crisp-edges;
       image-rendering: crisp-edges;
@@ -80,11 +94,10 @@
       background: rgba(240, 208, 96, 0.28);
     }
     #inventory-screen {
-      position: fixed;
-      top: env(safe-area-inset-top, 0);
-      left: 0;
-      width: 100vw;
-      aspect-ratio: 270 / 585;
+      position: absolute;
+      inset: 0;
+      width: 270px;
+      height: 585px;
       z-index: 90;
       display: none;
       background: #000;
@@ -196,7 +209,8 @@
     }
     #render-canvas {
       display: block;
-      width: 100%;
+      width: 270px;
+      height: 380px;
       image-rendering: pixelated;
       image-rendering: -moz-crisp-edges;
       image-rendering: crisp-edges;
@@ -233,7 +247,7 @@
     }
     #btn-door.visible { display: flex; }
     #message-toast {
-      position: fixed;
+      position: absolute;
       top: 28%;
       left: 50%;
       transform: translate(-50%, -50%);
@@ -338,22 +352,20 @@
     .gameover-btn[hidden] { display: none; }
     #title-overlay,
     #intro-overlay {
-      position: fixed;
+      position: absolute;
       inset: 0;
       z-index: 1500;
       display: none;
-      align-items: flex-start;
-      justify-content: center;
       background: #000;
     }
     #title-overlay.show,
-    #intro-overlay.show { display: flex; }
+    #intro-overlay.show { display: block; }
     #intro-overlay { z-index: 1600; }
     #title-stage,
     #intro-stage {
       position: relative;
-      width: min(100vw, calc(100dvh * 270 / 585));
-      aspect-ratio: 270 / 585;
+      width: 270px;
+      height: 585px;
       background: #000;
     }
     #title-canvas,
@@ -401,7 +413,7 @@
     }
     #title-toast.show { opacity: 1; }
     #fps-counter {
-      position: fixed;
+      position: absolute;
       top: 10px;
       left: 10px;
       background: rgba(0, 0, 0, 0.7);
@@ -417,8 +429,8 @@
       visibility: hidden;
     }
     #oil-readout {
-      position: fixed;
-      top: calc(10px + env(safe-area-inset-top, 0px));
+      position: absolute;
+      top: 10px;
       right: 10px;
       background: rgba(0, 0, 0, 0.65);
       color: #e8c98a;
@@ -430,11 +442,11 @@
       pointer-events: none;
     }
     #note-overlay {
-      position: fixed;
+      position: absolute;
       left: 50%;
       top: 18%;
       transform: translate(-50%, 0);
-      width: min(88vw, 360px);
+      width: 238px;
       background: rgba(18, 14, 10, 0.92);
       border: 1px solid #8a7348;
       color: #e8e0d0;
@@ -466,38 +478,43 @@
     <div id="tap-to-start-text"></div>
     <div style="font-size: 12px; color: #888;">3D Prototype</div>
   </div>
-  <div id="canvas-container">
-    <canvas id="render-canvas"></canvas>
-    <div id="flank-flash" aria-hidden="true"></div>
-    <div id="torch-choice">
-      <button id="btn-torch-take" class="hud-choice-btn" type="button"></button>
-      <button id="btn-torch-snuff" class="hud-choice-btn" type="button"></button>
-    </div>
-    <button id="btn-door" class="control-btn" type="button"></button>
-    <canvas id="speech-bubble" width="270" height="32" aria-hidden="true"></canvas>
-  </div>
-  <div id="party-hud">
-    <canvas id="party-canvas"></canvas>
-  </div>
-  <div id="inventory-screen" hidden>
-    <canvas id="inventory-canvas"></canvas>
-  </div>
-  <div id="message-toast"></div>
-  <div id="note-overlay">
-    <div id="note-title"></div>
-    <div id="note-text"></div>
-  </div>
-  <div id="oil-readout"></div>
-  <div id="title-overlay">
-    <div id="title-stage">
-      <canvas id="title-canvas" width="270" height="585"></canvas>
-      <div id="title-hint"></div>
-      <div id="title-toast"></div>
-    </div>
-  </div>
-  <div id="intro-overlay">
-    <div id="intro-stage">
-      <canvas id="intro-canvas" width="270" height="480"></canvas>
+  <div id="game-letterbox">
+    <div id="game-stage">
+      <div id="canvas-container">
+        <canvas id="render-canvas"></canvas>
+        <div id="flank-flash" aria-hidden="true"></div>
+        <div id="torch-choice">
+          <button id="btn-torch-take" class="hud-choice-btn" type="button"></button>
+          <button id="btn-torch-snuff" class="hud-choice-btn" type="button"></button>
+        </div>
+        <button id="btn-door" class="control-btn" type="button"></button>
+        <canvas id="speech-bubble" width="270" height="32" aria-hidden="true"></canvas>
+      </div>
+      <div id="party-hud">
+        <canvas id="party-canvas"></canvas>
+      </div>
+      <div id="inventory-screen" hidden>
+        <canvas id="inventory-canvas"></canvas>
+      </div>
+      <div id="message-toast"></div>
+      <div id="note-overlay">
+        <div id="note-title"></div>
+        <div id="note-text"></div>
+      </div>
+      <div id="oil-readout"></div>
+      <div id="fps-counter">FPS: --</div>
+      <div id="title-overlay">
+        <div id="title-stage">
+          <canvas id="title-canvas" width="270" height="585"></canvas>
+          <div id="title-hint"></div>
+          <div id="title-toast"></div>
+        </div>
+      </div>
+      <div id="intro-overlay">
+        <div id="intro-stage">
+          <canvas id="intro-canvas" width="270" height="480"></canvas>
+        </div>
+      </div>
     </div>
   </div>
   <div id="gameover">

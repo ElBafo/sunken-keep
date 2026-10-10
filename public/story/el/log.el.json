@@ -563,5 +563,10 @@
   "key": "chest_loot_one",
   "text": "Σεντούκι: {item}. Στον σάκο.",
   "when": "one tap loots a chest with exactly 1 item"
+ },
+ {
+  "key": "item_guarded",
+  "text": "{monster}: εμπόδιο. Πρώτα η μάχη.",
+  "when": "tap to pick up an item on a square with a living monster; nothing is picked up"
  }
 ]

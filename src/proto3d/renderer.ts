@@ -30,7 +30,12 @@ export class PixelRenderer {
     this.scene.background = new THREE.Color(FOG_COLOR);
     
     // Vertical FOV is wide enough that an adjacent wall sits in frame with a floor strip
-    this.camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, CAMERA_NEAR, CAMERA_FAR);
+    this.camera = new THREE.PerspectiveCamera(
+      CAMERA_FOV,
+      this.viewWidth / this.viewHeight,
+      CAMERA_NEAR,
+      CAMERA_FAR
+    );
     this.camera.rotation.order = 'YXZ';
     this.camera.position.set(0, 0, 0);
     
@@ -219,49 +224,17 @@ export class PixelRenderer {
   }
   
   resize() {
-    const vw = window.innerWidth;
-    const vh = window.innerHeight;
-    const scale = vw / this.viewWidth;
-
-    const bodyStyle = getComputedStyle(document.body);
-    const padTop = parseFloat(bodyStyle.paddingTop) || 0;
-    const padBottom = parseFloat(bodyStyle.paddingBottom) || 0;
-
-    const controls = document.getElementById('controls');
-    const hud = document.getElementById('party-hud');
-    let controlsSpace = 0;
-    if (controls && getComputedStyle(controls).display !== 'none') {
-      const cs = getComputedStyle(controls);
-      controlsSpace =
-        controls.offsetHeight +
-        (parseFloat(cs.marginTop) || 0) +
-        (parseFloat(cs.marginBottom) || 0);
+    // Internal 3D resolution is fixed to camera.json `view`. CSS scales the 270×585 stage.
+    const w = this.viewWidth;
+    const h = this.viewHeight;
+    if (this.renderTarget.width !== w || this.renderTarget.height !== h) {
+      this.renderTarget.setSize(w, h);
     }
-    if (hud) {
-      const hs = getComputedStyle(hud);
-      controlsSpace +=
-        hud.offsetHeight +
-        (parseFloat(hs.marginTop) || 0) +
-        (parseFloat(hs.marginBottom) || 0);
-    }
-
-    const available = Math.max(1, vh - padTop - padBottom - controlsSpace);
-    let cssHeight = this.viewHeight * scale;
-    // Prefer shrinking the view over overlapping the D-pad on short screens
-    if (cssHeight > available) {
-      cssHeight = available;
-    }
-
-    const renderHeight = Math.max(1, Math.round((cssHeight / scale)));
-
-    this.renderTarget.setSize(this.viewWidth, renderHeight);
-    this.camera.aspect = this.viewWidth / renderHeight;
+    this.camera.aspect = w / h;
     this.camera.updateProjectionMatrix();
-
-    // Drawing buffer stays viewW×logicalH; CSS upscales nearest-neighbour to the viewport
-    this.renderer.setSize(this.viewWidth, renderHeight, false);
-    this.canvas.style.width = `${vw}px`;
-    this.canvas.style.height = `${cssHeight}px`;
+    this.renderer.setSize(w, h, false);
+    this.canvas.style.width = `${w}px`;
+    this.canvas.style.height = `${h}px`;
   }
   
   render() {

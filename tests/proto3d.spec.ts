@@ -77,8 +77,8 @@ test('proto3d camera offset, wall sconces, no errors', async ({ page }) => {
   const canvas = canvasBox!;
   const canvasBottom = canvas.y + canvas.height;
 
-  expect(canvas.x, 'canvas left').toBe(0);
-  expect(canvas.width, 'canvas width == viewport width').toBe(viewport.width);
+  expect(canvas.width / canvas.height, '3D view keeps 270/380').toBeCloseTo(270 / 380, 2);
+  expect(canvas.width, 'view is CSS-scaled, not width-stretched').toBeLessThanOrEqual(viewport.width + 1);
   expect(canvas.y, 'canvas top >= 0').toBeGreaterThanOrEqual(0);
 
   const buttonIds = ['#btn-forward', '#btn-left', '#btn-back', '#btn-right'];
@@ -95,6 +95,7 @@ test('proto3d camera offset, wall sconces, no errors', async ({ page }) => {
     return { width: c.width, height: c.height };
   });
   expect(backing.width).toBe(270);
+  expect(backing.height, 'render target stays 380').toBe(380);
 
   await page.screenshot({ path: 'screenshots/layout-test.png', fullPage: false });
   await page.screenshot({ path: 'screenshots/proto-slime-2sq.png', fullPage: false });

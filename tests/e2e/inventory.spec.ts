@@ -195,30 +195,22 @@ test('proto3d step3 inventory: pickup, chest loot-all, bag, potions, key, oil, g
   expect(save.bag).toBeTruthy();
   expect(save.equipment).toBeTruthy();
 
-  // Adjacent 2× close range (slime at 7,2)
+  // Slime at (7,2): quarter-square toward the party, 1× world height (no adjacent 2× pull)
   await page.evaluate(() => {
     const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-    proto.setAdjacentScale(1);
+    proto.setAdjacentScale(2);
     proto.setPosition(6, 2, 1);
   });
   await page.waitForTimeout(120);
   await page.screenshot({ path: `${OUT}/step3-adjacent-before.png`, fullPage: false });
-  const before = await page.evaluate(() => {
-    const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-    return proto.sprites().find((s) => s.monsterKind === 'slime' && s.x === 7 && s.y === 2);
-  });
-  await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.setAdjacentScale(2));
-  await page.waitForTimeout(120);
-  await page.screenshot({ path: `${OUT}/step3-adjacent-after.png`, fullPage: false });
   const after = await page.evaluate(() => {
     const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
     return proto.sprites().find((s) => s.monsterKind === 'slime' && s.x === 7 && s.y === 2);
   });
   expect(after, 'slime sprite present').toBeTruthy();
-  expect(after!.scaleY / after!.baseH, 'adjacent scale is integer 2×').toBe(2);
-  expect(Number.isInteger(after!.scaleY / after!.baseH)).toBe(true);
-  expect(after!.worldX, 'close-range feet on the near floor strip').toBeCloseTo(12.28, 5);
-  expect(before!.scaleY / before!.baseH, 'before shot uses 1×').toBe(1);
+  expect(after!.scaleY / after!.baseH, 'no adjacent 2× scale').toBeCloseTo(1, 5);
+  expect(after!.worldX, 'slime drawn a quarter square toward the party').toBeCloseTo(13.5, 5);
+  expect(after!.worldZ, 'slime stays on its grid row').toBeCloseTo(2 * 2, 5);
 
   const listen = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.listenerPose());
   expect(listen.x, 'listener on party square centre').toBeCloseTo(6 * 2, 5);

@@ -24,6 +24,21 @@ function logs(events: CombatEvent[], key: string) {
   return events.filter((ev) => ev.type === 'log' && ev.key === key);
 }
 
+describe('grid adjacency stays on the square, not the drawn offset', () => {
+  it('a monster two squares away is never adjacent', () => {
+    const e = engine();
+    const slime = e.spawnMonster('slime', 2, 0);
+    e.setPartyPos(0, 0, 1);
+    expect(e.facingMonster()).toBeUndefined();
+    expect(e.adjacentMonster()).toBeUndefined();
+    expect(e.monsterSide(slime)).toBeNull();
+    e.setPartyPos(1, 0, 1);
+    expect(e.facingMonster()?.id).toBe(slime.id);
+    expect(e.adjacentMonster()?.id).toBe(slime.id);
+    expect(e.monsterSide(slime)).toBe('front');
+  });
+});
+
 describe('hero voices and perk hook flags', () => {
   it('keeps voices behind one constant and only releases perk hooks after the fight', () => {
     expect(HERO_VOICES).toBe(true);
