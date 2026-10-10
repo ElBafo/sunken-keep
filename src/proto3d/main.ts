@@ -1038,6 +1038,7 @@ class Game {
       lastMessage: () => this.lastMessage,
       lastHitType: () => this.lastHitType ?? this.spriteManager.lastHitType,
       playingLoops: () => this.audioManager.playingLoops(),
+      loopKit: () => this.audioManager.loopKit(),
       playHitFx: (id: string, kind: 'resist' | 'weak' | 'crit' | 'hit') =>
         this.spriteManager.playHitFx(id, kind, performance.now()),
       hitFxPlaying: () => this.spriteManager.hitFxPlaying(),

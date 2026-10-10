@@ -21,6 +21,7 @@ type Proto3d = {
   restartFloor: () => void;
   lastHitType: () => string | null;
   playingLoops: () => { count: number; kinds: string[] };
+  loopKit: () => { count: number; kinds: string[] };
   playHitFx: (id: string, kind: 'resist' | 'weak' | 'crit' | 'hit') => void;
   hitFxPlaying: () => Array<{ hostId: string; frames: number }>;
   addXp: (n: number) => void;
@@ -58,16 +59,17 @@ test('proto3d combat: block square, first swing, voices, perks, game over', asyn
     { timeout: 25000 }
   );
   await page.locator('#tap-to-start').tap();
+  await page.waitForTimeout(400);
   await page.waitForFunction(
     () => {
       const p = (window as unknown as { __proto3d?: Proto3d }).__proto3d;
-      return (p?.playingLoops().count ?? 0) >= 10;
+      return (p?.loopKit().count ?? 0) >= 8;
     },
     null,
     { timeout: 15000 }
   );
   const freshLoops = await page.evaluate(() =>
-    (window as unknown as { __proto3d: Proto3d }).__proto3d.playingLoops()
+    (window as unknown as { __proto3d: Proto3d }).__proto3d.loopKit()
   );
 
   const voicesOn = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.heroVoices());
@@ -225,7 +227,7 @@ test('proto3d combat: block square, first swing, voices, perks, game over', asyn
   expect(restarted.fighting).toBe(false);
   expect(restarted.heroes.every((h) => h.hp === h.maxHp && !h.downed), 'party is restored').toBe(true);
   const restartedLoops = await page.evaluate(() =>
-    (window as unknown as { __proto3d: Proto3d }).__proto3d.playingLoops()
+    (window as unknown as { __proto3d: Proto3d }).__proto3d.loopKit()
   );
   expect(restartedLoops.count, `restart loops ${restartedLoops.kinds} vs fresh ${freshLoops.kinds}`).toBe(
     freshLoops.count

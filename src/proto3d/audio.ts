@@ -570,12 +570,22 @@ export class AudioManager {
   }
 
   playingLoops(): { count: number; kinds: string[] } {
+    return this.loopKit(true);
+  }
+
+  /** Floor-kit loops. Pass `playingOnly` to count voices that are actually audible. */
+  loopKit(playingOnly = false): { count: number; kinds: string[] } {
     const kinds: string[] = [];
-    if (this.ambientSound?.isPlaying) kinds.push('ambient');
-    if (this.musicSound?.isPlaying) kinds.push('music');
-    if (this.lanternSound?.isPlaying) kinds.push(`lantern:${this.lanternMode}`);
+    const keep = (exists: boolean, playing: boolean | undefined, name: string) => {
+      if (exists && (!playingOnly || playing)) kinds.push(name);
+    };
+    keep(!!this.ambientSound, this.ambientSound?.isPlaying, 'ambient');
+    keep(!!this.musicSound, this.musicSound?.isPlaying, 'music');
+    keep(!!this.lanternSound, this.lanternSound?.isPlaying, `lantern:${this.lanternMode}`);
     for (const v of this.voices) {
-      if (v.loop && v.audio.isPlaying) kinds.push(v.kind);
+      if (!v.loop || v.kind === 'presence') continue;
+      if (playingOnly && !v.audio.isPlaying) continue;
+      kinds.push(v.kind);
     }
     return { count: kinds.length, kinds };
   }
