@@ -250,6 +250,7 @@ test.describe('proto3d step4 title and saves', () => {
 
     await page.evaluate(() => {
       const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+      (p as unknown as { finishFight?: () => void }).finishFight?.();
       p.setPosition(1, 7, 0);
     });
     const auto = await page.evaluate(() => {
