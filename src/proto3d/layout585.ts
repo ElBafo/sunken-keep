@@ -18,11 +18,27 @@ export interface InventoryPaperdoll {
   trinket: LayoutRect;
 }
 
+export interface StackCountPos {
+  rightX: number;
+  glyphTop: number;
+}
+
+export interface CloseIconSpec {
+  icon: string;
+  size: [number, number];
+  pos: [number, number];
+}
+
 export interface InventoryScreenLayout {
   slots: LayoutRect[];
   paperdoll: Record<HeroId, Array<Partial<InventoryPaperdoll> & Record<string, LayoutRect>>>;
   close: LayoutRect;
+  closeIcon: CloseIconSpec;
   desc: LayoutRect;
+  descLines: LayoutRect[];
+  hintLine: LayoutRect;
+  stackCount: StackCountPos[];
+  slotImages: { normal: string; selected: string };
 }
 
 export interface PanelIconCount {
@@ -152,11 +168,62 @@ export async function loadLayout585(): Promise<Layout585> {
     compass: isRect(raw.compass) ? raw.compass : null,
     pad,
     panelIcons: parsePanelIcons(raw.panelIcons),
-    inventoryScreen: {
-      slots,
-      paperdoll,
-      close: requireRect(screenRaw.close, 'inventory_screen.close'),
-      desc: requireRect(screenRaw.desc, 'inventory_screen.desc')
+    inventoryScreen: parseInventoryScreen(screenRaw, slots, paperdoll)
+  };
+}
+
+function asXywh(raw: LayoutRect): LayoutRect {
+  const [a, b, c, d] = raw;
+  if (c > a && d > b && c - a <= 48 && d - b <= 48) return [a, b, c - a, d - b];
+  return raw;
+}
+
+function parseRectList(raw: unknown, key: string): LayoutRect[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((s, i) => requireRect(s, `${key}[${i}]`));
+}
+
+function parseStackCount(raw: unknown, slots: LayoutRect[]): StackCountPos[] {
+  if (Array.isArray(raw)) {
+    return raw.map((entry, i) => {
+      const rec = (entry ?? {}) as Record<string, unknown>;
+      return {
+        rightX: Number.isFinite(rec.rightX) ? Number(rec.rightX) : slots[i]?.[0] + 36,
+        glyphTop: Number.isFinite(rec.glyphTop) ? Number(rec.glyphTop) : slots[i]?.[1] + 29
+      };
+    });
+  }
+  return slots.map(([x, y]) => ({ rightX: x + 36, glyphTop: y + 29 }));
+}
+
+function parseInventoryScreen(
+  screenRaw: Record<string, unknown>,
+  slotsAabb: LayoutRect[],
+  paperdoll: InventoryScreenLayout['paperdoll']
+): InventoryScreenLayout {
+  const slotRects = parseRectList(screenRaw.slotRects, 'inventory_screen.slotRects').map(asXywh);
+  const slots = (slotRects.length ? slotRects : slotsAabb.map(asXywh)).slice(0, 12);
+  const descLines = parseRectList(screenRaw.descLines, 'inventory_screen.descLines');
+  const images = (screenRaw.slotImages ?? {}) as Record<string, unknown>;
+  const closeIconRaw = (screenRaw.closeIcon ?? {}) as Record<string, unknown>;
+  const iconPos = Array.isArray(closeIconRaw.pos) ? closeIconRaw.pos : [243, 15];
+  const iconSize = Array.isArray(closeIconRaw.size) ? closeIconRaw.size : [12, 12];
+  return {
+    slots,
+    paperdoll,
+    close: requireRect(screenRaw.close, 'inventory_screen.close'),
+    closeIcon: {
+      icon: typeof closeIconRaw.icon === 'string' ? closeIconRaw.icon : 'ui/panel/icon_close.png',
+      size: [Number(iconSize[0]) || 12, Number(iconSize[1]) || 12],
+      pos: [Number(iconPos[0]) || 243, Number(iconPos[1]) || 15]
+    },
+    desc: requireRect(screenRaw.desc, 'inventory_screen.desc'),
+    descLines,
+    hintLine: isRect(screenRaw.hintLine) ? screenRaw.hintLine : [11, 390, 248, 10],
+    stackCount: parseStackCount(screenRaw.stackCount, slots),
+    slotImages: {
+      normal: typeof images.normal === 'string' ? images.normal : 'ui/items/slot_40.png',
+      selected: typeof images.selected === 'string' ? images.selected : 'ui/items/slot_40_selected.png'
     }
   };
 }

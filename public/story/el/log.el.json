@@ -441,7 +441,7 @@
  {
   "key": "chest_item",
   "text": "Μέσα: {item}.",
-  "when": "one line per chestItems entry after chest_open"
+  "when": "legacy, unused once chest_loot_one/chest_loot_all are wired"
  },
  {
   "key": "equip",
@@ -557,6 +557,11 @@
  {
   "key": "chest_loot_all",
   "text": "Σεντούκι: {n} πράγματα. Όλα στον σάκο.",
-  "when": "one tap loots a chest with 2+ items; use instead of one chest_item line per item"
+  "when": "one tap loots a chest with 2+ items ({n} is always 2 or more)"
+ },
+ {
+  "key": "chest_loot_one",
+  "text": "Σεντούκι: {item}. Στον σάκο.",
+  "when": "one tap loots a chest with exactly 1 item"
  }
 ]

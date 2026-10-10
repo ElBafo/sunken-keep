@@ -191,7 +191,8 @@ class Game {
     this.inventory = new InventoryUi(this.story, this.bag, layout.inventoryScreen, {
       equipment: () => this.equipmentState(),
       onUse: (index) => this.useBagSlot(index),
-      onEquip: (index, hero) => this.equipBagSlot(index, hero),
+      onEquip: (index, hero, slot) => this.equipBagSlot(index, hero, slot),
+      onDrink: (index, hero) => this.drinkBagSlot(index, hero),
       onClose: () => this.closeBag(),
       playUi: (name) => this.audioManager?.playUi(name)
     });
@@ -378,7 +379,10 @@ class Game {
     for (const id of loot) {
       stored += this.bag.add(id);
     }
-    if (stored) {
+    if (stored === 1) {
+      this.audioManager.playUi('pickup');
+      this.showMessage(this.storyLog('chest_loot_one', { item: this.story.itemName(loot[0]) }));
+    } else if (stored > 1) {
       this.audioManager.playUi('pickup');
       this.showMessage(this.storyLog('chest_loot_all', { n: stored }));
     }
@@ -427,7 +431,24 @@ class Game {
     }
     if (this.inventory?.open && this.inventory.pickHero) {
       this.drinkPendingPotion(hero);
+      return;
     }
+    if (this.inventory?.open && this.inventory.selected >= 0) {
+      const slot = this.bag.slots[this.inventory.selected];
+      if (slot?.item === 'potion_red' || slot?.item === 'potion_blue' || slot?.item === 'potion_green') {
+        this.drinkBagSlot(this.inventory.selected, hero);
+        return;
+      }
+      if (this.inventory.equipPick) this.equipBagSlot(this.inventory.selected, hero);
+    }
+  }
+
+  private drinkBagSlot(index: number, hero: HeroId) {
+    const slot = this.bag.slots[index];
+    if (!slot) return;
+    if (slot.item !== 'potion_red' && slot.item !== 'potion_blue' && slot.item !== 'potion_green') return;
+    this.pendingPotion = slot.item;
+    this.drinkPendingPotion(hero);
   }
 
   private quickPotion(kind: 'health' | 'mana') {
@@ -506,21 +527,33 @@ class Game {
     this.inventory.redraw();
   }
 
-  equipBagSlot(index: number, hero: HeroId) {
-    const slot = this.bag.slots[index];
-    if (!slot || !canEquip(slot.item, hero)) {
+  equipBagSlot(index: number, hero: HeroId, slot?: 'main' | 'off' | 'armour' | 'trinket') {
+    const entry = this.bag.slots[index];
+    if (!entry || !canEquip(entry.item, hero)) {
+      this.audioManager.playUi('item_use_fail');
+      return;
+    }
+    const item = entry.item;
+    if (slot === 'trinket') {
+      this.audioManager.playUi('item_use_fail');
+      return;
+    }
+    if (item === 'chain_mail' && slot && slot !== 'armour') {
+      this.audioManager.playUi('item_use_fail');
+      return;
+    }
+    if (item !== 'chain_mail' && slot === 'armour') {
       this.audioManager.playUi('item_use_fail');
       return;
     }
     const taken = this.bag.takeAt(index, 1);
     if (!taken) return;
-    const item = taken.item;
     if (item === 'chain_mail') {
       const prev = this.hud.heroes[hero].armour;
       if (prev) this.bag.add(prev);
       this.hud.setArmour(hero, item);
     } else {
-      const hand = preferredHand(item);
+      const hand = slot === 'main' || slot === 'off' ? slot : preferredHand(item);
       const prev = this.hud.heroes[hero].equipment[hand];
       if (prev && prev !== 'empty_hand') this.bag.add(prev);
       this.hud.setHand(hero, hand, item as GearId);
@@ -925,6 +958,10 @@ class Game {
   interact(clientX?: number, clientY?: number) {
     this.interactCount += 1;
     if (this.inventory?.open) {
+      if (this.inventory.selected >= 0) {
+        this.useBagSlot(this.inventory.selected);
+        return;
+      }
       this.closeBag();
       return;
     }
@@ -1439,6 +1476,14 @@ class Game {
         return this.pickupItemAt(x, y);
       },
       chestOpen: (x: number, y: number) => !!this.player.tileAt(x, y)?.chestOpen,
+      fillChest: (x: number, y: number, items: string[]) => {
+        const tile = this.player.tileAt(x, y);
+        if (!tile) return false;
+        tile.chest = true;
+        tile.chestOpen = false;
+        tile.chestItems = [...items];
+        return true;
+      },
       setAdjacentScale: (n: number) => {
         this.spriteManager.setAdjacentScale(n);
         this.spriteManager.update(performance.now(), this.player.x, this.player.y, this.player.dir);

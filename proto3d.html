@@ -80,11 +80,14 @@
       background: rgba(240, 208, 96, 0.28);
     }
     #inventory-screen {
-      position: absolute;
-      inset: 0;
+      position: fixed;
+      top: env(safe-area-inset-top, 0);
+      left: 0;
+      width: 100vw;
+      aspect-ratio: 270 / 585;
       z-index: 90;
       display: none;
-      background: rgba(8, 6, 4, 0.2);
+      background: #000;
       touch-action: none;
     }
     #inventory-screen.show { display: block; }
@@ -98,7 +101,9 @@
     }
     .inv-slot,
     .inv-action,
-    .inv-close {
+    .inv-close,
+    .inv-doll,
+    .inv-hero {
       position: absolute;
       min-width: 44px;
       min-height: 44px;
@@ -112,11 +117,6 @@
       touch-action: none;
       -webkit-tap-highlight-color: transparent;
       z-index: 91;
-    }
-    .inv-action,
-    .inv-close {
-      background: rgba(42, 36, 32, 0.92);
-      border: 1px solid #8a7348;
     }
     .hand-btn.swap-armed {
       outline: 2px solid #f0d060;
@@ -335,6 +335,10 @@
       z-index: 200;
       display: none; /* Hidden by default, shown with ?debug=1 */
     }
+    body.bag-open #oil-readout,
+    body.bag-open #fps-counter {
+      visibility: hidden;
+    }
     #oil-readout {
       position: fixed;
       top: calc(10px + env(safe-area-inset-top, 0px));
@@ -392,13 +396,13 @@
       <button id="btn-torch-take" class="hud-choice-btn" type="button"></button>
       <button id="btn-torch-snuff" class="hud-choice-btn" type="button"></button>
     </div>
-    <div id="inventory-screen" hidden>
-      <canvas id="inventory-canvas"></canvas>
-    </div>
     <button id="btn-door" class="control-btn" type="button"></button>
   </div>
   <div id="party-hud">
     <canvas id="party-canvas"></canvas>
+  </div>
+  <div id="inventory-screen" hidden>
+    <canvas id="inventory-canvas"></canvas>
   </div>
   <div id="message-toast"></div>
   <div id="note-overlay">

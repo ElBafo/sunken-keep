@@ -21,7 +21,7 @@ import {
 } from './layout585';
 
 export type HandSlot = 'main' | 'off';
-export type GearId = ItemType | 'torch_lit' | 'torch_burnt';
+export type GearId = ItemType | 'torch_lit' | 'torch_burnt' | 'iron_shield' | 'chain_mail' | 'ashmantle_hammer';
 type Rect = LayoutRect;
 
 export interface HeroHud {
@@ -760,7 +760,10 @@ export class PartyHud {
     let item = hero.equipment[hand] as string;
     if (item === 'prayer_lantern' && this.oilFn() <= 0) item = 'prayer_lantern_ember';
     const iconKey = item === 'empty_hand' || item === 'fist' ? `fist_${hero.id}` : item;
-    const file = this.icons.get(iconKey) ?? `hand_${iconKey}.png`;
+    const file =
+      this.icons.get(iconKey) ??
+      (item === 'iron_shield' ? this.icons.get('shield') : undefined) ??
+      `hand_${iconKey}.png`;
     const img = this.images.get(file);
     const recovering = hero.recovery[hand] > now;
     const melee = MELEE_ITEMS.includes(item as ItemType) || item === 'torch_lit' || item === 'torch_burnt';

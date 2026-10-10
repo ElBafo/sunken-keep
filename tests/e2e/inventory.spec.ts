@@ -28,6 +28,8 @@ type Proto3d = {
   setOil: (n: number) => void;
   setHeroHp: (id: string, hp: number) => void;
   chestOpen: (x: number, y: number) => boolean;
+  fillChest: (x: number, y: number, items: string[]) => boolean;
+  getHands: () => Array<{ id: string; main: string; off: string }>;
   tryMoveForward: () => { result: string; after: { x: number; y: number; dir: number } };
   sprites: () => Array<{
     kind: string;
@@ -105,18 +107,20 @@ test('proto3d step3 inventory: pickup, chest loot-all, bag, potions, key, oil, g
   bag = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.getBag());
   expect(bag.find((s) => s.item === 'potion_red')?.count, 'stackable potions merge').toBe(2);
 
-  // Chest loot-all: one log line, not one per item
-  await page.evaluate(() => {
-    const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-    proto.giveItem('potion_blue', 1);
-    proto.giveItem('potion_green', 1);
-  });
+  // Chest loot: one item → chest_loot_one; two+ → chest_loot_all
   await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.setPosition(5, 7, 0));
   await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.pickupHere());
   expect(await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.chestOpen(5, 7))).toBe(true);
-  const logs = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.logLines());
+  let logs = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.logLines());
+  expect(logs.some((l) => /Chest: .+\. Into the bag\./.test(l)), 'chest_loot_one for a single item').toBe(true);
+  await page.evaluate(() => {
+    const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    proto.fillChest(5, 7, ['potion_blue', 'potion_green']);
+    proto.pickupHere();
+  });
+  logs = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.logLines());
   expect(logs.some((l) => /Chest: \d+ things\. All in the bag\./.test(l)), 'one chest_loot_all line').toBe(true);
-  expect(logs.filter((l) => l.startsWith('Chest:')).length, 'not one line per item').toBeLessThanOrEqual(2);
+  expect(logs.filter((l) => l.startsWith('Chest:')).length, 'not one line per item').toBeLessThanOrEqual(3);
 
   // Open bag + equip compare
   await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.giveItem('iron_shield', 1));
@@ -126,7 +130,8 @@ test('proto3d step3 inventory: pickup, chest loot-all, bag, potions, key, oil, g
   await page.locator('#btn-bag').tap();
   expect(await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.bagOpen())).toBe(true);
   await expect(page.locator('#inventory-screen')).toBeVisible();
-  await page.locator('.inv-slot[data-name="slot-0"]').tap();
+  await expect(page.locator('body')).toHaveClass(/bag-open/);
+  await expect(page.locator('.inv-action')).toHaveCount(0);
   await page.waitForTimeout(80);
   await page.screenshot({ path: `${OUT}/step3-open-bag.png`, fullPage: false });
 
@@ -134,14 +139,23 @@ test('proto3d step3 inventory: pickup, chest loot-all, bag, potions, key, oil, g
     const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
     return proto.getBag().findIndex((s) => s.item === 'iron_shield');
   });
-  await page.evaluate((i) => {
-    const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-    proto.equipBagSlot(i, 'mags');
-  }, shieldIndex);
+  expect(shieldIndex, 'iron_shield in bag').toBeGreaterThanOrEqual(0);
+  await page.locator(`.inv-slot[data-name="slot-${shieldIndex}"]`).tap();
+  await page.waitForTimeout(80);
   const compare = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.lastCompare());
-  expect(compare === 'Better' || compare === 'Worse' || compare === 'Same' || compare == null).toBe(true);
+  expect(compare === 'Better' || compare === 'Worse' || compare === 'Same').toBe(true);
+  await page.screenshot({ path: `${OUT}/step3-item-selected.png`, fullPage: false });
   await page.screenshot({ path: `${OUT}/step3-equip-compare.png`, fullPage: false });
+
+  await page.locator('.inv-doll[data-hero="mags"][data-slot="off"]').tap();
+  await page.waitForTimeout(80);
+  const hands = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.getHands());
+  expect(hands.find((h) => h.id === 'mags')?.off, 'iron_shield equips in Mags off hand').toBe('iron_shield');
+  bag = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.getBag());
+  expect(bag.some((s) => s.item === 'tricks_pouch'), 'tricks pouch returns to the bag').toBe(true);
+  await page.screenshot({ path: `${OUT}/step3-mags-shield.png`, fullPage: false });
   await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.closeBag());
+  await expect(page.locator('body')).not.toHaveClass(/bag-open/);
 
   // Potion use (heal Brannoc) via the panel well + portrait
   await page.evaluate(() => {

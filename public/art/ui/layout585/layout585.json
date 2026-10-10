@@ -226,244 +226,76 @@
  "inventory_screen": {
   "slots": [
    [
-    7,
-    170,
-    37,
-    200
+    5,
+    200,
+    45,
+    240
    ],
    [
-    39,
-    170,
-    69,
-    200
+    49,
+    200,
+    89,
+    240
    ],
    [
-    71,
-    170,
-    101,
-    200
-   ],
-   [
-    103,
-    170,
+    93,
+    200,
     133,
-    200
+    240
    ],
    [
-    135,
-    170,
-    165,
-    200
+    137,
+    200,
+    177,
+    240
    ],
    [
-    167,
-    170,
-    197,
-    200
+    181,
+    200,
+    221,
+    240
    ],
    [
-    199,
-    170,
-    229,
-    200
+    225,
+    200,
+    265,
+    240
    ],
    [
-    231,
-    170,
-    261,
-    200
+    5,
+    244,
+    45,
+    284
    ],
    [
-    7,
-    202,
-    37,
-    232
+    49,
+    244,
+    89,
+    284
    ],
    [
-    39,
-    202,
-    69,
-    232
-   ],
-   [
-    71,
-    202,
-    101,
-    232
-   ],
-   [
-    103,
-    202,
+    93,
+    244,
     133,
-    232
+    284
    ],
    [
-    135,
-    202,
-    165,
-    232
+    137,
+    244,
+    177,
+    284
    ],
    [
-    167,
-    202,
-    197,
-    232
+    181,
+    244,
+    221,
+    284
    ],
    [
-    199,
-    202,
-    229,
-    232
-   ],
-   [
-    231,
-    202,
-    261,
-    232
-   ],
-   [
-    7,
-    234,
-    37,
-    264
-   ],
-   [
-    39,
-    234,
-    69,
-    264
-   ],
-   [
-    71,
-    234,
-    101,
-    264
-   ],
-   [
-    103,
-    234,
-    133,
-    264
-   ],
-   [
-    135,
-    234,
-    165,
-    264
-   ],
-   [
-    167,
-    234,
-    197,
-    264
-   ],
-   [
-    199,
-    234,
-    229,
-    264
-   ],
-   [
-    231,
-    234,
-    261,
-    264
-   ],
-   [
-    7,
-    266,
-    37,
-    296
-   ],
-   [
-    39,
-    266,
-    69,
-    296
-   ],
-   [
-    71,
-    266,
-    101,
-    296
-   ],
-   [
-    103,
-    266,
-    133,
-    296
-   ],
-   [
-    135,
-    266,
-    165,
-    296
-   ],
-   [
-    167,
-    266,
-    197,
-    296
-   ],
-   [
-    199,
-    266,
-    229,
-    296
-   ],
-   [
-    231,
-    266,
-    261,
-    296
-   ],
-   [
-    7,
-    298,
-    37,
-    328
-   ],
-   [
-    39,
-    298,
-    69,
-    328
-   ],
-   [
-    71,
-    298,
-    101,
-    328
-   ],
-   [
-    103,
-    298,
-    133,
-    328
-   ],
-   [
-    135,
-    298,
-    165,
-    328
-   ],
-   [
-    167,
-    298,
-    197,
-    328
-   ],
-   [
-    199,
-    298,
-    229,
-    328
-   ],
-   [
-    231,
-    298,
-    261,
-    328
+    225,
+    244,
+    265,
+    284
    ]
   ],
   "paperdoll": {
@@ -610,13 +442,207 @@
    26,
    26
   ],
-  "note": "tap an item to select (glow), then tap a hero, slot, or the view (e.g. a door) to use it; long-press for its description in the log box",
+  "slotRects": [
+   [
+    5,
+    200,
+    40,
+    40
+   ],
+   [
+    49,
+    200,
+    40,
+    40
+   ],
+   [
+    93,
+    200,
+    40,
+    40
+   ],
+   [
+    137,
+    200,
+    40,
+    40
+   ],
+   [
+    181,
+    200,
+    40,
+    40
+   ],
+   [
+    225,
+    200,
+    40,
+    40
+   ],
+   [
+    5,
+    244,
+    40,
+    40
+   ],
+   [
+    49,
+    244,
+    40,
+    40
+   ],
+   [
+    93,
+    244,
+    40,
+    40
+   ],
+   [
+    137,
+    244,
+    40,
+    40
+   ],
+   [
+    181,
+    244,
+    40,
+    40
+   ],
+   [
+    225,
+    244,
+    40,
+    40
+   ]
+  ],
+  "stackCount": [
+   {
+    "rightX": 41,
+    "glyphTop": 229
+   },
+   {
+    "rightX": 85,
+    "glyphTop": 229
+   },
+   {
+    "rightX": 129,
+    "glyphTop": 229
+   },
+   {
+    "rightX": 173,
+    "glyphTop": 229
+   },
+   {
+    "rightX": 217,
+    "glyphTop": 229
+   },
+   {
+    "rightX": 261,
+    "glyphTop": 229
+   },
+   {
+    "rightX": 41,
+    "glyphTop": 273
+   },
+   {
+    "rightX": 85,
+    "glyphTop": 273
+   },
+   {
+    "rightX": 129,
+    "glyphTop": 273
+   },
+   {
+    "rightX": 173,
+    "glyphTop": 273
+   },
+   {
+    "rightX": 217,
+    "glyphTop": 273
+   },
+   {
+    "rightX": 261,
+    "glyphTop": 273
+   }
+  ],
+  "slotsFormat": "slots = [x0,y0,x1,y1] (same format as before and as paperdoll; x1/y1 exclusive); slotRects = the same as [x,y,w,h]. 12 slots, row-major, index 0-11. The old 40-slot grid is gone, no locked slots.",
+  "slotImages": {
+   "normal": "ui/items/slot_40.png",
+   "selected": "ui/items/slot_40_selected.png"
+  },
+  "iconRule": "item icons are the existing 24x24 icons (ui/items/items.json), centred at 1x (slot x+8, y+8), never scaled",
+  "stackCountRule": {
+   "font": "font/font_5x7.png (font_5x7.json glyphs)",
+   "colour": "#d8ccb0",
+   "shadow": "#1a1210 at +1,+1",
+   "position": "right-aligned: text x = rightX - (digits*6 - 1), y = glyphTop (top of the 5x9 glyph box). rightX is exclusive: last lit column = rightX-1 (slot x+35), shadow column = rightX; digit rows y+29..35, shadow row y+36",
+   "show": "only when the slot holds 2 or more; display capped at 5 (the stack limit for potions, oil flasks, keys)",
+   "sameAs": "panelIcons potion count colours"
+  },
+  "selectedGlow": {
+   "image": "ui/items/slot_40_selected.png",
+   "rule": "tap an item: its slot frame swaps to slot_40_selected.png (static warm orange frame, no pulsing or flicker); icon stays full colour at x+8,y+8. One selection at a time; tap it again or tap close to deselect. While selected, the desc box shows the item and hintLine shows bag.pick_hero."
+  },
+  "note": "12-slot bag (levels/actions.json progression.bag). Tap an item to select (selectedGlow), then tap a hero, slot, or the view (e.g. a door) to use it; long-press for its description in the desc box",
   "desc": [
    7,
    340,
    256,
    60
-  ]
+  ],
+  "descLines": [
+   [
+    11,
+    343,
+    248,
+    10
+   ],
+   [
+    11,
+    353,
+    248,
+    10
+   ],
+   [
+    11,
+    363,
+    248,
+    10
+   ],
+   [
+    11,
+    373,
+    248,
+    10
+   ]
+  ],
+  "hintLine": [
+   11,
+   390,
+   248,
+   10
+  ],
+  "hintRule": {
+   "text": "story/ui_text.json bag.pick_hero (\"Tap a hero.\" / el \"Πάτα έναν ήρωα.\"), shown only while an item is selected",
+   "colour": "#ffbe5a",
+   "shadow": "#1a1210 at +1,+1",
+   "align": "left; y = glyph-box top (390 = desc y + 50)",
+   "descLinesNote": "item name (#ffbe5a) on line 1, description and effect (#d8ccb0) on lines 2-4"
+  },
+  "closeIcon": {
+   "icon": "ui/panel/icon_close.png",
+   "size": [
+    12,
+    12
+   ],
+   "pos": [
+    243,
+    15
+   ],
+   "rule": "centred in the close rect at 1x, never scaled; pressed: well_pressed 26x26 (button_pressed_9slice) + icon 1 px lower"
+  },
+  "paperdollIconRule": "equipped item icon (24x24) centred at 1x in the slot: x = x0 + 3, y = y0 + 3 (slots are drawn inclusive, 31x31 px incl. the bronze outline)"
  },
  "panelIcons": {
   "rule": "Icons are drawn by code, centred in their rect at 1x, NEVER scaled (1 art px = 1 canvas px; positions are integer). panel_585.png bakes only the raised stone plates of these buttons, no icons. Finger down: draw the pressed plate over the rect, then the icon 1 px lower; on release redraw the normal plate (well_28.png / well_60x28.png) + icon. Positions below are in 270x585 space.",

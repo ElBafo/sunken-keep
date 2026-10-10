@@ -9,7 +9,7 @@ function isUiTarget(el: EventTarget | null): boolean {
   return (
     el instanceof HTMLElement &&
     !!el.closest(
-      '.control-btn, #tap-to-start, .hand-btn, .portrait-btn, .hud-chrome-btn, .hud-choice-btn, #torch-choice, #party-hud, #inventory-screen, .inv-slot, .inv-action, .inv-close'
+      '.control-btn, #tap-to-start, .hand-btn, .portrait-btn, .hud-chrome-btn, .hud-choice-btn, #torch-choice, #party-hud, #inventory-screen, .inv-slot, .inv-action, .inv-close, .inv-doll, .inv-hero'
     )
   );
 }
