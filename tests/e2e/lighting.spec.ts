@@ -392,7 +392,7 @@ test('proto3d floor1v2: start-key-door-hall-stairs and pantry-lamp room', async 
   await pose(2, 3, 0);
   expect((await step()).after).toMatchObject({ x: 2, y: 2 });
   await pose(2, 2, 1);
-  expect((await step('monster')).result, 'leeches at (3,2) block the square').toBe('monster');
+  expect((await step()).after).toMatchObject({ x: 3, y: 2 });
   await pose(3, 2, 1);
   await tap();
   await page.waitForTimeout(900);
