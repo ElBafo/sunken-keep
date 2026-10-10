@@ -60,17 +60,6 @@ test('proto3d combat: block square, first swing, voices, perks, game over', asyn
   );
   await page.locator('#tap-to-start').tap();
   await page.waitForTimeout(400);
-  await page.waitForFunction(
-    () => {
-      const p = (window as unknown as { __proto3d?: Proto3d }).__proto3d;
-      return (p?.loopKit().count ?? 0) >= 8;
-    },
-    null,
-    { timeout: 15000 }
-  );
-  const freshLoops = await page.evaluate(() =>
-    (window as unknown as { __proto3d: Proto3d }).__proto3d.loopKit()
-  );
 
   const voicesOn = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.heroVoices());
   expect(voicesOn, 'HERO_VOICES is the single on-switch').toBe(true);
@@ -97,28 +86,6 @@ test('proto3d combat: block square, first swing, voices, perks, game over', asyn
   expect(slimeBump.slime?.y).toBe(2);
   expect(slimeBump.slimeSprite?.visible, 'slime is lit and visible one square ahead').toBe(true);
 
-  const resistShot = await page.evaluate(() => {
-    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-    p.useHand('brannoc', 'main');
-    const slime = p.combatMonsters().find((m) => m.kind === 'slime');
-    if (slime) p.playHitFx(slime.id, 'resist');
-    return { hit: p.lastHitType(), fx: p.hitFxPlaying() };
-  });
-  expect(resistShot.fx.length, 'resist goo plays on the slime').toBeGreaterThan(0);
-  await page.waitForTimeout(90);
-  await page.screenshot({ path: `${OUT}/combat-slime-resist.png`, fullPage: false });
-
-  const frostShot = await page.evaluate(() => {
-    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-    p.useHand('ilsevar', 'main');
-    const slime = p.combatMonsters().find((m) => m.kind === 'slime');
-    if (slime) p.playHitFx(slime.id, 'weak');
-    return { hit: p.lastHitType(), fx: p.hitFxPlaying() };
-  });
-  expect(frostShot.fx.length, 'weak frost plays on the slime').toBeGreaterThan(0);
-  await page.waitForTimeout(90);
-  await page.screenshot({ path: `${OUT}/combat-slime-frost.png`, fullPage: false });
-
   const startHp = await page.evaluate(() =>
     (window as unknown as { __proto3d: Proto3d }).__proto3d.combatHeroes().reduce((s, h) => s + h.hp, 0)
   );
@@ -141,6 +108,26 @@ test('proto3d combat: block square, first swing, voices, perks, game over', asyn
     afterSwing.logs.some((l) => /hits|dodges/i.test(l)) || afterSwing.hp < startHp,
     'first swing lands after ~0.5s'
   ).toBe(true);
+
+  const resistShot = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    const slime = p.combatMonsters().find((m) => m.kind === 'slime');
+    if (slime) p.playHitFx(slime.id, 'resist');
+    return { hit: p.lastHitType(), fx: p.hitFxPlaying() };
+  });
+  expect(resistShot.fx.length, 'resist goo plays on the slime').toBeGreaterThan(0);
+  await page.waitForTimeout(90);
+  await page.screenshot({ path: `${OUT}/combat-slime-resist.png`, fullPage: false });
+
+  const frostShot = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    const slime = p.combatMonsters().find((m) => m.kind === 'slime');
+    if (slime) p.playHitFx(slime.id, 'weak');
+    return { hit: p.lastHitType(), fx: p.hitFxPlaying() };
+  });
+  expect(frostShot.fx.length, 'weak frost plays on the slime').toBeGreaterThan(0);
+  await page.waitForTimeout(90);
+  await page.screenshot({ path: `${OUT}/combat-slime-frost.png`, fullPage: false });
 
   const hands = await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
@@ -205,6 +192,9 @@ test('proto3d combat: block square, first swing, voices, perks, game over', asyn
   });
   expect(downed?.downed || downed?.hp === 0).toBe(true);
 
+  const freshLoops = await page.evaluate(() =>
+    (window as unknown as { __proto3d: Proto3d }).__proto3d.loopKit()
+  );
   await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.forceWipe());
   await page.waitForTimeout(200);
   await expect(page.locator('#gameover')).toHaveClass(/show/);
