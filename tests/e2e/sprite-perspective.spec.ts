@@ -49,10 +49,29 @@ type Proto3d = {
   };
   canvasSize: () => { canvas: [number, number]; renderTarget: [number, number] };
   gameStage: () => {
-    stage: { width: number; height: number; x: number; y: number; right: number; bottom: number } | null;
-    oil: { width: number; height: number; x: number; y: number; right: number; bottom: number } | null;
+    stage: {
+      width: number;
+      height: number;
+      x: number;
+      y: number;
+      top: number;
+      left: number;
+      right: number;
+      bottom: number;
+    } | null;
+    oil: {
+      width: number;
+      height: number;
+      x: number;
+      y: number;
+      top: number;
+      left: number;
+      right: number;
+      bottom: number;
+    } | null;
     oilInside: boolean;
     toastInside: boolean;
+    fpsInside: boolean;
   };
   listenerPose: () => { x: number; y: number; z: number };
   snapDoor?: (x: number, y: number, open: boolean) => void;
@@ -215,15 +234,17 @@ test('fixed 270x380 view; idle body heights; slime 3/2/1; no jump', async ({ pag
 });
 
 test('phone stage fills width at 393x852 and height at 393x659; HUD stays inside', async ({ page }) => {
+  await page.setViewportSize({ width: 393, height: 659 });
   await boot(page);
   const short = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.gameStage());
   expect(short.oilInside, 'oil gauge is inside the 270×585 stage').toBe(true);
   expect(short.toastInside, 'toasts are inside the 270×585 stage').toBe(true);
+  expect(short.fpsInside, 'debug FPS lives inside the stage when present').toBe(true);
   expect(short.stage!.height, '393×659 is height-limited').toBeGreaterThanOrEqual(657);
   expect(short.stage!.height).toBeLessThanOrEqual(660);
   expect(short.stage!.width, 'short Safari letterboxes the sides').toBeLessThan(360);
   expect(short.oil!.right).toBeLessThanOrEqual(short.stage!.right + 1);
-  expect(short.oil!.top).toBeGreaterThanOrEqual(short.stage!.y - 1);
+  expect(short.oil!.top).toBeGreaterThanOrEqual(short.stage!.top - 1);
 
   await page.setViewportSize({ width: 393, height: 852 });
   await page.evaluate(() => window.dispatchEvent(new Event('resize')));
@@ -231,7 +252,9 @@ test('phone stage fills width at 393x852 and height at 393x659; HUD stays inside
   expect(tall.stage!.width, '393×852 fills the width').toBeGreaterThanOrEqual(390);
   expect(tall.stage!.width).toBeLessThanOrEqual(394);
   expect(tall.oilInside).toBe(true);
+  expect(tall.fpsInside).toBe(true);
   expect(tall.oil!.right).toBeLessThanOrEqual(tall.stage!.right + 1);
+  expect(tall.oil!.top).toBeGreaterThanOrEqual(tall.stage!.top - 1);
 });
 
 test('monster two squares away is never adjacent', async ({ page }) => {

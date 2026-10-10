@@ -37,6 +37,7 @@ export function fitGameStage(): { scale: number; left: number; top: number; widt
   stage.style.height = `${GAME_STAGE_H}px`;
   stage.style.transformOrigin = 'top left';
   stage.style.transform = `scale(${scale})`;
+  stage.style.imageRendering = 'pixelated';
   stage.style.left = `${left}px`;
   stage.style.top = `${top}px`;
   return { scale, left, top, width, height };

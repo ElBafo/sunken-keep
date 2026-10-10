@@ -45,6 +45,9 @@
       width: 270px;
       height: 585px;
       transform-origin: top left;
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
     }
     #canvas-container {
       position: relative;
@@ -423,6 +426,7 @@
         <div id="note-text"></div>
       </div>
       <div id="oil-readout"></div>
+      <div id="fps-counter">FPS: --</div>
     </div>
   </div>
   <div id="gameover">

@@ -1328,14 +1328,26 @@ class Game {
         const box = (el: Element | null) => {
           if (!el) return null;
           const r = el.getBoundingClientRect();
-          return { x: r.x, y: r.y, width: r.width, height: r.height, right: r.right, bottom: r.bottom };
+          return {
+            x: r.x,
+            y: r.y,
+            top: r.top,
+            left: r.left,
+            width: r.width,
+            height: r.height,
+            right: r.right,
+            bottom: r.bottom
+          };
         };
+        const fps = document.getElementById('fps-counter');
         return {
           stage: box(stage),
           oil: box(oil),
           toast: box(toast),
+          fps: box(fps),
           oilInside: !!oil && !!stage?.contains(oil),
-          toastInside: !!toast && !!stage?.contains(toast)
+          toastInside: !!toast && !!stage?.contains(toast),
+          fpsInside: !fps || !!stage?.contains(fps)
         };
       },
       adjacentMonster: () => {
