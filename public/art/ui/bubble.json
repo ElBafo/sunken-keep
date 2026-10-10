@@ -1,5 +1,8 @@
 {
  "bubble": "bubble_9slice.png, 12x12, slice margins 4px on every side; stretch the middle",
  "tail": "bubble_tail.png, 9x6, points down; place its top row over the bubble's bottom border, centred on the speaker's portrait",
- "layout": "bubble spans x 0-269 at the bottom of the 270x200 view; text padding 6px left/right, 4px top/bottom; 43 chars per line at 6px advance; 2 lines = 28px tall bubble"
+ "layout": "bubble spans x 0-269 at the bottom of the 270x380 3D view (bottom edge y 376, above the panel at 380); 2 lines = 28px tall, so y 348-376; text padding 6px left/right, 4px top/bottom; 43 chars per line at 6px advance",
+ "speakerName": "line 1 starts with the speaker's display name from story/names.json (names.el.json in Greek) plus ': ', drawn in #ffbe5a; the bark text follows in #d8ccb0 and wraps to line 2",
+ "tailRule": "tail top row over the bubble's bottom border, x centred on the speaker's 44x44 panel portrait (portrait rects in ui/layout585/layout585.json)",
+ "superseded": "old layout was for the 270x200 view; backup in bubble_before_view380.json"
 }

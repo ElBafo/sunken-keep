@@ -34,6 +34,7 @@ type Proto3d = {
   secretOpen: (x: number, y: number) => boolean;
   speakBark: (trigger: string, speaker?: string) => boolean;
   bubbleVisible: () => boolean;
+  bubbleText: () => string;
   mapState: () => {
     oil: number;
     bag: Array<{ item: string; count: number }>;
@@ -69,6 +70,7 @@ type Proto3d = {
   titleVisible: () => boolean;
   introVisible: () => boolean;
   skipIntro: () => void;
+  setLocale?: (locale: string) => Promise<void>;
   setEscapeRun: (on: boolean) => void;
   persistCalled: () => boolean;
   killKind: (kind: string) => boolean;
@@ -136,14 +138,16 @@ test.describe('proto3d step4 title and saves', () => {
     });
 
     await keepSavesAcrossReload(page);
-    await page.goto(`${BASE_URL}/proto3d.html?debug=1`);
+    await page.goto(`${BASE_URL}/proto3d.html`);
     await page.waitForFunction(
       () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
       null,
       { timeout: 30000 }
     );
     await expect(page.locator('#title-overlay')).toHaveClass(/show/);
-    await expect(page.locator('#title-hint')).toContainText(/Always play from the Home Screen/i);
+    await expect(page.locator('#fps-counter')).toHaveCount(0);
+    await expect(page.locator('#title-hint')).toContainText(/Add to Home Screen first/i);
+    await expect(page.locator('#title-hint')).toContainText(/Safari can lose saves/i);
     const persist = await page.evaluate(() => ({
       available: typeof navigator.storage?.persist === 'function',
       called: (window as unknown as { __proto3d: Proto3d }).__proto3d.persistCalled()
@@ -160,7 +164,7 @@ test.describe('proto3d step4 title and saves', () => {
 
     await page.locator('.title-hit[data-id="Settings"]').tap();
     await page.waitForTimeout(400);
-    await expect(page.locator('#title-hint')).toContainText(/Αρχική|Home Screen/);
+    await expect(page.locator('#title-hint')).toContainText(/Αφετηρίας|Home Screen/);
     const locale = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.locale());
     expect(locale).toBe('el');
     await page.screenshot({ path: `${OUT}/title-el.png`, fullPage: false });
@@ -291,22 +295,80 @@ test.describe('proto3d step4 title and saves', () => {
     await page.waitForTimeout(200);
     const floorRestored = await page.evaluate(() => {
       const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-      return { over: p.gameOverVisible(), pos: p.getPosition() };
+      return { over: p.gameOverVisible(), pos: p.getPosition(), logs: p.logLines() };
     });
     expect(floorRestored.over).toBe(false);
     expect(floorRestored.pos).toMatchObject({ x: 1, y: 7 });
+    expect(floorRestored.logs.some((l) => /water takes you|βράχ/i.test(l))).toBe(false);
+    await page.screenshot({ path: `${OUT}/log-after-restart.png`, fullPage: false });
 
+    await bootPlay(page, 'test=1&persist=1');
+    await expect(page.locator('#fps-counter')).toHaveCount(0);
+    const freshLog = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.logLines());
+    expect(freshLog.some((l) => /water takes you/i.test(l))).toBe(false);
     await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.speakBark('secret_wall', 'wren'));
     await page.waitForTimeout(100);
     const bark = await page.evaluate(() => {
       const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-      return { logs: p.logLines(), bubble: p.bubbleVisible() };
+      return { logs: p.logLines(), bubble: p.bubbleVisible(), bubbleText: p.bubbleText() };
     });
-    expect(bark.logs.some((l) => /Wren:|Ρεν:| Wren/i.test(l) || l.includes(':'))).toBe(true);
+    expect(bark.logs.some((l) => /Wren:/.test(l))).toBe(true);
     expect(bark.bubble).toBe(true);
+    expect(bark.bubbleText).toMatch(/^Wren:/);
     await page.screenshot({ path: `${OUT}/speech-bubble.png`, fullPage: false });
 
+    await page.evaluate(async () => {
+      const p = (window as unknown as { __proto3d: Proto3d & { setLocale?: (l: string) => Promise<void> } }).__proto3d;
+      await p.setLocale?.('el');
+      p.speakBark('secret_wall', 'brannoc');
+    });
+    await page.waitForTimeout(150);
+    const barkEl = await page.evaluate(() => {
+      const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+      return p.bubbleText();
+    });
+    expect(barkEl).toMatch(/^Μπράννοκ:/);
+    expect(barkEl).not.toMatch(/brannoc/i);
+    await page.screenshot({ path: `${OUT}/speech-bubble-el.png`, fullPage: false });
+
     expect(errors, 'page errors').toEqual([]);
+  });
+
+  test('old save version shows wet-slot copy, not a blank slot', async ({ page }) => {
+    mkdirSync(OUT, { recursive: true });
+    await keepSavesAcrossReload(page);
+    await page.goto(`${BASE_URL}/proto3d.html`);
+    await page.waitForFunction(
+      () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
+      null,
+      { timeout: 30000 }
+    );
+    await rememberSaves(page);
+    await page.evaluate(() => {
+      localStorage.setItem(
+        'proto3d.save.v1.slot.2',
+        JSON.stringify({ version: 1, party: [], monsters: [], position: { x: 1, y: 7, dir: 0 } })
+      );
+    });
+    await page.reload();
+    await page.waitForFunction(
+      () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
+      null,
+      { timeout: 30000 }
+    );
+    await page.locator('.title-hit[data-id="Load"]').tap();
+    await page.waitForTimeout(250);
+    const slot = page.locator('#title-canvas');
+    await expect(page.locator('#title-overlay')).toHaveClass(/show/);
+    const painted = await page.evaluate(() => {
+      const canvas = document.getElementById('title-canvas') as HTMLCanvasElement | null;
+      return !!canvas;
+    });
+    expect(painted).toBe(true);
+    await page.screenshot({ path: `${OUT}/corrupt-slot.png`, fullPage: false });
+    await page.locator('.title-hit[data-id="slot-2"]').tap();
+    await expect(page.locator('#title-toast')).toContainText(/got wet|βράχηκε/i);
+    void slot;
   });
 
   test('map state survives a reload after each Levie-list mutation', async ({ page }) => {

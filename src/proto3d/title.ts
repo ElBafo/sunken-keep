@@ -1,4 +1,5 @@
 import { StoryText, type Locale } from './i18n';
+import { drawFont5x7, type FontGlyphs } from './font5x7';
 import {
   formatPlayTime,
   hasAnySave,
@@ -8,6 +9,31 @@ import {
   type SavePayload,
   type SlotSummary
 } from './saves';
+
+export function isStandaloneMode(): boolean {
+  try {
+    const nav = navigator as Navigator & { standalone?: boolean };
+    if (nav.standalone === true) return true;
+    return window.matchMedia('(display-mode: standalone)').matches;
+  } catch {
+    return false;
+  }
+}
+
+export function isSafariBrowser(): boolean {
+  try {
+    const ua = navigator.userAgent;
+    if (!/Safari/i.test(ua)) return false;
+    if (/CriOS|FxiOS|EdgiOS|Chrome|Chromium|Android|OPR|Edg/i.test(ua)) return false;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function showInstallHint(): boolean {
+  return isSafariBrowser() && !isStandaloneMode();
+}
 
 interface TitleLayout {
   canvas: [number, number];
@@ -71,6 +97,8 @@ export class TitleScreen {
   private pressed: string | null = null;
   private raf = 0;
   private onAction: (a: TitleAction) => void;
+  private font: HTMLImageElement | null = null;
+  private fontGlyphs: FontGlyphs = {};
   visible = false;
 
   constructor(canvas: HTMLCanvasElement, story: StoryText, onAction: (a: TitleAction) => void) {
@@ -100,16 +128,24 @@ export class TitleScreen {
       'ilsevar_healthy.png',
       'mags_healthy.png'
     ];
-    await Promise.all(
-      files.map((file) => {
+    await Promise.all([
+      ...files.map((file) => {
         const rel = file.includes('/')
           ? file
           : file.endsWith('_healthy.png')
             ? `art/portraits/${file}`
             : `art/ui/title/${file}`;
         return this.cache(file, `${base}${rel}`);
-      })
-    );
+      }),
+      this.cache('font_5x7.png', `${base}art/font/font_5x7.png`)
+    ]);
+    this.font = this.images.get('font_5x7.png') ?? null;
+    try {
+      const meta = (await fetch(`${base}art/font/font_5x7.json`).then((r) => r.json())) as { glyphs?: FontGlyphs };
+      this.fontGlyphs = meta.glyphs ?? {};
+    } catch {
+      this.fontGlyphs = {};
+    }
   }
 
   private cache(key: string, src: string) {
@@ -139,6 +175,8 @@ export class TitleScreen {
     this.visible = false;
     cancelAnimationFrame(this.raf);
     document.getElementById('title-overlay')?.classList.remove('show');
+    const hint = document.getElementById('title-hint');
+    if (hint) hint.hidden = true;
   }
 
   setMode(mode: Mode) {
@@ -149,9 +187,17 @@ export class TitleScreen {
     this.draw();
   }
 
+  refreshHint() {
+    this.syncHint();
+    if (this.visible) this.draw();
+  }
+
   private syncHint() {
     const hint = document.getElementById('title-hint');
-    if (hint) hint.style.visibility = this.mode === 'title' ? 'visible' : 'hidden';
+    if (!hint) return;
+    const show = this.mode === 'title' && showInstallHint();
+    hint.textContent = show ? this.story.titleLines('install_hint').join(' ') : '';
+    hint.hidden = !show;
   }
 
   getMode(): Mode {
@@ -223,6 +269,21 @@ export class TitleScreen {
     this.paintButton('New Game', 'normal');
     this.paintButton('Load', 'normal');
     this.paintButton('Settings', 'normal', this.story.locale === 'el' ? 'EL' : 'EN');
+    this.drawHint();
+  }
+
+  private drawHint() {
+    if (!this.layout || this.mode !== 'title' || !showInstallHint()) return;
+    const lines = this.story.titleLines('install_hint').slice(0, 2);
+    if (!lines.length) return;
+    const canvasW = this.layout.canvas[0];
+    const ys = [556, 566];
+    lines.forEach((line, i) => {
+      const x = Math.floor((canvasW - line.length * 6) / 2);
+      drawFont5x7(this.ctx, this.font, line, x, ys[i] ?? 556, this.fontGlyphs, 6, 'rgb(170,190,160)', {
+        colour: '#1a1210'
+      });
+    });
   }
 
   private paintButton(name: string, state: 'normal' | 'pressed' | 'dim', labelOverride?: string) {
@@ -293,6 +354,17 @@ export class TitleScreen {
       const [lx2, ly2] = this.layout.saveSlot.textLines[1];
       ctx.fillText(this.story.titleText('slot.empty'), x + lx1, y + ly1);
       ctx.fillText(this.story.titleText('slot.empty_sub'), x + lx2, y + ly2);
+      return;
+    }
+    if (entry.status === 'corrupt') {
+      ctx.fillStyle = '#c8a070';
+      ctx.font = '11px monospace';
+      ctx.textAlign = 'left';
+      ctx.textBaseline = 'top';
+      const [cx1, cy1] = this.layout.saveSlot.textLines[0];
+      const [cx2, cy2] = this.layout.saveSlot.textLines[1];
+      ctx.fillText(this.story.uiText('slot.corrupt'), x + cx1, y + cy1);
+      ctx.fillText(this.story.uiText('slot.corrupt_sub'), x + cx2, y + cy2);
       return;
     }
     const save = entry.payload;

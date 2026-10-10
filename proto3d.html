@@ -153,11 +153,9 @@
     #speech-bubble {
       position: absolute;
       left: 0;
-      right: 0;
-      bottom: 0;
       width: 100%;
-      height: auto;
-      aspect-ratio: 270 / 40;
+      top: calc(348 / 380 * 100%);
+      height: calc(34 / 380 * 100%);
       display: none;
       pointer-events: none;
       z-index: 45;
@@ -381,15 +379,13 @@
     }
     #title-hint {
       position: absolute;
-      left: 8%;
-      right: 8%;
-      top: calc(210 / 585 * 100%);
-      color: #c8c8b0;
-      font-family: monospace;
-      font-size: clamp(10px, 3.2vw, 13px);
-      text-align: center;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      clip-path: inset(50%);
+      white-space: nowrap;
       pointer-events: none;
-      text-shadow: 1px 1px 0 #1a1210;
     }
     #title-toast {
       position: absolute;
@@ -478,7 +474,7 @@
       <button id="btn-torch-snuff" class="hud-choice-btn" type="button"></button>
     </div>
     <button id="btn-door" class="control-btn" type="button"></button>
-    <canvas id="speech-bubble" width="270" height="40" aria-hidden="true"></canvas>
+    <canvas id="speech-bubble" width="270" height="34" aria-hidden="true"></canvas>
   </div>
   <div id="party-hud">
     <canvas id="party-canvas"></canvas>

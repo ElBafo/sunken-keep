@@ -444,6 +444,11 @@ export class PartyHud {
     host.appendChild(btn);
   }
 
+  clearLog() {
+    this.logLines = [];
+    this.draw(performance.now());
+  }
+
   pushLog(text: string) {
     if (!text) return;
     const [, , w] = this.logRect;

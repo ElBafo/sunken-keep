@@ -1,7 +1,7 @@
 import type { HeroId, HandSlot } from '../core/types';
 import type { HeroState, MonsterState } from '../core/types';
 
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 const PREFIX = 'proto3d.save.v1.';
 export const SLOT_COUNT = 3;
 const AUTOSAVE_KEEP = 2;
@@ -52,6 +52,13 @@ export interface SavedTile {
   chestOpen?: boolean;
   chestItems?: string[];
   item?: string | null;
+  puzzle?: Record<string, string | number | boolean>;
+}
+
+export interface SavedFloor {
+  tiles: SavedTile[];
+  sconces: SavedSconce[];
+  monsters: SavedMonster[];
 }
 
 export interface SavedBagEntry {
@@ -70,23 +77,22 @@ export interface SavePayload {
   floor: number;
   position: { x: number; y: number; dir: number };
   oil: number;
-  hasKey: boolean;
   party: SavedHero[];
   bag: SavedBagEntry[];
-  monsters: SavedMonster[];
-  tiles: SavedTile[];
-  sconces: SavedSconce[];
+  floors: Record<string, SavedFloor>;
   flags: string[];
   firedOnce: string[];
   goals: Record<string, 'hidden' | 'active' | 'done' | 'failed'>;
+  journalPages: string[];
+  dialogue: Record<string, string>;
   escapeRunActive: boolean;
   leader: HeroId;
 }
 
-export type SlotSummary = {
-  slot: number;
-  payload: SavePayload;
-} | null;
+export type SlotSummary =
+  | { slot: number; status: 'ok'; payload: SavePayload }
+  | { slot: number; status: 'corrupt' }
+  | null;
 
 export function persistStorage(): void {
   try {
@@ -136,11 +142,14 @@ export function parseSave(raw: unknown): SavePayload | null {
   if (!raw || typeof raw !== 'object') return null;
   const rec = raw as Record<string, unknown>;
   if (rec.version !== SAVE_VERSION) return null;
-  if (!Array.isArray(rec.party) || !Array.isArray(rec.monsters)) return null;
+  if (!Array.isArray(rec.party)) return null;
   if (!rec.position || typeof rec.position !== 'object') return null;
+  if (!rec.floors || typeof rec.floors !== 'object' || Array.isArray(rec.floors)) return null;
   const payload = rec as unknown as SavePayload;
   if (!Array.isArray(payload.firedOnce)) payload.firedOnce = [];
   if (!payload.goals || typeof payload.goals !== 'object') payload.goals = {};
+  if (!Array.isArray(payload.journalPages)) payload.journalPages = [];
+  if (!payload.dialogue || typeof payload.dialogue !== 'object') payload.dialogue = {};
   return payload;
 }
 
@@ -161,16 +170,17 @@ export function writeSlot(slot: number, payload: SavePayload): boolean {
 export function listSlots(): SlotSummary[] {
   return [1, 2, 3].map((slot) => {
     const data = loadSlot(slot);
-    if (!data || data === 'corrupt') return null;
-    return { slot, payload: data };
+    if (data == null) return null;
+    if (data === 'corrupt') return { slot, status: 'corrupt' };
+    return { slot, status: 'ok', payload: data };
   });
 }
 
 export function newestSlot(): { slot: number; payload: SavePayload } | null {
   let best: { slot: number; payload: SavePayload } | null = null;
   for (const entry of listSlots()) {
-    if (!entry) continue;
-    if (!best || entry.payload.timestamp > best.payload.timestamp) best = entry;
+    if (!entry || entry.status !== 'ok') continue;
+    if (!best || entry.payload.timestamp > best.payload.timestamp) best = { slot: entry.slot, payload: entry.payload };
   }
   const autos = listAutosaves();
   for (const a of autos) {
@@ -206,6 +216,10 @@ export function writeFloorSnapshot(payload: SavePayload): boolean {
 
 export function loadFloorSnapshot(floor: number): SavePayload | null {
   return parseSave(readRaw(floorKey(floor)));
+}
+
+export function floorState(save: SavePayload, floor = save.floor): SavedFloor | undefined {
+  return save.floors?.[String(floor)];
 }
 
 export function formatPlayTime(ms: number): string {

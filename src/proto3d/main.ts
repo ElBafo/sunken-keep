@@ -35,7 +35,9 @@ import {
   writeAutosave,
   writeFloorSnapshot,
   writeSlot,
-  type SavePayload
+  floorState,
+  type SavePayload,
+  type SavedFloor
 } from './saves';
 import { TitleScreen } from './title';
 import { IntroPlayer } from './intro';
@@ -111,6 +113,9 @@ class Game {
   private doorUnlockTimer = 0;
   private pendingUnlock: { x: number; y: number } | null = null;
   private flags = new Set<string>();
+  private journalPages = new Set<string>();
+  private dialogue = new Map<string, string>();
+  private floorStates: Record<string, SavedFloor> = {};
   private storyProgress = new StoryProgress();
   private playStartedAt = 0;
   private playAccMs = 0;
@@ -435,7 +440,14 @@ class Game {
   }
 
   hasBagKey(): boolean {
-    return this.bag.has('key') || this.player.hasKey;
+    return this.bag.has('key') || this.bag.has('captain_key') || this.player.hasKey;
+  }
+
+  private rememberStoryKey(id: string, branch?: string) {
+    if (/journal|note_lampkeeper|lampkeeper_note|read_journal/i.test(id)) this.journalPages.add(id);
+    if (/^(f\d_|hobb|dialogue|dlg_)/i.test(id) || /frogcatcher|grate_tam|tam_cell|captain/i.test(id)) {
+      this.dialogue.set(id, branch ?? this.dialogue.get(id) ?? 'seen');
+    }
   }
 
   pickupItemAt(x: number, y: number): boolean {
@@ -490,7 +502,7 @@ class Game {
   }
 
   private syncKeyFlag() {
-    this.player.hasKey = this.bag.has('key');
+    this.player.hasKey = this.bag.has('key') || this.bag.has('captain_key');
   }
 
   openBag() {
@@ -925,6 +937,8 @@ class Game {
     this.perkHooks = [];
     this.perkScreenOpen = false;
     this.hud?.clearReadyArmed();
+    this.hud?.clearLog();
+    this.lastMessage = '';
     this.combat.resetParty();
     this.spriteManager.resetMonsters(floor1);
     this.darkFx.resetEyes(this.audioManager);
@@ -994,6 +1008,8 @@ class Game {
     }
     this.storyProgress.fire('note_lampkeeper');
     this.flags.add('note_lampkeeper');
+    this.rememberStoryKey('note_lampkeeper');
+    this.rememberStoryKey('journal_page_1');
     this.showNote();
     return true;
   }
@@ -1308,13 +1324,17 @@ class Game {
     return this.playAccMs + Math.max(0, performance.now() - this.playStartedAt);
   }
 
-  captureSave(kind: SavePayload['kind'] = 'slot'): SavePayload {
-    const tiles: SavePayload['tiles'] = [];
+  private snapshotCurrentFloor(): SavedFloor {
+    const tiles: SavedFloor['tiles'] = [];
     for (let y = 0; y < floor1.height; y++) {
       for (let x = 0; x < floor1.width; x++) {
         const tile = floor1.tiles[y][x];
         const snap = this.tileSnap[y * floor1.width + x];
-        if (!tile.door && !tile.secret && !tile.chest && !tile.item && !snap?.item && !snap?.chest) continue;
+        const puzzle =
+          tile.puzzle && typeof tile.puzzle === 'object'
+            ? (tile.puzzle as Record<string, string | number | boolean>)
+            : undefined;
+        if (!tile.door && !tile.secret && !tile.chest && !tile.item && !snap?.item && !snap?.chest && !puzzle) continue;
         tiles.push({
           x,
           y,
@@ -1323,23 +1343,12 @@ class Game {
           secretOpen: tile.secretOpen,
           chestOpen: tile.chestOpen,
           chestItems: tile.chestItems ? [...tile.chestItems] : tile.chestItems,
-          item: tile.item ?? null
+          item: tile.item ?? null,
+          puzzle
         });
       }
     }
     return {
-      version: SAVE_VERSION,
-      kind,
-      timestamp: Date.now(),
-      playTimeMs: this.playTimeMs(),
-      locale: this.story.locale,
-      floor: FLOOR_NUMBER,
-      position: { x: this.player.x, y: this.player.y, dir: this.player.dir },
-      oil: this.oil,
-      hasKey: this.player.hasKey || this.bag.has('key'),
-      party: HERO_IDS.map((id) => snapshotHero(this.combat.heroes[id], this.hud.heroes[id]?.armour)),
-      bag: this.bag.serialize(),
-      monsters: this.combat.monsters.map(snapshotMonster),
       tiles,
       sconces: floor1Sconces.map((s) => ({
         x: s.x,
@@ -1349,9 +1358,29 @@ class Game {
         empty: !!s.empty,
         capped: !!s.capped
       })),
+      monsters: this.combat.monsters.map(snapshotMonster)
+    };
+  }
+
+  captureSave(kind: SavePayload['kind'] = 'slot'): SavePayload {
+    this.floorStates[String(FLOOR_NUMBER)] = this.snapshotCurrentFloor();
+    return {
+      version: SAVE_VERSION,
+      kind,
+      timestamp: Date.now(),
+      playTimeMs: this.playTimeMs(),
+      locale: this.story.locale,
+      floor: FLOOR_NUMBER,
+      position: { x: this.player.x, y: this.player.y, dir: this.player.dir },
+      oil: this.oil,
+      party: HERO_IDS.map((id) => snapshotHero(this.combat.heroes[id], this.hud.heroes[id]?.armour)),
+      bag: this.bag.serialize(),
+      floors: { ...this.floorStates },
       flags: [...this.flags],
       firedOnce: this.storyProgress.serialize().fired,
       goals: this.storyProgress.serialize().goals,
+      journalPages: [...this.journalPages],
+      dialogue: Object.fromEntries(this.dialogue),
       escapeRunActive: this.escapeRunActive,
       leader: 'brannoc'
     };
@@ -1359,6 +1388,8 @@ class Game {
 
   applySave(save: SavePayload) {
     document.getElementById('gameover')?.classList.remove('show');
+    this.hud?.clearLog();
+    this.lastMessage = '';
     this.restoreTiles();
     this.restoreSconceDefaults();
     this.flags = new Set(save.flags ?? []);
@@ -1368,8 +1399,12 @@ class Game {
     this.escapeRunActive = !!save.escapeRunActive;
     this.oil = save.oil;
     this.bag.load(save.bag ?? []);
-    this.player.hasKey = !!save.hasKey || this.bag.has('key');
-    for (const t of save.tiles ?? []) {
+    this.player.hasKey = this.bag.has('key') || this.bag.has('captain_key');
+    this.floorStates = { ...(save.floors ?? {}) };
+    this.journalPages = new Set(save.journalPages ?? []);
+    this.dialogue = new Map(Object.entries(save.dialogue ?? {}));
+    const floor = floorState(save) ?? this.floorStates[String(save.floor)];
+    for (const t of floor?.tiles ?? []) {
       const tile = floor1.tiles[t.y]?.[t.x];
       if (!tile) continue;
       if (t.item === null) tile.item = undefined;
@@ -1386,9 +1421,10 @@ class Game {
         tile.secretOpen = t.secretOpen;
         this.sceneBuilder.setSecretOpen(this.renderer.scene, t.x, t.y, !!t.secretOpen);
       }
+      if (t.puzzle) tile.puzzle = { ...t.puzzle };
     }
     this.spriteManager.resetItems(floor1);
-    for (const s of save.sconces ?? []) {
+    for (const s of floor?.sconces ?? []) {
       const live = floor1Sconces.find((c) => c.x === s.x && c.y === s.y && c.face === s.face);
       if (!live || live.capped) continue;
       live.lit = !!s.lit;
@@ -1397,7 +1433,7 @@ class Game {
     }
     this.combat.resetParty();
     for (const hero of save.party ?? []) this.combat.applyHero(hero);
-    this.combat.restoreMonsters(save.monsters ?? []);
+    this.combat.restoreMonsters(floor?.monsters ?? []);
     this.spriteManager.resetMonsters(floor1);
     for (const m of this.combat.monsters) {
       const sprite =
@@ -1496,10 +1532,10 @@ class Game {
     const text = entry?.text || this.story.bark(trigger);
     if (!text) return false;
     const speaker = (forcedSpeaker || (entry?.speaker as HeroId) || 'brannoc') as HeroId;
-    const name = this.story.heroName(speaker);
+    const name = this.story.speakerName(speaker);
     this.lastMessage = `${name}: ${text}`;
     this.hud?.pushLog(`${name}: ${text}`);
-    this.bubble?.show(text, speaker);
+    this.bubble?.show(text, speaker, name);
     return true;
   }
 
@@ -1548,10 +1584,8 @@ class Game {
     document.documentElement.lang = locale;
     this.applyStoryLabels();
     this.title.story = this.story;
-    this.title.draw();
+    this.title.refreshHint();
     this.title.layoutButtons();
-    const hint = document.getElementById('title-hint');
-    if (hint) hint.textContent = this.story.titleText('homescreen_hint');
   }
 
   private async wireTitleAndIntro() {
@@ -1592,8 +1626,7 @@ class Game {
       if (action.type === 'save') this.commitSlot(action.slot);
     });
     await this.title.load();
-    const hint = document.getElementById('title-hint');
-    if (hint) hint.textContent = this.story.titleText('homescreen_hint');
+    this.title.refreshHint();
     if (!this.skipTitle) {
       this.phase = 'title';
       document.getElementById('tap-to-start')?.classList.add('hidden');
@@ -1630,6 +1663,9 @@ class Game {
     this.playAccMs = 0;
     this.playStartedAt = performance.now();
     this.storyProgress.startNewGame();
+    this.journalPages.clear();
+    this.dialogue.clear();
+    this.floorStates = {};
     this.takeFloorSnapshot();
     this.phase = 'intro';
     this.audioManager.crossfadeToIntro();
@@ -2029,12 +2065,18 @@ class Game {
       secretOpen: (x: number, y: number) => !!this.player.tileAt(x, y)?.secretOpen,
       speakBark: (trigger: string, speaker?: HeroId) => this.speakBark(trigger, speaker),
       bubbleVisible: () => !!this.bubble?.visible,
+      bubbleText: () => this.bubble?.displayText() ?? '',
       flags: () => [...this.flags],
       addFlag: (f: string) => {
         this.flags.add(f);
+        this.rememberStoryKey(f);
         this.storyProgress.fire(f);
       },
-      fireOnce: (id: string) => this.storyProgress.fire(id),
+      fireOnce: (id: string) => {
+        const ok = this.storyProgress.fire(id);
+        if (ok) this.rememberStoryKey(id);
+        return ok;
+      },
       firedOnce: () => [...this.storyProgress.fired],
       goals: () => this.storyProgress.snapshotGoals(),
       setGoal: (id: string, status: 'hidden' | 'active' | 'done' | 'failed') => {

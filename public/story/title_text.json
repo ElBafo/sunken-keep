@@ -36,10 +36,16 @@
  "save_blocked": "No time to save! Run!",
  "tagline": "Something holds the water back.",
  "game_title": "The Sunken Keep",
- "homescreen_hint": "Always play from the Home Screen icon.",
  "language": {
   "label": "Language",
   "en": "English",
   "el": "Ελληνικά"
+ },
+ "install_hint": {
+  "lines": [
+   "Add to Home Screen first.",
+   "Safari can lose saves otherwise."
+  ],
+  "_when": "title screen, only in Safari when not launched from the Home Screen (navigator.standalone false); pixel font; never in the installed app"
  }
 }

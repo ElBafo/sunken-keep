@@ -171,13 +171,32 @@ export class StoryText {
     return fill(raw, vars);
   }
 
-  heroName(id: string): string {
-    const heroes = this.names.heroes;
-    if (heroes && typeof heroes === 'object') {
-      const name = (heroes as Json)[id];
+  titleLines(path: string): string[] {
+    const raw = getPath(this.title, path);
+    if (Array.isArray(raw)) return raw.filter((l): l is string => typeof l === 'string');
+    if (raw && typeof raw === 'object') {
+      const lines = (raw as Json).lines;
+      if (Array.isArray(lines)) return lines.filter((l): l is string => typeof l === 'string');
+    }
+    if (typeof raw === 'string' && raw) return [raw];
+    return [];
+  }
+
+  private nameIn(group: string, id: string): string {
+    const bag = this.names[group];
+    if (bag && typeof bag === 'object') {
+      const name = (bag as Json)[id];
       if (typeof name === 'string') return name;
     }
-    return id;
+    return '';
+  }
+
+  heroName(id: string): string {
+    return this.nameIn('heroes', id) || id;
+  }
+
+  speakerName(id: string): string {
+    return this.nameIn('heroes', id) || this.nameIn('npcs', id) || id;
   }
 
   monsterName(id: string): string {
