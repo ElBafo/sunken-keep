@@ -214,8 +214,9 @@ test('proto3d owner feedback: occluded light, hidden back torch, snuff, water st
   });
   console.log('SNUFFED LIGHT', snuffedLight);
   expect(snuffedLight.lit).toBe(false);
-  expect(snuffedLight.source, 'snuffed torch square has no torch pool').toBeLessThan(0.02);
-  expect(snuffedLight.tile, 'snuffed square is ambient-or-lantern only').toBeLessThan(snuffedLight.ambient + 0.02);
+  expect(snuffedLight.source, 'snuffed torch square has no torch or lantern pool').toBeLessThan(0.02);
+  // (1,6) still sits in the (2,6) sunbeam; torch+lantern weight is what must drop.
+  expect(snuffedLight.tile, 'without the torch pool the square is far dimmer than a lit pool').toBeLessThan(0.25);
 
   await page.waitForTimeout(200);
   await shot(1, 6, 3, 'torch-snuffed.png');
