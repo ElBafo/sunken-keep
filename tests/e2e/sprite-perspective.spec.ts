@@ -48,6 +48,12 @@ type Proto3d = {
     wallSpriteHeightPx: Record<string, number>;
   };
   canvasSize: () => { canvas: [number, number]; renderTarget: [number, number] };
+  gameStage: () => {
+    stage: { width: number; height: number; x: number; y: number; right: number; bottom: number } | null;
+    oil: { width: number; height: number; x: number; y: number; right: number; bottom: number } | null;
+    oilInside: boolean;
+    toastInside: boolean;
+  };
   listenerPose: () => { x: number; y: number; z: number };
   snapDoor?: (x: number, y: number, open: boolean) => void;
   showMonster?: (x: number, y: number) => void;
@@ -193,9 +199,11 @@ test('fixed 270x380 view; idle body heights; slime 3/2/1; no jump', async ({ pag
       const rect = await measure(page, x, y, dir, 'monster', sx, sy);
       expect(rect, `${kind.name} at ${i + 1} square`).toBeTruthy();
       expect(rect!.lod, `${kind.name}@${i + 1} lod`).toBe(LOD_BY_SQUARES[i]);
-      const body = rect!.idleBodyHeight ?? rect!.height;
-      bodies.push(body);
-      expectIdleBody(body, ranges[kind.name][LOD_BY_SQUARES[i]], `${kind.name}@${i + 1}`);
+      const range = ranges[kind.name][LOD_BY_SQUARES[i]];
+      const onScreen = rect!.idleBodyHeight ?? rect!.height;
+      const comparable = rect!.height > 0 ? onScreen * (range.frameH / rect!.height) : onScreen;
+      bodies.push(onScreen);
+      expectIdleBody(comparable, range, `${kind.name}@${i + 1}`);
     }
     console.log(
       'IDLE_BODY_1_2_3_4',
@@ -204,6 +212,26 @@ test('fixed 270x380 view; idle body heights; slime 3/2/1; no jump', async ({ pag
       ranges[kind.name]
     );
   }
+});
+
+test('phone stage fills width at 393x852 and height at 393x659; HUD stays inside', async ({ page }) => {
+  await boot(page);
+  const short = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.gameStage());
+  expect(short.oilInside, 'oil gauge is inside the 270×585 stage').toBe(true);
+  expect(short.toastInside, 'toasts are inside the 270×585 stage').toBe(true);
+  expect(short.stage!.height, '393×659 is height-limited').toBeGreaterThanOrEqual(657);
+  expect(short.stage!.height).toBeLessThanOrEqual(660);
+  expect(short.stage!.width, 'short Safari letterboxes the sides').toBeLessThan(360);
+  expect(short.oil!.right).toBeLessThanOrEqual(short.stage!.right + 1);
+  expect(short.oil!.top).toBeGreaterThanOrEqual(short.stage!.y - 1);
+
+  await page.setViewportSize({ width: 393, height: 852 });
+  await page.evaluate(() => window.dispatchEvent(new Event('resize')));
+  const tall = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.gameStage());
+  expect(tall.stage!.width, '393×852 fills the width').toBeGreaterThanOrEqual(390);
+  expect(tall.stage!.width).toBeLessThanOrEqual(394);
+  expect(tall.oilInside).toBe(true);
+  expect(tall.oil!.right).toBeLessThanOrEqual(tall.stage!.right + 1);
 });
 
 test('monster two squares away is never adjacent', async ({ page }) => {

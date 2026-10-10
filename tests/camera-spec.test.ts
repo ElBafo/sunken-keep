@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import spec from '../public/proto3d/camera.json';
 import { CAMERA_FOV, CAMERA_VIEW, MONSTER_OFFSET_TOWARD_PARTY } from '../src/proto3d/constants';
-import { gameStageScale } from '../src/proto3d/game-stage';
+import { gameStageScale, isCompactViewport } from '../src/proto3d/game-stage';
 
 describe('camera.json monster offset heights', () => {
   it('keeps 80° FOV, 270×380 view, and a quarter-square visual offset', () => {
@@ -24,8 +24,13 @@ describe('camera.json monster offset heights', () => {
 });
 
 describe('270×585 stage scale', () => {
-  it('snaps to whole device pixels and letterboxes short Safari', () => {
-    expect(gameStageScale(393, 659, 3)).toBe(1);
-    expect(gameStageScale(393, 852, 3)).toBeCloseTo(4 / 3, 5);
+  it('uses a fractional contain scale on phones and whole-number scale on desktop', () => {
+    expect(isCompactViewport(393, 659)).toBe(true);
+    expect(isCompactViewport(393, 852)).toBe(true);
+    expect(isCompactViewport(1280, 800)).toBe(false);
+    expect(gameStageScale(393, 852)).toBeCloseTo(393 / 270, 5);
+    expect(gameStageScale(393, 659)).toBeCloseTo(659 / 585, 5);
+    expect(gameStageScale(1280, 800)).toBe(1);
+    expect(gameStageScale(1920, 1200)).toBe(2);
   });
 });

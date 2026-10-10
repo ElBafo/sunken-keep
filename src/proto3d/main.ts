@@ -125,7 +125,7 @@ class Game {
       el.id = 'fps-counter';
       el.textContent = 'FPS: --';
       el.style.display = 'block';
-      if (!fpsEl) document.body.appendChild(el);
+      if (!fpsEl) (document.getElementById('game-stage') ?? document.body).appendChild(el);
       this.fpsCounter = el;
     } else if (fpsEl) {
       fpsEl.remove();
@@ -1321,6 +1321,23 @@ class Game {
         renderTarget: [this.renderer.renderTarget.width, this.renderer.renderTarget.height] as [number, number],
         css: [this.renderer.canvas.clientWidth, this.renderer.canvas.clientHeight] as [number, number]
       }),
+      gameStage: () => {
+        const stage = document.getElementById('game-stage');
+        const oil = document.getElementById('oil-readout');
+        const toast = document.getElementById('message-toast');
+        const box = (el: Element | null) => {
+          if (!el) return null;
+          const r = el.getBoundingClientRect();
+          return { x: r.x, y: r.y, width: r.width, height: r.height, right: r.right, bottom: r.bottom };
+        };
+        return {
+          stage: box(stage),
+          oil: box(oil),
+          toast: box(toast),
+          oilInside: !!oil && !!stage?.contains(oil),
+          toastInside: !!toast && !!stage?.contains(toast)
+        };
+      },
       adjacentMonster: () => {
         const m = this.combat.adjacentMonster();
         return m ? { id: m.id, kind: m.kind, x: m.x, y: m.y, alive: m.alive } : null;
