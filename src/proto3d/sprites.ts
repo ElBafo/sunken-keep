@@ -502,7 +502,7 @@ export class SpriteManager {
         }
 
         const itemName = tile.item || (tile.chest ? 'chest' : undefined);
-        if (itemName && !(tile.secret && !tile.secretOpen)) {
+        if (itemName) {
           const def = ITEM_SPRITE[itemName] ?? {
             file: `item_${itemName}_near.png`,
             h: ITEM_HEIGHT[itemName] ?? 0.3
@@ -543,6 +543,10 @@ export class SpriteManager {
             anim: 'idle',
             animOnce: false
           });
+          if (tile.secret && !tile.secretOpen) {
+            sprite.visible = false;
+            this.sprites[this.sprites.length - 1].hidden = true;
+          }
         }
       }
     }
@@ -902,6 +906,22 @@ export class SpriteManager {
         s.object.visible = false;
       }
     }
+  }
+
+  applyMonsterAlive() {
+    for (const s of this.sprites) {
+      if (s.kind !== 'monster') continue;
+      if (s.hidden) {
+        s.object.visible = false;
+      }
+    }
+  }
+
+  hideDeadMonsterId(id: string) {
+    const s = this.spriteByMonsterId(id);
+    if (!s) return;
+    s.hidden = true;
+    s.object.visible = false;
   }
 
   resetMonsters(floor: FloorData) {

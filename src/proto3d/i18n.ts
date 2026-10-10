@@ -73,7 +73,7 @@ function capitalizeLog(text: string): string {
 export class StoryText {
   locale: Locale = 'en';
   private logs = new Map<string, string>();
-  private barks = new Map<string, string>();
+  private barks = new Map<string, { text: string; speaker?: string }>();
   private names: Json = {};
   private ui: Json = {};
   private title: Json = {};
@@ -88,7 +88,7 @@ export class StoryText {
       this.fetchJson<Json>(this.url(base, 'ui_text.json', locale)),
       this.fetchJson<Json>(this.url(base, 'title_text.json', locale)),
       this.fetchJson<Json>(this.url(base, 'note_lampkeeper.json', locale)),
-      this.fetchJson<Array<{ trigger?: string; text?: string }>>(this.url(base, 'barks.json', locale))
+      this.fetchJson<Array<{ trigger?: string; text?: string; speaker?: string }>>(this.url(base, 'barks.json', locale))
     ]);
     this.logs.clear();
     for (const entry of log ?? []) {
@@ -101,7 +101,9 @@ export class StoryText {
     }
     this.barks.clear();
     for (const entry of barks ?? []) {
-      if (entry?.trigger && typeof entry.text === 'string') this.barks.set(entry.trigger, entry.text);
+      if (entry?.trigger && typeof entry.text === 'string' && !this.barks.has(entry.trigger)) {
+        this.barks.set(entry.trigger, { text: entry.text, speaker: entry.speaker });
+      }
     }
     this.names = names ?? {};
     this.ui = ui ?? {};
@@ -139,7 +141,11 @@ export class StoryText {
   }
 
   bark(trigger: string): string {
-    return this.barks.get(trigger) ?? '';
+    return this.barks.get(trigger)?.text ?? '';
+  }
+
+  barkEntry(trigger: string): { text: string; speaker?: string } | null {
+    return this.barks.get(trigger) ?? null;
   }
 
   uiText(path: string, vars?: Record<string, string | number>): string {
@@ -165,13 +171,32 @@ export class StoryText {
     return fill(raw, vars);
   }
 
-  heroName(id: string): string {
-    const heroes = this.names.heroes;
-    if (heroes && typeof heroes === 'object') {
-      const name = (heroes as Json)[id];
+  titleLines(path: string): string[] {
+    const raw = getPath(this.title, path);
+    if (Array.isArray(raw)) return raw.filter((l): l is string => typeof l === 'string');
+    if (raw && typeof raw === 'object') {
+      const lines = (raw as Json).lines;
+      if (Array.isArray(lines)) return lines.filter((l): l is string => typeof l === 'string');
+    }
+    if (typeof raw === 'string' && raw) return [raw];
+    return [];
+  }
+
+  private nameIn(group: string, id: string): string {
+    const bag = this.names[group];
+    if (bag && typeof bag === 'object') {
+      const name = (bag as Json)[id];
       if (typeof name === 'string') return name;
     }
-    return id;
+    return '';
+  }
+
+  heroName(id: string): string {
+    return this.nameIn('heroes', id) || id;
+  }
+
+  speakerName(id: string): string {
+    return this.nameIn('heroes', id) || this.nameIn('npcs', id) || id;
   }
 
   monsterName(id: string): string {

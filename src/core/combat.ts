@@ -969,6 +969,82 @@ export class CombatEngine {
     h.hp = clamp(Math.floor(hp), 0, h.maxHp);
     h.downed = h.hp <= 0;
   }
+
+  nearestMonsterDist(): number {
+    let best = Infinity;
+    for (const m of this.monsters) {
+      if (!m.alive) continue;
+      const d = manhattan(m.x, m.y, this.partyX, this.partyY);
+      if (d < best) best = d;
+    }
+    return best;
+  }
+
+  allHeroesUnderHpFrac(frac: number): boolean {
+    return HERO_IDS.every((id) => {
+      const h = this.heroes[id];
+      return h.maxHp > 0 && h.hp / h.maxHp < frac;
+    });
+  }
+
+  applyHero(saved: {
+    id: HeroId;
+    hp: number;
+    maxHp: number;
+    mana: number;
+    maxMana: number;
+    ac?: number;
+    level: number;
+    xp: number;
+    formation?: 'front' | 'back';
+    equipment: { main: string; off: string };
+    pendingPerk: number | null;
+    downed?: boolean;
+  }) {
+    const h = this.heroes[saved.id];
+    if (!h) return;
+    h.hp = saved.hp;
+    h.maxHp = saved.maxHp;
+    h.mana = saved.mana;
+    h.maxMana = saved.maxMana;
+    if (typeof saved.ac === 'number') h.ac = saved.ac;
+    h.level = saved.level;
+    h.xp = saved.xp;
+    if (saved.formation) h.formation = saved.formation;
+    h.equipment = { ...saved.equipment };
+    h.pendingPerk = saved.pendingPerk;
+    h.downed = !!saved.downed || saved.hp <= 0;
+    h.recovery = { main: 0, off: 0 };
+  }
+
+  restoreMonsters(
+    list: Array<{ id: string; kind: string; x: number; y: number; hp: number; maxHp: number; alive: boolean }>
+  ) {
+    this.monsters = [];
+    this.fight = null;
+    this.gameOver = false;
+    let maxId = 0;
+    for (const s of list) {
+      const n = Number(String(s.id).split('-').pop());
+      if (Number.isFinite(n)) maxId = Math.max(maxId, n);
+      this.monsters.push({
+        id: s.id,
+        kind: s.kind,
+        x: s.x,
+        y: s.y,
+        hp: s.hp,
+        maxHp: s.maxHp,
+        noticed: false,
+        attackCount: 0,
+        nextAttackAt: 0,
+        windup: null,
+        missNext: false,
+        alive: s.alive,
+        deadAt: s.alive ? 0 : 1
+      });
+    }
+    this.nextId = maxId + 1;
+  }
 }
 
 export function openGrid(

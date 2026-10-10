@@ -72,6 +72,9 @@ type Proto3d = {
     oilInside: boolean;
     toastInside: boolean;
     fpsInside: boolean;
+    titleInside?: boolean;
+    introInside?: boolean;
+    bubbleInside?: boolean;
   };
   listenerPose: () => { x: number; y: number; z: number };
   snapDoor?: (x: number, y: number, open: boolean) => void;
@@ -240,6 +243,8 @@ test('phone stage fills width at 393x852 and height at 393x659; HUD stays inside
   expect(short.oilInside, 'oil gauge is inside the 270×585 stage').toBe(true);
   expect(short.toastInside, 'toasts are inside the 270×585 stage').toBe(true);
   expect(short.fpsInside, 'debug FPS lives inside the stage when present').toBe(true);
+  expect(short.titleInside, 'title/load screens live in the 270×585 stage').toBe(true);
+  expect(short.bubbleInside, 'speech bubble lives in the 270×585 stage').toBe(true);
   expect(short.stage!.height, '393×659 is height-limited').toBeGreaterThanOrEqual(657);
   expect(short.stage!.height).toBeLessThanOrEqual(660);
   expect(short.stage!.width, 'short Safari letterboxes the sides').toBeLessThan(360);

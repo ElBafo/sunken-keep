@@ -29,6 +29,8 @@ export interface Sconce {
   face: 'N' | 'E' | 'S' | 'W';
   lit: boolean;
   capped?: boolean;
+  /** Bracket has no torch (taken), distinct from snuffed. */
+  empty?: boolean;
 }
 
 export interface SpriteData {

@@ -34,6 +34,9 @@ export class AudioManager {
   private uiSound: THREE.Audio | null = null;
   private ambientSound: THREE.Audio | null = null;
   private musicSound: THREE.Audio | null = null;
+  private menuSound: THREE.Audio | null = null;
+  private introSound: THREE.Audio | null = null;
+  private carriedTorchSound: THREE.Audio | null = null;
   private voices: PositionalVoice[] = [];
   private dripPool: PositionalVoice[] = [];
   private farVoice: PositionalVoice | null = null;
@@ -64,9 +67,12 @@ export class AudioManager {
   private lastHeroHurt: Record<string, string> = {};
   private nextHeroHurtAt = 0;
   lastHeroVoice: string | null = null;
+  playStarted = false;
   private windups = new Map<string, PositionalVoice>();
   private combatPool: PositionalVoice[] = [];
   private resumeWired = false;
+  private gameOverSound: THREE.Audio | null = null;
+  private fading = new WeakSet<THREE.Audio>();
 
   constructor(quality: QualityLevel) {
     this.listener = new THREE.AudioListener();
@@ -157,6 +163,8 @@ export class AudioManager {
       ['banner', 'audio/sfx_banner_flutter.mp3'],
       ['bones', 'audio/sfx_bones_settle.mp3'],
       ['music_act1', 'audio/music_act1_loop.mp3'],
+      ['menu', 'audio/music_menu_loop.mp3'],
+      ['intro', 'audio/music_intro.mp3'],
       ['leech_idle', 'audio/sfx_bog_leeches_idle_loop.mp3'],
       ['step', 'audio/sfx_step.mp3'],
       ['step_1', 'audio/sfx_step_1.mp3'],
@@ -200,6 +208,8 @@ export class AudioManager {
       ['torch_dunk', 'audio/sfx_torch_dunk.mp3'],
       ['ui_log_line', 'audio/sfx_ui_log_line.mp3'],
       ['ui_button_denied', 'audio/sfx_ui_button_denied.mp3'],
+      ['save', 'audio/sfx_save.mp3'],
+      ['ui_button', 'audio/sfx_ui_button.mp3'],
       ['ui_inventory_move', 'audio/sfx_ui_inventory_move.mp3'],
       ['pickup', 'audio/sfx_pickup.mp3'],
       ['chest', 'audio/sfx_chest.mp3'],
@@ -298,7 +308,6 @@ export class AudioManager {
       this.ambientSound.setBuffer(amb);
       this.ambientSound.setLoop(true);
       this.ambientSound.setVolume(0.32);
-      this.ambientSound.play();
     }
 
     const music = this.buffers.get('music_act1');
@@ -307,20 +316,29 @@ export class AudioManager {
       this.musicSound.setBuffer(music);
       this.musicSound.setLoop(true);
       this.musicSound.setVolume(0.3);
-      this.musicSound.play();
+    }
+
+    const menu = this.buffers.get('menu');
+    if (menu) {
+      this.menuSound = new THREE.Audio(this.listener);
+      this.menuSound.setBuffer(menu);
+      this.menuSound.setLoop(true);
+      this.menuSound.setVolume(0.7);
+    }
+
+    const intro = this.buffers.get('intro');
+    if (intro) {
+      this.introSound = new THREE.Audio(this.listener);
+      this.introSound.setBuffer(intro);
+      this.introSound.setLoop(false);
+      this.introSound.setVolume(0.7);
     }
 
     this.uiSound = new THREE.Audio(this.listener);
     this.uiPool.push(this.uiSound);
     this.scene = scene;
 
-    const torchBuf = this.buffers.get('torch');
-    if (torchBuf) {
-      for (const sconce of sconces) {
-        if (!sconce.lit) continue;
-        this.startTorchLoop(sconce);
-      }
-    }
+    void sconces;
 
     for (let i = 0; i < 5; i++) {
       const object = new THREE.Object3D();
@@ -593,6 +611,7 @@ export class AudioManager {
   }
 
   startFloorLoops(hasOil: boolean) {
+    this.stopMenuBeds();
     if (this.ambientSound && !this.ambientSound.isPlaying) {
       this.ambientSound.setVolume(this.trueDark ? this.ambVolume * 10 ** (-DARK_AMB_DUCK_DB / 20) : this.ambVolume);
       this.ambientSound.play();
@@ -602,12 +621,173 @@ export class AudioManager {
       this.musicSound.play();
     }
     this.startLanternLoop(hasOil);
-    for (const v of this.voices) {
-      if (v.loop && v.kind !== 'presence' && !v.audio.isPlaying) {
-        v.audio.setVolume(v.baseVolume);
-        v.audio.play();
-      }
+  }
+
+  playMenu() {
+    if (this.playStarted) return;
+    this.unlock();
+    this.stopFloorLoops();
+    this.stopIntro();
+    if (this.menuSound && !this.menuSound.isPlaying) {
+      this.menuSound.setVolume(0.7);
+      this.menuSound.play();
     }
+  }
+
+  markPlayStarted() {
+    this.playStarted = true;
+    this.fadeOut(this.menuSound, 1000);
+  }
+
+  crossfadeToIntro(ms = 1000) {
+    this.unlock();
+    this.fadeOut(this.menuSound, ms);
+    if (this.introSound) {
+      if (this.introSound.isPlaying) this.introSound.stop();
+      this.introSound.setVolume(0);
+      this.introSound.play();
+      this.fadeIn(this.introSound, 0.7, ms);
+    }
+  }
+
+  crossfadeToAct1(ms = 1000) {
+    this.unlock();
+    this.fadeOut(this.menuSound, ms);
+    this.fadeOut(this.introSound, ms);
+    if (this.ambientSound && !this.ambientSound.isPlaying) {
+      this.ambientSound.setVolume(0);
+      this.ambientSound.play();
+      this.fadeIn(this.ambientSound, this.ambVolume, ms);
+    }
+    if (this.musicSound && !this.musicSound.isPlaying) {
+      this.musicSound.setVolume(0);
+      this.musicSound.play();
+      this.fadeIn(this.musicSound, this.musicVolume, Math.max(ms, 4000));
+    }
+  }
+
+  rebuildFloorLoops(state: {
+    oil: number;
+    sconces: readonly Sconce[];
+    leeches: Array<{ x: number; y: number; alive: boolean; kind: string }>;
+    carriedTorch: boolean;
+  }) {
+    this.stopMenuBeds();
+    this.stopIntro();
+    this.clearTorchLoops();
+    this.clearLeechLoops();
+    this.stopCarriedTorchLoop();
+    this.startFloorLoops(state.oil > 0);
+    for (const sconce of state.sconces) {
+      if (sconce.lit && !sconce.capped) this.startTorchLoop(sconce);
+      else this.stopTorchLoop(sconce);
+    }
+    if (state.carriedTorch) this.startCarriedTorchLoop();
+    this.syncLeechLoopsFromAlive(state.leeches);
+  }
+
+  syncLeechLoopsFromAlive(monsters: Array<{ x: number; y: number; alive: boolean; kind: string }>) {
+    this.clearLeechLoops();
+    const buf = this.buffers.get('leech_idle');
+    const scene = this.scene;
+    if (!buf || !scene) return;
+    for (const m of monsters) {
+      if (m.kind !== 'bog_leeches' || !m.alive) continue;
+      const object = new THREE.Object3D();
+      const audio = new THREE.PositionalAudio(this.listener);
+      audio.setBuffer(buf);
+      audio.setRefDistance(CELL_SIZE);
+      audio.setMaxDistance(2 * CELL_SIZE);
+      audio.setRolloffFactor(1);
+      audio.setLoop(true);
+      audio.setVolume(0.4);
+      object.add(audio);
+      scene.add(object);
+      audio.play();
+      this.voices.push({
+        audio,
+        object,
+        loop: true,
+        baseVolume: 0.4,
+        kind: 'leech',
+        name: `leech:${m.x},${m.y}`
+      });
+      object.position.set(m.x * CELL_SIZE, 0.2, m.y * CELL_SIZE);
+    }
+  }
+
+  startCarriedTorchLoop() {
+    const buf = this.buffers.get('torch');
+    if (!buf) return;
+    if (!this.carriedTorchSound) this.carriedTorchSound = new THREE.Audio(this.listener);
+    if (this.carriedTorchSound.isPlaying) return;
+    this.carriedTorchSound.setBuffer(buf);
+    this.carriedTorchSound.setLoop(true);
+    this.carriedTorchSound.setVolume(0.2);
+    this.carriedTorchSound.play();
+  }
+
+  stopCarriedTorchLoop() {
+    if (this.carriedTorchSound?.isPlaying) this.carriedTorchSound.stop();
+  }
+
+  private stopMenuBeds() {
+    if (this.playStarted) this.fadeOut(this.menuSound, 1000);
+    else if (this.menuSound?.isPlaying) this.menuSound.stop();
+  }
+
+  private stopIntro() {
+    if (this.introSound?.isPlaying) this.introSound.stop();
+  }
+
+  private clearTorchLoops() {
+    for (const [key, voice] of [...this.torchVoices.entries()]) {
+      if (voice.audio.isPlaying) voice.audio.stop();
+      voice.object.parent?.remove(voice.object);
+      this.voices = this.voices.filter((v) => v !== voice);
+      this.torchVoices.delete(key);
+    }
+  }
+
+  private fadeOut(sound: THREE.Audio | null, ms: number) {
+    if (!sound?.isPlaying) return;
+    if (this.fading.has(sound)) return;
+    this.fading.add(sound);
+    const start = sound.getVolume();
+    const t0 = performance.now();
+    const tick = () => {
+      const t = Math.min(1, (performance.now() - t0) / ms);
+      sound.setVolume(start * (1 - t));
+      if (t >= 1) {
+        sound.stop();
+        this.fading.delete(sound);
+        return;
+      }
+      requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }
+
+  fadeGameOver(ms = 300) {
+    this.fadeOut(this.gameOverSound, ms);
+  }
+
+  isGameOverPlaying() {
+    return !!this.gameOverSound?.isPlaying;
+  }
+
+  isMenuPlaying() {
+    return !!this.menuSound?.isPlaying;
+  }
+
+  private fadeIn(sound: THREE.Audio, target: number, ms: number) {
+    const t0 = performance.now();
+    const tick = () => {
+      const t = Math.min(1, (performance.now() - t0) / ms);
+      sound.setVolume(target * t);
+      if (t < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
   }
 
   stopPresenceLoops() {
@@ -636,7 +816,10 @@ export class AudioManager {
     };
     keep(!!this.ambientSound, this.ambientSound?.isPlaying, 'ambient', 'ambience');
     keep(!!this.musicSound, this.musicSound?.isPlaying, 'music', 'music_act1');
+    keep(!!this.menuSound, this.menuSound?.isPlaying, 'menu', 'menu');
+    keep(!!this.introSound, this.introSound?.isPlaying, 'intro', 'intro');
     keep(!!this.lanternSound, this.lanternSound?.isPlaying, `lantern:${this.lanternMode}`, `lantern:${this.lanternMode}`);
+    keep(!!this.carriedTorchSound, this.carriedTorchSound?.isPlaying, 'torch:carried', 'torch:carried');
     for (const v of this.voices) {
       if (!v.loop || v.kind === 'presence') continue;
       if (playingOnly && !v.audio.isPlaying) continue;
@@ -696,6 +879,7 @@ export class AudioManager {
     sound.setPlaybackRate(rate);
     sound.setVolume(Math.min(1, Math.max(0, volume)));
     sound.play();
+    if (name === 'game_over') this.gameOverSound = sound;
   }
 
   private pickStepVariant(kind: 'step' | 'step_water_shallow' | 'step_water_deep'): string {
@@ -821,7 +1005,7 @@ export class AudioManager {
     object.add(audio);
     scene.add(object);
     audio.play();
-    const voice: PositionalVoice = { audio, object, loop: true, baseVolume: 0.42, kind: 'torch', name: 'torch' };
+    const voice: PositionalVoice = { audio, object, loop: true, baseVolume: 0.42, kind: 'torch', name: `torch:${key}` };
     this.voices.push(voice);
     this.torchVoices.set(key, voice);
   }

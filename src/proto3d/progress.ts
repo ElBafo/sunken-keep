@@ -13,7 +13,10 @@ function sconceKey(s: Sconce): string {
 }
 
 export function persistEnabled(): boolean {
-  return new URLSearchParams(window.location.search).get('test') !== '1';
+  const q = new URLSearchParams(window.location.search);
+  if (q.get('persist') === '1') return true;
+  if (q.get('persist') === '0') return false;
+  return q.get('test') !== '1';
 }
 
 /** True once proto3d has written a floor save (oil/torches). */
