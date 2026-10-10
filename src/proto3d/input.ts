@@ -9,7 +9,7 @@ function isUiTarget(el: EventTarget | null): boolean {
   return (
     el instanceof HTMLElement &&
     !!el.closest(
-      '.control-btn, #tap-to-start, .hand-btn, .portrait-btn, .hud-chrome-btn, .hud-choice-btn, #torch-choice, #party-hud, #bag-bar, #inventory-screen, .inv-slot, .inv-action, .inv-close'
+      '.control-btn, #tap-to-start, .hand-btn, .portrait-btn, .hud-chrome-btn, .hud-choice-btn, #torch-choice, #party-hud, #inventory-screen, .inv-slot, .inv-action, .inv-close'
     )
   );
 }
@@ -51,6 +51,12 @@ export class InputManager {
     });
     document.getElementById('btn-right')?.addEventListener('click', () => {
       this.emitMove(this.player.turnRight());
+    });
+    document.getElementById('btn-strafe-left')?.addEventListener('click', () => {
+      this.emitMove(this.player.strafeLeft());
+    });
+    document.getElementById('btn-strafe-right')?.addEventListener('click', () => {
+      this.emitMove(this.player.strafeRight());
     });
     document.getElementById('btn-door')?.addEventListener('click', (e) => {
       e.stopPropagation();

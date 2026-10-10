@@ -617,5 +617,107 @@
    256,
    60
   ]
+ },
+ "panelIcons": {
+  "rule": "Icons are drawn by code, centred in their rect at 1x, NEVER scaled (1 art px = 1 canvas px; positions are integer). panel_585.png bakes only the raised stone plates of these buttons, no icons. Finger down: draw the pressed plate over the rect, then the icon 1 px lower; on release redraw the normal plate (well_28.png / well_60x28.png) + icon. Positions below are in 270x585 space.",
+  "potion_health": {
+   "rect": [
+    172,
+    508,
+    28,
+    28
+   ],
+   "icon": "ui/panel/icon_potion_red_btn.png",
+   "iconEmpty": "ui/panel/icon_potion_red_btn_empty.png",
+   "iconPos": [
+    176,
+    512
+   ],
+   "pressed": "ui/panel/well_pressed_28.png",
+   "normal": "ui/panel/well_28.png",
+   "count": {
+    "font": "font/font_5x7.png (font_5x7.json glyphs, digits 0-9)",
+    "colour": "#d8ccb0",
+    "colourEmpty": "#918d7d",
+    "shadow": "#1a1210 at +1,+1",
+    "anchor": "bottom-right",
+    "rightEdgeOffset": 25,
+    "glyphTopOffset": 18,
+    "rule": "right-align: text x = rect.x + 25 - (digits*6 - 1), y = rect.y + 18 (top of the 5x9 glyph box; digits use rows 0-6, shadow lands on the plate bevel). Caps at 99; 2-digit counts overlap the flask by a few px but stay legible thanks to the shadow (suggest capping the display at 9 if counts stay small). Pressed: +1 px down with the icon. At 0 show the _empty icon and \"0\" in colourEmpty."
+   }
+  },
+  "potion_mana": {
+   "rect": [
+    204,
+    508,
+    28,
+    28
+   ],
+   "icon": "ui/panel/icon_potion_blue_btn.png",
+   "iconEmpty": "ui/panel/icon_potion_blue_btn_empty.png",
+   "iconPos": [
+    208,
+    512
+   ],
+   "pressed": "ui/panel/well_pressed_28.png",
+   "normal": "ui/panel/well_28.png",
+   "count": {
+    "font": "font/font_5x7.png (font_5x7.json glyphs, digits 0-9)",
+    "colour": "#d8ccb0",
+    "colourEmpty": "#918d7d",
+    "shadow": "#1a1210 at +1,+1",
+    "anchor": "bottom-right",
+    "rightEdgeOffset": 25,
+    "glyphTopOffset": 18,
+    "rule": "right-align: text x = rect.x + 25 - (digits*6 - 1), y = rect.y + 18 (top of the 5x9 glyph box; digits use rows 0-6, shadow lands on the plate bevel). Caps at 99; 2-digit counts overlap the flask by a few px but stay legible thanks to the shadow (suggest capping the display at 9 if counts stay small). Pressed: +1 px down with the icon. At 0 show the _empty icon and \"0\" in colourEmpty."
+   }
+  },
+  "inventory": {
+   "rect": [
+    172,
+    540,
+    60,
+    28
+   ],
+   "icon": "ui/panel/icon_bag.png",
+   "iconPos": [
+    192,
+    544
+   ],
+   "pressed": "ui/panel/well_pressed_60x28.png",
+   "normal": "ui/panel/well_60x28.png"
+  },
+  "menu": {
+   "rect": [
+    236,
+    508,
+    28,
+    28
+   ],
+   "icon": "ui/panel/icon_menu.png",
+   "iconPos": [
+    245,
+    518
+   ],
+   "pressed": "ui/panel/well_pressed_28.png",
+   "normal": "ui/panel/well_28.png"
+  },
+  "save": {
+   "rect": [
+    236,
+    540,
+    28,
+    28
+   ],
+   "icon": "ui/panel/icon_save.png",
+   "iconPos": [
+    244,
+    548
+   ],
+   "pressed": "ui/panel/well_pressed_28.png",
+   "normal": "ui/panel/well_28.png"
+  },
+  "padNote": "the 6 movement pad icons ARE baked into panel_585.png; for their pressed look draw well_pressed_28.png + the pad icon 1 px lower (centred).",
+  "potionNote": "the old potion bottle icons (ui/items/icon_potion_*.png, 24x24, bottle 12x21) fit the plate but the bottle body runs into the bottom-right count corner, so the panel uses the 20x20 _btn versions (flask kept to the left 15 columns). Bag/floor icons stay as they are."
  }
 }

@@ -177,7 +177,11 @@ class Game {
       },
       onPortrait: (hero) => this.handlePortraitTap(hero),
       onBag: () => this.toggleBag(),
-      onPotion: (kind) => this.quickPotion(kind)
+      onPotion: (kind) => this.quickPotion(kind),
+      potionCounts: () => ({
+        health: this.bag.countOf('potion_red'),
+        mana: this.bag.countOf('potion_blue')
+      })
     });
     await this.initCombat(params);
     this.loadLampNote();
@@ -262,15 +266,20 @@ class Game {
     btn.classList.toggle('visible', !!this.doorAhead());
   }
 
-  showMessage(text: string) {
+  showMessage(text: string, prompt = false) {
     if (!text) return;
     this.lastMessage = text;
     this.hud?.pushLog(text);
+    if (!prompt) return;
     const el = document.getElementById('message-toast');
     if (!el) return;
     el.textContent = text;
     el.classList.add('show');
     this.messageTimer = performance.now() + 1200;
+  }
+
+  private showPrompt(text: string) {
+    this.showMessage(text, true);
   }
 
   private storyLog(key: string, vars?: Record<string, string | number>): string {
@@ -338,7 +347,7 @@ class Game {
     const id = tile.item === 'oil' ? 'oil_flask' : tile.item;
     const added = this.bag.add(id);
     if (!added) {
-      this.showMessage(this.storyLog('bag_full'));
+      this.showPrompt(this.storyLog('bag_full'));
       this.audioManager.playUi('item_use_fail');
       return true;
     }
@@ -433,7 +442,7 @@ class Game {
     this.inventory.pickHero = id;
     this.hud.setPickHero(true);
     this.inventory.redraw();
-    this.showMessage(this.story.uiText('bag.who_drinks') || this.story.uiText('bag.pick_hero'));
+    this.showPrompt(this.story.uiText('bag.who_drinks') || this.story.uiText('bag.pick_hero'));
   }
 
   useBagSlot(index: number) {
@@ -466,7 +475,7 @@ class Game {
 
   private useOilFlask(index: number) {
     if (this.oil >= OIL_MAX) {
-      this.showMessage(this.storyLog('oil_full'));
+      this.showPrompt(this.storyLog('oil_full'));
       this.audioManager.playUi('item_use_fail');
       return;
     }
@@ -854,7 +863,7 @@ class Game {
     this.updateOilHud();
     saveProgress(floor1Sconces, this.oil, this.persist);
     this.vertexLighting.updateAllMeshes(this.renderer.scene);
-    if (prev > 0 && next <= 0) this.showMessage(this.storyLog('lantern_out'));
+    if (prev > 0 && next <= 0) this.showPrompt(this.storyLog('lantern_out'));
   }
 
   handleFacingTorch(): boolean {
@@ -862,7 +871,7 @@ class Game {
     if (!sconce) return false;
     if (sconce.capped) {
       this.audioManager.playDoor('door_locked', sconce.x, sconce.y);
-      this.showMessage(this.storyLog('torch_capped'));
+      this.showPrompt(this.storyLog('torch_capped'));
       return true;
     }
     if (this.torches.isTapLocked(sconce)) return true;
@@ -897,7 +906,7 @@ class Game {
   private relightTorch(sconce: Sconce) {
     if (sconce.lit) return;
     if (this.oil < OIL_TORCH_COST) {
-      this.showMessage(this.storyLog('no_oil'));
+      this.showPrompt(this.storyLog('no_oil'));
       return;
     }
     const now = performance.now();
@@ -957,7 +966,7 @@ class Game {
       }
     }
     if (tile.prop === 'lamp_capped') {
-      this.showMessage(this.storyLog('torch_capped'));
+      this.showPrompt(this.storyLog('torch_capped'));
       return true;
     }
     return true;
@@ -984,11 +993,6 @@ class Game {
     snuff?.addEventListener('click', stop);
   }
 
-  private setBagBarVisible(on: boolean) {
-    const bar = document.getElementById('bag-bar');
-    if (bar) bar.style.visibility = on ? '' : 'hidden';
-  }
-
   private showTorchChoice(sconce: Sconce) {
     this.torchChoice = { sconce };
     const el = document.getElementById('torch-choice');
@@ -996,7 +1000,6 @@ class Game {
       el.hidden = false;
       el.classList.add('show');
     }
-    this.setBagBarVisible(false);
   }
 
   hideTorchChoice() {
@@ -1006,7 +1009,6 @@ class Game {
       el.hidden = true;
       el.classList.remove('show');
     }
-    if (!this.inventory?.open) this.setBagBarVisible(true);
   }
 
   private confirmTake() {
@@ -1088,7 +1090,7 @@ class Game {
     const slot = this.hud.findFreeHand();
     if (!slot) {
       this.armSwap(sconce);
-      this.showMessage(this.story.uiText('torch_choice.hands_full') || this.storyLog('hands_full'));
+      this.showPrompt(this.story.uiText('torch_choice.hands_full') || this.storyLog('hands_full'));
       return;
     }
     this.giveTorchTo(sconce, slot.hero, slot.hand);
@@ -1158,7 +1160,7 @@ class Game {
       const fromBag = this.bag.has('key');
       if (!fromBag && !this.player.hasKey) {
         this.audioManager.playDoor('door_locked', x, y);
-        this.showMessage(this.storyLog('door_locked'));
+        this.showPrompt(this.storyLog('door_locked'));
         return;
       }
       if (fromBag) this.bag.remove('key', 1);

@@ -167,6 +167,28 @@ export class Player {
     return reason;
   }
 
+  strafeLeft(): MoveResult {
+    if (this.isMoving) return 'busy';
+    const [dx, dy] = DIRS[(this.dir + 3) % 4];
+    const reason = this.blockReason(this.x + dx, this.y + dy);
+    if (reason === 'ok') {
+      this.startMove(this.x + dx, this.y + dy, this.dir);
+      return 'ok';
+    }
+    return reason;
+  }
+
+  strafeRight(): MoveResult {
+    if (this.isMoving) return 'busy';
+    const [dx, dy] = DIRS[(this.dir + 1) % 4];
+    const reason = this.blockReason(this.x + dx, this.y + dy);
+    if (reason === 'ok') {
+      this.startMove(this.x + dx, this.y + dy, this.dir);
+      return 'ok';
+    }
+    return reason;
+  }
+
   turnLeft(): MoveResult {
     if (this.isMoving) return 'busy';
     const newDir = (this.dir + 3) % 4;

@@ -120,7 +120,10 @@ test('proto3d step3 inventory: pickup, chest loot-all, bag, potions, key, oil, g
 
   // Open bag + equip compare
   await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.giveItem('iron_shield', 1));
-  await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.openBag());
+  await expect(page.locator('#bag-bar')).toHaveCount(0);
+  await expect(page.locator('#party-hud #btn-bag')).toBeVisible();
+  await page.screenshot({ path: `${OUT}/step3-panel-wells.png`, fullPage: false });
+  await page.locator('#btn-bag').tap();
   expect(await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.bagOpen())).toBe(true);
   await expect(page.locator('#inventory-screen')).toBeVisible();
   await page.locator('.inv-slot[data-name="slot-0"]').tap();
@@ -140,12 +143,15 @@ test('proto3d step3 inventory: pickup, chest loot-all, bag, potions, key, oil, g
   await page.screenshot({ path: `${OUT}/step3-equip-compare.png`, fullPage: false });
   await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.closeBag());
 
-  // Potion use (heal Brannoc)
+  // Potion use (heal Brannoc) via the panel well + portrait
   await page.evaluate(() => {
     const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
     proto.setHeroHp('brannoc', 10);
-    proto.drinkPotion('brannoc', 'potion_red');
   });
+  await page.locator('#btn-potion-health').tap();
+  await page.waitForTimeout(80);
+  await page.locator('.portrait-btn[data-hero="brannoc"]').tap();
+  await page.waitForTimeout(80);
   const afterPotion = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.logLines());
   expect(afterPotion.some((l) => /potion|heals|HP|φίλτρο|ζωή/i.test(l) || l.length > 0)).toBe(true);
   await page.screenshot({ path: `${OUT}/step3-potion-use.png`, fullPage: false });
@@ -196,7 +202,7 @@ test('proto3d step3 inventory: pickup, chest loot-all, bag, potions, key, oil, g
   expect(after, 'slime sprite present').toBeTruthy();
   expect(after!.scaleY / after!.baseH, 'adjacent scale is integer 2×').toBe(2);
   expect(Number.isInteger(after!.scaleY / after!.baseH)).toBe(true);
-  expect(after!.worldX, 'pulled to the near edge of its square').toBeCloseTo(7 * 2 - 1, 5);
+  expect(after!.worldX, 'close-range feet on the near floor strip').toBeCloseTo(12.28, 5);
   expect(before!.scaleY / before!.baseH, 'before shot uses 1×').toBe(1);
 
   const listen = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.listenerPose());

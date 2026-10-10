@@ -61,6 +61,17 @@ const ITEM_SPRITE: Record<string, { file: string; h: number; base?: string; pref
 const OWN_SQUARE_SCALE = 0.72;
 /** Must be in the visible floor strip (near plane hits y=0 at ~1.0 in front of the camera). */
 const OWN_SQUARE_FORWARD = 1.18;
+/**
+ * Adjacent billboards sit on this camera-forward floor line so their
+ * `monster_anchor.json` feet land near the bottom of the 3D view (EOB close range).
+ */
+const CLOSE_RANGE_FORWARD = 1.28;
+const FACING = [
+  [0, -1],
+  [1, 0],
+  [0, 1],
+  [-1, 0]
+] as const;
 /** Adjacent near frames only: whole-number 2× with nearest-pixel filtering. */
 const ADJACENT_INTEGER_SCALE = 2;
 const SPRITE_RENDER_ORDER = 10;
@@ -511,10 +522,17 @@ export class SpriteManager {
 
       const manh = Math.abs(sprite.x - playerX) + Math.abs(sprite.y - playerY);
       if (manh === 1) {
-        const toX = Math.sign(playerX - sprite.x);
-        const toY = Math.sign(playerY - sprite.y);
-        const wx = sprite.x * CELL_SIZE + toX * (CELL_SIZE / 2);
-        const wz = sprite.y * CELL_SIZE + toY * (CELL_SIZE / 2);
+        const [fdx, fdy] = FACING[dir] ?? [0, 0];
+        const ahead = sprite.x === playerX + fdx && sprite.y === playerY + fdy;
+        let wx: number;
+        let wz: number;
+        if (ahead) {
+          wx = camX + fx * CLOSE_RANGE_FORWARD;
+          wz = camZ + fz * CLOSE_RANGE_FORWARD;
+        } else {
+          wx = sprite.x * CELL_SIZE + Math.sign(playerX - sprite.x) * (CELL_SIZE / 2);
+          wz = sprite.y * CELL_SIZE + Math.sign(playerY - sprite.y) * (CELL_SIZE / 2);
+        }
         const h = sprite.baseH * adjScale;
         const w = sprite.baseW * adjScale;
         const file = this.nearFile(sprite);
