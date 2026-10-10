@@ -871,6 +871,7 @@ class Game {
       this.lastTime = performance.now();
       this.fpsLastTime = this.lastTime;
       requestAnimationFrame(() => this.gameLoop());
+      this.audioManager.startLanternLoop(this.oil > 0);
       try {
         await this.audioManager.loadSounds(this.renderer.scene, floor1Sconces);
         this.audioManager.startLanternLoop(this.oil > 0);
@@ -886,6 +887,7 @@ class Game {
         );
       } catch (err) {
         console.warn('Audio init failed', err);
+        this.audioManager.startLanternLoop(this.oil > 0);
       }
     };
     tapToStart.addEventListener('click', start);

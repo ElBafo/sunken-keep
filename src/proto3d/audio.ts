@@ -416,7 +416,8 @@ export class AudioManager {
   startLanternLoop(hasOil: boolean) {
     const key = hasOil ? 'lantern_loop' : 'lantern_ember_loop';
     const mode = hasOil ? 'oil' : 'ember';
-    if (this.lanternMode === mode && this.lanternSound?.isPlaying) return;
+    this.lanternMode = mode;
+    if (this.lanternSound?.isPlaying && this.buffers.get(key)) return;
     const buf = this.buffers.get(key);
     if (!buf) return;
     if (!this.lanternSound) this.lanternSound = new THREE.Audio(this.listener);
@@ -424,8 +425,11 @@ export class AudioManager {
     this.lanternSound.setBuffer(buf);
     this.lanternSound.setLoop(true);
     this.lanternSound.setVolume(hasOil ? 0.35 : 0.3);
-    this.lanternSound.play();
-    this.lanternMode = mode;
+    try {
+      this.lanternSound.play();
+    } catch {
+      // Host audio can refuse playback; the loop is still intended to run.
+    }
   }
 
   private sconceKey(sconce: Sconce): string {
