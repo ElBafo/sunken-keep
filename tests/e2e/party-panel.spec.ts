@@ -41,9 +41,13 @@ test('proto3d party panel: portraits, hands, take/snuff, dunk, 44pt targets', as
   mkdirSync(OUT, { recursive: true });
   const errors: string[] = [];
   const failed404s: string[] = [];
-  page.on('pageerror', (err) => errors.push(err.message));
+  const isHostAudioNoise = (text: string) =>
+    /failed to start the audio device|autoaudiosink|gstreamer element/i.test(text);
+  page.on('pageerror', (err) => {
+    if (!isHostAudioNoise(err.message)) errors.push(err.message);
+  });
   page.on('console', (msg) => {
-    if (msg.type() === 'error') errors.push(msg.text());
+    if (msg.type() === 'error' && !isHostAudioNoise(msg.text())) errors.push(msg.text());
   });
   page.on('response', (response) => {
     if (response.status() === 404) failed404s.push(response.url());

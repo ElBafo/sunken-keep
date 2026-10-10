@@ -166,12 +166,20 @@ export class PartyHud {
       return img;
     };
 
-    const hands = (await fetch(`${base}art/ui/hands/hands.json`).then((r) => r.json())) as {
-      icons?: Record<string, string>;
-      size?: [number, number];
-    };
+    const [hands, fontMeta] = await Promise.all([
+      fetch(`${base}art/ui/hands/hands.json`).then((r) => r.json()) as Promise<{
+        icons?: Record<string, string>;
+        size?: [number, number];
+      }>,
+      fetch(`${base}art/font/font_5x7.json`).then((r) => r.json()) as Promise<{
+        columns?: number;
+        cellWidth?: number;
+      }>
+    ]);
 
     if (Array.isArray(hands.size) && Number.isFinite(hands.size[0])) this.iconSize = hands.size[0];
+    if (Number.isFinite(fontMeta.columns)) this.fontCols = fontMeta.columns!;
+    if (Number.isFinite(fontMeta.cellWidth)) this.fontCellW = fontMeta.cellWidth!;
     for (const [id, file] of Object.entries(hands.icons ?? {})) this.icons.set(id, file);
 
     const portraitFiles = [
