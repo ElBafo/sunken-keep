@@ -117,7 +117,8 @@
  },
  {
   "key": "hero_down",
-  "text": "{hero} collapses."
+  "text": "{hero} collapses.",
+  "when": "a hero drops to 0 HP"
  },
  {
   "key": "drink_potion",
@@ -375,7 +376,7 @@
  {
   "key": "revive",
   "text": "{hero} gets back up. Just.",
-  "when": "a downed hero is revived (rule TBD)"
+  "when": "a downed hero is healed above 0 HP by Wren's heal or a red potion"
  },
  {
   "key": "monster_dies_dry",
@@ -478,8 +479,13 @@
   "when": "Take a torch or equip with both hands full"
  },
  {
+  "key": "get_up_after_fight",
+  "text": "{hero} staggers up. 1 HP and a grudge.",
+  "when": "after a fight, each downed hero gets up on 1 HP"
+ },
+ {
   "key": "no_oil",
-  "text": "No oil to spare.",
-  "when": "relight a dead torch with 0 oil"
+  "text": "No oil left. The ember will have to do.",
+  "when": "tapping a dead torch with 0 oil"
  }
 ]

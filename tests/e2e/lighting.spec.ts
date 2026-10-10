@@ -223,7 +223,7 @@ test('proto3d lighting: pools, relight, oil, no 404s', async ({ page }) => {
   });
   await page.waitForTimeout(200);
   expect(await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.lastMessage())).toBe(
-    'No oil to spare.'
+    'No oil left. The ember will have to do.'
   );
   expect(
     await page.evaluate(

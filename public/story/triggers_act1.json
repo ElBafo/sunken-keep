@@ -1237,6 +1237,258 @@
     5,
     9
    ]
+  },
+  "crit": {
+   "type": "log",
+   "system": "combat",
+   "fire": "a hero's attack crits (natural 20)",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "dodge": {
+   "type": "log",
+   "system": "combat",
+   "fire": "a monster's attack misses a hero",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "block_raise": {
+   "type": "log",
+   "system": "combat",
+   "fire": "a hero uses a shield (Block)",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "block_hit": {
+   "type": "log",
+   "system": "combat",
+   "fire": "a hit lands while a block is up (halved)",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "torch_hit": {
+   "type": "log",
+   "system": "combat",
+   "fire": "a lit torch swing hits",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "leech_burned": {
+   "type": "log",
+   "system": "combat",
+   "fire": "a torch swing hits latched or attacking leeches",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "torch_burns_out": {
+   "type": "log",
+   "system": "combat",
+   "fire": "a held torch goes from lit to burnt",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "frost_bolt": {
+   "type": "log",
+   "system": "combat",
+   "fire": "Ilsevar's scroll hand hits",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "pocket_sand": {
+   "type": "log",
+   "system": "combat",
+   "fire": "Mags's tricks pouch used on a monster",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "lock_picked": {
+   "type": "log",
+   "system": "interaction",
+   "fire": "tricks pouch used on a lock or locked chest",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "heal": {
+   "type": "log",
+   "system": "combat",
+   "fire": "Wren's lantern hand heals the most hurt hero",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "heal_none": {
+   "type": "log",
+   "system": "combat",
+   "fire": "Wren's heal used with everyone at full HP (no mana spent)",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "no_mana": {
+   "type": "log",
+   "system": "combat",
+   "fire": "a mana hand is tapped without enough mana",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "level_up": {
+   "type": "log",
+   "system": "combat",
+   "fire": "a hero levels up",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "xp_gain": {
+   "type": "log",
+   "system": "combat",
+   "fire": "a monster dies (party XP)",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "revive": {
+   "type": "log",
+   "system": "combat",
+   "fire": "a downed hero is revived (rule TBD)",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "monster_dies_dry": {
+   "type": "log",
+   "system": "combat",
+   "fire": "a monster dies on a dry square (monster_dies is for water)",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "monster_near": {
+   "type": "log",
+   "system": "combat",
+   "fire": "a monster starts approaching from out of sight",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "drink_mana": {
+   "type": "log",
+   "system": "inventory",
+   "fire": "blue potion used",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "drink_green": {
+   "type": "log",
+   "system": "inventory",
+   "fire": "green potion used",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "leech_off": {
+   "type": "log",
+   "system": "inventory",
+   "fire": "leeches removed (green potion or torch)",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "cured": {
+   "type": "log",
+   "system": "inventory",
+   "fire": "poison removed (green potion)",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "full_health": {
+   "type": "log",
+   "system": "inventory",
+   "fire": "red/green potion tapped on a hero at full HP and no leeches/poison; potion kept",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "no_mana_pool": {
+   "type": "log",
+   "system": "inventory",
+   "fire": "blue potion tapped on Brannoc or Mags; potion kept",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "oil_use": {
+   "type": "log",
+   "system": "inventory",
+   "fire": "oil flask used from the bag",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "oil_full": {
+   "type": "log",
+   "system": "inventory",
+   "fire": "oil flask used at max oil; flask kept",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "bag_full": {
+   "type": "log",
+   "system": "inventory",
+   "fire": "pickup with no bag space",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "pickup_item": {
+   "type": "log",
+   "system": "inventory",
+   "fire": "pickup of any item without its own pickup_ key",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "chest_item": {
+   "type": "log",
+   "system": "inventory",
+   "fire": "one line per chestItems entry after chest_open",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "equip": {
+   "type": "log",
+   "system": "inventory",
+   "fire": "gear moved into a hero's hand/body",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "unequip": {
+   "type": "log",
+   "system": "inventory",
+   "fire": "gear moved back to the bag",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "give": {
+   "type": "log",
+   "system": "inventory",
+   "fire": "item given to a hero",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "drop_item": {
+   "type": "log",
+   "system": "inventory",
+   "fire": "item dropped on the square",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "cant_use": {
+   "type": "log",
+   "system": "inventory",
+   "fire": "gear not allowed for that hero",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "mail_no_cast": {
+   "type": "log",
+   "system": "inventory",
+   "fire": "Ilsevar taps a spell hand while wearing chain mail",
+   "floor": "any",
+   "repeat": "every"
+  },
+  "hands_full": {
+   "type": "log",
+   "system": "inventory",
+   "fire": "Take a torch or equip with both hands full",
+   "floor": "any",
+   "repeat": "every"
   }
  },
  "flags": {

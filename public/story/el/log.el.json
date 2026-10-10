@@ -117,7 +117,8 @@
  },
  {
   "key": "hero_down",
-  "text": "{hero}: σωριάζεται."
+  "text": "{hero}: σωριάζεται.",
+  "when": "a hero drops to 0 HP"
  },
  {
   "key": "drink_potion",
@@ -375,7 +376,7 @@
  {
   "key": "revive",
   "text": "{hero}: σηκώνεται ξανά. Μόλις.",
-  "when": "a downed hero is revived (rule TBD)"
+  "when": "a downed hero is healed above 0 HP by Wren's heal or a red potion"
  },
  {
   "key": "monster_dies_dry",
@@ -476,5 +477,15 @@
   "key": "hands_full",
   "text": "{hero}: κανένα ελεύθερο χέρι.",
   "when": "Take a torch or equip with both hands full"
+ },
+ {
+  "key": "get_up_after_fight",
+  "text": "{hero}: σηκώνεται. 1 ζωή και πολύ νεύρο.",
+  "when": "after a fight, each downed hero gets up on 1 HP"
+ },
+ {
+  "key": "no_oil",
+  "text": "Δεν έμεινε λάδι. Φτάνει η σπίθα της Ρεν.",
+  "when": "tapping a dead torch with 0 oil"
  }
 ]

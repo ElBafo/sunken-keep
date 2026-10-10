@@ -12,8 +12,7 @@ import {
   OIL_TORCH_COST,
   parseAmbientFloor,
   STEP_VOLUME,
-  TORCH_IGNITE_FLARE_MS,
-  isWaterTile
+  TORCH_IGNITE_FLARE_MS
 } from './constants';
 import { Dressing } from './dressing';
 import { floor1, floor1Sconces } from './floor-data';
@@ -57,7 +56,7 @@ class Game {
   hud!: PartyHud;
   private torchChoice: { sconce: Sconce } | null = null;
   lastMessage = '';
-  lampNote = { title: "Lamp-keeper's note", text: '' };
+  lampNote = { title: '', text: '' };
   noteOpen = false;
   interactCount = 0;
   messageTimer = 0;
@@ -83,6 +82,9 @@ class Game {
       }
     }
     this.oil = loadProgress(floor1Sconces, this.persist);
+
+    await this.story.load('en');
+    this.applyStoryLabels();
 
     const layout = await loadLayout585();
     this.renderer = new PixelRenderer(canvas, layout.view[2], layout.view[3]);
@@ -134,15 +136,15 @@ class Game {
     await this.spriteManager.loadSprites(this.renderer.scene, floor1);
     this.darkFx = new DarkFx();
     await this.darkFx.load(this.renderer.scene, floor1, this.spriteManager);
-    await this.story.load('en');
     this.hud = new PartyHud(this.story, () => this.oil, layout, {
       onUse: (hero, hand) => this.handleHandTap(hero, hand),
       onLog: () => this.audioManager?.playUi('ui_log_line'),
       playUi: (name) => this.audioManager?.playUi(name),
       onCancel: () => this.hideTorchChoice()
     });
+    this.loadLampNote();
     this.updateOilHud();
-    await Promise.all([this.hud.load(), this.loadLampNote()]);
+    await this.hud.load();
     this.wireTorchChoice();
     this.renderer.resize();
 
@@ -244,25 +246,25 @@ class Game {
     return true;
   }
 
+  private applyStoryLabels() {
+    const tap = document.getElementById('tap-to-start-text');
+    if (tap) tap.textContent = this.story.uiText('tap_to_start');
+    const door = document.getElementById('btn-door');
+    if (door) door.textContent = this.story.uiText('controls.door');
+  }
+
   updateOilHud() {
     const el = document.getElementById('oil-readout');
     if (!el) return;
-    const text = this.story.uiText('step1_party_panel.bars.oil_readout', { n: this.oil, max: OIL_MAX });
-    el.textContent = text || `Oil ${this.oil}/${OIL_MAX}`;
+    const text =
+      this.story.uiText('step1_party_panel.bars.oil_readout', { n: this.oil, max: OIL_MAX }) || this.story.log('no_oil');
+    el.textContent = text;
     this.hud?.draw(performance.now());
   }
 
-  async loadLampNote() {
-    try {
-      const baseUrl = import.meta.env.BASE_URL;
-      const res = await fetch(`${baseUrl}story/note_lampkeeper.json`);
-      const note = (await res.json()) as { title?: string; text?: string };
-      if (note.title) this.lampNote.title = note.title;
-      if (note.text) this.lampNote.text = note.text;
-    } catch {
-      this.lampNote.text =
-        "They took the lamps first. Then the oil. Thane's orders. I kept one. Don't tell him. - Pell, lamp-keeper";
-    }
+  loadLampNote() {
+    this.lampNote.title = this.story.noteTitle();
+    this.lampNote.text = this.story.noteText();
   }
 
   showNote() {
@@ -348,7 +350,7 @@ class Game {
     this.audioManager.playPositional('torch_extinguish', pos.x, pos.y, pos.z, 1);
     this.audioManager.stopTorchLoop(sconce);
     saveProgress(floor1Sconces, this.oil, this.persist);
-    this.showMessage(this.storyLog('torch_snuffed', { hero: this.story.heroName('wren') }));
+    this.showMessage(this.storyLog('torch_snuffed', { hero: this.story.heroName(this.hud.actingFrontHero()) }));
   }
 
   private relightTorch(sconce: Sconce) {
@@ -475,7 +477,7 @@ class Game {
 
   private maybeDunkTorch(x: number, y: number) {
     const tile = this.player.tileAt(x, y);
-    if (!tile || !isWaterTile(tile)) return;
+    if (!tile?.deepWater) return;
     const dunked = this.hud.dunkCarriedTorches();
     if (!dunked.length) return;
     this.audioManager.playUi('torch_dunk');
@@ -858,5 +860,5 @@ class Game {
 const game = new Game();
 game.init().catch((err) => {
   console.error('Failed to initialize game:', err);
-  alert('Failed to load game. Check console for details.');
+  alert(game.story.uiText('status.load_failed'));
 });

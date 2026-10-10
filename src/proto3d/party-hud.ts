@@ -298,6 +298,16 @@ export class PartyHud {
     });
   }
 
+  /** Front-row hero who just acted, else the first front-row hero. */
+  actingFrontHero(): HeroId {
+    const last = this.lastHand?.hero;
+    if (last && this.heroes[last]?.formation === 'front') return last;
+    for (const id of HERO_ORDER) {
+      if (this.heroes[id].formation === 'front') return id;
+    }
+    return 'brannoc';
+  }
+
   findFreeFrontHand(): { hero: HeroId; hand: HandSlot } | null {
     for (const id of HERO_ORDER) {
       const hero = this.heroes[id];

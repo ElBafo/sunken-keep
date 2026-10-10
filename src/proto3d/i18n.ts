@@ -35,15 +35,17 @@ export class StoryText {
   private names: Json = {};
   private ui: Json = {};
   private title: Json = {};
+  private note: Json = {};
 
   async load(locale: Locale = 'en') {
     this.locale = locale;
     const base = import.meta.env.BASE_URL;
-    const [log, names, ui, title] = await Promise.all([
+    const [log, names, ui, title, note] = await Promise.all([
       this.fetchJson<LogEntry[]>(this.url(base, 'log.json', locale)),
       this.fetchJson<Json>(this.url(base, 'names.json', locale)),
       this.fetchJson<Json>(this.url(base, 'ui_text.json', locale)),
-      this.fetchJson<Json>(this.url(base, 'title_text.json', locale))
+      this.fetchJson<Json>(this.url(base, 'title_text.json', locale)),
+      this.fetchJson<Json>(this.url(base, 'note_lampkeeper.json', locale))
     ]);
     this.logs.clear();
     for (const entry of log ?? []) {
@@ -52,6 +54,7 @@ export class StoryText {
     this.names = names ?? {};
     this.ui = ui ?? {};
     this.title = title ?? {};
+    this.note = note ?? {};
   }
 
   /**
@@ -84,9 +87,20 @@ export class StoryText {
   }
 
   uiText(path: string, vars?: Record<string, string | number>): string {
-    const raw = getPath(this.ui, path);
-    if (typeof raw !== 'string') return '';
-    return fill(raw, vars);
+    const prefixes = ['', 'step1_party_panel.', 'step4_title_saves.'];
+    for (const prefix of prefixes) {
+      const raw = getPath(this.ui, `${prefix}${path}`);
+      if (typeof raw === 'string') return fill(raw, vars);
+    }
+    return '';
+  }
+
+  noteTitle(): string {
+    return typeof this.note.title === 'string' ? this.note.title : '';
+  }
+
+  noteText(): string {
+    return typeof this.note.text === 'string' ? this.note.text : '';
   }
 
   titleText(path: string, vars?: Record<string, string | number>): string {

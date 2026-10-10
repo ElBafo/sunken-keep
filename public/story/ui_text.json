@@ -56,6 +56,9 @@
    "swap_hint": "Drag a face to swap places.",
    "close": "Close",
    "down": "Out"
+  },
+  "controls": {
+   "door": "Door"
   }
  },
  "step2_combat": {
@@ -81,8 +84,9 @@
   "game_over": {
    "title": "The water takes you all.",
    "body": "The keep keeps you. For now.",
-   "load_last": "Load",
-   "title_screen": "Title"
+   "load_last": "Autosave",
+   "title_screen": "Title",
+   "load_floor": "Stairs"
   }
  },
  "step3_inventory": {
@@ -262,7 +266,8 @@
    "autosaved": "Autosaved.",
    "loaded": "Game loaded.",
    "save_failed": "Couldn't save. Storage is full.",
-   "no_saves": "No saves yet."
+   "no_saves": "No saves yet.",
+   "load_failed": "The keep won't open. Try again."
   },
   "confirm": {
    "new_game_title": "Start a new game?",
@@ -282,6 +287,7 @@
    "on": "On",
    "off": "Off",
    "ambience_short": "Ambience"
-  }
+  },
+  "tap_to_start": "Tap to start"
  }
 }

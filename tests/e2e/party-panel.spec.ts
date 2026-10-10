@@ -198,19 +198,30 @@ test('proto3d party panel: portraits, hands, take/snuff, dunk, 44pt targets', as
     return { lit: p.torchLit(6, 4), msg: p.lastMessage() };
   });
   expect(snuffed.lit, 'Snuff still puts the wall torch out').toBe(false);
-  expect(snuffed.msg.toLowerCase(), 'snuff log line').toMatch(/snuffs the torch/);
+  expect(snuffed.msg, 'snuff names the acting hero, not always Wren').toMatch(/Brannoc snuffs the torch/i);
 
   await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
     p.setPosition(1, 5, 0);
   });
-  const dunk = await page.evaluate(() => {
+  const shallow = await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
     const moved = p.tryMoveForward();
     return { moved, carried: p.carriedTorch(), pool: p.hasCarriedTorchLight(), msg: p.lastMessage() };
   });
-  expect(dunk.moved.after, 'step onto water').toMatchObject({ x: 1, y: 4 });
-  expect(dunk.carried, 'dunked torch is burnt').toMatchObject({ lit: false });
+  expect(shallow.moved.after, 'step onto shallow water').toMatchObject({ x: 1, y: 4 });
+  expect(shallow.carried, 'shallow water keeps the carried torch lit').toMatchObject({ lit: true });
+  expect(shallow.pool, 'carried torch still lights the party square in shallow water').toBe(true);
+  expect(shallow.msg.toLowerCase(), 'shallow water does not dunk').not.toMatch(/dunks the torch/);
+
+  const dunk = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    p.setPosition(1, 3, 1);
+    const moved = p.tryMoveForward();
+    return { moved, carried: p.carriedTorch(), pool: p.hasCarriedTorchLight(), msg: p.lastMessage() };
+  });
+  expect(dunk.moved.after, 'step onto deep water').toMatchObject({ x: 2, y: 3 });
+  expect(dunk.carried, 'deep water dunks the torch').toMatchObject({ lit: false });
   expect(dunk.pool, 'burnt torch no longer lights the square').toBe(false);
   expect(dunk.msg.toLowerCase(), 'dunk log line').toMatch(/dunks the torch/);
 
