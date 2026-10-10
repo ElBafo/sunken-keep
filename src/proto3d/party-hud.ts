@@ -308,12 +308,17 @@ export class PartyHud {
     return 'brannoc';
   }
 
+  isGuaranteedLantern(hero: HeroId, hand: HandSlot): boolean {
+    const item = this.heroes[hero]?.equipment[hand];
+    return item === 'prayer_lantern';
+  }
+
   findFreeHand(): { hero: HeroId; hand: HandSlot } | null {
     for (const id of HERO_ORDER) {
       const hero = this.heroes[id];
       for (const hand of ['main', 'off'] as const) {
         const item = hero.equipment[hand];
-        if (item === 'empty_hand') return { hero: id, hand };
+        if (item === 'empty_hand' && !this.isGuaranteedLantern(id, hand)) return { hero: id, hand };
       }
     }
     return null;
@@ -321,7 +326,10 @@ export class PartyHud {
 
   setSwapHighlight(armed: boolean) {
     document.querySelectorAll<HTMLElement>('.hand-btn').forEach((el) => {
-      el.classList.toggle('swap-armed', armed);
+      const hero = el.dataset.hero as HeroId | undefined;
+      const hand = el.dataset.hand as HandSlot | undefined;
+      const skip = !!(hero && hand && this.isGuaranteedLantern(hero, hand));
+      el.classList.toggle('swap-armed', armed && !skip);
     });
   }
 

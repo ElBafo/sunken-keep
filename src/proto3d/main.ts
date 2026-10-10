@@ -496,9 +496,12 @@ class Game {
       this.cancelSwap();
       return;
     }
+    if (this.hud.isGuaranteedLantern(hero, hand)) return;
     const current = this.hud.heroes[hero]?.equipment[hand];
+    let stashed = false;
     if (current && current !== 'empty_hand') {
       this.bag.push({ item: current, count: 1, from: { hero, hand } });
+      stashed = true;
       this.showMessage(
         this.storyLog('unequip', {
           hero: this.story.heroName(hero),
@@ -514,6 +517,7 @@ class Game {
     this.syncCarriedLight();
     saveProgress(floor1Sconces, this.oil, this.persist);
     this.audioManager.playUi('torch_take');
+    if (stashed) this.audioManager.playUi('ui_inventory_move');
     this.showMessage(this.storyLog('torch_take', { hero: this.story.heroName(hero) }));
   }
 
@@ -539,6 +543,7 @@ class Game {
     this.syncCarriedLight();
     const pos = torchWorldPos(sconce);
     this.audioManager.playUi('torch_place');
+    if (restored) this.audioManager.playUi('ui_inventory_move');
     window.setTimeout(() => this.audioManager.startTorchLoop(sconce), TORCH_IGNITE_FLARE_MS);
     saveProgress(floor1Sconces, this.oil, this.persist);
     this.showMessage(this.storyLog('torch_place', { hero: this.story.heroName(held.hero) }));
@@ -563,6 +568,7 @@ class Game {
   handleHandTap(hero: HeroId, hand: HandSlot) {
     this.hideTorchChoice();
     if (this.isSwapArmed() && this.swapSconce) {
+      if (this.hud.isGuaranteedLantern(hero, hand)) return;
       this.giveTorchTo(this.swapSconce, hero, hand);
       return;
     }
@@ -805,6 +811,8 @@ class Game {
       getBag: () => this.bag.map((slot) => ({ ...slot, from: slot.from ? { ...slot.from } : undefined })),
       swapArmed: () => this.isSwapArmed(),
       swapHighlightCount: () => document.querySelectorAll('.hand-btn.swap-armed').length,
+      lastUi: () => this.audioManager.lastUi(),
+      lanternLoop: () => this.audioManager.lanternLoop(),
       playLevelUp: (id: HeroId) => this.hud.playLevelUp(id),
       logLines: () => this.hud.logLines.slice(),
       layout: () => this.hud.layout,

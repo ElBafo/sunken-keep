@@ -54,6 +54,7 @@ export class AudioManager {
   private torchVoices = new Map<string, PositionalVoice>();
   private lastStepVariant: Record<string, string> = {};
   private lastStepName: string | null = null;
+  private lastUiNames: string[] = [];
 
   constructor(camera: THREE.Camera, quality: QualityLevel) {
     this.listener = new THREE.AudioListener();
@@ -147,7 +148,8 @@ export class AudioManager {
       ['torch_place', 'audio/sfx_torch_place.mp3'],
       ['torch_dunk', 'audio/sfx_torch_dunk.mp3'],
       ['ui_log_line', 'audio/sfx_ui_log_line.mp3'],
-      ['ui_button_denied', 'audio/sfx_ui_button_denied.mp3']
+      ['ui_button_denied', 'audio/sfx_ui_button_denied.mp3'],
+      ['ui_inventory_move', 'audio/sfx_ui_inventory_move.mp3']
     ];
 
     const results = await Promise.all(
@@ -325,7 +327,17 @@ export class AudioManager {
     }
   }
 
+  lastUi(): string[] {
+    return this.lastUiNames.slice();
+  }
+
+  lanternLoop(): { mode: 'oil' | 'ember' | 'off'; playing: boolean } {
+    return { mode: this.lanternMode, playing: !!this.lanternSound?.isPlaying };
+  }
+
   playUi(name: string, volume = 1, rate = 1) {
+    this.lastUiNames.push(name);
+    if (this.lastUiNames.length > 24) this.lastUiNames.splice(0, this.lastUiNames.length - 24);
     const buf = this.buffers.get(name);
     if (!buf) return;
     let sound = this.uiPool.find((a) => !a.isPlaying);

@@ -35,6 +35,8 @@ type Proto3d = {
   getBag: () => Array<{ item: string; count: number; from?: { hero: string; hand: string } }>;
   swapArmed: () => boolean;
   swapHighlightCount: () => number;
+  lastUi: () => string[];
+  lanternLoop: () => { mode: string; playing: boolean };
 };
 
 test.use(devices['iPhone 15']);
@@ -182,7 +184,13 @@ test('proto3d party panel: portraits, hands, take/snuff, dunk, 44pt targets', as
   expect(armed.lit, 'wall torch stays until a hand is chosen').toBe(true);
   expect(armed.carried, 'no torch taken yet').toBeNull();
   expect(armed.armed, 'swap mode armed').toBe(true);
-  expect(armed.highlights, 'all eight hands highlighted').toBe(8);
+  expect(armed.highlights, 'seven hands highlighted; lantern excluded').toBe(7);
+  expect(
+    await page.locator('.hand-btn[data-hero="wren"][data-hand="off"]').evaluate((el) =>
+      el.classList.contains('swap-armed')
+    ),
+    "Wren's lantern hand is not highlighted"
+  ).toBe(false);
   expect(armed.msg.toLowerCase(), 'hands-full prompt').toMatch(/no free hand|tap a hand to swap/);
   await page.screenshot({ path: `${OUT}/party-panel-swap-armed.png`, fullPage: false });
 
@@ -248,12 +256,14 @@ test('proto3d party panel: portraits, hands, take/snuff, dunk, 44pt targets', as
   const tapsBeforeWren = await page.evaluate(
     () => (window as unknown as { __proto3d: Proto3d }).__proto3d.handTapCount()
   );
-  await page.locator('.hand-btn[data-hero="wren"][data-hand="off"]').tap();
+  await page.locator('.hand-btn[data-hero="wren"][data-hand="main"]').tap();
   await page.waitForTimeout(120);
   const wrenSwap = await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    const wren = p.getHands().find((h) => h.id === 'wren');
     return {
       hands: p.getHands(),
+      wren,
       bag: p.getBag(),
       taps: p.handTapCount(),
       last: p.lastHand(),
@@ -263,7 +273,9 @@ test('proto3d party panel: portraits, hands, take/snuff, dunk, 44pt targets', as
       source: p.sourceLight(1, 6),
       armed: p.swapArmed(),
       highlights: p.swapHighlightCount(),
-      msg: p.lastMessage()
+      msg: p.lastMessage(),
+      ui: p.lastUi(),
+      lantern: p.lanternLoop()
     };
   });
   expect(wrenSwap.taps, 'swap tap must not use the hand').toBe(tapsBeforeWren);
@@ -274,41 +286,57 @@ test('proto3d party panel: portraits, hands, take/snuff, dunk, 44pt targets', as
   expect(wrenSwap.lit, 'Wren take removes the wall torch').toBe(false);
   expect(wrenSwap.carried, 'back-row Wren can carry the torch').toMatchObject({
     hero: 'wren',
-    hand: 'off',
+    hand: 'main',
     lit: true
   });
-  expect(wrenSwap.hands.find((h) => h.id === 'wren')?.off).toBe('torch_lit');
-  expect(wrenSwap.bag, 'Wren lantern stowed in the bag').toEqual(
+  expect(wrenSwap.wren?.main, 'torch replaces Wren mace').toBe('torch_lit');
+  expect(wrenSwap.wren?.off, 'Wren lantern stays in hand').toBe('prayer_lantern');
+  expect(wrenSwap.bag, 'Wren mace stowed in the bag').toEqual(
     expect.arrayContaining([
       expect.objectContaining({
-        item: 'prayer_lantern',
+        item: 'mace',
         count: 1,
-        from: { hero: 'wren', hand: 'off' }
+        from: { hero: 'wren', hand: 'main' }
       })
     ])
   );
+  expect(wrenSwap.bag.find((s) => s.item === 'prayer_lantern' || s.item === 'prayer_lantern_ember')).toBeUndefined();
   expect(wrenSwap.pool, 'back-row torch still lights the party square').toBe(true);
   expect(wrenSwap.source, 'party square has a torch pool').toBeGreaterThan(0.2);
+  expect(wrenSwap.lantern.mode, 'lantern loop keeps running').toBe('oil');
   expect(wrenSwap.armed, 'swap ends after the hand is chosen').toBe(false);
   expect(wrenSwap.highlights).toBe(0);
   expect(wrenSwap.msg.toLowerCase(), 'take log line').toMatch(/takes the torch/);
+  const takeAt = wrenSwap.ui.lastIndexOf('torch_take');
+  const moveAt = wrenSwap.ui.lastIndexOf('ui_inventory_move');
+  expect(takeAt, 'swap plays torch_take').toBeGreaterThanOrEqual(0);
+  expect(moveAt, 'swap then plays inventory_move').toBeGreaterThan(takeAt);
   await page.screenshot({ path: `${OUT}/party-panel-carried-torch.png`, fullPage: false });
 
   await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.interact());
   await page.waitForTimeout(80);
   const placed = await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    const wren = p.getHands().find((h) => h.id === 'wren');
     return {
       lit: p.torchLit(0, 6),
       carried: p.carriedTorch(),
-      wrenOff: p.getHands().find((h) => h.id === 'wren')?.off,
-      bag: p.getBag()
+      wren,
+      bag: p.getBag(),
+      ui: p.lastUi(),
+      lantern: p.lanternLoop()
     };
   });
   expect(placed.lit, 'place puts the torch back').toBe(true);
   expect(placed.carried).toBeNull();
-  expect(placed.wrenOff, 'place restores Wren lantern').toBe('prayer_lantern');
-  expect(placed.bag.find((s) => s.item === 'prayer_lantern')).toBeUndefined();
+  expect(placed.wren?.main, 'place restores Wren mace').toBe('mace');
+  expect(placed.wren?.off, 'lantern never left Wren').toBe('prayer_lantern');
+  expect(placed.bag.find((s) => s.item === 'mace')).toBeUndefined();
+  expect(placed.lantern.mode, 'lantern loop still running after place').toBe('oil');
+  const placeAt = placed.ui.lastIndexOf('torch_place');
+  const placeMove = placed.ui.lastIndexOf('ui_inventory_move');
+  expect(placeAt, 'place plays torch_place').toBeGreaterThanOrEqual(0);
+  expect(placeMove, 'place then plays inventory_move').toBeGreaterThan(placeAt);
 
   await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
