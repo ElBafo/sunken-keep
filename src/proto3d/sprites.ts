@@ -59,6 +59,9 @@ const SPRITE_RENDER_ORDER = 10;
 const HITFX_RENDER_ORDER = 12;
 const MONSTER_TEXEL_W = 80;
 const MONSTER_TEXEL_H = 60;
+const FROST_HOLD_FRAMES = 2;
+const FROST_HOLD_FPS = 6;
+const FROST_TINT = 0xb8d8ff;
 
 interface HitFxSpec {
   frames: THREE.Texture[];
@@ -81,6 +84,10 @@ interface HitFxPlay {
   imgH: number;
   pivotX: number;
   pivotYFromTop: number;
+  holdFrames: number;
+  holdFps: number;
+  tintHost: boolean;
+  frame: number;
 }
 
 interface BodyAnchor {
@@ -545,10 +552,28 @@ export class SpriteManager {
       imgW: spec.imgW,
       imgH: spec.imgH,
       pivotX: spec.pivotX,
-      pivotYFromTop: spec.pivotYFromTop
+      pivotYFromTop: spec.pivotYFromTop,
+      holdFrames: specName === 'weak' ? FROST_HOLD_FRAMES : 0,
+      holdFps: specName === 'weak' ? FROST_HOLD_FPS : spec.fps,
+      tintHost: specName === 'weak',
+      frame: 0
     };
     this.playingFx.push(play);
     this.placeHitFx(play, host);
+    this.applyHostTint(play, host);
+  }
+
+  private hitFxFrame(fx: HitFxPlay, elapsedSec: number): number {
+    if (fx.holdFrames <= 0) return Math.floor(elapsedSec * fx.fps);
+    const holdDur = fx.holdFrames / fx.holdFps;
+    if (elapsedSec < holdDur) return Math.floor(elapsedSec * fx.holdFps);
+    return fx.holdFrames + Math.floor((elapsedSec - holdDur) * fx.fps);
+  }
+
+  private applyHostTint(fx: HitFxPlay, host: SpriteInfo) {
+    if (!fx.tintHost) return;
+    const hold = fx.frame >= 0 && fx.frame < fx.holdFrames;
+    host.material.color.setHex(hold ? FROST_TINT : 0xffffff);
   }
 
   private async loadHitFx(
@@ -633,11 +658,13 @@ export class SpriteManager {
         continue;
       }
       this.placeHitFx(fx, host);
-      const frame = Math.floor(((time - fx.started) / 1000) * fx.fps);
+      const frame = this.hitFxFrame(fx, (time - fx.started) / 1000);
       if (frame >= fx.frames.length) {
         this.removeHitFx(fx);
         continue;
       }
+      fx.frame = frame;
+      this.applyHostTint(fx, host);
       const tex = fx.frames[Math.max(0, frame)];
       if (fx.material.map !== tex) {
         fx.material.map = tex;
@@ -649,6 +676,8 @@ export class SpriteManager {
   }
 
   private removeHitFx(fx: HitFxPlay) {
+    const host = this.spriteByMonsterId(fx.hostId);
+    if (host && fx.tintHost) host.material.color.setHex(0xffffff);
     fx.sprite.visible = false;
     fx.sprite.parent?.remove(fx.sprite);
     fx.material.dispose();
@@ -660,7 +689,19 @@ export class SpriteManager {
     this.lastHitType = null;
   }
 
-  hitFxPlaying(): Array<{ hostId: string; frames: number }> {
-    return this.playingFx.map((fx) => ({ hostId: fx.hostId, frames: fx.frames.length }));
+  hitFxPlaying(): Array<{ hostId: string; frames: number; frame: number; tint: number }> {
+    return this.playingFx.map((fx) => {
+      const host = this.spriteByMonsterId(fx.hostId);
+      return {
+        hostId: fx.hostId,
+        frames: fx.frames.length,
+        frame: fx.frame,
+        tint: host?.material.color.getHex() ?? 0xffffff
+      };
+    });
+  }
+
+  hostTint(id: string): number {
+    return this.spriteByMonsterId(id)?.material.color.getHex() ?? 0xffffff;
   }
 }

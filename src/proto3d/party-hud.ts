@@ -29,6 +29,7 @@ export interface HeroHud {
   equipment: { main: GearId; off: GearId };
   recovery: { main: number; off: number };
   downed?: boolean;
+  pendingPerk: number | null;
 }
 
 const HERO_ORDER: HeroId[] = ['brannoc', 'wren', 'ilsevar', 'mags'];
@@ -138,7 +139,8 @@ export class PartyHud {
           main: DEFAULT_EQUIPMENT[id].main,
           off: DEFAULT_EQUIPMENT[id].off
         },
-        recovery: { main: 0, off: 0 }
+        recovery: { main: 0, off: 0 },
+        pendingPerk: null
       };
     }
     return out;
@@ -345,22 +347,47 @@ export class PartyHud {
   armFrostHint() {
     if (this.frostHintDismissed) return;
     this.frostHintArmed = true;
+    this.syncFrostHintAttr();
     this.draw(performance.now());
   }
 
   dismissFrostHint() {
     this.frostHintDismissed = true;
     this.frostHintArmed = false;
+    this.syncFrostHintAttr();
     this.draw(performance.now());
   }
 
   hideFrostHint() {
     this.frostHintArmed = false;
+    this.syncFrostHintAttr();
     this.draw(performance.now());
   }
 
   frostHintState() {
     return { armed: this.frostHintArmed, dismissed: this.frostHintDismissed };
+  }
+
+  private wandHintVisible(now = performance.now()): boolean {
+    if (!this.frostHintArmed || this.frostHintDismissed || this.swapArmed) return false;
+    const hero = this.heroes.ilsevar;
+    if (!hero || hero.downed || hero.hp <= 0) return false;
+    const hand = this.frostHintHand(hero);
+    if (!hand) return false;
+    if (hero.recovery[hand] > now) return false;
+    if (hero.equipment[hand] === 'scroll' && hero.mana <= 0) return false;
+    return true;
+  }
+
+  private syncFrostHintAttr() {
+    const show = this.wandHintVisible();
+    const hand = this.frostHintHand(this.heroes.ilsevar);
+    document.querySelectorAll<HTMLElement>('.hand-btn').forEach((el) => {
+      const match = show && el.dataset.hero === 'ilsevar' && el.dataset.hand === hand;
+      if (match) el.setAttribute('data-hint', 'wand');
+      else el.removeAttribute('data-hint');
+      el.classList.toggle('wand-hint', match);
+    });
   }
 
   carriedTorch(): { hero: HeroId; hand: HandSlot; lit: boolean } | null {
@@ -428,7 +455,15 @@ export class PartyHud {
 
   syncHero(
     id: HeroId,
-    state: { hp: number; maxHp: number; mana: number; maxMana: number; downed?: boolean; recovery?: { main: number; off: number } }
+    state: {
+      hp: number;
+      maxHp: number;
+      mana: number;
+      maxMana: number;
+      downed?: boolean;
+      recovery?: { main: number; off: number };
+      pendingPerk?: number | null;
+    }
   ) {
     const hero = this.heroes[id];
     if (!hero) return;
@@ -437,6 +472,7 @@ export class PartyHud {
     hero.mana = state.mana;
     hero.maxMana = state.maxMana;
     hero.downed = !!state.downed;
+    hero.pendingPerk = state.pendingPerk ?? null;
     if (state.recovery) {
       hero.recovery.main = state.recovery.main * 1000;
       hero.recovery.off = state.recovery.off * 1000;
@@ -523,6 +559,10 @@ export class PartyHud {
       if (flash) ctx.drawImage(flash, x, y, w, h);
       if (t >= 3) this.levelFlash = null;
     }
+    if (hero.pendingPerk) {
+      ctx.fillStyle = '#f0d060';
+      ctx.fillRect(x + w - 3, y + 1, 2, 2);
+    }
     ctx.lineWidth = hero.formation === 'front' ? 2 : 1;
     ctx.strokeStyle = hero.formation === 'front' ? '#cd7f32' : '#8a8a8a';
     ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
@@ -576,6 +616,7 @@ export class PartyHud {
       ctx.stroke();
     }
     this.drawFrostHint(ctx, hero, hand, rect, now, recovering);
+    if (hero.id === 'ilsevar') this.syncFrostHintAttr();
   }
 
   private frostHintHand(hero: HeroHud): HandSlot | null {

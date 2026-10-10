@@ -538,5 +538,20 @@
   "key": "sand_miss",
   "text": "Άμμος στα μάτια. Χτυπά το κενό.",
   "when": "a monster misses because of pocket sand"
+ },
+ {
+  "key": "attacked_left",
+  "text": "{monster} επιτίθεται από τα αριστερά!",
+  "when": "a monster strikes from the square to the party's left"
+ },
+ {
+  "key": "attacked_right",
+  "text": "{monster} επιτίθεται από τα δεξιά!",
+  "when": "a monster strikes from the square to the party's right"
+ },
+ {
+  "key": "attacked_behind",
+  "text": "{monster} επιτίθεται από πίσω!",
+  "when": "a monster strikes from the square behind the party"
  }
 ]

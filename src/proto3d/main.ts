@@ -76,6 +76,8 @@ class Game {
   bag: BagEntry[] = [];
   lastMessage = '';
   lastHitType: string | null = null;
+  lastFlank: 'left' | 'right' | 'behind' | null = null;
+  private flankTimer: ReturnType<typeof setTimeout> | null = null;
   lampNote = { title: '', text: '' };
   noteOpen = false;
   interactCount = 0;
@@ -454,6 +456,9 @@ class Game {
           this.audioManager?.setFightDuck(false);
           this.hud.hideFrostHint();
           break;
+        case 'flank':
+          this.flashFlank(e.side);
+          break;
         case 'game_over':
           this.showGameOver();
           break;
@@ -473,6 +478,18 @@ class Game {
       }
     }
     this.syncPartyHud();
+  }
+
+  private flashFlank(side: 'left' | 'right' | 'behind') {
+    this.lastFlank = side;
+    const el = document.getElementById('flank-flash');
+    if (!el) return;
+    el.dataset.side = side;
+    el.classList.add('show');
+    if (this.flankTimer) clearTimeout(this.flankTimer);
+    this.flankTimer = setTimeout(() => {
+      el.classList.remove('show');
+    }, 420);
   }
 
   private wireGameOver() {
@@ -528,6 +545,7 @@ class Game {
     this.updateOilHud();
     this.updateDoorButton();
     this.audioManager?.stopPresenceLoops();
+    this.audioManager?.clearLeechLoops();
     this.audioManager?.startFloorLoops(this.oil > 0);
     this.audioManager?.syncLeechLoops(floor1);
     for (const sconce of floor1Sconces) {
@@ -1039,10 +1057,18 @@ class Game {
       lastHitType: () => this.lastHitType ?? this.spriteManager.lastHitType,
       playingLoops: () => this.audioManager.playingLoops(),
       loopKit: () => this.audioManager.loopKit(),
-      playHitFx: (id: string, kind: 'resist' | 'weak' | 'crit' | 'hit') =>
-        this.spriteManager.playHitFx(id, kind, performance.now()),
+      playHitFx: (id: string, kind: 'resist' | 'weak' | 'crit' | 'hit') => {
+        this.spriteManager.playHitFx(id, kind, performance.now());
+        this.lastHitType = kind;
+        this.hud.lastHitType = kind;
+        if (kind === 'resist') this.hud.armFrostHint();
+      },
       hitFxPlaying: () => this.spriteManager.hitFxPlaying(),
+      hostTint: (id: string) => this.spriteManager.hostTint(id),
       frostHint: () => this.hud.frostHintState(),
+      lastFlank: () => this.lastFlank,
+      flashFlank: (side: 'left' | 'right' | 'behind') => this.flashFlank(side),
+      partyState: () => this.combat.partyState(),
       lastNote: () => this.lampNote,
       noteOpen: () => this.noteOpen,
       getOil: () => this.oil,
@@ -1111,7 +1137,15 @@ class Game {
       combatHeroes: () =>
         HERO_IDS.map((id) => {
           const h = this.combat.heroes[id];
-          return { id, hp: h.hp, maxHp: h.maxHp, downed: h.downed, level: h.level, xp: h.xp };
+          return {
+            id,
+            hp: h.hp,
+            maxHp: h.maxHp,
+            downed: h.downed,
+            level: h.level,
+            xp: h.xp,
+            pendingPerk: h.pendingPerk
+          };
         }),
       combatMonsters: () =>
         this.combat.monsters.map((m) => ({
@@ -1139,6 +1173,14 @@ class Game {
         m.nextAttackAt = this.nowSec();
         this.applyEvents(this.combat.tick(this.nowSec()));
         return !!m.windup;
+      },
+      forceSwing: () => {
+        const m = this.combat.fightMonster() ?? this.combat.adjacentMonster();
+        if (!m) return false;
+        m.windup = null;
+        m.nextAttackAt = this.nowSec();
+        this.applyEvents(this.combat.tick(this.nowSec()));
+        return true;
       },
       gameOverVisible: () => !!document.getElementById('gameover')?.classList.contains('show'),
       logLines: () => this.hud.logLines.slice(),

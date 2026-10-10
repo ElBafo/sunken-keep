@@ -20,10 +20,16 @@ type Proto3d = {
   forceWipe: () => void;
   restartFloor: () => void;
   lastHitType: () => string | null;
-  playingLoops: () => { count: number; kinds: string[] };
-  loopKit: () => { count: number; kinds: string[] };
+  playingLoops: () => { count: number; kinds: string[]; names: string[] };
+  loopKit: () => { count: number; kinds: string[]; names: string[] };
   playHitFx: (id: string, kind: 'resist' | 'weak' | 'crit' | 'hit') => void;
-  hitFxPlaying: () => Array<{ hostId: string; frames: number }>;
+  hitFxPlaying: () => Array<{ hostId: string; frames: number; frame: number; tint: number }>;
+  hostTint: (id: string) => number;
+  frostHint: () => { armed: boolean; dismissed: boolean };
+  lastFlank: () => 'left' | 'right' | 'behind' | null;
+  flashFlank: (side: 'left' | 'right' | 'behind') => void;
+  forceSwing: () => boolean;
+  partyState: () => { pendingPerks: Array<{ hero: string; level: number }> };
   addXp: (n: number) => void;
   finishFight: () => void;
   forceWindup: () => boolean;
@@ -119,14 +125,30 @@ test('proto3d combat: block square, first swing, voices, perks, game over', asyn
   await page.waitForTimeout(90);
   await page.screenshot({ path: `${OUT}/combat-slime-resist.png`, fullPage: false });
 
+  const wandHint = await page.evaluate(() => {
+    const btn = document.querySelector('.hand-btn[data-hero="ilsevar"][data-hand="main"]');
+    return {
+      hint: btn?.getAttribute('data-hint') ?? null,
+      armed: (window as unknown as { __proto3d: Proto3d }).__proto3d.frostHint().armed
+    };
+  });
+  expect(wandHint.armed, 'resisted blade arms the wand hint').toBe(true);
+  expect(wandHint.hint, 'wand button exposes data-hint').toBe('wand');
+  await page.screenshot({ path: `${OUT}/combat-wand-glow.png`, fullPage: false });
+
   const frostShot = await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
     const slime = p.combatMonsters().find((m) => m.kind === 'slime');
     if (slime) p.playHitFx(slime.id, 'weak');
-    return { hit: p.lastHitType(), fx: p.hitFxPlaying() };
+    return { hit: p.lastHitType(), id: slime?.id ?? '', fx: p.hitFxPlaying() };
   });
   expect(frostShot.fx.length, 'weak frost plays on the slime').toBeGreaterThan(0);
   await page.waitForTimeout(90);
+  const frostTint = await page.evaluate((id) => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    return { tint: p.hostTint(id), fx: p.hitFxPlaying() };
+  }, frostShot.id);
+  expect(frostTint.tint, 'hold frames tint the slime pale blue').toBe(0xb8d8ff);
   await page.screenshot({ path: `${OUT}/combat-slime-frost.png`, fullPage: false });
 
   const hands = await page.evaluate(() => {
@@ -161,10 +183,18 @@ test('proto3d combat: block square, first swing, voices, perks, game over', asyn
   await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.finishFight());
   const afterFight = await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-    return { hooks: p.perkHooks(), screen: p.perkScreenOpen(), fighting: p.inCombat() };
+    return {
+      hooks: p.perkHooks(),
+      screen: p.perkScreenOpen(),
+      fighting: p.inCombat(),
+      pending: p.pendingPerks(),
+      party: p.partyState()
+    };
   });
   expect(afterFight.fighting).toBe(false);
   expect(afterFight.hooks.length, 'perk hook fires only after the fight').toBeGreaterThan(0);
+  expect(afterFight.pending.length, 'mid-fight level-up stays pending').toBeGreaterThan(0);
+  expect(afterFight.party.pendingPerks.length, 'pending perks persist in party state').toBeGreaterThan(0);
   expect(afterFight.screen, 'hook still does not open a screen').toBe(false);
 
   const crab = await page.evaluate(() => {
@@ -179,6 +209,23 @@ test('proto3d combat: block square, first swing, voices, perks, game over', asyn
   expect(crab.wind || crab.monsters.some((m) => m.windup === 'pinch'), 'crab wind-up on the 3rd swing').toBe(true);
   await page.waitForTimeout(200);
   await page.screenshot({ path: `${OUT}/combat-crab-windup.png`, fullPage: false });
+
+  const flank = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    p.setPosition(5, 2, 1);
+    p.forceSwing();
+    const flash = document.getElementById('flank-flash');
+    return {
+      flank: p.lastFlank(),
+      logs: p.logLines(),
+      side: flash?.dataset.side ?? null,
+      shown: flash?.classList.contains('show') ?? false
+    };
+  });
+  expect(flank.flank === 'right' || /from the right/i.test(flank.logs.join('\n'))).toBe(true);
+  expect(flank.side, 'red edge marks the attacking side').toBe('right');
+  expect(flank.shown, 'flank flash is visible').toBe(true);
+  await page.screenshot({ path: `${OUT}/combat-flank-right.png`, fullPage: false });
 
   await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
@@ -222,6 +269,10 @@ test('proto3d combat: block square, first swing, voices, perks, game over', asyn
   expect(restartedLoops.count, `restart loops ${restartedLoops.kinds} vs fresh ${freshLoops.kinds}`).toBe(
     freshLoops.count
   );
+  expect(
+    [...restartedLoops.names].sort(),
+    `restart names ${restartedLoops.names} vs fresh ${freshLoops.names}`
+  ).toEqual([...freshLoops.names].sort());
 
   const rat = await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;

@@ -98,7 +98,8 @@ export class CombatEngine {
         downed: false,
         webbedUntil: 0,
         latched: false,
-        latchTurnsLeft: 0
+        latchTurnsLeft: 0,
+        pendingPerk: null
       };
     }
     return out;
@@ -193,15 +194,51 @@ export class CombatEngine {
     return { x: this.partyX + dx, y: this.partyY + dy };
   }
 
-  adjacentMonster(): MonsterState | undefined {
+  facingMonster(): MonsterState | undefined {
     const face = this.facingPos();
-    const faced = this.monsterAt(face.x, face.y);
+    return this.monsterAt(face.x, face.y);
+  }
+
+  adjacentMonster(): MonsterState | undefined {
+    const faced = this.facingMonster();
     if (faced) return faced;
     for (const [dx, dy] of DIRS) {
       const m = this.monsterAt(this.partyX + dx, this.partyY + dy);
       if (m) return m;
     }
     return undefined;
+  }
+
+  /** Relative side of an adjacent monster. Front-only targeting uses `facingMonster`. */
+  monsterSide(m: MonsterState): 'front' | 'left' | 'right' | 'behind' | null {
+    const dx = m.x - this.partyX;
+    const dy = m.y - this.partyY;
+    if (Math.abs(dx) + Math.abs(dy) !== 1) return null;
+    let monsterDir = 0;
+    if (dx === 1) monsterDir = 1;
+    else if (dx === -1) monsterDir = 3;
+    else if (dy === 1) monsterDir = 2;
+    const rel = (monsterDir - (this.partyDir & 3) + 4) & 3;
+    return rel === 0 ? 'front' : rel === 1 ? 'right' : rel === 2 ? 'behind' : 'left';
+  }
+
+  partyState() {
+    return {
+      pendingPerks: this.pendingPerks.slice(),
+      heroes: HERO_IDS.map((id) => {
+        const h = this.heroes[id];
+        return {
+          id,
+          hp: h.hp,
+          maxHp: h.maxHp,
+          mana: h.mana,
+          maxMana: h.maxMana,
+          level: h.level,
+          xp: h.xp,
+          pendingPerk: h.pendingPerk
+        };
+      })
+    };
   }
 
   beginFight(monster: MonsterState, now: number): CombatEvent[] {
@@ -368,6 +405,7 @@ export class CombatEngine {
       this.emit({ type: 'sfx', name: 'level_up', combat: true });
       if (this.data.progression.perkLevels.includes(h.level)) {
         this.pendingPerks.push({ hero: h.id, level: h.level });
+        h.pendingPerk = h.level;
         this.emit({ type: 'perk_pending', hero: h.id, level: h.level });
       }
     }
@@ -420,8 +458,7 @@ export class CombatEngine {
     this.fight = null;
     this.emit({ type: 'fight_end' });
     if (this.pendingPerks.length) {
-      const pending = this.pendingPerks.splice(0);
-      for (const p of pending) this.emit({ type: 'perk_hook', hero: p.hero, level: p.level });
+      for (const p of this.pendingPerks) this.emit({ type: 'perk_hook', hero: p.hero, level: p.level });
     }
     for (const id of HERO_IDS) {
       const h = this.heroes[id];
@@ -542,15 +579,21 @@ export class CombatEngine {
       return this.flush();
     }
 
-    const target = this.fightMonster();
+    const target = this.facingMonster();
     const actSfx = itemActSfx(item);
     const isPunch = item === 'empty_hand' || item === 'fist';
 
     if (!target) {
       hero.recovery[hand] = now + (rules.recovery ?? 1.5);
       this.emit({ type: 'hand_used', hero: heroId, hand, item });
-      this.emit({ type: 'sfx', name: actSfx, combat: true });
-      if (isPunch) this.emit({ type: 'log', key: 'punch_air', vars: { hero: heroId } });
+      if (isPunch) {
+        this.emit({ type: 'sfx', name: actSfx, combat: true });
+        this.emit({ type: 'log', key: 'punch_air', vars: { hero: heroId } });
+      } else {
+        this.emit({ type: 'sfx', name: actSfx, combat: true });
+        this.emit({ type: 'sfx', name: 'act_miss', combat: true });
+        this.emit({ type: 'log', key: 'miss', vars: { hero: heroId } });
+      }
       return this.flush();
     }
 
@@ -796,6 +839,11 @@ export class CombatEngine {
   ) {
     const def = this.def(m.kind);
     if (!def) return;
+    const side = this.monsterSide(m);
+    if (side && side !== 'front') {
+      this.emit({ type: 'log', key: `attacked_${side}`, vars: { monster: m.kind } });
+      this.emit({ type: 'flank', side });
+    }
     const attackSfx = m.kind === 'captain_dural' ? 'drowned_dwarf_attack' : `${m.kind}_attack`;
     this.emit({ type: 'monster_anim', id: m.id, anim: 'attack' });
     this.emit({ type: 'sfx', name: attackSfx, x: m.x, y: m.y, combat: true });

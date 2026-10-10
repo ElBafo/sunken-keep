@@ -75,6 +75,31 @@
       background: rgba(240, 208, 96, 0.42);
       box-shadow: 0 0 0 1px #3a2a10, 0 0 8px 2px rgba(240, 208, 96, 0.65);
     }
+    .hand-btn[data-hint="wand"],
+    .hand-btn.wand-hint {
+      outline: 1px solid #9ad4ff;
+      outline-offset: 1px;
+      box-shadow: 0 0 10px 3px rgba(140, 210, 255, 0.85);
+      background: rgba(120, 190, 255, 0.22);
+    }
+    #flank-flash {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 40;
+      opacity: 0;
+      transition: opacity 90ms linear;
+    }
+    #flank-flash.show { opacity: 1; }
+    #flank-flash[data-side="left"] {
+      box-shadow: inset 22px 0 18px -4px rgba(200, 24, 24, 0.92);
+    }
+    #flank-flash[data-side="right"] {
+      box-shadow: inset -22px 0 18px -4px rgba(200, 24, 24, 0.92);
+    }
+    #flank-flash[data-side="behind"] {
+      box-shadow: inset 0 -22px 18px -4px rgba(200, 24, 24, 0.92);
+    }
     #torch-choice {
       position: absolute;
       left: 50%;
@@ -328,6 +353,7 @@
   </div>
   <div id="canvas-container">
     <canvas id="render-canvas"></canvas>
+    <div id="flank-flash" aria-hidden="true"></div>
     <div id="torch-choice">
       <button id="btn-torch-take" class="hud-choice-btn" type="button"></button>
       <button id="btn-torch-snuff" class="hud-choice-btn" type="button"></button>

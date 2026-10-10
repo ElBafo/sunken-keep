@@ -22,6 +22,7 @@ interface PositionalVoice {
   loop: boolean;
   baseVolume: number;
   kind: 'torch' | 'drip' | 'far' | 'door' | 'chain' | 'banner' | 'wind' | 'bones' | 'leech' | 'water' | 'presence' | 'named';
+  name?: string;
 }
 
 export class AudioManager {
@@ -329,8 +330,25 @@ export class AudioManager {
     this.syncLeechLoops(floorData);
   }
 
+  /** Drop every leech idle, including a stray copy left over from a previous start. */
+  clearLeechLoops() {
+    const leechBuf = this.buffers.get('leech_idle');
+    const extra = this.voices.filter(
+      (v) => v.kind === 'leech' || v.name === 'leech_idle' || (!!leechBuf && v.audio.buffer === leechBuf)
+    );
+    for (const voice of extra) {
+      if (voice.audio.isPlaying) voice.audio.stop();
+      voice.object.parent?.remove(voice.object);
+      this.voices = this.voices.filter((v) => v !== voice);
+      for (const [id, named] of this.namedLoops) {
+        if (named === voice) this.namedLoops.delete(id);
+      }
+    }
+  }
+
   /** Rebind leech idle loops to the squares that currently hold bog_leeches. */
   syncLeechLoops(floorData: FloorData) {
+    this.clearLeechLoops();
     const buf = this.buffers.get('leech_idle');
     const scene = this.scene;
     if (!buf || !scene) return;
@@ -347,32 +365,28 @@ export class AudioManager {
         });
       }
     }
-    const existing = this.voices.filter((v) => v.kind === 'leech');
     const range = 2 * CELL_SIZE;
-    for (let i = 0; i < spots.length; i++) {
-      const spot = spots[i];
-      let voice = existing[i];
-      if (!voice) {
-        const object = new THREE.Object3D();
-        const audio = new THREE.PositionalAudio(this.listener);
-        audio.setBuffer(buf);
-        audio.setRefDistance(CELL_SIZE);
-        audio.setMaxDistance(range);
-        audio.setRolloffFactor(1);
-        audio.setLoop(true);
-        audio.setVolume(0.4);
-        object.add(audio);
-        scene.add(object);
-        voice = { audio, object, loop: true, baseVolume: 0.4, kind: 'leech' };
-        this.voices.push(voice);
-      }
-      voice.object.position.set(spot.x * CELL_SIZE, spot.floorY + 0.2, spot.y * CELL_SIZE);
-    }
-    for (let i = spots.length; i < existing.length; i++) {
-      const extra = existing[i];
-      if (extra.audio.isPlaying) extra.audio.stop();
-      extra.object.parent?.remove(extra.object);
-      this.voices = this.voices.filter((v) => v !== extra);
+    for (const spot of spots) {
+      const object = new THREE.Object3D();
+      const audio = new THREE.PositionalAudio(this.listener);
+      audio.setBuffer(buf);
+      audio.setRefDistance(CELL_SIZE);
+      audio.setMaxDistance(range);
+      audio.setRolloffFactor(1);
+      audio.setLoop(true);
+      audio.setVolume(0.4);
+      object.add(audio);
+      scene.add(object);
+      audio.play();
+      this.voices.push({
+        audio,
+        object,
+        loop: true,
+        baseVolume: 0.4,
+        kind: 'leech',
+        name: 'leech_idle'
+      });
+      object.position.set(spot.x * CELL_SIZE, spot.floorY + 0.2, spot.y * CELL_SIZE);
     }
   }
 
@@ -422,7 +436,7 @@ export class AudioManager {
         object.add(audio);
         scene.add(object);
         audio.play();
-        this.voices.push({ audio, object, loop: true, baseVolume: 0.35, kind: 'water' });
+        this.voices.push({ audio, object, loop: true, baseVolume: 0.35, kind: 'water', name: 'water_lap' });
       }
     }
   }
@@ -446,7 +460,7 @@ export class AudioManager {
       object.add(audio);
       scene.add(object);
       audio.play();
-      this.voices.push({ audio, object, loop: true, baseVolume: 0.28, kind: 'wind' });
+      this.voices.push({ audio, object, loop: true, baseVolume: 0.28, kind: 'wind', name: 'crack_wind' });
     }
   }
 
@@ -574,20 +588,25 @@ export class AudioManager {
   }
 
   /** Floor-kit loops. Pass `playingOnly` to count voices that are actually audible. */
-  loopKit(playingOnly = false): { count: number; kinds: string[] } {
+  loopKit(playingOnly = false): { count: number; kinds: string[]; names: string[] } {
     const kinds: string[] = [];
-    const keep = (exists: boolean, playing: boolean | undefined, name: string) => {
-      if (exists && (!playingOnly || playing)) kinds.push(name);
+    const names: string[] = [];
+    const keep = (exists: boolean, playing: boolean | undefined, kind: string, name: string) => {
+      if (exists && (!playingOnly || playing)) {
+        kinds.push(kind);
+        names.push(name);
+      }
     };
-    keep(!!this.ambientSound, this.ambientSound?.isPlaying, 'ambient');
-    keep(!!this.musicSound, this.musicSound?.isPlaying, 'music');
-    keep(!!this.lanternSound, this.lanternSound?.isPlaying, `lantern:${this.lanternMode}`);
+    keep(!!this.ambientSound, this.ambientSound?.isPlaying, 'ambient', 'ambience');
+    keep(!!this.musicSound, this.musicSound?.isPlaying, 'music', 'music_act1');
+    keep(!!this.lanternSound, this.lanternSound?.isPlaying, `lantern:${this.lanternMode}`, `lantern:${this.lanternMode}`);
     for (const v of this.voices) {
       if (!v.loop || v.kind === 'presence') continue;
       if (playingOnly && !v.audio.isPlaying) continue;
       kinds.push(v.kind);
+      names.push(v.name ?? v.kind);
     }
-    return { count: kinds.length, kinds };
+    return { count: kinds.length, kinds, names };
   }
 
   private pickVariant(family: string, names: string[]): string {
@@ -696,7 +715,7 @@ export class AudioManager {
     object.add(audio);
     scene.add(object);
     audio.play();
-    const voice: PositionalVoice = { audio, object, loop: true, baseVolume: volume, kind };
+    const voice: PositionalVoice = { audio, object, loop: true, baseVolume: volume, kind, name };
     this.voices.push(voice);
     this.namedLoops.set(id, voice);
     return id;
@@ -765,7 +784,7 @@ export class AudioManager {
     object.add(audio);
     scene.add(object);
     audio.play();
-    const voice: PositionalVoice = { audio, object, loop: true, baseVolume: 0.42, kind: 'torch' };
+    const voice: PositionalVoice = { audio, object, loop: true, baseVolume: 0.42, kind: 'torch', name: 'torch' };
     this.voices.push(voice);
     this.torchVoices.set(key, voice);
   }

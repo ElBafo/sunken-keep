@@ -303,7 +303,70 @@ describe('src/core combat rules', () => {
     expect(midEv.some((x) => x.type === 'perk_hook')).toBe(false);
     expect(mid.pendingPerks.length).toBeGreaterThan(0);
     mid.endFight(1);
-    expect(mid.pendingPerks.length).toBe(0);
+    expect(mid.pendingPerks.length).toBeGreaterThan(0);
+    expect(mid.heroes.brannoc.pendingPerk).toBe(3);
+    expect(mid.partyState().pendingPerks.length).toBeGreaterThan(0);
+  });
+
+  it('keeps a mid-fight level-up pending after the fight ends', () => {
+    const e = engine();
+    e.heroes.brannoc.xp = 219;
+    const alive = fight(e, 'slime');
+    const midEv = e.debugAddXp(40);
+    expect(alive.alive).toBe(true);
+    expect(midEv.some((x) => x.type === 'perk_pending' && x.level === 3)).toBe(true);
+    expect(midEv.some((x) => x.type === 'perk_hook')).toBe(false);
+    expect(e.pendingPerks).toEqual([{ hero: 'brannoc', level: 3 }]);
+    expect(e.heroes.brannoc.pendingPerk).toBe(3);
+    const end = e.finishFight(1);
+    expect(end.some((x) => x.type === 'fight_end')).toBe(true);
+    expect(end.some((x) => x.type === 'perk_hook' && x.level === 3)).toBe(true);
+    expect(e.pendingPerks).toEqual([{ hero: 'brannoc', level: 3 }]);
+    expect(e.heroes.brannoc.pendingPerk).toBe(3);
+    expect(e.partyState().heroes.find((h) => h.id === 'brannoc')?.pendingPerk).toBe(3);
+  });
+
+  it('melee and wand only hit the square ahead; side attacks log a flank', () => {
+    const beside = engine();
+    beside.setPartyPos(0, 0, 1);
+    const sideSlime = beside.spawnMonster('slime', 0, 1);
+    beside.beginFight(sideSlime, 0);
+    beside.setEquipment('brannoc', 'main', 'empty_hand');
+    const punch = beside.useHand('brannoc', 'main', 0, 'empty_hand');
+    expect(logs(punch, 'punch_air').length).toBe(1);
+    expect(sideSlime.hp).toBe(sideSlime.maxHp);
+
+    const axe = engine();
+    axe.setPartyPos(0, 0, 1);
+    const sideRat = axe.spawnMonster('keep_rat', 0, -1);
+    axe.beginFight(sideRat, 0);
+    const swing = axe.useHand('brannoc', 'main', 0);
+    expect(logs(swing, 'miss').length).toBe(1);
+    expect(logs(swing, 'hit').length).toBe(0);
+    expect(sideRat.hp).toBe(sideRat.maxHp);
+
+    const wand = engine();
+    wand.setPartyPos(0, 0, 1);
+    const sideCrab = wand.spawnMonster('rust_crab', 0, 1);
+    wand.beginFight(sideCrab, 0);
+    const bolt = wand.useHand('ilsevar', 'main', 0);
+    expect(logs(bolt, 'miss').length).toBe(1);
+    expect(sideCrab.hp).toBe(sideCrab.maxHp);
+
+    const front = engine(7);
+    const ahead = fight(front, 'keep_rat');
+    const before = ahead.hp;
+    front.useHand('brannoc', 'main', 0);
+    expect(ahead.hp).toBeLessThanOrEqual(before);
+
+    const flank = engine();
+    flank.setPartyPos(0, 0, 1);
+    const crab = flank.spawnMonster('rust_crab', 0, -1);
+    flank.beginFight(crab, 0);
+    const ev = flank.tick(0.5);
+    expect(logs(ev, 'attacked_left').length).toBe(1);
+    expect(ev.some((x) => x.type === 'flank' && x.side === 'left')).toBe(true);
+    expect(flank.partyDir).toBe(1);
   });
 
   it('downed heroes stand up with 1 HP after a fight', () => {

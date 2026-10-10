@@ -104,6 +104,7 @@ export interface HeroState {
   webbedUntil: number;
   latched: boolean;
   latchTurnsLeft: number;
+  pendingPerk: number | null;
 }
 
 export interface MonsterState {
@@ -143,6 +144,7 @@ export type CombatEvent =
   | { type: 'perk_hook'; hero: HeroId; level: number }
   | { type: 'fight_start'; monsterId: string; kind: string }
   | { type: 'fight_end' }
+  | { type: 'flank'; side: 'left' | 'right' | 'behind' }
   | { type: 'game_over' }
   | { type: 'hit_type'; kind: HitKind; id: string; x: number; y: number; monster: string }
   | { type: 'hand_used'; hero: HeroId; hand: HandSlot; item: string }
