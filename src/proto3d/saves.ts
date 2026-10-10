@@ -90,6 +90,7 @@ export function persistStorage(): void {
   try {
     const storage = navigator.storage;
     if (storage && typeof storage.persist === 'function') {
+      (globalThis as { __proto3dPersistCalled?: boolean }).__proto3dPersistCalled = true;
       void storage.persist();
     }
   } catch {
@@ -122,6 +123,7 @@ function readRaw(key: string): unknown | null {
 function writeRaw(key: string, value: unknown): boolean {
   try {
     localStorage.setItem(key, JSON.stringify(value));
+    persistStorage();
     return true;
   } catch {
     return false;

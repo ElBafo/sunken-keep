@@ -130,6 +130,7 @@ export class TitleScreen {
     this.visible = true;
     const overlay = document.getElementById('title-overlay');
     if (overlay) overlay.classList.add('show');
+    this.syncHint();
     this.layoutButtons();
     this.loop();
   }
@@ -143,8 +144,14 @@ export class TitleScreen {
   setMode(mode: Mode) {
     this.mode = mode;
     this.overwriteSlot = null;
+    this.syncHint();
     this.layoutButtons();
     this.draw();
+  }
+
+  private syncHint() {
+    const hint = document.getElementById('title-hint');
+    if (hint) hint.style.visibility = this.mode === 'title' ? 'visible' : 'hidden';
   }
 
   getMode(): Mode {

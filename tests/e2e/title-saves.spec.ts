@@ -42,10 +42,12 @@ type Proto3d = {
     secrets: Array<{ x: number; y: number; open: boolean }>;
     items: Array<{ x: number; y: number; item: string | null }>;
     chests: Array<{ x: number; y: number; open: boolean; loot: string[] }>;
-    sconces: Array<{ x: number; y: number; lit: boolean; empty: boolean }>;
+    sconces: Array<{ x: number; y: number; face?: string; lit: boolean; empty: boolean }>;
     monsters: Array<{ kind: string; alive: boolean; hp: number }>;
     flags: string[];
+    carried?: { hero: string; hand: string; lit: boolean } | null;
   };
+  setHand: (id: string, hand: string, item: string) => void;
   pickupHere: () => boolean;
   pickupFacing: () => boolean;
   chestOpen: (x: number, y: number) => boolean;
@@ -61,9 +63,22 @@ type Proto3d = {
   introVisible: () => boolean;
   skipIntro: () => void;
   setEscapeRun: (on: boolean) => void;
+  persistCalled: () => boolean;
+  killKind: (kind: string) => boolean;
+  carriedTorch: () => { hero: string; hand: string; lit: boolean } | null;
 };
 
 test.use(devices['iPhone 15']);
+
+async function keepSavesAcrossReload(page: import('@playwright/test').Page) {
+  await page.addInitScript(() => {
+    if (!sessionStorage.getItem('proto3d-keep-saves')) localStorage.clear();
+  });
+}
+
+async function rememberSaves(page: import('@playwright/test').Page) {
+  await page.evaluate(() => sessionStorage.setItem('proto3d-keep-saves', '1'));
+}
 
 async function bootPlay(page: import('@playwright/test').Page, qs = 'test=1&persist=1&debug=1') {
   await page.goto(`${BASE_URL}/proto3d.html?${qs}`);
@@ -77,8 +92,22 @@ async function bootPlay(page: import('@playwright/test').Page, qs = 'test=1&pers
   await page.waitForTimeout(300);
 }
 
-function api(page: import('@playwright/test').Page) {
-  return page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d);
+async function saveReloadLoad(page: import('@playwright/test').Page, slot = 2) {
+  await rememberSaves(page);
+  await page.evaluate((n) => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    p.saveToSlot(n);
+  }, slot);
+  await page.reload();
+  await bootPlay(page, 'test=1&persist=1&debug=1');
+  await page.evaluate((n) => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    p.loadFromSlot(n);
+  }, slot);
+}
+
+async function mapState(page: import('@playwright/test').Page) {
+  return page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.mapState());
 }
 
 test.describe('proto3d step4 title and saves', () => {
@@ -98,7 +127,7 @@ test.describe('proto3d step4 title and saves', () => {
       if (msg.type() === 'error' && !isHostAudioNoise(msg.text())) errors.push(msg.text());
     });
 
-    await page.addInitScript(() => localStorage.clear());
+    await keepSavesAcrossReload(page);
     await page.goto(`${BASE_URL}/proto3d.html?debug=1`);
     await page.waitForFunction(
       () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
@@ -106,7 +135,12 @@ test.describe('proto3d step4 title and saves', () => {
       { timeout: 30000 }
     );
     await expect(page.locator('#title-overlay')).toHaveClass(/show/);
-    await expect(page.locator('#title-hint')).toContainText(/Home Screen/i);
+    await expect(page.locator('#title-hint')).toContainText(/Always play from the Home Screen/i);
+    const persist = await page.evaluate(() => ({
+      available: typeof navigator.storage?.persist === 'function',
+      called: (window as unknown as { __proto3d: Proto3d }).__proto3d.persistCalled()
+    }));
+    if (persist.available) expect(persist.called).toBe(true);
     await page.screenshot({ path: `${OUT}/title-en.png`, fullPage: false });
 
     const continueBtn = page.locator('.title-hit[data-id="Continue"]');
@@ -138,23 +172,16 @@ test.describe('proto3d step4 title and saves', () => {
       p.setHeroHp('brannoc', 20);
       p.setPosition(4, 2, 1);
       p.openDoor(4, 2);
-      const slime = p.combatMonsters().find((m) => m.kind === 'slime');
-      if (slime) {
-        p.setPosition(slime.x - 1, slime.y, 1);
-        p.tryMoveForward();
-        for (let i = 0; i < 8; i++) (p as unknown as { useHand: (a: string, b: string) => void }).useHand?.('brannoc', 'main');
-      }
+      p.killKind('slime');
     });
     await page.waitForTimeout(200);
     await page.evaluate(() => {
       const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-      const slime = p.combatMonsters().find((m) => m.kind === 'slime');
-      if (slime && slime.alive) {
-        (p as unknown as { finishFight?: () => void }).finishFight?.();
-      }
+      (p as unknown as { finishFight?: () => void }).finishFight?.();
       p.setPosition(1, 7, 0);
       p.saveToSlot(1);
     });
+    await rememberSaves(page);
 
     await page.locator('#btn-save').tap();
     await page.waitForTimeout(200);
@@ -267,57 +294,101 @@ test.describe('proto3d step4 title and saves', () => {
     expect(errors, 'page errors').toEqual([]);
   });
 
-  test('map state survives reload after door, secret, sconces, torch, kill, chest, item, oil, flags', async ({
-    page
-  }) => {
+  test('map state survives a reload after each Levie-list mutation', async ({ page }) => {
     mkdirSync(OUT, { recursive: true });
-    await page.addInitScript(() => localStorage.clear());
+    await keepSavesAcrossReload(page);
     await bootPlay(page, 'test=1&persist=1&debug=1');
 
-    const before = await page.evaluate(() => {
+    const aliveKinds = async () =>
+      (await mapState(page)).monsters.filter((m) => m.alive).map((m) => m.kind).sort();
+    const startAlive = await aliveKinds();
+    const startOil = (await mapState(page)).oil;
+
+    await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.openDoor(4, 2));
+    await saveReloadLoad(page);
+    expect((await mapState(page)).doors.find((d) => d.x === 4 && d.y === 2)?.open).toBe(true);
+    expect(await aliveKinds()).toEqual(startAlive);
+
+    await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.openSecret(5, 1));
+    await saveReloadLoad(page);
+    const afterSecret = await mapState(page);
+    expect(afterSecret.secrets.find((s) => s.x === 5 && s.y === 1)?.open).toBe(true);
+    expect(afterSecret.doors.find((d) => d.x === 4 && d.y === 2)?.open).toBe(true);
+    expect(afterSecret.flags).toEqual(expect.arrayContaining(['secret_found']));
+
+    await page.evaluate(() => {
       const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-      p.openDoor(4, 2);
-      p.openSecret(5, 1);
       p.setPosition(1, 6, 3);
       p.snuffFacing();
-      p.setPosition(5, 7, 2);
-      p.fillChest(5, 7, ['potion_red']);
-      p.pickupFacing();
-      p.setPosition(5, 6, 0);
-      p.pickupHere();
-      p.setOil(3);
-      p.addFlag('note_lampkeeper');
-      const rat = p.combatMonsters().find((m) => m.kind === 'keep_rat');
-      if (rat) {
-        (p as unknown as { combat?: { monsters: Array<{ kind: string; alive: boolean; hp: number }> } }).combat;
-      }
-      p.setPosition(9, 1, 1);
-      p.tryMoveForward();
-      const api = p as unknown as { useHand: (a: string, b: string) => void; finishFight: () => void };
-      for (let i = 0; i < 12; i++) api.useHand('brannoc', 'main');
-      api.finishFight();
-      p.setPosition(2, 7, 0);
-      p.saveToSlot(2);
-      return p.mapState();
     });
+    await saveReloadLoad(page);
+    const afterSnuff = await mapState(page);
+    const snuffed = afterSnuff.sconces.find((s) => s.x === 0 && s.y === 6);
+    expect(snuffed?.lit).toBe(false);
+    expect(snuffed?.empty).toBe(false);
 
-    await page.reload();
-    await bootPlay(page, 'test=1&persist=1&debug=1');
-    const after = await page.evaluate(() => {
+    await page.evaluate(() => {
       const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-      p.loadFromSlot(2);
-      return p.mapState();
+      p.setHand('brannoc', 'off', 'empty_hand');
+      p.setPosition(6, 5, 0);
+      p.takeFacingTorch();
     });
+    await saveReloadLoad(page);
+    const afterTake = await mapState(page);
+    const emptied = afterTake.sconces.find((s) => s.x === 6 && s.y === 4);
+    expect(emptied?.lit).toBe(false);
+    expect(emptied?.empty).toBe(true);
+    expect(afterTake.carried?.lit || afterTake.bag.some((s) => s.item === 'torch_lit')).toBeTruthy();
+    expect(snuffed && afterTake.sconces.find((s) => s.x === 0 && s.y === 6)?.lit).toBe(false);
 
-    expect(after.doors.find((d) => d.x === 4 && d.y === 2)?.open).toBe(true);
-    expect(after.secrets.find((s) => s.x === 5 && s.y === 1)?.open).toBe(true);
-    expect(after.chests.find((c) => c.x === 5 && c.y === 7)?.open).toBe(true);
-    expect(after.oil).toBe(before.oil);
-    expect(after.bag.some((s) => s.item === 'potion_red' || s.item === 'oil_flask')).toBe(true);
-    expect(after.flags).toEqual(expect.arrayContaining(['secret_found', 'note_lampkeeper']));
-    expect(after.items.find((i) => i.x === 5 && i.y === 1)?.item == null || after.secrets[0].open).toBeTruthy();
-    const deadRat = after.monsters.find((m) => m.kind === 'keep_rat' && !m.alive);
-    expect(deadRat || after.monsters.some((m) => !m.alive)).toBeTruthy();
-    expect(after.sconces.some((s) => !s.lit)).toBe(true);
+    await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.killKind('keep_rat'));
+    await saveReloadLoad(page);
+    const afterKill = await mapState(page);
+    expect(afterKill.monsters.filter((m) => m.kind === 'keep_rat').some((m) => !m.alive)).toBe(true);
+    expect(afterKill.monsters.filter((m) => m.kind === 'keep_rat' && m.alive).length).toBeLessThan(
+      startAlive.filter((k) => k === 'keep_rat').length
+    );
+    expect(afterKill.monsters.find((m) => m.kind === 'slime')?.alive).toBe(true);
+
+    await page.evaluate(() => {
+      const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+      p.fillChest(5, 7, ['potion_red']);
+      p.setPosition(5, 6, 2);
+      p.pickupFacing();
+    });
+    await saveReloadLoad(page);
+    const afterChest = await mapState(page);
+    expect(afterChest.chests.find((c) => c.x === 5 && c.y === 7)?.open).toBe(true);
+    expect(afterChest.chests.find((c) => c.x === 5 && c.y === 7)?.loot ?? []).toEqual([]);
+    expect(afterChest.bag.some((s) => s.item === 'potion_red')).toBe(true);
+
+    await page.evaluate(() => {
+      const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+      p.setPosition(6, 6, 0);
+      p.pickupHere();
+    });
+    await saveReloadLoad(page);
+    const afterItem = await mapState(page);
+    expect(afterItem.items.find((i) => i.x === 6 && i.y === 6)?.item ?? null).toBeNull();
+    expect(afterItem.bag.some((s) => s.item === 'oil_flask')).toBe(true);
+
+    await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.setOil(3));
+    await saveReloadLoad(page);
+    const afterOil = await mapState(page);
+    expect(afterOil.oil).toBe(3);
+    expect(afterOil.oil).not.toBe(startOil);
+
+    await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.addFlag('note_lampkeeper'));
+    await saveReloadLoad(page);
+    const afterFlags = await mapState(page);
+    expect(afterFlags.flags).toEqual(expect.arrayContaining(['secret_found', 'note_lampkeeper']));
+    expect(afterFlags.doors.find((d) => d.x === 4 && d.y === 2)?.open).toBe(true);
+    expect(afterFlags.secrets.find((s) => s.x === 5 && s.y === 1)?.open).toBe(true);
+    expect(afterFlags.chests.find((c) => c.x === 5 && c.y === 7)?.open).toBe(true);
+    expect(afterFlags.items.find((i) => i.x === 6 && i.y === 6)?.item ?? null).toBeNull();
+    expect(afterFlags.sconces.find((s) => s.x === 0 && s.y === 6)?.lit).toBe(false);
+    expect(afterFlags.sconces.find((s) => s.x === 6 && s.y === 4)?.empty).toBe(true);
+    expect(afterFlags.monsters.filter((m) => m.kind === 'keep_rat').some((m) => !m.alive)).toBe(true);
+    expect(afterFlags.oil).toBe(3);
   });
 });

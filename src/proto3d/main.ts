@@ -892,6 +892,8 @@ class Game {
       const def = FLOOR_SCONCE_DEFAULTS.find((d) => d.x === s.x && d.y === s.y && d.face === s.face);
       if (!def || s.capped) continue;
       s.lit = def.lit;
+      s.empty = !!def.empty;
+      this.torches?.syncFromSconce(s);
     }
     this.oil = OIL_START;
   }
@@ -1307,7 +1309,8 @@ class Game {
     for (let y = 0; y < floor1.height; y++) {
       for (let x = 0; x < floor1.width; x++) {
         const tile = floor1.tiles[y][x];
-        if (!tile.door && !tile.secret && !tile.chest && !tile.item) continue;
+        const snap = this.tileSnap[y * floor1.width + x];
+        if (!tile.door && !tile.secret && !tile.chest && !tile.item && !snap?.item && !snap?.chest) continue;
         tiles.push({
           x,
           y,
@@ -1315,7 +1318,7 @@ class Game {
           doorLocked: tile.doorLocked,
           secretOpen: tile.secretOpen,
           chestOpen: tile.chestOpen,
-          chestItems: tile.chestItems ? [...tile.chestItems] : undefined,
+          chestItems: tile.chestItems ? [...tile.chestItems] : tile.chestItems,
           item: tile.item ?? null
         });
       }
@@ -1365,7 +1368,7 @@ class Game {
       if (t.item === null) tile.item = undefined;
       else if (t.item !== undefined) tile.item = t.item;
       if (t.chestOpen !== undefined) tile.chestOpen = t.chestOpen;
-      if (t.chestItems) tile.chestItems = [...t.chestItems];
+      if (t.chestItems !== undefined) tile.chestItems = [...t.chestItems];
       if (t.doorOpen !== undefined) {
         tile.doorOpen = t.doorOpen;
         const visual = this.sceneBuilder.doors.get(t.x, t.y);
@@ -2017,9 +2020,20 @@ class Game {
       bubbleVisible: () => !!this.bubble?.visible,
       flags: () => [...this.flags],
       addFlag: (f: string) => this.flags.add(f),
+      persistCalled: () => !!(globalThis as { __proto3dPersistCalled?: boolean }).__proto3dPersistCalled,
+      killKind: (kind: string) => {
+        const m = this.combat.monsters.find((x) => x.kind === kind && x.alive);
+        if (!m) return false;
+        m.alive = false;
+        m.hp = 0;
+        m.deadAt = 1;
+        this.spriteManager.hideDeadMonsterId(m.id);
+        return true;
+      },
       mapState: () => ({
         oil: this.oil,
         bag: this.bag.serialize(),
+        carried: this.hud.carriedTorch(),
         position: { x: this.player.x, y: this.player.y, dir: this.player.dir },
         doors: this.tileSnap
           .filter((t) => floor1.tiles[t.y][t.x].door)

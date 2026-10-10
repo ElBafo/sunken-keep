@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { wrapFontLine } from '../src/proto3d/font5x7';
-import { formatPlayTime, parseSave, SAVE_VERSION } from '../src/proto3d/saves';
+import { formatPlayTime, parseSave, persistStorage, SAVE_VERSION } from '../src/proto3d/saves';
 
 describe('wrapFontLine', () => {
   it('wraps long log lines instead of clipping', () => {
@@ -21,5 +21,17 @@ describe('save version', () => {
   it('formats play time', () => {
     expect(formatPlayTime(90_000)).toBe('1m');
     expect(formatPlayTime(3_600_000 + 120_000)).toBe('1h 2m');
+  });
+});
+
+describe('persistStorage', () => {
+  it('calls navigator.storage.persist when available', () => {
+    const persist = vi.fn().mockResolvedValue(true);
+    Object.defineProperty(globalThis, 'navigator', {
+      configurable: true,
+      value: { storage: { persist } }
+    });
+    persistStorage();
+    expect(persist).toHaveBeenCalled();
   });
 });
