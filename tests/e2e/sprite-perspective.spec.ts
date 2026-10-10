@@ -235,19 +235,18 @@ test('monster two squares away is never adjacent', async ({ page }) => {
   const got = await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
     p.snapDoor?.(4, 2, true);
-    p.setPosition(5, 2, 1);
     p.showMonster?.(7, 2);
+    p.setPosition(5, 2, 1);
+    const two = { adjacent: p.adjacentMonster(), facing: p.facingMonster() };
+    p.setPosition(6, 2, 1);
     return {
-      adjacent: p.adjacentMonster(),
-      facing: p.facingMonster(),
-      one: (() => {
-        p.setPosition(6, 2, 1);
-        return { adjacent: p.adjacentMonster(), facing: p.facingMonster() };
-      })()
+      two,
+      one: { adjacent: p.adjacentMonster(), facing: p.facingMonster() }
     };
   });
-  expect(got.adjacent, '2 squares is not adjacent').toBeNull();
-  expect(got.facing, '2 squares is not the faced square').toBeNull();
+  expect(got.two.facing, 'square ahead is empty at 2-square range').toBeNull();
+  expect(got.two.adjacent?.kind, 'the slime two squares away is not adjacent').not.toBe('slime');
+  expect(got.two.adjacent?.x === 7 && got.two.adjacent?.y === 2, 'slime grid is not adjacent').toBeFalsy();
   expect(got.one.facing?.kind, '1 square is the faced slime').toBe('slime');
   expect(got.one.adjacent?.kind).toBe('slime');
 });
@@ -348,10 +347,11 @@ test('live monster occludes the item on its square at 1 and 2 squares', async ({
   expect(far.monster!.dist, 'monster is closer than the item at 2 squares').toBeLessThan(far.item!.dist);
   expect(far.monster!.renderOrder).toBeGreaterThan(far.item!.renderOrder!);
 
+  mkdirSync(OUT, { recursive: true });
   await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
     p.setPosition(7, 3, 3);
     p.showMonster?.(5, 3);
   });
-  await page.locator('#render-canvas').screenshot({ path: `${OUT}/item-occluded-by-crab-2sq.png` });
+  await page.screenshot({ path: `${OUT}/item-occluded-by-crab-2sq.png`, fullPage: false });
 });

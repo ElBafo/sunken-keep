@@ -195,7 +195,7 @@ test('proto3d step3 inventory: pickup, chest loot-all, bag, potions, key, oil, g
   expect(save.bag).toBeTruthy();
   expect(save.equipment).toBeTruthy();
 
-  // Slime at (7,2): centre of its square, 1× world height (no adjacent 2× pull)
+  // Slime at (7,2): quarter-square toward the party, 1× world height (no adjacent 2× pull)
   await page.evaluate(() => {
     const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
     proto.setAdjacentScale(2);
@@ -209,8 +209,8 @@ test('proto3d step3 inventory: pickup, chest loot-all, bag, potions, key, oil, g
   });
   expect(after, 'slime sprite present').toBeTruthy();
   expect(after!.scaleY / after!.baseH, 'no adjacent 2× scale').toBeCloseTo(1, 5);
-  expect(after!.worldX, 'slime stands at square centre').toBeCloseTo(7 * 2, 5);
-  expect(after!.worldZ, 'slime stands at square centre').toBeCloseTo(2 * 2, 5);
+  expect(after!.worldX, 'slime drawn a quarter square toward the party').toBeCloseTo(13.5, 5);
+  expect(after!.worldZ, 'slime stays on its grid row').toBeCloseTo(2 * 2, 5);
 
   const listen = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.listenerPose());
   expect(listen.x, 'listener on party square centre').toBeCloseTo(6 * 2, 5);
