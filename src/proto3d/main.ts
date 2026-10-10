@@ -115,13 +115,16 @@ class Game {
     this.renderer = new PixelRenderer(canvas, layout.view[2], layout.view[3]);
     await this.renderer.loadPalette();
     if (params.get('palette') === '0') this.renderer.setPaletteEnabled(false);
+    const fpsEl = document.getElementById('fps-counter');
     if (params.get('debug') === '1') {
-      const el = document.createElement('div');
+      const el = fpsEl ?? document.createElement('div');
       el.id = 'fps-counter';
       el.textContent = 'FPS: --';
       el.style.display = 'block';
-      document.body.appendChild(el);
+      if (!fpsEl) document.body.appendChild(el);
       this.fpsCounter = el;
+    } else if (fpsEl) {
+      fpsEl.remove();
     }
 
     this.atmosphere = new Atmosphere(this.quality);
@@ -1272,16 +1275,26 @@ class Game {
         })),
       spriteScreen: (kind: 'monster' | 'item', x: number, y: number) => {
         this.spriteManager.layoutBillboards(this.player.x, this.player.y, this.player.dir);
-        this.renderer.render();
+        const cam = this.renderer.camera;
+        const [vw, vh] = CAMERA_SPEC.view as [number, number];
+        const prevAspect = cam.aspect;
+        cam.aspect = vw / vh;
+        cam.updateProjectionMatrix();
         const s = this.spriteManager.sprites.find((sp) => sp.kind === kind && sp.x === x && sp.y === y && !sp.hidden);
-        if (!s) return null;
-        return {
-          ...this.spriteManager.screenRect(s, this.renderer.canvas.width, this.renderer.canvas.height),
-          gridX: s.x,
-          gridY: s.y,
-          player: { x: this.player.x, y: this.player.y, dir: this.player.dir },
-          lods: s.lodSets ? Object.keys(s.lodSets) : []
-        };
+        const rect = s
+          ? {
+              ...this.spriteManager.screenRect(s, vw, vh),
+              gridX: s.x,
+              gridY: s.y,
+              player: { x: this.player.x, y: this.player.y, dir: this.player.dir },
+              lods: s.lodSets ? Object.keys(s.lodSets) : [],
+              view: [vw, vh] as [number, number]
+            }
+          : null;
+        cam.aspect = prevAspect;
+        cam.updateProjectionMatrix();
+        this.renderer.render();
+        return rect;
       },
       cameraSpec: () => CAMERA_SPEC,
       showMonster: (x: number, y: number) => {

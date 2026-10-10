@@ -29,7 +29,7 @@ type Proto3d = {
 test.use(devices['iPhone 15']);
 
 async function boot(page: import('@playwright/test').Page) {
-  await page.goto(`${BASE_URL}/proto3d.html?test=1&debug=1&bright=1.6`);
+  await page.goto(`${BASE_URL}/proto3d.html?test=1&bright=1.6`);
   await page.waitForFunction(
     () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
     null,
@@ -37,6 +37,7 @@ async function boot(page: import('@playwright/test').Page) {
   );
   await page.locator('#tap-to-start').tap();
   await page.waitForTimeout(400);
+  await expect(page.locator('#fps-counter')).toHaveCount(0);
 }
 
 async function measure(
@@ -121,13 +122,31 @@ test('slime size grows smoothly at 3 / 2 / 1 squares; approach-independent', asy
   const backToTwo = await measure(page, 5, 2, 1, 'monster', 7, 2);
   expect(backToTwo!.height, 'size at 2 squares is the same after stepping away').toBeCloseTo(mid!.height, 1);
 
-  const rat = await measure(page, 6, 5, 1, 'monster', 7, 5);
+  const rat1 = await measure(page, 6, 5, 1, 'monster', 7, 5);
   await page.locator('#render-canvas').screenshot({ path: `${OUT}/rat-1-square.png` });
-  expect(rat, 'keep_rat at 1 square').toBeTruthy();
-  expect(rat!.lod).toBe('close');
-  expect(rat!.scaleY, 'rat is much shorter than the slime').toBeLessThan(near!.scaleY * 0.55);
-  expect(rat!.worldX).toBeCloseTo(14, 5);
-  expect(rat!.worldZ).toBeCloseTo(10, 5);
+  const rat2 = await measure(page, 5, 5, 1, 'monster', 7, 5);
+  const rat3 = await measure(page, 4, 5, 1, 'monster', 7, 5);
+  const rat4 = await measure(page, 3, 5, 1, 'monster', 7, 5);
+  expect(rat1, 'keep_rat at 1 square').toBeTruthy();
+  expect(rat1!.lod).toBe('close');
+  expect(rat1!.scaleY, 'rat is much shorter than the slime').toBeLessThan(near!.scaleY * 0.55);
+  expect(rat1!.worldX).toBeCloseTo(14, 5);
+  expect(rat1!.worldZ).toBeCloseTo(10, 5);
+  const ratHeights = [rat1!, rat2!, rat3!, rat4!].map((r) => Math.round(r.height));
+  console.log('RAT_HEIGHTS_1_2_3_4', ratHeights, [rat1, rat2, rat3, rat4].map((r) => r && { h: r.height, lod: r.lod, scaleY: r.scaleY }));
+  expect(ratHeights, 'rat on-screen height at 1/2/3/4 squares').toEqual([37, 22, 16, 13]);
+
+  const crab1 = await measure(page, 6, 3, 3, 'monster', 5, 3);
+  await page.locator('#render-canvas').screenshot({ path: `${OUT}/crab-1-square.png` });
+  const crab2 = await measure(page, 7, 3, 3, 'monster', 5, 3);
+  const crab3 = await measure(page, 8, 3, 3, 'monster', 5, 3);
+  const crab4 = await measure(page, 9, 3, 3, 'monster', 5, 3);
+  expect(crab1, 'rust_crab at 1 square').toBeTruthy();
+  expect(crab1!.lod).toBe('close');
+  expect(crab1!.scaleY, 'crab world height is 0.35 walls').toBeCloseTo(0.7, 5);
+  const crabHeights = [crab1!, crab2!, crab3!, crab4!].map((r) => Math.round(r.height));
+  console.log('CRAB_HEIGHTS_1_2_3_4', crabHeights, [crab1, crab2, crab3, crab4].map((r) => r && { h: r.height, lod: r.lod, scaleY: r.scaleY }));
+  expect(crabHeights, 'crab on-screen height at 1/2/3/4 squares').toEqual([52, 31, 23, 18]);
 
   await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.setPosition(6, 2, 1));
   await page.locator('#render-canvas').screenshot({ path: `${OUT}/slime-1-square-again.png` });

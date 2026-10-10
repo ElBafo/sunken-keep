@@ -42,7 +42,7 @@
       "counter": "kill it first; Mags's speed"
     },
     "size": {
-      "worldHeight": 0.2
+      "worldHeight": 0.25
     }
   },
   "rust_crab": {
@@ -66,7 +66,7 @@
       ]
     },
     "size": {
-      "worldHeight": 0.3
+      "worldHeight": 0.35
     }
   },
   "slime": {

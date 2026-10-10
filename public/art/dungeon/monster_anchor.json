@@ -1858,18 +1858,18 @@
   "rerun": "When camera.json lands: python3 build_monsters_v2.py --camera <path> && python3 build_monster_anchor.py && python3 ../preview/build_monsters_v2_preview.py",
   "monsters": {
    "keep_rat": {
-    "worldHeight": 0.2,
+    "worldHeight": 0.25,
     "worldHeightSource": "levels/monsters.json",
     "close": {
      "squares": 1,
      "px": [
-      37,
-      30
+      42,
+      37
      ],
-     "exactPx": 29.7,
+     "exactPx": 37.13,
      "quadWorld": [
-      0.4933,
-      0.4
+      0.5676,
+      0.5
      ],
      "feetShifted": {},
      "rimLight": false
@@ -1877,13 +1877,13 @@
     "near": {
      "squares": 2,
      "px": [
-      23,
-      18
+      27,
+      22
      ],
-     "exactPx": 17.95,
+     "exactPx": 22.44,
      "quadWorld": [
-      0.5111,
-      0.4
+      0.6136,
+      0.5
      ],
      "feetShifted": {},
      "rimLight": true
@@ -1891,13 +1891,13 @@
     "mid": {
      "squares": 3,
      "px": [
-      17,
-      13
+      20,
+      16
      ],
-     "exactPx": 12.86,
+     "exactPx": 16.08,
      "quadWorld": [
-      0.5231,
-      0.4
+      0.625,
+      0.5
      ],
      "feetShifted": {},
      "rimLight": true
@@ -1905,31 +1905,31 @@
     "far": {
      "squares": 4,
      "px": [
-      12,
-      10
+      17,
+      13
      ],
-     "exactPx": 10.02,
+     "exactPx": 12.53,
      "quadWorld": [
-      0.48,
-      0.4
+      0.6538,
+      0.5
      ],
      "feetShifted": {},
      "rimLight": true
     }
    },
    "rust_crab": {
-    "worldHeight": 0.3,
+    "worldHeight": 0.35,
     "worldHeightSource": "levels/monsters.json",
     "close": {
      "squares": 1,
      "px": [
-      68,
-      45
+      77,
+      52
      ],
-     "exactPx": 44.55,
+     "exactPx": 51.98,
      "quadWorld": [
-      0.9067,
-      0.6
+      1.0365,
+      0.7
      ],
      "feetShifted": {},
      "rimLight": false
@@ -1937,13 +1937,13 @@
     "near": {
      "squares": 2,
      "px": [
-      43,
-      27
+      49,
+      31
      ],
-     "exactPx": 26.93,
+     "exactPx": 31.41,
      "quadWorld": [
-      0.9556,
-      0.6
+      1.1065,
+      0.7
      ],
      "feetShifted": {},
      "rimLight": false
@@ -1951,32 +1951,32 @@
     "mid": {
      "squares": 3,
      "px": [
-      31,
-      19
+      37,
+      23
      ],
-     "exactPx": 19.29,
+     "exactPx": 22.51,
      "quadWorld": [
-      0.9789,
-      0.6
+      1.1261,
+      0.7
      ],
      "feetShifted": {
-      "hurt_1": 1
+      "idle_4": 1
      },
      "rimLight": true
     },
     "far": {
      "squares": 4,
      "px": [
-      26,
-      15
+      29,
+      18
      ],
-     "exactPx": 15.03,
+     "exactPx": 17.54,
      "quadWorld": [
-      1.04,
-      0.6
+      1.1278,
+      0.7
      ],
      "feetShifted": {
-      "idle_3": 1,
+      "attack_2": 1,
       "hurt_1": 1
      },
      "rimLight": true
@@ -2105,732 +2105,732 @@
   },
   "files": {
    "keep_rat_attack_1_close.png": {
-    "imageW": 37,
-    "imageH": 30,
-    "footRow": 29,
+    "imageW": 42,
+    "imageH": 37,
+    "footRow": 36,
     "gapBelow": 0,
-    "topRow": 5
+    "topRow": 7
    },
    "keep_rat_attack_1_far.png": {
-    "imageW": 12,
-    "imageH": 10,
-    "footRow": 9,
+    "imageW": 17,
+    "imageH": 13,
+    "footRow": 12,
     "gapBelow": 0,
     "topRow": 2
    },
    "keep_rat_attack_1_mid.png": {
-    "imageW": 17,
-    "imageH": 13,
-    "footRow": 12,
-    "gapBelow": 0,
-    "topRow": 2
-   },
-   "keep_rat_attack_1_near.png": {
-    "imageW": 23,
-    "imageH": 18,
-    "footRow": 17,
+    "imageW": 20,
+    "imageH": 16,
+    "footRow": 15,
     "gapBelow": 0,
     "topRow": 3
    },
+   "keep_rat_attack_1_near.png": {
+    "imageW": 27,
+    "imageH": 22,
+    "footRow": 21,
+    "gapBelow": 0,
+    "topRow": 4
+   },
    "keep_rat_attack_2_close.png": {
-    "imageW": 37,
-    "imageH": 30,
-    "footRow": 29,
+    "imageW": 42,
+    "imageH": 37,
+    "footRow": 36,
     "gapBelow": 0,
     "topRow": 0
    },
    "keep_rat_attack_2_far.png": {
-    "imageW": 12,
-    "imageH": 10,
-    "footRow": 9,
+    "imageW": 17,
+    "imageH": 13,
+    "footRow": 12,
     "gapBelow": 0,
     "topRow": 0
    },
    "keep_rat_attack_2_mid.png": {
-    "imageW": 17,
-    "imageH": 13,
-    "footRow": 12,
+    "imageW": 20,
+    "imageH": 16,
+    "footRow": 15,
     "gapBelow": 0,
     "topRow": 0
    },
    "keep_rat_attack_2_near.png": {
-    "imageW": 23,
-    "imageH": 18,
-    "footRow": 17,
+    "imageW": 27,
+    "imageH": 22,
+    "footRow": 21,
     "gapBelow": 0,
     "topRow": 0
    },
    "keep_rat_attack_3_close.png": {
-    "imageW": 37,
-    "imageH": 30,
-    "footRow": 29,
+    "imageW": 42,
+    "imageH": 37,
+    "footRow": 36,
     "gapBelow": 0,
-    "topRow": 2
+    "topRow": 3
    },
    "keep_rat_attack_3_far.png": {
-    "imageW": 12,
-    "imageH": 10,
-    "footRow": 9,
+    "imageW": 17,
+    "imageH": 13,
+    "footRow": 12,
     "gapBelow": 0,
     "topRow": 1
    },
    "keep_rat_attack_3_mid.png": {
-    "imageW": 17,
-    "imageH": 13,
-    "footRow": 12,
+    "imageW": 20,
+    "imageH": 16,
+    "footRow": 15,
     "gapBelow": 0,
     "topRow": 1
    },
    "keep_rat_attack_3_near.png": {
-    "imageW": 23,
-    "imageH": 18,
-    "footRow": 17,
+    "imageW": 27,
+    "imageH": 22,
+    "footRow": 21,
     "gapBelow": 0,
     "topRow": 1
    },
    "keep_rat_close.png": {
-    "imageW": 37,
-    "imageH": 30,
-    "footRow": 29,
+    "imageW": 42,
+    "imageH": 37,
+    "footRow": 36,
     "gapBelow": 0,
-    "topRow": 3
+    "topRow": 4
    },
    "keep_rat_death_1_close.png": {
-    "imageW": 37,
-    "imageH": 30,
-    "footRow": 29,
+    "imageW": 42,
+    "imageH": 37,
+    "footRow": 36,
     "gapBelow": 0,
-    "topRow": 6
+    "topRow": 7
    },
    "keep_rat_death_1_far.png": {
-    "imageW": 12,
-    "imageH": 10,
-    "footRow": 9,
+    "imageW": 17,
+    "imageH": 13,
+    "footRow": 12,
     "gapBelow": 0,
     "topRow": 2
    },
    "keep_rat_death_1_mid.png": {
-    "imageW": 17,
-    "imageH": 13,
-    "footRow": 12,
-    "gapBelow": 0,
-    "topRow": 2
-   },
-   "keep_rat_death_1_near.png": {
-    "imageW": 23,
-    "imageH": 18,
-    "footRow": 17,
+    "imageW": 20,
+    "imageH": 16,
+    "footRow": 15,
     "gapBelow": 0,
     "topRow": 3
    },
-   "keep_rat_death_2_close.png": {
-    "imageW": 37,
-    "imageH": 30,
-    "footRow": 29,
-    "gapBelow": 0,
-    "topRow": 13
-   },
-   "keep_rat_death_2_far.png": {
-    "imageW": 12,
-    "imageH": 10,
-    "footRow": 9,
+   "keep_rat_death_1_near.png": {
+    "imageW": 27,
+    "imageH": 22,
+    "footRow": 21,
     "gapBelow": 0,
     "topRow": 4
    },
-   "keep_rat_death_2_mid.png": {
+   "keep_rat_death_2_close.png": {
+    "imageW": 42,
+    "imageH": 37,
+    "footRow": 36,
+    "gapBelow": 0,
+    "topRow": 16
+   },
+   "keep_rat_death_2_far.png": {
     "imageW": 17,
     "imageH": 13,
     "footRow": 12,
     "gapBelow": 0,
     "topRow": 6
    },
-   "keep_rat_death_2_near.png": {
-    "imageW": 23,
-    "imageH": 18,
-    "footRow": 17,
-    "gapBelow": 0,
-    "topRow": 8
-   },
-   "keep_rat_death_3_close.png": {
-    "imageW": 37,
-    "imageH": 30,
-    "footRow": 29,
-    "gapBelow": 0,
-    "topRow": 20
-   },
-   "keep_rat_death_3_far.png": {
-    "imageW": 12,
-    "imageH": 10,
-    "footRow": 9,
+   "keep_rat_death_2_mid.png": {
+    "imageW": 20,
+    "imageH": 16,
+    "footRow": 15,
     "gapBelow": 0,
     "topRow": 7
    },
-   "keep_rat_death_3_mid.png": {
+   "keep_rat_death_2_near.png": {
+    "imageW": 27,
+    "imageH": 22,
+    "footRow": 21,
+    "gapBelow": 0,
+    "topRow": 9
+   },
+   "keep_rat_death_3_close.png": {
+    "imageW": 42,
+    "imageH": 37,
+    "footRow": 36,
+    "gapBelow": 0,
+    "topRow": 25
+   },
+   "keep_rat_death_3_far.png": {
     "imageW": 17,
     "imageH": 13,
     "footRow": 12,
     "gapBelow": 0,
     "topRow": 9
    },
-   "keep_rat_death_3_near.png": {
-    "imageW": 23,
-    "imageH": 18,
-    "footRow": 17,
+   "keep_rat_death_3_mid.png": {
+    "imageW": 20,
+    "imageH": 16,
+    "footRow": 15,
     "gapBelow": 0,
-    "topRow": 12
+    "topRow": 11
+   },
+   "keep_rat_death_3_near.png": {
+    "imageW": 27,
+    "imageH": 22,
+    "footRow": 21,
+    "gapBelow": 0,
+    "topRow": 15
    },
    "keep_rat_death_4_close.png": {
-    "imageW": 37,
-    "imageH": 30,
-    "footRow": 29,
+    "imageW": 42,
+    "imageH": 37,
+    "footRow": 36,
     "gapBelow": 0,
-    "topRow": 27
+    "topRow": 33
    },
    "keep_rat_death_4_far.png": {
-    "imageW": 12,
-    "imageH": 10,
-    "footRow": 9,
-    "gapBelow": 0,
-    "topRow": 8
-   },
-   "keep_rat_death_4_mid.png": {
     "imageW": 17,
     "imageH": 13,
     "footRow": 12,
     "gapBelow": 0,
     "topRow": 11
    },
+   "keep_rat_death_4_mid.png": {
+    "imageW": 20,
+    "imageH": 16,
+    "footRow": 15,
+    "gapBelow": 0,
+    "topRow": 14
+   },
    "keep_rat_death_4_near.png": {
-    "imageW": 23,
+    "imageW": 27,
+    "imageH": 22,
+    "footRow": 21,
+    "gapBelow": 0,
+    "topRow": 20
+   },
+   "keep_rat_far.png": {
+    "imageW": 17,
+    "imageH": 13,
+    "footRow": 12,
+    "gapBelow": 0,
+    "topRow": 1
+   },
+   "keep_rat_hurt_1_close.png": {
+    "imageW": 42,
+    "imageH": 37,
+    "footRow": 36,
+    "gapBelow": 0,
+    "topRow": 5
+   },
+   "keep_rat_hurt_1_far.png": {
+    "imageW": 17,
+    "imageH": 13,
+    "footRow": 12,
+    "gapBelow": 0,
+    "topRow": 2
+   },
+   "keep_rat_hurt_1_mid.png": {
+    "imageW": 20,
+    "imageH": 16,
+    "footRow": 15,
+    "gapBelow": 0,
+    "topRow": 2
+   },
+   "keep_rat_hurt_1_near.png": {
+    "imageW": 27,
+    "imageH": 22,
+    "footRow": 21,
+    "gapBelow": 0,
+    "topRow": 3
+   },
+   "keep_rat_idle_1_close.png": {
+    "imageW": 42,
+    "imageH": 37,
+    "footRow": 36,
+    "gapBelow": 0,
+    "topRow": 4
+   },
+   "keep_rat_idle_1_far.png": {
+    "imageW": 17,
+    "imageH": 13,
+    "footRow": 12,
+    "gapBelow": 0,
+    "topRow": 1
+   },
+   "keep_rat_idle_1_mid.png": {
+    "imageW": 20,
+    "imageH": 16,
+    "footRow": 15,
+    "gapBelow": 0,
+    "topRow": 2
+   },
+   "keep_rat_idle_1_near.png": {
+    "imageW": 27,
+    "imageH": 22,
+    "footRow": 21,
+    "gapBelow": 0,
+    "topRow": 2
+   },
+   "keep_rat_idle_2_close.png": {
+    "imageW": 42,
+    "imageH": 37,
+    "footRow": 36,
+    "gapBelow": 0,
+    "topRow": 5
+   },
+   "keep_rat_idle_2_far.png": {
+    "imageW": 17,
+    "imageH": 13,
+    "footRow": 12,
+    "gapBelow": 0,
+    "topRow": 2
+   },
+   "keep_rat_idle_2_mid.png": {
+    "imageW": 20,
+    "imageH": 16,
+    "footRow": 15,
+    "gapBelow": 0,
+    "topRow": 2
+   },
+   "keep_rat_idle_2_near.png": {
+    "imageW": 27,
+    "imageH": 22,
+    "footRow": 21,
+    "gapBelow": 0,
+    "topRow": 3
+   },
+   "keep_rat_idle_3_close.png": {
+    "imageW": 42,
+    "imageH": 37,
+    "footRow": 36,
+    "gapBelow": 0,
+    "topRow": 4
+   },
+   "keep_rat_idle_3_far.png": {
+    "imageW": 17,
+    "imageH": 13,
+    "footRow": 12,
+    "gapBelow": 0,
+    "topRow": 1
+   },
+   "keep_rat_idle_3_mid.png": {
+    "imageW": 20,
+    "imageH": 16,
+    "footRow": 15,
+    "gapBelow": 0,
+    "topRow": 2
+   },
+   "keep_rat_idle_3_near.png": {
+    "imageW": 27,
+    "imageH": 22,
+    "footRow": 21,
+    "gapBelow": 0,
+    "topRow": 2
+   },
+   "keep_rat_idle_4_close.png": {
+    "imageW": 42,
+    "imageH": 37,
+    "footRow": 36,
+    "gapBelow": 0,
+    "topRow": 3
+   },
+   "keep_rat_idle_4_far.png": {
+    "imageW": 17,
+    "imageH": 13,
+    "footRow": 12,
+    "gapBelow": 0,
+    "topRow": 1
+   },
+   "keep_rat_idle_4_mid.png": {
+    "imageW": 20,
+    "imageH": 16,
+    "footRow": 15,
+    "gapBelow": 0,
+    "topRow": 1
+   },
+   "keep_rat_idle_4_near.png": {
+    "imageW": 27,
+    "imageH": 22,
+    "footRow": 21,
+    "gapBelow": 0,
+    "topRow": 2
+   },
+   "keep_rat_mid.png": {
+    "imageW": 20,
+    "imageH": 16,
+    "footRow": 15,
+    "gapBelow": 0,
+    "topRow": 2
+   },
+   "keep_rat_near.png": {
+    "imageW": 27,
+    "imageH": 22,
+    "footRow": 21,
+    "gapBelow": 0,
+    "topRow": 2
+   },
+   "rust_crab_attack_1_close.png": {
+    "imageW": 77,
+    "imageH": 52,
+    "footRow": 51,
+    "gapBelow": 0,
+    "topRow": 9
+   },
+   "rust_crab_attack_1_far.png": {
+    "imageW": 29,
+    "imageH": 18,
+    "footRow": 17,
+    "gapBelow": 0,
+    "topRow": 3
+   },
+   "rust_crab_attack_1_mid.png": {
+    "imageW": 37,
+    "imageH": 23,
+    "footRow": 22,
+    "gapBelow": 0,
+    "topRow": 4
+   },
+   "rust_crab_attack_1_near.png": {
+    "imageW": 49,
+    "imageH": 31,
+    "footRow": 30,
+    "gapBelow": 0,
+    "topRow": 5
+   },
+   "rust_crab_attack_2_close.png": {
+    "imageW": 77,
+    "imageH": 52,
+    "footRow": 51,
+    "gapBelow": 0,
+    "topRow": 0
+   },
+   "rust_crab_attack_2_far.png": {
+    "imageW": 29,
+    "imageH": 18,
+    "footRow": 17,
+    "gapBelow": 0,
+    "topRow": 1
+   },
+   "rust_crab_attack_2_mid.png": {
+    "imageW": 37,
+    "imageH": 23,
+    "footRow": 22,
+    "gapBelow": 0,
+    "topRow": 0
+   },
+   "rust_crab_attack_2_near.png": {
+    "imageW": 49,
+    "imageH": 31,
+    "footRow": 30,
+    "gapBelow": 0,
+    "topRow": 0
+   },
+   "rust_crab_attack_3_close.png": {
+    "imageW": 77,
+    "imageH": 52,
+    "footRow": 51,
+    "gapBelow": 0,
+    "topRow": 4
+   },
+   "rust_crab_attack_3_far.png": {
+    "imageW": 29,
+    "imageH": 18,
+    "footRow": 17,
+    "gapBelow": 0,
+    "topRow": 1
+   },
+   "rust_crab_attack_3_mid.png": {
+    "imageW": 37,
+    "imageH": 23,
+    "footRow": 22,
+    "gapBelow": 0,
+    "topRow": 2
+   },
+   "rust_crab_attack_3_near.png": {
+    "imageW": 49,
+    "imageH": 31,
+    "footRow": 30,
+    "gapBelow": 0,
+    "topRow": 2
+   },
+   "rust_crab_close.png": {
+    "imageW": 77,
+    "imageH": 52,
+    "footRow": 51,
+    "gapBelow": 0,
+    "topRow": 6
+   },
+   "rust_crab_death_1_close.png": {
+    "imageW": 77,
+    "imageH": 52,
+    "footRow": 51,
+    "gapBelow": 0,
+    "topRow": 10
+   },
+   "rust_crab_death_1_far.png": {
+    "imageW": 29,
+    "imageH": 18,
+    "footRow": 17,
+    "gapBelow": 0,
+    "topRow": 4
+   },
+   "rust_crab_death_1_mid.png": {
+    "imageW": 37,
+    "imageH": 23,
+    "footRow": 22,
+    "gapBelow": 0,
+    "topRow": 5
+   },
+   "rust_crab_death_1_near.png": {
+    "imageW": 49,
+    "imageH": 31,
+    "footRow": 30,
+    "gapBelow": 0,
+    "topRow": 6
+   },
+   "rust_crab_death_2_close.png": {
+    "imageW": 77,
+    "imageH": 52,
+    "footRow": 51,
+    "gapBelow": 0,
+    "topRow": 23
+   },
+   "rust_crab_death_2_far.png": {
+    "imageW": 29,
+    "imageH": 18,
+    "footRow": 17,
+    "gapBelow": 0,
+    "topRow": 8
+   },
+   "rust_crab_death_2_mid.png": {
+    "imageW": 37,
+    "imageH": 23,
+    "footRow": 22,
+    "gapBelow": 0,
+    "topRow": 10
+   },
+   "rust_crab_death_2_near.png": {
+    "imageW": 49,
+    "imageH": 31,
+    "footRow": 30,
+    "gapBelow": 0,
+    "topRow": 13
+   },
+   "rust_crab_death_3_close.png": {
+    "imageW": 77,
+    "imageH": 52,
+    "footRow": 51,
+    "gapBelow": 0,
+    "topRow": 35
+   },
+   "rust_crab_death_3_far.png": {
+    "imageW": 29,
+    "imageH": 18,
+    "footRow": 17,
+    "gapBelow": 0,
+    "topRow": 12
+   },
+   "rust_crab_death_3_mid.png": {
+    "imageW": 37,
+    "imageH": 23,
+    "footRow": 22,
+    "gapBelow": 0,
+    "topRow": 16
+   },
+   "rust_crab_death_3_near.png": {
+    "imageW": 49,
+    "imageH": 31,
+    "footRow": 30,
+    "gapBelow": 0,
+    "topRow": 21
+   },
+   "rust_crab_death_4_close.png": {
+    "imageW": 77,
+    "imageH": 52,
+    "footRow": 51,
+    "gapBelow": 0,
+    "topRow": 47
+   },
+   "rust_crab_death_4_far.png": {
+    "imageW": 29,
     "imageH": 18,
     "footRow": 17,
     "gapBelow": 0,
     "topRow": 16
    },
-   "keep_rat_far.png": {
-    "imageW": 12,
-    "imageH": 10,
-    "footRow": 9,
-    "gapBelow": 0,
-    "topRow": 1
-   },
-   "keep_rat_hurt_1_close.png": {
-    "imageW": 37,
-    "imageH": 30,
-    "footRow": 29,
-    "gapBelow": 0,
-    "topRow": 4
-   },
-   "keep_rat_hurt_1_far.png": {
-    "imageW": 12,
-    "imageH": 10,
-    "footRow": 9,
-    "gapBelow": 0,
-    "topRow": 2
-   },
-   "keep_rat_hurt_1_mid.png": {
-    "imageW": 17,
-    "imageH": 13,
-    "footRow": 12,
-    "gapBelow": 0,
-    "topRow": 2
-   },
-   "keep_rat_hurt_1_near.png": {
-    "imageW": 23,
-    "imageH": 18,
-    "footRow": 17,
-    "gapBelow": 0,
-    "topRow": 2
-   },
-   "keep_rat_idle_1_close.png": {
-    "imageW": 37,
-    "imageH": 30,
-    "footRow": 29,
-    "gapBelow": 0,
-    "topRow": 3
-   },
-   "keep_rat_idle_1_far.png": {
-    "imageW": 12,
-    "imageH": 10,
-    "footRow": 9,
-    "gapBelow": 0,
-    "topRow": 1
-   },
-   "keep_rat_idle_1_mid.png": {
-    "imageW": 17,
-    "imageH": 13,
-    "footRow": 12,
-    "gapBelow": 0,
-    "topRow": 1
-   },
-   "keep_rat_idle_1_near.png": {
-    "imageW": 23,
-    "imageH": 18,
-    "footRow": 17,
-    "gapBelow": 0,
-    "topRow": 2
-   },
-   "keep_rat_idle_2_close.png": {
-    "imageW": 37,
-    "imageH": 30,
-    "footRow": 29,
-    "gapBelow": 0,
-    "topRow": 4
-   },
-   "keep_rat_idle_2_far.png": {
-    "imageW": 12,
-    "imageH": 10,
-    "footRow": 9,
-    "gapBelow": 0,
-    "topRow": 2
-   },
-   "keep_rat_idle_2_mid.png": {
-    "imageW": 17,
-    "imageH": 13,
-    "footRow": 12,
-    "gapBelow": 0,
-    "topRow": 2
-   },
-   "keep_rat_idle_2_near.png": {
-    "imageW": 23,
-    "imageH": 18,
-    "footRow": 17,
-    "gapBelow": 0,
-    "topRow": 3
-   },
-   "keep_rat_idle_3_close.png": {
-    "imageW": 37,
-    "imageH": 30,
-    "footRow": 29,
-    "gapBelow": 0,
-    "topRow": 3
-   },
-   "keep_rat_idle_3_far.png": {
-    "imageW": 12,
-    "imageH": 10,
-    "footRow": 9,
-    "gapBelow": 0,
-    "topRow": 1
-   },
-   "keep_rat_idle_3_mid.png": {
-    "imageW": 17,
-    "imageH": 13,
-    "footRow": 12,
-    "gapBelow": 0,
-    "topRow": 1
-   },
-   "keep_rat_idle_3_near.png": {
-    "imageW": 23,
-    "imageH": 18,
-    "footRow": 17,
-    "gapBelow": 0,
-    "topRow": 2
-   },
-   "keep_rat_idle_4_close.png": {
-    "imageW": 37,
-    "imageH": 30,
-    "footRow": 29,
-    "gapBelow": 0,
-    "topRow": 3
-   },
-   "keep_rat_idle_4_far.png": {
-    "imageW": 12,
-    "imageH": 10,
-    "footRow": 9,
-    "gapBelow": 0,
-    "topRow": 1
-   },
-   "keep_rat_idle_4_mid.png": {
-    "imageW": 17,
-    "imageH": 13,
-    "footRow": 12,
-    "gapBelow": 0,
-    "topRow": 1
-   },
-   "keep_rat_idle_4_near.png": {
-    "imageW": 23,
-    "imageH": 18,
-    "footRow": 17,
-    "gapBelow": 0,
-    "topRow": 1
-   },
-   "keep_rat_mid.png": {
-    "imageW": 17,
-    "imageH": 13,
-    "footRow": 12,
-    "gapBelow": 0,
-    "topRow": 1
-   },
-   "keep_rat_near.png": {
-    "imageW": 23,
-    "imageH": 18,
-    "footRow": 17,
-    "gapBelow": 0,
-    "topRow": 2
-   },
-   "rust_crab_attack_1_close.png": {
-    "imageW": 68,
-    "imageH": 45,
-    "footRow": 44,
-    "gapBelow": 0,
-    "topRow": 8
-   },
-   "rust_crab_attack_1_far.png": {
-    "imageW": 26,
-    "imageH": 15,
-    "footRow": 14,
-    "gapBelow": 0,
-    "topRow": 3
-   },
-   "rust_crab_attack_1_mid.png": {
-    "imageW": 31,
-    "imageH": 19,
-    "footRow": 18,
-    "gapBelow": 0,
-    "topRow": 3
-   },
-   "rust_crab_attack_1_near.png": {
-    "imageW": 43,
-    "imageH": 27,
-    "footRow": 26,
-    "gapBelow": 0,
-    "topRow": 4
-   },
-   "rust_crab_attack_2_close.png": {
-    "imageW": 68,
-    "imageH": 45,
-    "footRow": 44,
-    "gapBelow": 0,
-    "topRow": 0
-   },
-   "rust_crab_attack_2_far.png": {
-    "imageW": 26,
-    "imageH": 15,
-    "footRow": 14,
-    "gapBelow": 0,
-    "topRow": 0
-   },
-   "rust_crab_attack_2_mid.png": {
-    "imageW": 31,
-    "imageH": 19,
-    "footRow": 18,
-    "gapBelow": 0,
-    "topRow": 0
-   },
-   "rust_crab_attack_2_near.png": {
-    "imageW": 43,
-    "imageH": 27,
-    "footRow": 26,
-    "gapBelow": 0,
-    "topRow": 0
-   },
-   "rust_crab_attack_3_close.png": {
-    "imageW": 68,
-    "imageH": 45,
-    "footRow": 44,
-    "gapBelow": 0,
-    "topRow": 3
-   },
-   "rust_crab_attack_3_far.png": {
-    "imageW": 26,
-    "imageH": 15,
-    "footRow": 14,
-    "gapBelow": 0,
-    "topRow": 1
-   },
-   "rust_crab_attack_3_mid.png": {
-    "imageW": 31,
-    "imageH": 19,
-    "footRow": 18,
-    "gapBelow": 0,
-    "topRow": 2
-   },
-   "rust_crab_attack_3_near.png": {
-    "imageW": 43,
-    "imageH": 27,
-    "footRow": 26,
-    "gapBelow": 0,
-    "topRow": 2
-   },
-   "rust_crab_close.png": {
-    "imageW": 68,
-    "imageH": 45,
-    "footRow": 44,
-    "gapBelow": 0,
-    "topRow": 5
-   },
-   "rust_crab_death_1_close.png": {
-    "imageW": 68,
-    "imageH": 45,
-    "footRow": 44,
-    "gapBelow": 0,
-    "topRow": 8
-   },
-   "rust_crab_death_1_far.png": {
-    "imageW": 26,
-    "imageH": 15,
-    "footRow": 14,
-    "gapBelow": 0,
-    "topRow": 3
-   },
-   "rust_crab_death_1_mid.png": {
-    "imageW": 31,
-    "imageH": 19,
-    "footRow": 18,
-    "gapBelow": 0,
-    "topRow": 4
-   },
-   "rust_crab_death_1_near.png": {
-    "imageW": 43,
-    "imageH": 27,
-    "footRow": 26,
-    "gapBelow": 0,
-    "topRow": 5
-   },
-   "rust_crab_death_2_close.png": {
-    "imageW": 68,
-    "imageH": 45,
-    "footRow": 44,
-    "gapBelow": 0,
-    "topRow": 20
-   },
-   "rust_crab_death_2_far.png": {
-    "imageW": 26,
-    "imageH": 15,
-    "footRow": 14,
-    "gapBelow": 0,
-    "topRow": 6
-   },
-   "rust_crab_death_2_mid.png": {
-    "imageW": 31,
-    "imageH": 19,
-    "footRow": 18,
-    "gapBelow": 0,
-    "topRow": 8
-   },
-   "rust_crab_death_2_near.png": {
-    "imageW": 43,
-    "imageH": 27,
-    "footRow": 26,
-    "gapBelow": 0,
-    "topRow": 12
-   },
-   "rust_crab_death_3_close.png": {
-    "imageW": 68,
-    "imageH": 45,
-    "footRow": 44,
-    "gapBelow": 0,
-    "topRow": 31
-   },
-   "rust_crab_death_3_far.png": {
-    "imageW": 26,
-    "imageH": 15,
-    "footRow": 14,
-    "gapBelow": 0,
-    "topRow": 10
-   },
-   "rust_crab_death_3_mid.png": {
-    "imageW": 31,
-    "imageH": 19,
-    "footRow": 18,
-    "gapBelow": 0,
-    "topRow": 13
-   },
-   "rust_crab_death_3_near.png": {
-    "imageW": 43,
-    "imageH": 27,
-    "footRow": 26,
-    "gapBelow": 0,
-    "topRow": 18
-   },
-   "rust_crab_death_4_close.png": {
-    "imageW": 68,
-    "imageH": 45,
-    "footRow": 44,
-    "gapBelow": 0,
-    "topRow": 41
-   },
-   "rust_crab_death_4_far.png": {
-    "imageW": 26,
-    "imageH": 15,
-    "footRow": 14,
-    "gapBelow": 0,
-    "topRow": 13
-   },
    "rust_crab_death_4_mid.png": {
-    "imageW": 31,
-    "imageH": 19,
-    "footRow": 18,
+    "imageW": 37,
+    "imageH": 23,
+    "footRow": 22,
     "gapBelow": 0,
-    "topRow": 17
+    "topRow": 21
    },
    "rust_crab_death_4_near.png": {
-    "imageW": 43,
-    "imageH": 27,
-    "footRow": 26,
+    "imageW": 49,
+    "imageH": 31,
+    "footRow": 30,
     "gapBelow": 0,
-    "topRow": 24
+    "topRow": 28
    },
    "rust_crab_far.png": {
-    "imageW": 26,
-    "imageH": 15,
-    "footRow": 14,
+    "imageW": 29,
+    "imageH": 18,
+    "footRow": 17,
     "gapBelow": 0,
     "topRow": 2
    },
    "rust_crab_hurt_1_close.png": {
-    "imageW": 68,
-    "imageH": 45,
-    "footRow": 44,
+    "imageW": 77,
+    "imageH": 52,
+    "footRow": 51,
     "gapBelow": 0,
-    "topRow": 6
+    "topRow": 7
    },
    "rust_crab_hurt_1_far.png": {
-    "imageW": 26,
-    "imageH": 15,
-    "footRow": 14,
+    "imageW": 29,
+    "imageH": 18,
+    "footRow": 17,
     "gapBelow": 0,
-    "topRow": 3
+    "topRow": 4
    },
    "rust_crab_hurt_1_mid.png": {
-    "imageW": 31,
-    "imageH": 19,
-    "footRow": 18,
+    "imageW": 37,
+    "imageH": 23,
+    "footRow": 22,
     "gapBelow": 0,
     "topRow": 4
    },
    "rust_crab_hurt_1_near.png": {
-    "imageW": 43,
-    "imageH": 27,
-    "footRow": 26,
-    "gapBelow": 0,
-    "topRow": 3
-   },
-   "rust_crab_idle_1_close.png": {
-    "imageW": 68,
-    "imageH": 45,
-    "footRow": 44,
+    "imageW": 49,
+    "imageH": 31,
+    "footRow": 30,
     "gapBelow": 0,
     "topRow": 5
    },
+   "rust_crab_idle_1_close.png": {
+    "imageW": 77,
+    "imageH": 52,
+    "footRow": 51,
+    "gapBelow": 0,
+    "topRow": 6
+   },
    "rust_crab_idle_1_far.png": {
-    "imageW": 26,
-    "imageH": 15,
-    "footRow": 14,
+    "imageW": 29,
+    "imageH": 18,
+    "footRow": 17,
     "gapBelow": 0,
     "topRow": 2
    },
    "rust_crab_idle_1_mid.png": {
-    "imageW": 31,
-    "imageH": 19,
-    "footRow": 18,
+    "imageW": 37,
+    "imageH": 23,
+    "footRow": 22,
     "gapBelow": 0,
-    "topRow": 2
+    "topRow": 3
    },
    "rust_crab_idle_1_near.png": {
-    "imageW": 43,
-    "imageH": 27,
-    "footRow": 26,
+    "imageW": 49,
+    "imageH": 31,
+    "footRow": 30,
     "gapBelow": 0,
-    "topRow": 3
+    "topRow": 4
    },
    "rust_crab_idle_2_close.png": {
-    "imageW": 68,
-    "imageH": 45,
-    "footRow": 44,
+    "imageW": 77,
+    "imageH": 52,
+    "footRow": 51,
     "gapBelow": 0,
-    "topRow": 6
+    "topRow": 7
    },
    "rust_crab_idle_2_far.png": {
-    "imageW": 26,
-    "imageH": 15,
-    "footRow": 14,
-    "gapBelow": 0,
-    "topRow": 2
-   },
-   "rust_crab_idle_2_mid.png": {
-    "imageW": 31,
-    "imageH": 19,
-    "footRow": 18,
+    "imageW": 29,
+    "imageH": 18,
+    "footRow": 17,
     "gapBelow": 0,
     "topRow": 3
    },
+   "rust_crab_idle_2_mid.png": {
+    "imageW": 37,
+    "imageH": 23,
+    "footRow": 22,
+    "gapBelow": 0,
+    "topRow": 4
+   },
    "rust_crab_idle_2_near.png": {
-    "imageW": 43,
-    "imageH": 27,
-    "footRow": 26,
+    "imageW": 49,
+    "imageH": 31,
+    "footRow": 30,
     "gapBelow": 0,
     "topRow": 4
    },
    "rust_crab_idle_3_close.png": {
-    "imageW": 68,
-    "imageH": 45,
-    "footRow": 44,
+    "imageW": 77,
+    "imageH": 52,
+    "footRow": 51,
     "gapBelow": 0,
-    "topRow": 5
+    "topRow": 6
    },
    "rust_crab_idle_3_far.png": {
-    "imageW": 26,
-    "imageH": 15,
-    "footRow": 14,
-    "gapBelow": 0,
-    "topRow": 2
-   },
-   "rust_crab_idle_3_mid.png": {
-    "imageW": 31,
-    "imageH": 19,
-    "footRow": 18,
-    "gapBelow": 0,
-    "topRow": 2
-   },
-   "rust_crab_idle_3_near.png": {
-    "imageW": 43,
-    "imageH": 27,
-    "footRow": 26,
+    "imageW": 29,
+    "imageH": 18,
+    "footRow": 17,
     "gapBelow": 0,
     "topRow": 3
    },
+   "rust_crab_idle_3_mid.png": {
+    "imageW": 37,
+    "imageH": 23,
+    "footRow": 22,
+    "gapBelow": 0,
+    "topRow": 3
+   },
+   "rust_crab_idle_3_near.png": {
+    "imageW": 49,
+    "imageH": 31,
+    "footRow": 30,
+    "gapBelow": 0,
+    "topRow": 4
+   },
    "rust_crab_idle_4_close.png": {
-    "imageW": 68,
-    "imageH": 45,
-    "footRow": 44,
+    "imageW": 77,
+    "imageH": 52,
+    "footRow": 51,
     "gapBelow": 0,
     "topRow": 4
    },
    "rust_crab_idle_4_far.png": {
-    "imageW": 26,
-    "imageH": 15,
-    "footRow": 14,
+    "imageW": 29,
+    "imageH": 18,
+    "footRow": 17,
     "gapBelow": 0,
     "topRow": 2
    },
    "rust_crab_idle_4_mid.png": {
-    "imageW": 31,
-    "imageH": 19,
-    "footRow": 18,
-    "gapBelow": 0,
-    "topRow": 2
-   },
-   "rust_crab_idle_4_near.png": {
-    "imageW": 43,
-    "imageH": 27,
-    "footRow": 26,
-    "gapBelow": 0,
-    "topRow": 2
-   },
-   "rust_crab_mid.png": {
-    "imageW": 31,
-    "imageH": 19,
-    "footRow": 18,
-    "gapBelow": 0,
-    "topRow": 2
-   },
-   "rust_crab_near.png": {
-    "imageW": 43,
-    "imageH": 27,
-    "footRow": 26,
+    "imageW": 37,
+    "imageH": 23,
+    "footRow": 22,
     "gapBelow": 0,
     "topRow": 3
+   },
+   "rust_crab_idle_4_near.png": {
+    "imageW": 49,
+    "imageH": 31,
+    "footRow": 30,
+    "gapBelow": 0,
+    "topRow": 3
+   },
+   "rust_crab_mid.png": {
+    "imageW": 37,
+    "imageH": 23,
+    "footRow": 22,
+    "gapBelow": 0,
+    "topRow": 3
+   },
+   "rust_crab_near.png": {
+    "imageW": 49,
+    "imageH": 31,
+    "footRow": 30,
+    "gapBelow": 0,
+    "topRow": 4
    },
    "bog_leeches_attack_1_close.png": {
     "imageW": 37,

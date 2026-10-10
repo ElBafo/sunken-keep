@@ -15,8 +15,8 @@ const ITEM_ASPECT = 80 / 60;
 /** Wall-fraction defaults when `size.worldHeight` is missing from monsters.json. */
 const DEFAULT_WORLD_HEIGHT: Record<string, number> = {
   bog_leeches: 0.15,
-  keep_rat: 0.2,
-  rust_crab: 0.3,
+  keep_rat: 0.25,
+  rust_crab: 0.35,
   cellar_spider: 0.3,
   slime: 0.55,
   drowned_dwarf: 0.6,
