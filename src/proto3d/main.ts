@@ -73,7 +73,7 @@ class Game {
   messageTimer = 0;
 
   lastTime = 0;
-  fpsCounter = document.getElementById('fps-counter')!;
+  fpsCounter: HTMLElement | null = null;
   fpsFrames = 0;
   fpsLastTime = 0;
   lastFps = 0;
@@ -101,7 +101,13 @@ class Game {
     this.renderer = new PixelRenderer(canvas, layout.view[2], layout.view[3]);
     await this.renderer.loadPalette();
     if (params.get('palette') === '0') this.renderer.setPaletteEnabled(false);
-    if (params.get('debug') === '1') this.fpsCounter.style.display = 'block';
+    if (params.get('debug') === '1') {
+      const el = document.createElement('div');
+      el.id = 'fps-counter';
+      el.textContent = 'FPS: --';
+      document.body.appendChild(el);
+      this.fpsCounter = el;
+    }
 
     this.atmosphere = new Atmosphere(this.quality);
     this.atmosphere.applyFog(this.renderer.scene, this.renderer.renderer);
@@ -944,7 +950,7 @@ class Game {
     this.fpsFrames++;
     if (now - this.fpsLastTime >= 1000) {
       const fps = Math.round((this.fpsFrames * 1000) / (now - this.fpsLastTime));
-      this.fpsCounter.textContent = `FPS: ${fps}`;
+      if (this.fpsCounter) this.fpsCounter.textContent = `FPS: ${fps}`;
       this.lastFps = fps;
       this.fpsFrames = 0;
       this.fpsLastTime = now;

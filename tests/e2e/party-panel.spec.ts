@@ -421,4 +421,15 @@ test('proto3d party panel: portraits, hands, take/snuff, dunk, 44pt targets', as
 
   expect(errors, 'page/console errors').toEqual([]);
   expect(failed404s, '404s').toEqual([]);
+
+  await page.goto(`${BASE_URL}/proto3d.html?test=1`);
+  await page.waitForFunction(
+    () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
+    null,
+    { timeout: 25000 }
+  );
+  await page.locator('#tap-to-start').tap();
+  await page.waitForTimeout(400);
+  await expect(page.locator('#fps-counter')).toHaveCount(0);
+  await page.screenshot({ path: `${OUT}/party-panel-no-debug.png`, fullPage: false });
 });
