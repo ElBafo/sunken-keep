@@ -121,7 +121,7 @@ export function toPanelLocal(rect: LayoutRect, panelTop: number): LayoutRect {
 
 /** Height of the proto3d HUD strip: portraits through the 3-line log (not the 2D D-pad). */
 export function panelContentHeight(layout: Layout585): number {
-  const rects: LayoutRect[] = [layout.log, layout.oilBar, layout.inventory, layout.potionHealth, layout.potionMana];
+  const rects: LayoutRect[] = [layout.log, layout.oilBar];
   for (const hero of layout.heroes) {
     rects.push(hero.portrait_opens_sheet, hero.hand_main, hero.hand_off, hero.hpBar);
     if (hero.manaBar) rects.push(hero.manaBar);

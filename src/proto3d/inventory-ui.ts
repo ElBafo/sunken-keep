@@ -203,6 +203,9 @@ export class InventoryUi {
     this.open = true;
     this.host.hidden = false;
     this.host.classList.add('show');
+    document.getElementById('message-toast')?.classList.remove('show');
+    const bar = document.getElementById('bag-bar');
+    if (bar) bar.style.visibility = 'hidden';
     this.select(-1);
     this.playUi('inventory_open');
   }
@@ -214,6 +217,8 @@ export class InventoryUi {
     this.host.classList.remove('show');
     this.host.hidden = true;
     this.host.querySelectorAll('.inv-action').forEach((el) => el.remove());
+    const bar = document.getElementById('bag-bar');
+    if (bar) bar.style.visibility = '';
     this.playUi('inventory_close');
   }
 

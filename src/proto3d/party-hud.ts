@@ -270,33 +270,39 @@ export class PartyHud {
   }
 
   private mountChromeButtons() {
-    const host = document.getElementById('party-hud');
-    if (!host) return;
-    host.querySelectorAll('.hud-chrome-btn').forEach((el) => el.remove());
-    const bag = this.placeChromeBtn(host, toPanelLocal(this.layout.inventory, this.panelTop), 'bag');
-    bag.setAttribute('aria-label', this.story.uiText('bag.title'));
-    bag.addEventListener('pointerup', (e) => {
-      if (!e.isPrimary) return;
-      e.preventDefault();
-      e.stopPropagation();
-      this.onBag?.();
-    });
-    const health = this.placeChromeBtn(host, toPanelLocal(this.layout.potionHealth, this.panelTop), 'potion-health');
-    health.setAttribute('aria-label', this.story.itemName('potion_red'));
-    health.addEventListener('pointerup', (e) => {
-      if (!e.isPrimary) return;
-      e.preventDefault();
-      e.stopPropagation();
-      this.onPotion?.('health');
-    });
-    const mana = this.placeChromeBtn(host, toPanelLocal(this.layout.potionMana, this.panelTop), 'potion-mana');
-    mana.setAttribute('aria-label', this.story.itemName('potion_blue'));
-    mana.addEventListener('pointerup', (e) => {
-      if (!e.isPrimary) return;
-      e.preventDefault();
-      e.stopPropagation();
-      this.onPotion?.('mana');
-    });
+    const bag = document.getElementById('btn-bag');
+    const health = document.getElementById('btn-potion-health');
+    const mana = document.getElementById('btn-potion-mana');
+    if (bag) {
+      bag.textContent = this.story.uiText('bag.title');
+      bag.setAttribute('aria-label', this.story.uiText('bag.title'));
+      bag.addEventListener('pointerup', (e) => {
+        if (!e.isPrimary) return;
+        e.preventDefault();
+        e.stopPropagation();
+        this.onBag?.();
+      });
+    }
+    if (health) {
+      health.textContent = this.story.itemName('potion_red');
+      health.setAttribute('aria-label', this.story.itemName('potion_red'));
+      health.addEventListener('pointerup', (e) => {
+        if (!e.isPrimary) return;
+        e.preventDefault();
+        e.stopPropagation();
+        this.onPotion?.('health');
+      });
+    }
+    if (mana) {
+      mana.textContent = this.story.itemName('potion_blue');
+      mana.setAttribute('aria-label', this.story.itemName('potion_blue'));
+      mana.addEventListener('pointerup', (e) => {
+        if (!e.isPrimary) return;
+        e.preventDefault();
+        e.stopPropagation();
+        this.onPotion?.('mana');
+      });
+    }
   }
 
   private placePortraitBtn(host: HTMLElement, hero: HeroId, rect: Rect) {
@@ -317,20 +323,6 @@ export class PartyHud {
       this.onPortrait?.(hero);
     });
     host.appendChild(btn);
-  }
-
-  private placeChromeBtn(host: HTMLElement, rect: Rect, name: string) {
-    const [x, y, w, h] = rect;
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'hud-chrome-btn';
-    btn.dataset.name = name;
-    btn.style.left = `${(x / this.designWidth) * 100}%`;
-    btn.style.top = `${(y / this.designHeight) * 100}%`;
-    btn.style.width = `${(w / this.designWidth) * 100}%`;
-    btn.style.height = `${(h / this.designHeight) * 100}%`;
-    host.appendChild(btn);
-    return btn;
   }
 
   setPickHero(on: boolean) {

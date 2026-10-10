@@ -76,6 +76,34 @@
       outline-offset: 1px;
       background: rgba(240, 208, 96, 0.28);
     }
+    #bag-bar {
+      position: absolute;
+      left: 0;
+      right: 0;
+      bottom: 6px;
+      display: flex;
+      justify-content: flex-end;
+      align-items: center;
+      gap: 6px;
+      padding: 0 6px;
+      z-index: 85;
+      pointer-events: none;
+    }
+    #bag-bar .hud-chrome-btn { pointer-events: auto; }
+    #bag-bar .hud-chrome-btn {
+      position: relative;
+      left: auto;
+      top: auto;
+      width: auto;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0 10px;
+      border: 1px solid #8a7348;
+      background: rgba(42, 36, 32, 0.92);
+      color: #d8ccb0;
+      font-family: monospace;
+      font-size: 12px;
+    }
     #inventory-screen {
       position: absolute;
       inset: 0;
@@ -406,6 +434,11 @@
     </div>
     <div id="inventory-screen" hidden>
       <canvas id="inventory-canvas"></canvas>
+    </div>
+    <div id="bag-bar">
+      <button id="btn-potion-health" class="hud-chrome-btn" type="button"></button>
+      <button id="btn-potion-mana" class="hud-chrome-btn" type="button"></button>
+      <button id="btn-bag" class="hud-chrome-btn" type="button"></button>
     </div>
   </div>
   <div id="party-hud">

@@ -473,7 +473,7 @@ class Game {
     if (!this.bag.takeAt(index, 1)) return;
     this.setOil(this.oil + OIL_FLASK);
     this.audioManager.playUi('lantern_refill');
-    this.showMessage(this.storyLog('oil_use'));
+    this.showMessage(this.storyLog('oil_use', { n: this.oil, max: OIL_MAX }));
     this.inventory.redraw();
   }
 
@@ -984,6 +984,11 @@ class Game {
     snuff?.addEventListener('click', stop);
   }
 
+  private setBagBarVisible(on: boolean) {
+    const bar = document.getElementById('bag-bar');
+    if (bar) bar.style.visibility = on ? '' : 'hidden';
+  }
+
   private showTorchChoice(sconce: Sconce) {
     this.torchChoice = { sconce };
     const el = document.getElementById('torch-choice');
@@ -991,6 +996,7 @@ class Game {
       el.hidden = false;
       el.classList.add('show');
     }
+    this.setBagBarVisible(false);
   }
 
   hideTorchChoice() {
@@ -1000,6 +1006,7 @@ class Game {
       el.hidden = true;
       el.classList.remove('show');
     }
+    if (!this.inventory?.open) this.setBagBarVisible(true);
   }
 
   private confirmTake() {
