@@ -305,6 +305,21 @@ export class SceneBuilder {
     wall.userData.lightY = nz;
     wall.userData.face = face;
     wall.userData.kind = tile.secret ? 'secret' : 'wall';
+    wall.userData.cellX = x;
+    wall.userData.cellY = y;
     group.add(wall);
+  }
+
+  setSecretOpen(scene: THREE.Scene, x: number, y: number, open: boolean) {
+    scene.traverse((obj) => {
+      if (!(obj instanceof THREE.Mesh)) return;
+      if (obj.userData.kind !== 'secret') return;
+      if (obj.userData.cellX !== x || obj.userData.cellY !== y) return;
+      const mat = obj.material as THREE.MeshBasicMaterial;
+      mat.map = open ? this.secretOpen : this.secretClosed;
+      mat.transparent = open;
+      mat.alphaTest = open ? CUTOUT_ALPHA_TEST : 0;
+      mat.needsUpdate = true;
+    });
   }
 }

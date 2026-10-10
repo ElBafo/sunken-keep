@@ -262,7 +262,10 @@
    "autosave_tag": "Auto",
    "date": "{date}",
    "corrupt": "This save got wet.",
-   "corrupt_sub": "It can't be loaded."
+   "corrupt_sub": "It can't be loaded.",
+   "time_m": "{m}m",
+   "time_hm": "{h}h {m}m",
+   "_time_note": "fills {time} in title_text slot.line2; time_m under 1 hour, time_hm from 1 hour"
   },
   "status": {
    "saving": "Saving...",

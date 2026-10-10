@@ -8,7 +8,7 @@ import {
 import { ITEM_ACT_SFX } from '../core/types';
 import { HAND_COOLDOWN_MS, OIL_MAX } from './constants';
 import { StoryText } from './i18n';
-import { drawFont5x7, type FontGlyphs } from './font5x7';
+import { drawFont5x7, wrapFontLine, type FontGlyphs } from './font5x7';
 import {
   PAD_KEYS,
   panelArtPath,
@@ -85,6 +85,7 @@ export class PartyHud {
   private onCancel: () => void;
   private onPortrait: ((hero: HeroId) => void) | null = null;
   private onBag: (() => void) | null = null;
+  private onSave: (() => void) | null = null;
   private onPotion: ((kind: 'health' | 'mana') => void) | null = null;
   private potionCounts: () => { health: number; mana: number };
   private pressed = new Set<string>();
@@ -110,6 +111,7 @@ export class PartyHud {
       onCancel: () => void;
       onPortrait?: (hero: HeroId) => void;
       onBag?: () => void;
+      onSave?: () => void;
       onPotion?: (kind: 'health' | 'mana') => void;
       potionCounts?: () => { health: number; mana: number };
     }
@@ -123,6 +125,7 @@ export class PartyHud {
     this.onCancel = hooks.onCancel;
     this.onPortrait = hooks.onPortrait ?? null;
     this.onBag = hooks.onBag ?? null;
+    this.onSave = hooks.onSave ?? null;
     this.onPotion = hooks.onPotion ?? null;
     this.potionCounts = hooks.potionCounts ?? (() => ({ health: 0, mana: 0 }));
     this.heroes = this.createHeroes();
@@ -344,6 +347,16 @@ export class PartyHud {
       this.story.uiText('bag.title'),
       () => this.onBag?.()
     );
+    if (this.layout.save) {
+      this.placeChromeBtn(
+        host,
+        'btn-save',
+        this.layout.save,
+        'save',
+        this.story.uiText('buttons.save'),
+        () => this.onSave?.()
+      );
+    }
   }
 
   private placeChromeBtn(
@@ -431,14 +444,24 @@ export class PartyHud {
     host.appendChild(btn);
   }
 
+  clearLog() {
+    this.logLines = [];
+    this.draw(performance.now());
+  }
+
   pushLog(text: string) {
     if (!text) return;
+    const [, , w] = this.logRect;
+    const maxChars = Math.max(8, Math.floor((w - 4) / this.fontCellW));
     for (const line of text.split('\n')) {
       if (!line) continue;
-      this.logLines.push(line);
-      this.onLog(line);
+      const wrapped = wrapFontLine(line, maxChars);
+      for (const part of wrapped) {
+        this.logLines.push(part);
+        this.onLog(part);
+      }
     }
-    if (this.logLines.length > 12) this.logLines.splice(0, this.logLines.length - 12);
+    if (this.logLines.length > 24) this.logLines.splice(0, this.logLines.length - 24);
     this.draw(performance.now());
   }
 
@@ -520,6 +543,20 @@ export class PartyHud {
 
   dismissFrostHint() {
     this.frostHintDismissed = true;
+    this.frostHintArmed = false;
+    this.syncFrostHintAttr();
+    this.draw(performance.now());
+  }
+
+  setFrostHintDismissed(on: boolean) {
+    this.frostHintDismissed = on;
+    if (on) this.frostHintArmed = false;
+    this.syncFrostHintAttr();
+    this.draw(performance.now());
+  }
+
+  resetFrostHint() {
+    this.frostHintDismissed = false;
     this.frostHintArmed = false;
     this.syncFrostHintAttr();
     this.draw(performance.now());
@@ -825,13 +862,16 @@ export class PartyHud {
 
   private drawLog() {
     const [x, y, w] = this.logRect;
-    const lines = this.logLines.slice(-3);
     const pad = 2;
     const lh = 9;
-    const maxChars = Math.floor((w - pad * 2) / 6);
+    const maxChars = Math.max(8, Math.floor((w - pad * 2) / this.fontCellW));
+    const display: string[] = [];
+    for (const line of this.logLines) {
+      display.push(...wrapFontLine(line, maxChars));
+    }
+    const lines = display.slice(-3);
     lines.forEach((line, i) => {
-      const text = line.length > maxChars ? `${line.slice(0, maxChars - 1)}…` : line;
-      this.drawFont(text, x + pad, y + pad + i * lh);
+      this.drawFont(line, x + pad, y + pad + i * lh);
     });
   }
 

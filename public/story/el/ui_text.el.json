@@ -262,7 +262,10 @@
    "autosave_tag": "Αυτόμ.",
    "date": "{date}",
    "corrupt": "Αυτή η αποθήκευση βράχηκε.",
-   "corrupt_sub": "Δεν φορτώνει."
+   "corrupt_sub": "Δεν φορτώνει.",
+   "time_m": "{m}λ",
+   "time_hm": "{h}ώ {m}λ",
+   "_time_note": "fills {time} in title_text slot.line2; time_m under 1 hour, time_hm from 1 hour"
   },
   "status": {
    "saving": "Αποθήκευση...",

@@ -21,7 +21,29 @@ import { Dressing } from './dressing';
 import { floor1, floor1Sconces } from './floor-data';
 import { InputManager } from './input';
 import { MoveResult, Player } from './player';
-import { hasSavedProgress, loadProgress, persistEnabled, saveProgress } from './progress';
+import { loadProgress, persistEnabled, saveProgress } from './progress';
+import {
+  hasAnySave,
+  listAutosaves,
+  loadFloorSnapshot,
+  newestAutosave,
+  persistStorage,
+  SAVE_VERSION,
+  snapshotHero,
+  snapshotMonster,
+  loadSlot,
+  writeAutosave,
+  writeFloorSnapshot,
+  writeSlot,
+  floorState,
+  type SavePayload,
+  type SavedFloor
+} from './saves';
+import { TitleScreen } from './title';
+import { IntroPlayer } from './intro';
+import { SpeechBubble } from './bubble';
+import { StoryProgress } from './story-progress';
+import { saveLocale, type Locale } from './i18n';
 import { qualityFromSearch, QualityLevel } from './quality';
 import { PixelRenderer } from './renderer';
 import { SceneBuilder } from './scene-builder';
@@ -90,6 +112,33 @@ class Game {
   lastFps = 0;
   private doorUnlockTimer = 0;
   private pendingUnlock: { x: number; y: number } | null = null;
+  private flags = new Set<string>();
+  private journalPages = new Set<string>();
+  private dialogue = new Map<string, string>();
+  private floorStates: Record<string, SavedFloor> = {};
+  private storyProgress = new StoryProgress();
+  private playStartedAt = 0;
+  private playAccMs = 0;
+  private escapeRunActive = false;
+  private phase: 'title' | 'intro' | 'play' = 'play';
+  private skipTitle = false;
+  private pendingStartSnapshot = false;
+  private title!: TitleScreen;
+  private intro: IntroPlayer | null = null;
+  private bubble: SpeechBubble | null = null;
+  private loopStarted = false;
+  currentSlot: number | null = null;
+  private tileSnap: Array<{
+    x: number;
+    y: number;
+    doorOpen?: boolean;
+    doorLocked?: boolean;
+    secretOpen?: boolean;
+    item?: string;
+    chest?: boolean;
+    chestItems?: string[];
+    chestOpen?: boolean;
+  }> = [];
 
   async init() {
     const canvas = document.getElementById('render-canvas') as HTMLCanvasElement;
@@ -103,11 +152,18 @@ class Game {
         this.bright = Math.min(BRIGHT_MAX, Math.max(BRIGHT_MIN, brightRaw));
       }
     }
-    this.oil = loadProgress(floor1Sconces, this.persist);
+    this.oil = loadProgress(floor1Sconces, this.persist && params.get('test') === '1');
+    persistStorage();
+    this.skipTitle = params.get('test') === '1' && params.get('title') !== '1';
 
     const locale = resolveLocale(params, this.persist);
     document.documentElement.lang = locale;
     await this.story.load(locale);
+    await this.storyProgress.load(import.meta.env.BASE_URL);
+    if (this.skipTitle) {
+      this.storyProgress.startNewGame();
+      this.pendingStartSnapshot = true;
+    }
     this.applyStoryLabels();
 
     const layout = await loadLayout585();
@@ -177,6 +233,7 @@ class Game {
       },
       onPortrait: (hero) => this.handlePortraitTap(hero),
       onBag: () => this.toggleBag(),
+      onSave: () => this.requestManualSave(),
       onPotion: (kind) => this.quickPotion(kind),
       potionCounts: () => ({
         health: this.bag.countOf('potion_red'),
@@ -198,9 +255,11 @@ class Game {
     });
     await this.inventory.load();
     this.snapshotLoot();
+    this.snapshotTiles();
     this.wireTorchChoice();
     this.wireGameOver();
     this.wireInventoryControls();
+    this.wireVisibilityAutosave();
     this.renderer.resize();
 
     this.audioManager = new AudioManager(this.quality);
@@ -219,18 +278,25 @@ class Game {
       onInteract: (x, y) => this.interact(x, y)
     });
 
+    await this.wireTitleAndIntro();
     this.setupTapToStart();
     this.exposeDebugApi();
     this.updateDoorButton();
   }
 
   handleMove(result: MoveResult) {
+    if (this.phase !== 'play') return;
     this.cancelSwap();
     if (this.combat?.gameOver) return;
     if (result === 'ok') {
       this.playFootstep(this.player.moveToX, this.player.moveToY);
       this.maybeDunkTorch(this.player.moveToX, this.player.moveToY);
+      this.fireTileBark(this.player.moveToX, this.player.moveToY);
       return;
+    }
+    if (result === 'secret') {
+      const { x, y } = this.player.facingPos(1);
+      if (this.openSecretAt(x, y)) return;
     }
     if (result === 'busy') return;
     if (result === 'monster') {
@@ -246,9 +312,11 @@ class Game {
     if (tile.deepWater) {
       this.audioManager.playStep('step_water_deep');
       this.atmosphere.spawnStepSplash(x * CELL_SIZE, y * CELL_SIZE);
+      if (this.storyProgress.fire('water_deep')) this.showMessage(this.storyLog('water_deep'));
     } else if (tile.shallowWater) {
       this.audioManager.playStep('step_water_shallow');
       this.atmosphere.spawnStepSplash(x * CELL_SIZE, y * CELL_SIZE);
+      if (this.storyProgress.fire('water_shallow')) this.showMessage(this.storyLog('water_shallow'));
     } else {
       this.audioManager.playStep('step');
     }
@@ -313,6 +381,45 @@ class Game {
     }
   }
 
+  private snapshotTiles() {
+    this.tileSnap = [];
+    for (let y = 0; y < floor1.height; y++) {
+      for (let x = 0; x < floor1.width; x++) {
+        const tile = floor1.tiles[y][x];
+        this.tileSnap.push({
+          x,
+          y,
+          doorOpen: tile.doorOpen,
+          doorLocked: tile.doorLocked,
+          secretOpen: tile.secretOpen,
+          item: tile.item,
+          chest: tile.chest,
+          chestItems: tile.chestItems ? [...tile.chestItems] : undefined,
+          chestOpen: tile.chestOpen
+        });
+      }
+    }
+  }
+
+  private restoreTiles() {
+    for (const snap of this.tileSnap) {
+      const tile = floor1.tiles[snap.y][snap.x];
+      tile.doorOpen = snap.doorOpen;
+      tile.doorLocked = snap.doorLocked;
+      tile.secretOpen = snap.secretOpen;
+      tile.item = snap.item;
+      tile.chest = snap.chest;
+      tile.chestItems = snap.chestItems ? [...snap.chestItems] : undefined;
+      tile.chestOpen = snap.chestOpen;
+      if (tile.door) {
+        const visual = this.sceneBuilder.doors.get(snap.x, snap.y);
+        if (visual) this.sceneBuilder.doors.snapOpen(visual, !!snap.doorOpen);
+      }
+      if (tile.secret) this.sceneBuilder.setSecretOpen(this.renderer.scene, snap.x, snap.y, !!snap.secretOpen);
+    }
+    this.spriteManager.resetItems(floor1);
+  }
+
   private restoreLoot() {
     for (const snap of this.lootSnap) {
       const tile = floor1.tiles[snap.y][snap.x];
@@ -337,7 +444,14 @@ class Game {
   }
 
   hasBagKey(): boolean {
-    return this.bag.has('key') || this.player.hasKey;
+    return this.bag.has('key') || this.bag.has('captain_key') || this.player.hasKey;
+  }
+
+  private rememberStoryKey(id: string, branch?: string) {
+    if (/journal|note_lampkeeper|lampkeeper_note|read_journal/i.test(id)) this.journalPages.add(id);
+    if (/^(f\d_|hobb|dialogue|dlg_)/i.test(id) || /frogcatcher|grate_tam|tam_cell|captain/i.test(id)) {
+      this.dialogue.set(id, branch ?? this.dialogue.get(id) ?? 'seen');
+    }
   }
 
   pickupItemAt(x: number, y: number): boolean {
@@ -392,7 +506,7 @@ class Game {
   }
 
   private syncKeyFlag() {
-    this.player.hasKey = this.bag.has('key');
+    this.player.hasKey = this.bag.has('key') || this.bag.has('captain_key');
   }
 
   openBag() {
@@ -583,7 +697,7 @@ class Game {
     const goSave = document.getElementById('btn-go-autosave');
     if (goSave) {
       goSave.textContent = this.story.uiText('game_over.load_last');
-      goSave.hidden = !hasSavedProgress();
+      goSave.hidden = !newestAutosave();
     }
     const goFloor = document.getElementById('btn-go-floor');
     if (goFloor) goFloor.textContent = this.story.uiText('game_over.load_floor', { n: FLOOR_NUMBER });
@@ -734,6 +848,7 @@ class Game {
         case 'fight_end':
           this.audioManager?.setFightDuck(false);
           this.hud.hideFrostHint();
+          this.clearFlankFlash();
           break;
         case 'flank':
           this.flashFlank(e.side);
@@ -745,7 +860,7 @@ class Game {
           this.hud.lastHand = { hero: e.hero, hand: e.hand };
           this.hud.handTapCount += 1;
           if (e.hero === 'ilsevar' && (e.item === 'wand' || e.item === 'scroll')) {
-            this.hud.dismissFrostHint();
+            this.markFrostHintDismissed();
           }
           break;
         case 'out_of_reach':
@@ -766,9 +881,18 @@ class Game {
     el.dataset.side = side;
     el.classList.add('show');
     if (this.flankTimer) clearTimeout(this.flankTimer);
-    this.flankTimer = setTimeout(() => {
-      el.classList.remove('show');
-    }, 420);
+    this.flankTimer = setTimeout(() => this.clearFlankFlash(), 420);
+  }
+
+  private clearFlankFlash() {
+    const el = document.getElementById('flank-flash');
+    if (!el) return;
+    el.classList.remove('show');
+    delete el.dataset.side;
+    if (this.flankTimer) {
+      clearTimeout(this.flankTimer);
+      this.flankTimer = null;
+    }
   }
 
   private wireGameOver() {
@@ -790,16 +914,26 @@ class Game {
       const def = FLOOR_SCONCE_DEFAULTS.find((d) => d.x === s.x && d.y === s.y && d.face === s.face);
       if (!def || s.capped) continue;
       s.lit = def.lit;
+      s.empty = !!def.empty;
+      this.torches?.syncFromSconce(s);
     }
     this.oil = OIL_START;
   }
 
   loadAutosave() {
-    this.oil = loadProgress(floor1Sconces, true);
-    this.resetFloorState();
+    this.audioManager?.fadeGameOver(300);
+    const save = newestAutosave();
+    if (save) this.applySave(save);
+    else this.restartFloor();
   }
 
   restartFloor() {
+    this.audioManager?.fadeGameOver(300);
+    const snap = loadFloorSnapshot(FLOOR_NUMBER);
+    if (snap) {
+      this.applySave(snap);
+      return;
+    }
     this.restoreSconceDefaults();
     this.resetFloorState();
   }
@@ -809,6 +943,8 @@ class Game {
     this.perkHooks = [];
     this.perkScreenOpen = false;
     this.hud?.clearReadyArmed();
+    this.hud?.clearLog();
+    this.lastMessage = '';
     this.combat.resetParty();
     this.spriteManager.resetMonsters(floor1);
     this.darkFx.resetEyes(this.audioManager);
@@ -823,18 +959,15 @@ class Game {
     this.vertexLighting.relight();
     this.updateOilHud();
     this.updateDoorButton();
-    this.audioManager?.stopPresenceLoops();
-    this.audioManager?.clearLeechLoops();
-    this.audioManager?.startFloorLoops(this.oil > 0);
-    this.audioManager?.syncLeechLoops(floor1);
-    for (const sconce of floor1Sconces) {
-      if (sconce.lit) this.audioManager?.startTorchLoop(sconce);
-      else this.audioManager?.stopTorchLoop(sconce);
-    }
+    this.rebuildAudioFromState();
     this.lastHitType = null;
     this.hud.hideFrostHint();
     this.restoreLoot();
+    this.restoreTiles();
+    this.flags.clear();
+    this.hud.resetFrostHint();
     this.closeBag();
+    this.audioManager?.fadeGameOver(300);
     this.audioManager?.updateListener(this.player.x, this.player.y, this.player.dir);
   }
 
@@ -881,6 +1014,10 @@ class Game {
       this.messageTimer = 0;
       return true;
     }
+    this.storyProgress.fire('note_lampkeeper');
+    this.flags.add('note_lampkeeper');
+    this.rememberStoryKey('note_lampkeeper');
+    this.rememberStoryKey('journal_page_1');
     this.showNote();
     return true;
   }
@@ -956,6 +1093,7 @@ class Game {
   }
 
   interact(clientX?: number, clientY?: number) {
+    if (this.phase !== 'play') return;
     this.interactCount += 1;
     if (this.inventory?.open) {
       if (this.inventory.selected >= 0) {
@@ -984,6 +1122,7 @@ class Game {
     if (this.pickupItemAt(this.player.x, this.player.y)) return;
     const facing = this.player.facingPos(1);
     if (this.pickupItemAt(facing.x, facing.y)) return;
+    if (this.openSecretAt(facing.x, facing.y)) return;
     if (this.handleFacingTorch()) return;
     if (this.handleFacingProp()) return;
 
@@ -998,11 +1137,7 @@ class Game {
     if (!tile || !isFloorProp(tile)) return false;
     if (tile.readNote || tile.prop === 'desk') return this.readFacingDesk();
     if (tile.bark) {
-      const text = this.story.bark(tile.bark);
-      if (text) {
-        this.showMessage(text);
-        return true;
-      }
+      if (this.speakBark(tile.bark)) return true;
     }
     if (tile.prop === 'lamp_capped') {
       this.showPrompt(this.storyLog('torch_capped'));
@@ -1113,6 +1248,7 @@ class Game {
     }
     this.torches.takeOffWall(sconce);
     this.audioManager.stopTorchLoop(sconce);
+    this.audioManager.startCarriedTorchLoop();
     this.hud.setHand(hero, hand, 'torch_lit');
     this.combat?.setEquipment(hero, hand, 'torch_lit');
     this.cancelSwap();
@@ -1142,6 +1278,7 @@ class Game {
     const restored = this.takeBagFrom(held.hero, held.hand);
     this.hud.setHand(held.hero, held.hand, restored ?? 'empty_hand');
     this.combat?.setEquipment(held.hero, held.hand, restored ?? 'empty_hand');
+    this.audioManager.stopCarriedTorchLoop();
     this.torches.ignite(sconce, now);
     this.vertexLighting.relight();
     this.syncCarriedLight();
@@ -1161,6 +1298,7 @@ class Game {
     if (!dunked.length) return;
     for (const d of dunked) this.combat?.setEquipment(d.hero, d.hand, 'torch_burnt');
     this.audioManager.playUi('torch_dunk');
+    this.audioManager.stopCarriedTorchLoop();
     this.syncCarriedLight();
     this.showMessage(this.storyLog('torch_dunk', { hero: this.story.heroName(dunked[0].hero) }));
   }
@@ -1189,6 +1327,422 @@ class Game {
     return this.hud.handTapCount > before;
   }
 
+  private playTimeMs() {
+    if (!this.playStartedAt) return this.playAccMs;
+    return this.playAccMs + Math.max(0, performance.now() - this.playStartedAt);
+  }
+
+  private snapshotCurrentFloor(): SavedFloor {
+    const tiles: SavedFloor['tiles'] = [];
+    for (let y = 0; y < floor1.height; y++) {
+      for (let x = 0; x < floor1.width; x++) {
+        const tile = floor1.tiles[y][x];
+        const snap = this.tileSnap[y * floor1.width + x];
+        const puzzle =
+          tile.puzzle && typeof tile.puzzle === 'object'
+            ? (tile.puzzle as Record<string, string | number | boolean>)
+            : undefined;
+        if (!tile.door && !tile.secret && !tile.chest && !tile.item && !snap?.item && !snap?.chest && !puzzle) continue;
+        tiles.push({
+          x,
+          y,
+          doorOpen: tile.doorOpen,
+          doorLocked: tile.doorLocked,
+          secretOpen: tile.secretOpen,
+          chestOpen: tile.chestOpen,
+          chestItems: tile.chestItems ? [...tile.chestItems] : tile.chestItems,
+          item: tile.item ?? null,
+          puzzle
+        });
+      }
+    }
+    return {
+      tiles,
+      sconces: floor1Sconces.map((s) => ({
+        x: s.x,
+        y: s.y,
+        face: s.face,
+        lit: !!s.lit,
+        empty: !!s.empty,
+        capped: !!s.capped
+      })),
+      monsters: this.combat.monsters.map(snapshotMonster)
+    };
+  }
+
+  captureSave(kind: SavePayload['kind'] = 'slot'): SavePayload {
+    this.floorStates[String(FLOOR_NUMBER)] = this.snapshotCurrentFloor();
+    return {
+      version: SAVE_VERSION,
+      kind,
+      timestamp: Date.now(),
+      playTimeMs: this.playTimeMs(),
+      locale: this.story.locale,
+      floor: FLOOR_NUMBER,
+      position: { x: this.player.x, y: this.player.y, dir: this.player.dir },
+      oil: this.oil,
+      party: HERO_IDS.map((id) => snapshotHero(this.combat.heroes[id], this.hud.heroes[id]?.armour)),
+      bag: this.bag.serialize(),
+      floors: { ...this.floorStates },
+      flags: [...this.flags],
+      firedOnce: this.storyProgress.serialize().fired,
+      goals: this.storyProgress.serialize().goals,
+      journalPages: [...this.journalPages],
+      dialogue: Object.fromEntries(this.dialogue),
+      escapeRunActive: this.escapeRunActive,
+      leader: 'brannoc'
+    };
+  }
+
+  applySave(save: SavePayload) {
+    this.audioManager?.fadeGameOver(300);
+    document.getElementById('gameover')?.classList.remove('show');
+    this.hud?.clearLog();
+    this.lastMessage = '';
+    this.restoreTiles();
+    this.restoreSconceDefaults();
+    this.flags = new Set(save.flags ?? []);
+    this.storyProgress.restore({ fired: save.firedOnce, goals: save.goals });
+    this.playAccMs = save.playTimeMs ?? 0;
+    this.playStartedAt = performance.now();
+    this.escapeRunActive = !!save.escapeRunActive;
+    this.oil = save.oil;
+    this.bag.load(save.bag ?? []);
+    this.player.hasKey = this.bag.has('key') || this.bag.has('captain_key');
+    this.floorStates = { ...(save.floors ?? {}) };
+    this.journalPages = new Set(save.journalPages ?? []);
+    this.dialogue = new Map(Object.entries(save.dialogue ?? {}));
+    const floor = floorState(save) ?? this.floorStates[String(save.floor)];
+    for (const t of floor?.tiles ?? []) {
+      const tile = floor1.tiles[t.y]?.[t.x];
+      if (!tile) continue;
+      if (t.item === null) tile.item = undefined;
+      else if (t.item !== undefined) tile.item = t.item;
+      if (t.chestOpen !== undefined) tile.chestOpen = t.chestOpen;
+      if (t.chestItems !== undefined) tile.chestItems = [...t.chestItems];
+      if (t.doorOpen !== undefined) {
+        tile.doorOpen = t.doorOpen;
+        const visual = this.sceneBuilder.doors.get(t.x, t.y);
+        if (visual) this.sceneBuilder.doors.snapOpen(visual, !!t.doorOpen);
+      }
+      if (t.doorLocked !== undefined) tile.doorLocked = t.doorLocked;
+      if (t.secretOpen !== undefined) {
+        tile.secretOpen = t.secretOpen;
+        this.sceneBuilder.setSecretOpen(this.renderer.scene, t.x, t.y, !!t.secretOpen);
+      }
+      if (t.puzzle) tile.puzzle = { ...t.puzzle };
+    }
+    this.spriteManager.resetItems(floor1);
+    for (const s of floor?.sconces ?? []) {
+      const live = floor1Sconces.find((c) => c.x === s.x && c.y === s.y && c.face === s.face);
+      if (!live || live.capped) continue;
+      live.lit = !!s.lit;
+      live.empty = !!s.empty;
+      this.torches.syncFromSconce(live);
+    }
+    this.combat.resetParty();
+    for (const hero of save.party ?? []) this.combat.applyHero(hero);
+    this.combat.restoreMonsters(floor?.monsters ?? []);
+    this.spriteManager.resetMonsters(floor1);
+    for (const m of this.combat.monsters) {
+      const sprite =
+        this.spriteManager.sprites.find((s) => s.kind === 'monster' && s.monsterKind === m.kind && !s.monsterId) ??
+        this.spriteManager.sprites.find((s) => s.kind === 'monster' && s.monsterKind === m.kind);
+      if (!sprite) continue;
+      sprite.monsterId = m.id;
+      this.spriteManager.moveMonsterId(m.id, m.x, m.y);
+      if (!m.alive) this.spriteManager.hideDeadMonsterId(m.id);
+    }
+    for (const id of HERO_IDS) {
+      const h = this.combat.heroes[id];
+      this.hud.setHand(id, 'main', h.equipment.main as GearId);
+      this.hud.setHand(id, 'off', h.equipment.off as GearId);
+      if (this.hud.heroes[id]) this.hud.heroes[id].armour = save.party.find((p) => p.id === id)?.armour;
+    }
+    this.player.setPosition(save.position.x, save.position.y, save.position.dir);
+    this.combat.setPartyPos(this.player.x, this.player.y, this.player.dir);
+    this.syncEquipmentToCombat();
+    this.syncPartyHud();
+    this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
+    this.torches.setParty(this.player.x, this.player.y, this.player.dir);
+    this.syncCarriedLight();
+    this.vertexLighting.relight();
+    this.updateOilHud();
+    this.updateDoorButton();
+    this.inventory?.redraw();
+    this.lastHitType = null;
+    this.hud.hideFrostHint();
+    this.hud.setFrostHintDismissed(this.flags.has('frost_hint_dismissed'));
+    this.clearFlankFlash();
+    this.closeBag();
+    this.rebuildAudioFromState();
+    this.audioManager?.updateListener(this.player.x, this.player.y, this.player.dir);
+  }
+
+  private rebuildAudioFromState() {
+    this.audioManager?.stopPresenceLoops();
+    this.audioManager?.rebuildFloorLoops({
+      oil: this.oil,
+      sconces: floor1Sconces,
+      leeches: this.combat.monsters.map((m) => ({ kind: m.kind, x: m.x, y: m.y, alive: m.alive })),
+      carriedTorch: !!this.hud.carriedTorch()?.lit
+    });
+  }
+
+  canAutosave(): boolean {
+    if (this.phase !== 'play') return false;
+    if (this.escapeRunActive) return false;
+    if (this.combat?.gameOver) return false;
+    if (this.combat?.fight) return false;
+    if (this.combat && this.combat.nearestMonsterDist() <= 2) return false;
+    if (this.combat && this.combat.allHeroesUnderHpFrac(0.25)) return false;
+    return true;
+  }
+
+  tryAutosave(_reason = 'auto'): boolean {
+    if (!this.canAutosave()) return false;
+    return writeAutosave(this.captureSave('autosave'));
+  }
+
+  takeFloorSnapshot() {
+    writeFloorSnapshot(this.captureSave('floor'));
+  }
+
+  saveBlockedReason(): string | null {
+    if (this.combat?.fight) return 'combat';
+    if (this.escapeRunActive) return 'escape';
+    return null;
+  }
+
+  requestManualSave() {
+    const blocked = this.saveBlockedReason();
+    if (blocked) {
+      this.showPrompt(this.story.titleText('save_blocked'));
+      this.audioManager?.playUi('ui_button_denied');
+      return;
+    }
+    this.title.prepareSave(this.captureSave('slot'));
+    this.title.show('save');
+  }
+
+  commitSlot(slot: number) {
+    const payload = this.title.getMode() === 'save' ? this.captureSave('slot') : this.captureSave('slot');
+    if (writeSlot(slot, payload)) {
+      this.currentSlot = slot;
+      this.showPrompt(this.story.titleText('saved'));
+      this.audioManager?.playUi('save');
+      this.title.hide();
+    } else {
+      this.showPrompt(this.story.uiText('status.save_failed'));
+    }
+  }
+
+  private speakBark(trigger: string, forcedSpeaker?: HeroId) {
+    const entry = this.story.barkEntry(trigger);
+    const text = entry?.text || this.story.bark(trigger);
+    if (!text) return false;
+    const speaker = (forcedSpeaker || (entry?.speaker as HeroId) || 'brannoc') as HeroId;
+    const name = this.story.speakerName(speaker);
+    this.lastMessage = `${name}: ${text}`;
+    this.hud?.pushLog(`${name}: ${text}`);
+    this.bubble?.show(text, speaker, name);
+    return true;
+  }
+
+  private fireTileBark(x: number, y: number) {
+    const tile = this.player.tileAt(x, y);
+    if (!tile?.bark) return;
+    const key = `bark:${tile.bark}`;
+    if (this.flags.has(key) || !this.storyProgress.fire(tile.bark)) return;
+    if (this.speakBark(tile.bark)) this.flags.add(key);
+  }
+
+  openSecretAt(x: number, y: number): boolean {
+    const tile = this.player.tileAt(x, y);
+    if (!tile?.secret || tile.secretOpen) return false;
+    tile.secretOpen = true;
+    this.flags.add('secret_found');
+    this.sceneBuilder.setSecretOpen(this.renderer.scene, x, y, true);
+    this.spriteManager.resetItems(floor1);
+    this.combat.setOccupancy(
+      openGrid(
+        (ox, oy) => {
+          const t = floor1.tiles[oy]?.[ox];
+          if (!t || t.wall) return true;
+          if (t.secret && !t.secretOpen) return true;
+          if (t.door && !t.doorOpen) return true;
+          if (t.prop === 'beams_fallen' || t.prop === 'desk') return true;
+          return false;
+        },
+        floor1.width,
+        floor1.height,
+        (ox, oy) => {
+          const t = floor1.tiles[oy]?.[ox];
+          return !!(t?.deepWater || t?.shallowWater);
+        }
+      )
+    );
+    this.vertexLighting.relight();
+    if (this.storyProgress.fire('secret_found')) this.showMessage(this.storyLog('secret_found'));
+    this.speakBark('secret_wall', 'brannoc');
+    return true;
+  }
+
+  private async setLocale(locale: Locale) {
+    saveLocale(locale);
+    await this.story.load(locale);
+    document.documentElement.lang = locale;
+    this.applyStoryLabels();
+    this.title.story = this.story;
+    this.title.refreshHint();
+    this.title.layoutButtons();
+  }
+
+  private async wireTitleAndIntro() {
+    const titleCanvas = document.getElementById('title-canvas') as HTMLCanvasElement | null;
+    const introCanvas = document.getElementById('intro-canvas') as HTMLCanvasElement | null;
+    const bubbleCanvas = document.getElementById('speech-bubble') as HTMLCanvasElement | null;
+    if (bubbleCanvas) {
+      this.bubble = new SpeechBubble(bubbleCanvas);
+      await this.bubble.load();
+    }
+    if (introCanvas) {
+      this.intro = new IntroPlayer(introCanvas, this.story);
+      await this.intro.load();
+      introCanvas.addEventListener('pointerup', (e) => {
+        if (!e.isPrimary) return;
+        this.skipIntro();
+      });
+    }
+    if (!titleCanvas) return;
+    this.title = new TitleScreen(titleCanvas, this.story, (action) => {
+      if (action.type === 'toast' || action.type === 'language') {
+        this.audioManager?.playUi('ui_button_denied');
+        if (action.type === 'toast') this.showTitleToast(action.text);
+        else void this.setLocale(action.locale);
+        return;
+      }
+      this.audioManager?.playUi('ui_button');
+      if (action.type === 'new_game') {
+        this.startNewGame();
+        return;
+      }
+      if (action.type === 'continue' || action.type === 'load') {
+        this.title.hide();
+        this.audioManager.markPlayStarted();
+        this.applySave(action.payload);
+        this.beginPlay();
+        return;
+      }
+      if (action.type === 'save') this.commitSlot(action.slot);
+    });
+    await this.title.load();
+    this.title.refreshHint();
+    if (!this.skipTitle) {
+      this.phase = 'title';
+      document.getElementById('tap-to-start')?.classList.add('hidden');
+      this.title.show('title');
+      void this.audioManager.loadSounds(this.renderer.scene, floor1Sconces).then(() => {
+        if (this.phase === 'title') this.audioManager.playMenu();
+      });
+    }
+  }
+
+  private showTitleToast(text: string) {
+    const el = document.getElementById('title-toast');
+    if (!el) {
+      this.showPrompt(text);
+      return;
+    }
+    el.textContent = text;
+    el.classList.add('show');
+    window.setTimeout(() => el.classList.remove('show'), 1600);
+  }
+
+  private wireVisibilityAutosave() {
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.tryAutosave('quiet');
+    });
+    window.addEventListener('pagehide', () => this.tryAutosave('quiet'));
+  }
+
+  private startNewGame() {
+    this.title.hide();
+    this.audioManager.markPlayStarted();
+    this.restoreSconceDefaults();
+    this.resetFloorState();
+    this.flags.clear();
+    this.playAccMs = 0;
+    this.playStartedAt = performance.now();
+    this.storyProgress.startNewGame();
+    this.journalPages.clear();
+    this.dialogue.clear();
+    this.floorStates = {};
+    this.hud.resetFrostHint();
+    this.pendingStartSnapshot = true;
+    this.phase = 'intro';
+    this.audioManager.crossfadeToIntro();
+    const overlay = document.getElementById('intro-overlay');
+    if (overlay && this.intro) {
+      overlay.classList.add('show');
+      this.intro.start();
+    } else {
+      this.beginPlay();
+    }
+  }
+
+  private skipIntro() {
+    this.intro?.skip();
+    document.getElementById('intro-overlay')?.classList.remove('show');
+    this.beginPlay();
+  }
+
+  private beginPlay() {
+    this.phase = 'play';
+    if (!this.playStartedAt) this.playStartedAt = performance.now();
+    this.audioManager.markPlayStarted();
+    if (this.storyProgress.fire('enter_floor1')) this.showMessage(this.storyLog('enter_floor1'));
+    this.storyProgress.fire('f1_start');
+    if (this.pendingStartSnapshot) {
+      this.takeFloorSnapshot();
+      this.pendingStartSnapshot = false;
+    }
+    this.audioManager.crossfadeToAct1();
+    this.startLoop();
+  }
+
+  private markFrostHintDismissed() {
+    this.hud.dismissFrostHint();
+    this.flags.add('frost_hint_dismissed');
+  }
+
+  private startLoop() {
+    if (this.loopStarted) {
+      this.audioManager.unlock();
+      return;
+    }
+    this.loopStarted = true;
+    document.getElementById('tap-to-start')?.classList.add('hidden');
+    this.audioManager.unlock();
+    this.lastTime = performance.now();
+    this.fpsLastTime = this.lastTime;
+    requestAnimationFrame(() => this.gameLoop());
+    void this.loadFloorAudio();
+  }
+
+  private async loadFloorAudio() {
+    try {
+      await this.audioManager.loadSounds(this.renderer.scene, floor1Sconces);
+      this.audioManager.attachDressing(this.renderer.scene, this.dressing.marks);
+      this.audioManager.attachWaterPools(this.renderer.scene, floor1);
+      this.audioManager.startNamedLoop('lamp_hooks', 11 * CELL_SIZE, 0.55, 9 * CELL_SIZE, 0.38, 'named');
+      this.rebuildAudioFromState();
+    } catch (err) {
+      console.warn('Audio init failed', err);
+      this.audioManager.startLanternLoop(this.oil > 0);
+    }
+  }
+
   handleDoor(x: number, y: number) {
     const ahead = this.doorAhead();
     if (!ahead || ahead.x !== x || ahead.y !== y) return;
@@ -1199,13 +1753,14 @@ class Game {
       const fromBag = this.bag.has('key');
       if (!fromBag && !this.player.hasKey) {
         this.audioManager.playDoor('door_locked', x, y);
-        this.showPrompt(this.storyLog('door_locked'));
+        if (this.storyProgress.fire('door_locked')) this.showPrompt(this.storyLog('door_locked'));
         return;
       }
       if (fromBag) this.bag.remove('key', 1);
       this.syncKeyFlag();
       tile.doorLocked = false;
       this.audioManager.playDoor('door_unlock', x, y);
+      if (this.storyProgress.fire('door_unlocked')) this.showMessage(this.storyLog('door_unlocked'));
       this.pendingUnlock = { x, y };
       this.doorUnlockTimer = performance.now() + DOOR_UNLOCK_LEAD_MS;
       return;
@@ -1392,6 +1947,14 @@ class Game {
       hitFxPlaying: () => this.spriteManager.hitFxPlaying(),
       hostTint: (id: string) => this.spriteManager.hostTint(id),
       frostHint: () => this.hud.frostHintState(),
+      armFrostHint: () => this.hud.armFrostHint(),
+      dismissFrostHint: () => this.markFrostHintDismissed(),
+      playStarted: () => this.audioManager.playStarted,
+      menuPlaying: () => this.audioManager.isMenuPlaying(),
+      gameOverPlaying: () => this.audioManager.isGameOverPlaying(),
+      playingLoopNames: () => this.audioManager.loopKit(true).names.slice(),
+      handleDoor: (x: number, y: number) => this.handleDoor(x, y),
+      floorSnapshotGoals: () => loadFloorSnapshot(FLOOR_NUMBER)?.goals ?? {},
       lastFlank: () => this.lastFlank,
       flashFlank: (side: 'left' | 'right' | 'behind') => this.flashFlank(side),
       partyState: () => this.combat.partyState(),
@@ -1507,6 +2070,116 @@ class Game {
         equipment: this.equipmentState(),
         oil: this.oil
       }),
+      captureSave: () => this.captureSave('slot'),
+      applySave: (raw: SavePayload) => this.applySave(raw),
+      saveToSlot: (slot: number) => {
+        const ok = writeSlot(slot, this.captureSave('slot'));
+        if (ok) this.currentSlot = slot;
+        return ok;
+      },
+      loadFromSlot: (slot: number) => {
+        const data = loadSlot(slot);
+        if (!data || data === 'corrupt') return false;
+        this.applySave(data);
+        return true;
+      },
+      requestManualSave: () => this.requestManualSave(),
+      commitSlot: (slot: number) => this.commitSlot(slot),
+      tryAutosave: () => this.tryAutosave('auto'),
+      canAutosave: () => this.canAutosave(),
+      takeFloorSnapshot: () => this.takeFloorSnapshot(),
+      loadAutosave: () => this.loadAutosave(),
+      newestAutosave: () => newestAutosave(),
+      hasAnySave: () => hasAnySave(),
+      listAutosaves: () => listAutosaves(),
+      fireVisibilityAutosave: () => this.tryAutosave('quiet'),
+      openSecret: (x: number, y: number) => this.openSecretAt(x, y),
+      secretOpen: (x: number, y: number) => !!this.player.tileAt(x, y)?.secretOpen,
+      speakBark: (trigger: string, speaker?: HeroId) => this.speakBark(trigger, speaker),
+      bubbleVisible: () => !!this.bubble?.visible,
+      bubbleText: () => this.bubble?.displayText() ?? '',
+      flags: () => [...this.flags],
+      addFlag: (f: string) => {
+        this.flags.add(f);
+        this.rememberStoryKey(f);
+        this.storyProgress.fire(f);
+      },
+      fireOnce: (id: string) => {
+        const ok = this.storyProgress.fire(id);
+        if (ok) this.rememberStoryKey(id);
+        return ok;
+      },
+      firedOnce: () => [...this.storyProgress.fired],
+      goals: () => this.storyProgress.snapshotGoals(),
+      setGoal: (id: string, status: 'hidden' | 'active' | 'done' | 'failed') => {
+        this.storyProgress.goals.set(id, status);
+      },
+      loopNames: () =>
+        this.audioManager
+          .loopKit(false)
+          .names.filter((n) => n !== 'menu' && n !== 'intro')
+          .slice()
+          .sort(),
+      persistCalled: () => !!(globalThis as { __proto3dPersistCalled?: boolean }).__proto3dPersistCalled,
+      killKind: (kind: string) => {
+        const m = this.combat.monsters.find((x) => x.kind === kind && x.alive);
+        if (!m) return false;
+        m.alive = false;
+        m.hp = 0;
+        m.deadAt = 1;
+        this.spriteManager.hideDeadMonsterId(m.id);
+        return true;
+      },
+      mapState: () => ({
+        oil: this.oil,
+        bag: this.bag.serialize(),
+        carried: this.hud.carriedTorch(),
+        position: { x: this.player.x, y: this.player.y, dir: this.player.dir },
+        doors: this.tileSnap
+          .filter((t) => floor1.tiles[t.y][t.x].door)
+          .map((t) => ({ x: t.x, y: t.y, open: !!floor1.tiles[t.y][t.x].doorOpen })),
+        secrets: this.tileSnap
+          .filter((t) => floor1.tiles[t.y][t.x].secret)
+          .map((t) => ({ x: t.x, y: t.y, open: !!floor1.tiles[t.y][t.x].secretOpen })),
+        items: this.tileSnap
+          .filter((t) => floor1.tiles[t.y][t.x].item || t.item)
+          .map((t) => ({ x: t.x, y: t.y, item: floor1.tiles[t.y][t.x].item ?? null })),
+        chests: this.tileSnap
+          .filter((t) => floor1.tiles[t.y][t.x].chest)
+          .map((t) => ({
+            x: t.x,
+            y: t.y,
+            open: !!floor1.tiles[t.y][t.x].chestOpen,
+            loot: floor1.tiles[t.y][t.x].chestItems ?? []
+          })),
+        sconces: floor1Sconces.map((s) => ({
+          x: s.x,
+          y: s.y,
+          face: s.face,
+          lit: !!s.lit,
+          empty: !!s.empty
+        })),
+        monsters: this.combat.monsters.map((m) => ({
+          kind: m.kind,
+          x: m.x,
+          y: m.y,
+          hp: m.hp,
+          alive: m.alive
+        })),
+        flags: [...this.flags],
+        firedOnce: [...this.storyProgress.fired],
+        goals: this.storyProgress.snapshotGoals()
+      }),
+      setEscapeRun: (on: boolean) => {
+        this.escapeRunActive = on;
+      },
+      titleVisible: () => !!document.getElementById('title-overlay')?.classList.contains('show'),
+      introVisible: () => !!document.getElementById('intro-overlay')?.classList.contains('show'),
+      startNewGame: () => this.startNewGame(),
+      skipIntro: () => this.skipIntro(),
+      setLocale: (locale: Locale) => this.setLocale(locale),
+      showTitle: () => this.title.show('title'),
+      currentSlot: () => this.currentSlot,
       blockReason: (x: number, y: number) => this.player.blockReason(x, y),
       interactFacingProp: () => this.handleFacingProp(),
       swapArmed: () => this.isSwapArmed(),
@@ -1615,33 +2288,10 @@ class Game {
 
   setupTapToStart() {
     const tapToStart = document.getElementById('tap-to-start')!;
-    const start = async () => {
-      tapToStart.classList.add('hidden');
-      this.audioManager.unlock();
-      this.lastTime = performance.now();
-      this.fpsLastTime = this.lastTime;
-      requestAnimationFrame(() => this.gameLoop());
-      this.audioManager.startLanternLoop(this.oil > 0);
-      try {
-        await this.audioManager.loadSounds(this.renderer.scene, floor1Sconces);
-        this.audioManager.startLanternLoop(this.oil > 0);
-        this.audioManager.attachDressing(this.renderer.scene, this.dressing.marks);
-        this.audioManager.attachLeeches(this.renderer.scene, floor1);
-        this.audioManager.attachWaterPools(this.renderer.scene, floor1);
-        this.audioManager.startNamedLoop(
-          'lamp_hooks',
-          11 * CELL_SIZE,
-          0.55,
-          9 * CELL_SIZE,
-          0.38,
-          'named'
-        );
-      } catch (err) {
-        console.warn('Audio init failed', err);
-        this.audioManager.startLanternLoop(this.oil > 0);
-      }
-    };
-    tapToStart.addEventListener('click', start);
+    tapToStart.addEventListener('click', () => {
+      this.beginPlay();
+    });
+    if (this.skipTitle) tapToStart.classList.remove('hidden');
   }
 
   gameLoop() {
@@ -1649,6 +2299,12 @@ class Game {
     const deltaTime = now - this.lastTime;
     this.lastTime = now;
     const dtSec = Math.min(0.05, deltaTime / 1000);
+    this.bubble?.update(now);
+    if (this.phase !== 'play') {
+      this.renderer.render();
+      requestAnimationFrame(() => this.gameLoop());
+      return;
+    }
 
     const prevX = this.player.x;
     const prevY = this.player.y;

@@ -8,7 +8,7 @@
  },
  "slot": {
   "line1": "Όροφος {n}: {area}",
-  "line2": "{time} παιχνίδι",
+  "line2": "Χρόνος: {time}",
   "empty": "Κενή θέση",
   "empty_sub": "Το κάστρο περιμένει."
  },
@@ -40,5 +40,12 @@
   "en": "English",
   "el": "Ελληνικά"
  },
- "game_title": "Το Βυθισμένο Κάστρο"
+ "game_title": "Το Βυθισμένο Κάστρο",
+ "install_hint": {
+  "lines": [
+   "Πρόσθεσέ το στην οθόνη Αφετηρίας.",
+   "Αλλιώς χάνονται τα σωσίματα."
+  ],
+  "_when": "title screen, only in Safari when not launched from the Home Screen (navigator.standalone false); pixel font; never in the installed app"
+ }
 }

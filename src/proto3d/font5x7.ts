@@ -50,6 +50,32 @@ function drawTintedGlyph(
   ctx.drawImage(tintScratch, dx, dy);
 }
 
+/** Wrap a log line so it fits `maxChars` (6px advance) instead of clipping. */
+export function wrapFontLine(text: string, maxChars: number): string[] {
+  if (maxChars < 1) return [text];
+  if (text.length <= maxChars) return [text];
+  const words = text.split(/(\s+)/);
+  const lines: string[] = [];
+  let cur = '';
+  for (const part of words) {
+    if (!part) continue;
+    if (part.length > maxChars && !/^\s+$/.test(part)) {
+      if (cur.trim()) lines.push(cur);
+      cur = '';
+      for (let i = 0; i < part.length; i += maxChars) lines.push(part.slice(i, i + maxChars));
+      continue;
+    }
+    const next = cur + part;
+    if (next.length <= maxChars) cur = next;
+    else {
+      if (cur.trim()) lines.push(cur.replace(/\s+$/, ''));
+      cur = part.replace(/^\s+/, '');
+    }
+  }
+  if (cur.trim()) lines.push(cur.replace(/\s+$/, ''));
+  return lines.length ? lines : [text];
+}
+
 /** Draw one line with the 5×7 atlas, including the Greek block in `glyphs`. */
 export function drawFont5x7(
   ctx: CanvasRenderingContext2D,
