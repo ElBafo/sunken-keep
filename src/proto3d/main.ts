@@ -113,6 +113,7 @@ class Game {
       const el = document.createElement('div');
       el.id = 'fps-counter';
       el.textContent = 'FPS: --';
+      el.style.display = 'block';
       document.body.appendChild(el);
       this.fpsCounter = el;
     }

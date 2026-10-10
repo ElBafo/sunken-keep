@@ -238,7 +238,7 @@ test('proto3d lighting: pools, relight, oil, no 404s', async ({ page }) => {
   });
   await page.waitForTimeout(200);
   expect(await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.lastMessage())).toBe(
-    'Sealed. Dwarves don\'t do "temporary".'
+    "Sealed. It'll take forge-fire to open."
   );
   expect(
     await page.evaluate(
