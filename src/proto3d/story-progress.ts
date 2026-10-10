@@ -44,26 +44,6 @@ function mentions(field: string | undefined, eventId: string): boolean {
   return norm.split(/[^a-z0-9_]+/).includes(id);
 }
 
-function parseTriggers(raw: unknown): TriggerDef[] {
-  if (!raw || typeof raw !== 'object') return [];
-  const rec = raw as Record<string, unknown>;
-  const list = Array.isArray(raw) ? raw : Array.isArray(rec.triggers) ? rec.triggers : null;
-  if (!list) return [];
-  const out: TriggerDef[] = [];
-  for (const item of list) {
-    if (!item || typeof item !== 'object') continue;
-    const row = item as Record<string, unknown>;
-    const id = typeof row.id === 'string' ? row.id : typeof row.key === 'string' ? row.key : '';
-    if (!id) continue;
-    out.push({
-      id,
-      type: typeof row.type === 'string' ? row.type : typeof row.kind === 'string' ? row.kind : undefined,
-      once: row.once === true
-    });
-  }
-  return out;
-}
-
 export class StoryProgress {
   fired = new Set<string>();
   goals = new Map<string, GoalStatus>();
@@ -71,13 +51,9 @@ export class StoryProgress {
   private goalDefs: GoalDef[] = [];
 
   async load(base: string) {
-    const [triggersRaw, goalsRaw] = await Promise.all([
-      fetchJson(`${base}story/triggers_act1.json`),
-      fetchJson(`${base}story/goals_act1.json`)
-    ]);
-    const parsed = parseTriggers(triggersRaw);
-    const defs = parsed.length ? parsed : FALLBACK_ONCE;
-    this.onceIds = new Set(defs.filter((t) => t.once).map((t) => t.id));
+    // triggers_act1.json is a design leftover and is not shipped in public/.
+    this.onceIds = new Set(FALLBACK_ONCE.filter((t) => t.once).map((t) => t.id));
+    const goalsRaw = await fetchJson(`${base}story/goals_act1.json`);
     const goals = (goalsRaw as { goals?: GoalDef[] } | null)?.goals;
     this.goalDefs = Array.isArray(goals) ? goals : [];
     if (!this.goals.size) this.resetGoals();
@@ -152,7 +128,7 @@ export class StoryProgress {
 
 async function fetchJson(url: string): Promise<unknown | null> {
   try {
-    const res = await fetch(url);
+    const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
     if (!res.ok) return null;
     return res.json();
   } catch {
