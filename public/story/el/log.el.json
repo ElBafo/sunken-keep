@@ -69,7 +69,7 @@
  },
  {
   "key": "water_shallow",
-  "text": "Το νερό βαθαίνει.",
+  "text": "Νερό ως τους αστραγάλους.",
   "when": "first step into shallow water"
  },
  {
@@ -101,7 +101,7 @@
  },
  {
   "key": "monster_hit",
-  "text": "{monster}: χτυπά {hero} για {n}."
+  "text": "{monster} χτυπά. {hero}: -{n}."
  },
  {
   "key": "monster_dies",
@@ -109,7 +109,7 @@
  },
  {
   "key": "leech_latch",
-  "text": "Μια βδέλλα κολλάει πάνω σε {hero}!"
+  "text": "{hero}: μια βδέλλα κόλλησε!"
  },
  {
   "key": "leech_drain",
@@ -126,7 +126,7 @@
  },
  {
   "key": "not_ready",
-  "text": "{hero}: όχι ακόμα έτοιμος/η."
+  "text": "{hero}: το χέρι δεν είναι έτοιμο."
  },
  {
   "key": "party_dead",
@@ -242,7 +242,7 @@
  },
  {
   "key": "torch_capped",
-  "text": "Κλειστή. Οι νάνοι δεν κάνουν \"προσωρινά\".",
+  "text": "Σφραγισμένη. Θέλει φωτιά από καμίνι.",
   "when": "on tapping a capped torch"
  },
  {
@@ -263,7 +263,7 @@
  {
   "key": "torch_dunk",
   "text": "{hero}: βουτά τη δάδα. Σσσ. Τέλος.",
-  "when": "on dropping a held torch into water"
+  "when": "on stepping into deep water while holding a lit torch (shallow water never puts it out)"
  },
  {
   "key": "carving_bowl",
@@ -487,5 +487,71 @@
   "key": "no_oil",
   "text": "Δεν έμεινε λάδι. Φτάνει η σπίθα της Ρεν.",
   "when": "tapping a dead torch with 0 oil"
+ },
+ {
+  "key": "blocked_cistern",
+  "text": "Η στέρνα. Πλημμυρισμένη ως το ταβάνι."
+ },
+ {
+  "key": "lever_far_click",
+  "text": "Κάπου μακριά, πέτρα σέρνεται στην άκρη."
+ },
+ {
+  "key": "blocked_waterdoor",
+  "text": "Νερό στέκεται στο άνοιγμα. Περιμένει."
+ },
+ {
+  "key": "blocked_cellgate",
+  "text": "Κλειδωμένη. Το κλειδί το έχει ο λοχαγός."
+ },
+ {
+  "key": "blocked_stairs_f4",
+  "text": "Η σκάλα είναι πνιγμένη. Προς το παρόν."
+ },
+ {
+  "key": "enter_stores",
+  "text": "Αποθήκη. Σακιά και πεσμένα ράφια."
+ },
+ {
+  "key": "enter_cistern",
+  "text": "Η στέρνα άδειασε. Έμειναν οι αρουραίοι."
+ },
+ {
+  "key": "gate_unlocked",
+  "text": "Το κλειδί του λοχαγού γυρνά. Ανοίγει."
+ },
+ {
+  "key": "goal_new",
+  "text": "Ημερολόγιο: νέος στόχος."
+ },
+ {
+  "key": "punch_air",
+  "text": "{hero}: γροθιά στον αέρα. Ωραία ήταν.",
+  "when": "an empty-hand tap with nothing in front"
+ },
+ {
+  "key": "webbed",
+  "text": "{hero}: κόλλησε στον ιστό!",
+  "when": "a hero is webbed and can't act"
+ },
+ {
+  "key": "sand_miss",
+  "text": "Άμμος στα μάτια. Χτυπά το κενό.",
+  "when": "a monster misses because of pocket sand"
+ },
+ {
+  "key": "monster_flank_left",
+  "text": "{monster}: επίθεση από αριστερά!",
+  "when": "a monster attacks the party from a side or behind it isn't facing (red edge flash)"
+ },
+ {
+  "key": "monster_flank_right",
+  "text": "{monster}: επίθεση από δεξιά!",
+  "when": "a monster attacks the party from a side or behind it isn't facing (red edge flash)"
+ },
+ {
+  "key": "monster_flank_behind",
+  "text": "{monster}: επίθεση από πίσω!",
+  "when": "a monster attacks the party from a side or behind it isn't facing (red edge flash)"
  }
 ]

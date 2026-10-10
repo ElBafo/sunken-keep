@@ -86,7 +86,7 @@
    "body": "The keep keeps you. For now.",
    "load_last": "Autosave",
    "title_screen": "Title",
-   "load_floor": "Stairs"
+   "load_floor": "Floor {n}"
   }
  },
  "step3_inventory": {
@@ -163,8 +163,8 @@
    "captain_key": {
     "name": "Captain's key",
     "short": "Key",
-    "desc": "Dural's. Opens nothing now but memories.",
-    "effect": "A keepsake."
+    "desc": "Dural's. Opens the cell-wing door.",
+    "effect": "Opens the cell wing. Then a keepsake."
    },
    "iron_shield": {
     "name": "Iron shield",
@@ -289,5 +289,36 @@
    "ambience_short": "Ambience"
   },
   "tap_to_start": "Tap to start"
+ },
+ "journal": {
+  "_about": "Journal screen: tabs Goals / Map / Pages (pages = story/journal_act1.json). Goals text: story/goals_act1.json.",
+  "title": "Journal",
+  "tab_goals": "Goals",
+  "tab_map": "Map",
+  "tab_pages": "Pages",
+  "empty": "Nothing pressing. Explore.",
+  "done": "Done",
+  "failed": "Lost",
+  "optional": "Optional",
+  "optional_short": "Opt.",
+  "floor": "Floor {n}",
+  "map_unseen": "Not mapped yet.",
+  "open": "Journal",
+  "close": "Close"
+ },
+ "act1_end_card": {
+  "_about": "End card after log act1_end. One recap line per flag, then the teaser picked by saved_tam, then the button. Hobb: freed / drowned / left (met_hobb, neither flag) / unmet.",
+  "title": "Act 1 complete: The Drowned Halls.",
+  "tam_saved": "Tam: carried out.",
+  "tam_left": "Tam: left in the cell.",
+  "dural_spared": "Dural: spared.",
+  "dural_fought": "Dural: fought.",
+  "hobb_freed": "Hobb: freed. Debt paid.",
+  "hobb_drowned": "Hobb: drowned.",
+  "hobb_left": "Hobb: still under the shelf.",
+  "hobb_unmet": "Hobb: never found.",
+  "teaser_saved": "Tam is shivering, but walking. Below: the Homes.",
+  "teaser_left": "Mags hasn't spoken since the cells. Below: the Homes.",
+  "continue": "Continue"
  }
 }

@@ -1,0 +1,41 @@
+{
+ "file": "gameover_bg.png",
+ "size": [
+  270,
+  585
+ ],
+ "scale": "same as the game canvas: scale to screen width, NEAREST; fill any extra height above with the top colour and below with the bottom colour",
+ "waterSurfaceY": 300,
+ "text": {
+  "rect": [
+   10,
+   232,
+   250,
+   40
+  ],
+  "source": "story/ui_text.json \"title\": \"The water takes you all.\" (+ Greek in story/el/)",
+  "font": "font_5x7 (or the title font), colour #d8ccb0, shadow #1a1210, centred; 2 lines max at 10 px line height"
+ },
+ "buttons": [
+  {
+   "id": "last_autosave",
+   "rect": [
+    85,
+    410,
+    100,
+    31
+   ]
+  },
+  {
+   "id": "start_of_floor",
+   "rect": [
+    85,
+    449,
+    100,
+    31
+   ]
+  }
+ ],
+ "buttonNote": "two stacked stone buttons, 100x31 px each (146x45 pt), 8 px apart. Sprite: ui/panel/button_9slice.png / button_pressed_9slice.png, sliceMargin 4, stretched to the rect. Labels drawn by code (font_5x7, #d8ccb0, shadow #1a1210 +1,+1, centred, glyph box top at rect.y+12, +1 px when pressed). Up to 8 glyphs = 47 px fits easily; room for 14 glyphs.",
+ "note": "Heroes' silhouettes (from the healthy portraits) sink left to right: Brannoc, Wren, Ilsevar, Mags. Bands at y 226-278 and 398-488 are kept calm and dark for text and buttons."
+}

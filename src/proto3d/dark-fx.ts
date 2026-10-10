@@ -62,6 +62,8 @@ function fxMaterial(map: THREE.Texture) {
 interface EyeSlot {
   x: number;
   y: number;
+  spawnX: number;
+  spawnY: number;
   monster: string;
   tint: EyeTint;
   sprite: THREE.Sprite;
@@ -154,6 +156,8 @@ export class DarkFx {
           this.eyes.push({
             x,
             y,
+            spawnX: x,
+            spawnY: y,
             monster: tile.monster,
             tint,
             sprite,
@@ -227,6 +231,45 @@ export class DarkFx {
     }
   }
 
+  moveEye(fromX: number, fromY: number, toX: number, toY: number, audio?: AudioManager) {
+    const eye = this.eyes.find((e) => e.x === fromX && e.y === fromY);
+    if (!eye) return;
+    eye.x = toX;
+    eye.y = toY;
+    eye.sprite.position.x = toX * CELL_SIZE;
+    eye.sprite.position.z = toY * CELL_SIZE;
+    if (eye.presenceId) {
+      audio?.stopNamedLoop(eye.presenceId);
+      eye.presenceId = null;
+    }
+  }
+
+  hideEye(x: number, y: number, audio?: AudioManager) {
+    for (const eye of this.eyes) {
+      if (eye.x === x && eye.y === y) {
+        eye.sprite.visible = false;
+        if (eye.presenceId) {
+          audio?.stopNamedLoop(eye.presenceId);
+          eye.presenceId = null;
+        }
+      }
+    }
+  }
+
+  resetEyes(audio?: AudioManager) {
+    for (const eye of this.eyes) {
+      if (eye.presenceId) {
+        audio?.stopNamedLoop(eye.presenceId);
+        eye.presenceId = null;
+      }
+      eye.x = eye.spawnX;
+      eye.y = eye.spawnY;
+      eye.sprite.position.x = eye.x * CELL_SIZE;
+      eye.sprite.position.z = eye.y * CELL_SIZE;
+      eye.sprite.visible = false;
+    }
+  }
+
   update(
     now: number,
     lighting: VertexLightingManager,
@@ -240,7 +283,19 @@ export class DarkFx {
     const glintMs = 1000 / GLINT_ANIM_FPS;
 
     for (const eye of this.eyes) {
-      const lit = lighting.isSquareLit(eye.x, eye.y);
+      const host = sprites.sprites.find(
+        (s) => s.kind === 'monster' && s.x === eye.x && s.y === eye.y && !s.hidden
+      );
+      if (!host) {
+        eye.sprite.visible = false;
+        if (eye.presenceId) {
+          audio.stopNamedLoop(eye.presenceId);
+          eye.presenceId = null;
+        }
+        continue;
+      }
+      const adjacent = Math.abs(eye.x - partyX) + Math.abs(eye.y - partyY) <= 1;
+      const lit = adjacent || lighting.isSquareLit(eye.x, eye.y);
       sprites.setLitVisible(eye.x, eye.y, 'monster', lit);
       eye.sprite.visible = !lit;
       if (lit) {
@@ -250,14 +305,15 @@ export class DarkFx {
         }
         continue;
       }
-      if (!eye.presenceId) {
-        eye.presenceId = audio.startNamedLoop(
+      if (!eye.presenceId && lighting.getAmbientFloor() >= 3) {
+        const id = audio.startNamedLoop(
           'dark_presence',
           eye.x * CELL_SIZE,
           eye.sprite.position.y,
           eye.y * CELL_SIZE,
           0.3
         );
+        if (id) eye.presenceId = id;
       }
       if (now >= eye.nextAt) {
         if (eye.resting) {

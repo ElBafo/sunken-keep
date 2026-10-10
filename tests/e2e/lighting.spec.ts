@@ -238,7 +238,7 @@ test('proto3d lighting: pools, relight, oil, no 404s', async ({ page }) => {
   });
   await page.waitForTimeout(200);
   expect(await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.lastMessage())).toBe(
-    'Sealed. Dwarves don\'t do "temporary".'
+    "Sealed. It'll take forge-fire to open."
   );
   expect(
     await page.evaluate(
@@ -411,6 +411,10 @@ test('proto3d floor1v2: start-key-door-hall-stairs and pantry-lamp room', async 
     [10, 2]
   ] as const) {
     await pose(x, y, 1);
+    if (x === 6) {
+      expect((await step('monster')).result, 'slime at (7,2) blocks the square').toBe('monster');
+      continue;
+    }
     expect((await step()).after).toMatchObject({ x: x + 1, y: 2 });
   }
   await pose(11, 2, 1);

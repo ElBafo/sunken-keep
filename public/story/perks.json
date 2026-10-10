@@ -1,0 +1,75 @@
+{
+ "_about": "Perk names and one-line descriptions. name <=12 chars, desc <=80 chars. Rules in levels/actions.json progression.perks.",
+ "screen": {
+  "title": "Choose a gift",
+  "sub": "{hero} has grown. Pick one. It's for keeps.",
+  "confirm": "Take it",
+  "back": "Back"
+ },
+ "perks": {
+  "shield_wall": {
+   "name": "Shield Wall",
+   "desc": "His shield covers both front heroes. Stand close."
+  },
+  "cleave": {
+   "name": "Cleave",
+   "desc": "Axe hits splash half damage onto a second monster."
+  },
+  "stubborn": {
+   "name": "Stubborn",
+   "desc": "Once per fight, a killing blow leaves him at 1 HP. Too rude to die."
+  },
+  "heavy_swing": {
+   "name": "Heavy Swing",
+   "desc": "Axe hits +3 damage, but he's half a second slower."
+  },
+  "quick_hands": {
+   "name": "Quick Hands",
+   "desc": "Dagger ready in 1.5 s instead of 2."
+  },
+  "dirty_tricks": {
+   "name": "Dirty Tricks",
+   "desc": "Pocket sand stops a wind-up, and it's ready sooner."
+  },
+  "backstab": {
+   "name": "Backstab",
+   "desc": "Dagger crits on 18-20. She knows where it hurts."
+  },
+  "light_fingers": {
+   "name": "Light Fingers",
+   "desc": "Once per floor, opens a lock with no key. Chests give 1 more potion."
+  },
+  "mercy": {
+   "name": "Mercy",
+   "desc": "Her heal also lifts a downed hero back up."
+  },
+  "steady_flame": {
+   "name": "Steady Flame",
+   "desc": "Every second torch she relights costs no oil."
+  },
+  "sanctuary": {
+   "name": "Sanctuary",
+   "desc": "Heal the two most hurt heroes at once. 6 mana."
+  },
+  "ember_ward": {
+   "name": "Ember Ward",
+   "desc": "Her ember lights a full extra square. Leeches won't touch her."
+  },
+  "deep_frost": {
+   "name": "Deep Frost",
+   "desc": "Frost bolt slows its target. Its next attack comes 1.5 s late."
+  },
+  "tidecaller": {
+   "name": "Tidecaller",
+   "desc": "+2 wand damage to anything standing in water. The swamp remembers."
+  },
+  "shatter": {
+   "name": "Shatter",
+   "desc": "Frost bolt crits on 17-20 and goes straight through slime."
+  },
+  "cold_blood": {
+   "name": "Cold Blood",
+   "desc": "Mana comes back every 6 steps, not 10. Scales have perks."
+  }
+ }
+}

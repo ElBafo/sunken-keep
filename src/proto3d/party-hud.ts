@@ -1,9 +1,11 @@
 import {
   DEFAULT_EQUIPMENT,
   DEFAULT_FORMATION,
+  MELEE_ITEMS,
   type HeroId,
   type ItemType
 } from '../constants';
+import { ITEM_ACT_SFX } from '../core/types';
 import { HAND_COOLDOWN_MS, OIL_MAX } from './constants';
 import { StoryText } from './i18n';
 import {
@@ -26,6 +28,8 @@ export interface HeroHud {
   formation: 'front' | 'back';
   equipment: { main: GearId; off: GearId };
   recovery: { main: number; off: number };
+  downed?: boolean;
+  pendingPerk: number | null;
 }
 
 const HERO_ORDER: HeroId[] = ['brannoc', 'wren', 'ilsevar', 'mags'];
@@ -37,23 +41,7 @@ const HERO_STATS: Record<HeroId, { maxHp: number; maxMana: number }> = {
   mags: { maxHp: 28, maxMana: 0 }
 };
 
-const ACT_SFX: Record<string, string> = {
-  axe: 'act_axe',
-  shield: 'act_shield',
-  iron_shield: 'act_shield',
-  mace: 'act_mace',
-  prayer_lantern: 'act_prayer',
-  prayer_lantern_ember: 'act_prayer',
-  wand: 'act_wand',
-  scroll: 'act_scroll',
-  dagger: 'act_dagger',
-  tricks_pouch: 'act_tricks',
-  empty_hand: 'act_punch',
-  fist: 'act_punch',
-  torch_lit: 'act_torch',
-  torch_burnt: 'act_torch',
-  ashmantle_hammer: 'act_axe'
-};
+const ACT_SFX = ITEM_ACT_SFX;
 
 function healthState(hp: number, maxHp: number): 'healthy' | 'wounded' | 'near_death' {
   const pct = maxHp <= 0 ? 0 : hp / maxHp;
@@ -89,6 +77,13 @@ export class PartyHud {
   private onLog: (text: string) => void;
   private playUi: (name: string) => void;
   private onCancel: () => void;
+  private levelFlash: { id: HeroId; started: number } | null = null;
+  private readyArmed: Record<string, boolean> = {};
+  private notReadyAt: Partial<Record<HeroId, number>> = {};
+  private frostHintDismissed = false;
+  private frostHintArmed = false;
+  private swapArmed = false;
+  lastHitType: string | null = null;
 
   constructor(
     story: StoryText,
@@ -144,7 +139,8 @@ export class PartyHud {
           main: DEFAULT_EQUIPMENT[id].main,
           off: DEFAULT_EQUIPMENT[id].off
         },
-        recovery: { main: 0, off: 0 }
+        recovery: { main: 0, off: 0 },
+        pendingPerk: null
       };
     }
     return out;
@@ -204,11 +200,21 @@ export class PartyHud {
       cache('font', 'art/font/font_5x7.png'),
       cache('downed', 'art/ui/panel/portrait_downed.png'),
       cache('levelup1', 'art/ui/panel/portrait_levelup_1.png'),
+      cache('levelup2', 'art/ui/panel/portrait_levelup_2.png'),
+      cache('levelup3', 'art/ui/panel/portrait_levelup_3.png'),
       cache('oil0', 'art/ui/oil/oil_gauge_0.png'),
       cache('oil1', 'art/ui/oil/oil_gauge_1.png'),
       cache('oil2', 'art/ui/oil/oil_gauge_2.png'),
       cache('oil3', 'art/ui/oil/oil_gauge_3.png'),
       cache('oil4', 'art/ui/oil/oil_gauge_4.png'),
+      cache('hint1', 'art/ui/hands/hand_glow_hint_1.png'),
+      cache('hint2', 'art/ui/hands/hand_glow_hint_2.png'),
+      cache('hint3', 'art/ui/hands/hand_glow_hint_3.png'),
+      cache('hint4', 'art/ui/hands/hand_glow_hint_4.png'),
+      cache('perk1', 'art/ui/perks/perk_pending_1.png'),
+      cache('perk2', 'art/ui/perks/perk_pending_2.png'),
+      cache('perk3', 'art/ui/perks/perk_pending_3.png'),
+      cache('perk4', 'art/ui/perks/perk_pending_4.png'),
       ...portraitFiles.map((name) => cache(name, `art/portraits/${name}.png`)),
       ...[...this.icons.values()].map((file) => cache(file, `art/ui/hands/${file}`))
     ]);
@@ -271,10 +277,17 @@ export class PartyHud {
 
   pushLog(text: string) {
     if (!text) return;
-    this.logLines.push(text);
+    for (const line of text.split('\n')) {
+      if (!line) continue;
+      this.logLines.push(line);
+      this.onLog(line);
+    }
     if (this.logLines.length > 12) this.logLines.splice(0, this.logLines.length - 12);
-    this.onLog(text);
     this.draw(performance.now());
+  }
+
+  clearReadyArmed() {
+    this.readyArmed = {};
   }
 
   setHeroHp(id: HeroId, hp: number) {
@@ -325,11 +338,59 @@ export class PartyHud {
   }
 
   setSwapHighlight(armed: boolean) {
+    this.swapArmed = armed;
     document.querySelectorAll<HTMLElement>('.hand-btn').forEach((el) => {
       const hero = el.dataset.hero as HeroId | undefined;
       const hand = el.dataset.hand as HandSlot | undefined;
       const skip = !!(hero && hand && this.isGuaranteedLantern(hero, hand));
       el.classList.toggle('swap-armed', armed && !skip);
+    });
+    this.draw(performance.now());
+  }
+
+  armFrostHint() {
+    if (this.frostHintDismissed) return;
+    this.frostHintArmed = true;
+    this.syncFrostHintAttr();
+    this.draw(performance.now());
+  }
+
+  dismissFrostHint() {
+    this.frostHintDismissed = true;
+    this.frostHintArmed = false;
+    this.syncFrostHintAttr();
+    this.draw(performance.now());
+  }
+
+  hideFrostHint() {
+    this.frostHintArmed = false;
+    this.syncFrostHintAttr();
+    this.draw(performance.now());
+  }
+
+  frostHintState() {
+    return { armed: this.frostHintArmed, dismissed: this.frostHintDismissed };
+  }
+
+  private wandHintVisible(now = performance.now()): boolean {
+    if (!this.frostHintArmed || this.frostHintDismissed || this.swapArmed) return false;
+    const hero = this.heroes.ilsevar;
+    if (!hero || hero.downed || hero.hp <= 0) return false;
+    const hand = this.frostHintHand(hero);
+    if (!hand) return false;
+    if (hero.recovery[hand] > now) return false;
+    if (hero.equipment[hand] === 'scroll' && hero.mana <= 0) return false;
+    return true;
+  }
+
+  private syncFrostHintAttr() {
+    const show = this.wandHintVisible();
+    const hand = this.frostHintHand(this.heroes.ilsevar);
+    document.querySelectorAll<HTMLElement>('.hand-btn').forEach((el) => {
+      const match = show && el.dataset.hero === 'ilsevar' && el.dataset.hand === hand;
+      if (match) el.setAttribute('data-hint', 'wand');
+      else el.removeAttribute('data-hint');
+      el.classList.toggle('wand-hint', match);
     });
   }
 
@@ -371,7 +432,11 @@ export class PartyHud {
     if (!hero) return false;
     const now = performance.now();
     if (hero.recovery[hand] > now) {
-      this.pushLog(this.story.log('not_ready', { hero: this.story.heroName(heroId) }));
+      const last = this.notReadyAt[heroId] ?? -1e9;
+      if (now - last >= 1500) {
+        this.notReadyAt[heroId] = now;
+        this.pushLog(this.story.log('not_ready', { hero: this.story.heroName(heroId) }));
+      }
       this.playUi('ui_button_denied');
       return false;
     }
@@ -383,17 +448,39 @@ export class PartyHud {
     this.handTapCount += 1;
     const action = this.story.handLabel(item) || this.story.handLabel('fist');
     this.pushLog(`${this.story.heroName(heroId)}: ${action}`);
-    window.setTimeout(() => {
-      this.playUi('act_ready');
-      this.draw(performance.now());
-    }, HAND_COOLDOWN_MS);
     this.draw(now);
     return true;
   }
 
-  /** Step-2 hook: play the level-up overlay frames over a portrait. */
-  playLevelUp(_id: HeroId) {
-    // filled in step 2
+  playLevelUp(id: HeroId) {
+    this.levelFlash = { id, started: performance.now() };
+    this.draw(performance.now());
+  }
+
+  syncHero(
+    id: HeroId,
+    state: {
+      hp: number;
+      maxHp: number;
+      mana: number;
+      maxMana: number;
+      downed?: boolean;
+      recovery?: { main: number; off: number };
+      pendingPerk?: number | null;
+    }
+  ) {
+    const hero = this.heroes[id];
+    if (!hero) return;
+    hero.hp = state.hp;
+    hero.maxHp = state.maxHp;
+    hero.mana = state.mana;
+    hero.maxMana = state.maxMana;
+    hero.downed = !!state.downed;
+    hero.pendingPerk = state.pendingPerk ?? null;
+    if (state.recovery) {
+      hero.recovery.main = state.recovery.main * 1000;
+      hero.recovery.off = state.recovery.off * 1000;
+    }
   }
 
   portraitKey(hero: HeroHud): string {
@@ -404,6 +491,7 @@ export class PartyHud {
   }
 
   draw(now: number) {
+    this.tickReadySounds(now);
     const ctx = this.ctx;
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, this.designWidth, this.designHeight);
@@ -423,7 +511,7 @@ export class PartyHud {
       const hero = this.heroes[id];
       const layout = this.layoutHeroes.get(id);
       if (!layout) continue;
-      this.drawPortrait(ctx, hero, layout.portrait);
+      this.drawPortrait(ctx, hero, layout.portrait, now);
       this.drawBar(ctx, layout.hpBar, hero.hp / hero.maxHp, hero.hp > hero.maxHp * 0.3 ? '#4a8a3a' : '#8a3a3a', '#2a1a1a');
       if (layout.manaBar && hero.maxMana > 0) {
         this.drawBar(ctx, layout.manaBar, hero.mana / hero.maxMana, '#3a5a8a', '#1a1a2a');
@@ -435,7 +523,21 @@ export class PartyHud {
     this.drawLog();
   }
 
-  private drawPortrait(ctx: CanvasRenderingContext2D, hero: HeroHud, rect: Rect) {
+  private tickReadySounds(now: number) {
+    for (const id of HERO_ORDER) {
+      const hero = this.heroes[id];
+      for (const hand of ['main', 'off'] as const) {
+        const key = `${id}:${hand}`;
+        if (hero.recovery[hand] > now) this.readyArmed[key] = true;
+        else if (this.readyArmed[key]) {
+          this.readyArmed[key] = false;
+          this.playUi('act_ready');
+        }
+      }
+    }
+  }
+
+  private drawPortrait(ctx: CanvasRenderingContext2D, hero: HeroHud, rect: Rect, now: number) {
     const [x, y, w, h] = rect;
     const img = this.images.get(this.portraitKey(hero));
     if (img) ctx.drawImage(img, x, y, w, h);
@@ -443,7 +545,7 @@ export class PartyHud {
       ctx.fillStyle = '#333';
       ctx.fillRect(x, y, w, h);
     }
-    if (hero.hp <= 0) {
+    if (hero.hp <= 0 || hero.downed) {
       const downed = this.images.get('downed');
       if (downed) {
         ctx.save();
@@ -454,9 +556,24 @@ export class PartyHud {
         ctx.restore();
       }
     }
+    if (this.levelFlash && this.levelFlash.id === hero.id) {
+      const t = (performance.now() - this.levelFlash.started) / 180;
+      const frame = Math.min(2, Math.floor(t));
+      const flash = this.images.get(`levelup${frame + 1}`);
+      if (flash) ctx.drawImage(flash, x, y, w, h);
+      if (t >= 3) this.levelFlash = null;
+    }
     ctx.lineWidth = hero.formation === 'front' ? 2 : 1;
     ctx.strokeStyle = hero.formation === 'front' ? '#cd7f32' : '#8a8a8a';
     ctx.strokeRect(x + 0.5, y + 0.5, w - 1, h - 1);
+    if (hero.pendingPerk) this.drawPerkBadge(ctx, x, y, now);
+  }
+
+  private drawPerkBadge(ctx: CanvasRenderingContext2D, portraitX: number, portraitY: number, now: number) {
+    const frame = (Math.floor((now / 1000) * 2) % 4) + 1;
+    const img = this.images.get(`perk${frame}`);
+    if (!img) return;
+    ctx.drawImage(img, portraitX + 36, portraitY - 3);
   }
 
   private drawBar(ctx: CanvasRenderingContext2D, rect: Rect, pct: number, fill: string, back: string) {
@@ -482,11 +599,13 @@ export class PartyHud {
     const file = this.icons.get(iconKey) ?? `hand_${iconKey}.png`;
     const img = this.images.get(file);
     const recovering = hero.recovery[hand] > now;
+    const melee = MELEE_ITEMS.includes(item as ItemType) || item === 'torch_lit' || item === 'torch_burnt';
+    const outOfReach = hero.formation === 'back' && melee && item !== 'wand' && item !== 'scroll';
     if (img) {
       const size = Math.min(this.iconSize, w, h);
       const ix = x + (w - size) / 2;
       const iy = y + (h - size) / 2;
-      if (recovering) ctx.globalAlpha = 0.4;
+      if (recovering || outOfReach || hero.downed) ctx.globalAlpha = 0.35;
       ctx.drawImage(img, ix, iy, size, size);
       ctx.globalAlpha = 1;
     }
@@ -494,6 +613,47 @@ export class PartyHud {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
       ctx.fillRect(x, y, w, h);
     }
+    if (outOfReach) {
+      ctx.strokeStyle = '#8a3a3a';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x + 4, y + 4);
+      ctx.lineTo(x + w - 4, y + h - 4);
+      ctx.moveTo(x + w - 4, y + 4);
+      ctx.lineTo(x + 4, y + h - 4);
+      ctx.stroke();
+    }
+    this.drawFrostHint(ctx, hero, hand, rect, now, recovering);
+    if (hero.id === 'ilsevar') this.syncFrostHintAttr();
+  }
+
+  private frostHintHand(hero: HeroHud): HandSlot | null {
+    if (hero.equipment.main === 'wand' || hero.equipment.main === 'scroll') return 'main';
+    if (hero.equipment.off === 'wand' || hero.equipment.off === 'scroll') return 'off';
+    return null;
+  }
+
+  private drawFrostHint(
+    ctx: CanvasRenderingContext2D,
+    hero: HeroHud,
+    hand: HandSlot,
+    rect: Rect,
+    now: number,
+    recovering: boolean
+  ) {
+    if (hero.id !== 'ilsevar') return;
+    if (!this.frostHintArmed || this.frostHintDismissed || this.swapArmed) return;
+    if (this.frostHintHand(hero) !== hand) return;
+    if (recovering || hero.downed || hero.hp <= 0) return;
+    const item = hero.equipment[hand];
+    if (item === 'scroll' && hero.mana <= 0) return;
+    const reduced =
+      typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const frame = reduced ? 3 : (Math.floor(now / 500) % 4) + 1;
+    const img = this.images.get(`hint${frame}`);
+    if (!img) return;
+    const [x, y, w, h] = rect;
+    ctx.drawImage(img, x, y, w, h);
   }
 
   private drawLog() {

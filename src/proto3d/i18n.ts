@@ -29,6 +29,14 @@ function fill(text: string, vars?: Record<string, string | number>): string {
   return out;
 }
 
+function capitalizeLine(text: string): string {
+  return text.replace(/^(\s*)(\S)/, (_m, ws: string, ch: string) => ws + ch.toUpperCase());
+}
+
+function capitalizeLog(text: string): string {
+  return text.split('\n').map(capitalizeLine).join('\n');
+}
+
 export class StoryText {
   locale: Locale = 'en';
   private logs = new Map<string, string>();
@@ -49,7 +57,12 @@ export class StoryText {
     ]);
     this.logs.clear();
     for (const entry of log ?? []) {
-      if (entry?.key && typeof entry.text === 'string') this.logs.set(entry.key, entry.text);
+      if (!entry?.key) continue;
+      if (typeof entry.text === 'string') {
+        this.logs.set(entry.key, entry.text);
+      } else if (Array.isArray(entry.lines) && entry.lines.length) {
+        this.logs.set(entry.key, entry.lines.join('\n'));
+      }
     }
     this.names = names ?? {};
     this.ui = ui ?? {};
@@ -83,11 +96,11 @@ export class StoryText {
   log(key: string, vars?: Record<string, string | number>): string {
     const raw = this.logs.get(key);
     if (!raw) return '';
-    return fill(raw, vars);
+    return capitalizeLog(fill(raw, vars));
   }
 
   uiText(path: string, vars?: Record<string, string | number>): string {
-    const prefixes = ['', 'step1_party_panel.', 'step4_title_saves.'];
+    const prefixes = ['', 'step1_party_panel.', 'step2_combat.', 'step4_title_saves.'];
     for (const prefix of prefixes) {
       const raw = getPath(this.ui, `${prefix}${path}`);
       if (typeof raw === 'string') return fill(raw, vars);
@@ -116,6 +129,15 @@ export class StoryText {
       if (typeof name === 'string') return name;
     }
     return id;
+  }
+
+  monsterName(id: string): string {
+    const monsters = this.names.monsters;
+    if (monsters && typeof monsters === 'object') {
+      const name = (monsters as Json)[id];
+      if (typeof name === 'string') return name;
+    }
+    return id.replace(/_/g, ' ');
   }
 
   itemName(id: string): string {

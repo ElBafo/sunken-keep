@@ -16,6 +16,15 @@ export function persistEnabled(): boolean {
   return new URLSearchParams(window.location.search).get('test') !== '1';
 }
 
+/** True once proto3d has written a floor save (oil/torches). */
+export function hasSavedProgress(): boolean {
+  try {
+    return localStorage.getItem(STORAGE_KEY) != null;
+  } catch {
+    return false;
+  }
+}
+
 export function loadProgress(sconces: Sconce[], persist: boolean): number {
   if (!persist) return OIL_START;
   try {

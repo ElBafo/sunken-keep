@@ -14,7 +14,14 @@
       "sound": "sfx_bog_leeches_attack (quiet)"
     },
     "ac": 8,
-    "interval": 2.0
+    "interval": 2.0,
+    "behavior": {
+      "habit": "latch",
+      "tell": "none, they just cling",
+      "counter": "green potion pulls them off; fire damage makes them let go",
+      "stationary": true,
+      "stationary_note": "stay in their water; only fight when the party is next to them"
+    }
   },
   "keep_rat": {
     "floor": 1,
@@ -24,7 +31,13 @@
       4
     ],
     "ac": 10,
-    "interval": 2.0
+    "interval": 2.0,
+    "behavior": {
+      "habit": "dart",
+      "detail": "every 3rd attack bites a random back-row hero instead of the front",
+      "tell": "rat squeaks and ducks low first",
+      "counter": "kill it first; Mags's speed"
+    }
   },
   "rust_crab": {
     "floor": 1,
@@ -35,7 +48,17 @@
     ],
     "_armor": "helm shell is its high AC",
     "ac": 15,
-    "interval": 2.5
+    "interval": 2.5,
+    "behavior": {
+      "habit": "wind_up",
+      "detail": "every 3rd attack: 1.0s claw-raise, then a pinch for 5-8",
+      "tell": "claws rise + sfx wind-up",
+      "counter": "Brannoc's shield block during the wind-up halves it",
+      "specialDamage": [
+        5,
+        8
+      ]
+    }
   },
   "slime": {
     "floor": 1,
@@ -46,7 +69,15 @@
     ],
     "_role": "toughest thing on floor 1",
     "ac": 11,
-    "interval": 2.0
+    "interval": 2.5,
+    "behavior": {
+      "habit": "resist_blades",
+      "detail": "axe and dagger deal half damage; mace and frost deal full, frost +25%",
+      "tell": "blades sink in with a wet thunk",
+      "counter": "Ilsevar's frost, Wren swapping forward",
+      "stationary": true,
+      "stationary_note": "never chases; it blocks the arch to the guard hall so the crab and slime are separate fights"
+    }
   },
   "drowned_dwarf": {
     "floor": 3,
@@ -57,7 +88,13 @@
     ],
     "ac": 14,
     "interval": 3.0,
-    "_note": "slow, hits hard; first one triggers Brannoc's crest bark. Some patrol (see patrol on the tile)."
+    "_note": "slow, hits hard; first one triggers Brannoc's crest bark. Some patrol (see patrol on the tile).",
+    "behavior": {
+      "habit": "wind_up",
+      "detail": "every 3rd attack: 1.2s overhead slam for 8-12",
+      "tell": "hammer raised overhead + sfx",
+      "counter": "shield block, or pocket sand cancels it"
+    }
   },
   "tide_spawn": {
     "floor": 5,
@@ -77,7 +114,13 @@
     ],
     "ac": 12,
     "interval": 1.5,
-    "_note": "new for floor 2, fast and fragile; needs art from Pixelartie"
+    "_note": "new for floor 2, fast and fragile; needs art from Pixelartie",
+    "behavior": {
+      "habit": "web",
+      "detail": "25% on hit: webs a front hero, who can't act for 3s",
+      "tell": "web over the hero's portrait",
+      "counter": "tap Mags's dagger on the webbed hero's portrait to cut them free instantly"
+    }
   },
   "captain_dural": {
     "floor": 4,
@@ -89,6 +132,12 @@
     "ac": 16,
     "interval": 3.0,
     "boss": true,
-    "_note": "only fights if f4_captain ends in a fight; drops captain_key flavour item + potion_red"
+    "_note": "only fights if f4_captain ends in a fight; drops captain_key flavour item + potion_red",
+    "behavior": {
+      "habit": "boss_two_phase",
+      "detail": "phase 1: plain sword hits. Below 50% HP: every 3rd attack is a 1.5s telegraphed cleave hitting both front heroes for 6-11",
+      "tell": "blade flash + sfx",
+      "counter": "shield wall (or block) and heal timing"
+    }
   }
 }

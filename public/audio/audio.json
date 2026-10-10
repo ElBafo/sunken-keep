@@ -159,7 +159,74 @@
   "torch_take": "sfx_torch_take",
   "torch_place": "sfx_torch_place",
   "act_torch": "sfx_act_torch",
-  "torch_dunk": "sfx_torch_dunk"
+  "torch_dunk": "sfx_torch_dunk",
+  "hit_crit": "sfx_hit_crit",
+  "hero_down": "sfx_hero_down",
+  "hero_revive": "sfx_hero_revive",
+  "game_over": "sfx_game_over",
+  "hit_variants": [
+   "sfx_hit",
+   "sfx_hit_2",
+   "sfx_hit_3"
+  ],
+  "act_miss_variants": [
+   "sfx_act_miss",
+   "sfx_act_miss_2",
+   "sfx_act_miss_3"
+  ],
+  "hurt_variants": [
+   "sfx_hurt",
+   "sfx_hurt_2",
+   "sfx_hurt_3"
+  ],
+  "hit_crit_variants": [
+   "sfx_hit_crit",
+   "sfx_hit_crit_2",
+   "sfx_hit_crit_3"
+  ],
+  "rust_crab_windup": "sfx_rust_crab_windup",
+  "drowned_dwarf_windup": "sfx_drowned_dwarf_windup",
+  "dural_windup": "sfx_dural_windup",
+  "vox_brannoc_hurt_1": "vox_brannoc_hurt_1",
+  "vox_brannoc_hurt_2": "vox_brannoc_hurt_2",
+  "vox_brannoc_down": "vox_brannoc_down",
+  "vox_brannoc_hurt_variants": [
+   "vox_brannoc_hurt_1",
+   "vox_brannoc_hurt_2"
+  ],
+  "vox_wren_hurt_1": "vox_wren_hurt_1",
+  "vox_wren_hurt_2": "vox_wren_hurt_2",
+  "vox_wren_down": "vox_wren_down",
+  "vox_wren_hurt_variants": [
+   "vox_wren_hurt_1",
+   "vox_wren_hurt_2"
+  ],
+  "vox_ilsevar_hurt_1": "vox_ilsevar_hurt_1",
+  "vox_ilsevar_hurt_2": "vox_ilsevar_hurt_2",
+  "vox_ilsevar_down": "vox_ilsevar_down",
+  "vox_ilsevar_hurt_variants": [
+   "vox_ilsevar_hurt_1",
+   "vox_ilsevar_hurt_2"
+  ],
+  "vox_mags_hurt_1": "vox_mags_hurt_1",
+  "vox_mags_hurt_2": "vox_mags_hurt_2",
+  "vox_mags_down": "vox_mags_down",
+  "vox_mags_hurt_variants": [
+   "vox_mags_hurt_1",
+   "vox_mags_hurt_2"
+  ],
+  "hit_resist_1": "sfx_hit_resist_1",
+  "hit_resist_2": "sfx_hit_resist_2",
+  "hit_weak_1": "sfx_hit_weak_1",
+  "hit_weak_2": "sfx_hit_weak_2",
+  "hit_resist_variants": [
+   "sfx_hit_resist_1",
+   "sfx_hit_resist_2"
+  ],
+  "hit_weak_variants": [
+   "sfx_hit_weak_1",
+   "sfx_hit_weak_2"
+  ]
  },
  "music": {
   "intro": {
@@ -267,6 +334,11 @@
   "true_dark": "Floor 3+ (and the deep-dark test switch). For a monster waiting outside the light (where Pixelartie's eye glints show), loop sfx_dark_presence_loop from its square, positional, quiet (0.3), stopping once light reaches it and its normal alert plays. sfx_glint once, quietly, the first time a key/lever glint comes into view in the dark. In true dark also drop the Act 1 music to ~0.15 and the halls ambience by ~3 dB, so the player hears the dark rather than the score.",
   "lamp_hooks_loop": "Floor 1 lamp-keeper's room: loop from the hook rail, positional, audible ~4 squares away so it carries down the black corridor (volume 0.5). Fire Storie's lampkeeper_hooks_heard on the first square where it becomes audible. Pell's note: reuse sfx_scroll on tap. Guard hall sunbeam: sfx_crack_wind_loop; fallen beams: one sfx_far_pebbles when first entering.",
   "torch_hand": "Party panel round. Wall torch Take: sfx_torch_take (stop that bracket's torch_loop, start a quiet non-positional torch_loop at 0.2 while carried). Snuff: sfx_torch_extinguish. Torch in hand tap: sfx_act_torch, then sfx_hit or sfx_act_miss as usual. Back into an empty bracket: sfx_torch_place (positional loop resumes there). Dropped into water: sfx_torch_dunk, stop the carried loop.",
-  "loudness": "Loudness pass (Oct 10): one-shots levelled by tier so code can play everything at 1.0 (except steps at 0.4). Gameplay (actions, hits, monsters, pickups, doors, torches, puzzles, voices) about -20 LUFS; UI, equip and ambient one-shots about -26; big moments (level up, secrets, riddle, flood start/caught) about -17; steps about -28. Originals in _pre_loudness/."
+  "loudness": "Loudness pass (Oct 10): one-shots levelled by tier so code can play everything at 1.0 (except steps at 0.4). Gameplay (actions, hits, monsters, pickups, doors, torches, puzzles, voices) about -20 LUFS; UI, equip and ambient one-shots about -26; big moments (level up, secrets, riddle, flood start/caught) about -17; steps about -28. Originals in _pre_loudness/.",
+  "downed": "Levie's progression rules. Natural 20: sfx_hit_crit instead of sfx_hit. Hero hits 0 HP: sfx_hero_down. Revived by heal/potion or staggering up after a fight: sfx_hero_revive. All four down: stop music and loops, play sfx_game_over with Pixelartie's sinking screen, then silence until the button. Level up keeps sfx_level_up.",
+  "combat_variants": "hit, act_miss, hurt and hit_crit each have 3 variants (base, _2 lower, _3 brighter). Pick randomly, never the same twice in a row, plus playbackRate 0.95-1.05, so long fights don't get tiring.",
+  "windups": "Monster attack telegraphs. Play <monster>_windup when the visual tell starts (crab claw-raise, dwarf overhead wind-up, Dural's flash); the attack lands at its end: rust_crab and drowned_dwarf 1.0 s, dural 1.3 s, then play the attack sound (dural uses drowned_dwarf_attack until it has its own). Positional from the monster, combat priority, never ducked or voice-stolen. If the monster is interrupted or dies, stop the wind-up at once.",
+  "hero_voices": "Wordless party hero voices (work in English and Greek). Not positional (party sounds), Effects bus, combat priority. Hero takes damage: play a random vox_<hero>_hurt_variants entry, never the same one twice in a row for that hero, alongside the usual sfx_hurt; at most one hero hurt voice every 0.6 s across the whole party (drop extras, don't queue); optional: skip it for chip damage under 2 HP. Hero hits 0 HP: play vox_<hero>_down layered with sfx_hero_down (start together; the down voice is never skipped by the 0.6 s limit). Brannoc: low, gruff, creaky. Wren: warm mid voice. Ilsevar: calm, dry, with a throat rattle and a hiss. Mags: high, quick, bright. Hurts about -20 LUFS, downs about -19 LUFS, play at 1.0. hero ids match names.json (brannoc, wren, ilsevar, mags).",
+  "hit_types": "Damage-type hits (teach the slime lesson). When the target resists the attack's damage type (e.g. slime vs blades), play a random hit_resist_variants entry instead of hit; when the target is weak to it (e.g. slime vs Ilsevar's frost wand), play a random hit_weak_variants entry instead of hit. A natural 20 still overrides both with hit_crit. Same rule as the other combat variants: random, never the same one twice in a row, playbackRate 0.95-1.05. Positional from the monster, combat priority. Resist ~0.36 s, about -22 LUFS (dull wet thunk, sits under hit on purpose); weak ~0.52 s, about -19 LUFS (bright icy crack + shatter)."
  }
 }

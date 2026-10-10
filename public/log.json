@@ -69,7 +69,7 @@
  },
  {
   "key": "water_shallow",
-  "text": "The water deepens.",
+  "text": "Water to the ankles.",
   "when": "first step into shallow water"
  },
  {
@@ -101,7 +101,7 @@
  },
  {
   "key": "monster_hit",
-  "text": "The {monster} hits {hero} for {n}."
+  "text": "{monster}: hits {hero} for {n}."
  },
  {
   "key": "monster_dies",
@@ -242,7 +242,7 @@
  },
  {
   "key": "torch_capped",
-  "text": "Sealed. Dwarves don't do \"temporary\".",
+  "text": "Sealed. It'll take forge-fire to open.",
   "when": "on tapping a capped torch"
  },
  {
@@ -263,7 +263,7 @@
  {
   "key": "torch_dunk",
   "text": "{hero} dunks the torch. Hiss. Gone.",
-  "when": "on dropping a held torch into water"
+  "when": "on stepping into deep water while holding a lit torch (shallow water never puts it out)"
  },
  {
   "key": "carving_bowl",
@@ -487,5 +487,80 @@
   "key": "no_oil",
   "text": "No oil left. The ember will have to do.",
   "when": "tapping a dead torch with 0 oil"
+ },
+ {
+  "key": "blocked_cistern",
+  "text": "The cistern. Flooded to the roof.",
+  "when": "F2: bump the flooded cistern from the door (9,3)"
+ },
+ {
+  "key": "lever_far_click",
+  "text": "Far off, stone grinds aside.",
+  "when": "F2: pull the hidden lever (3,2)"
+ },
+ {
+  "key": "blocked_waterdoor",
+  "text": "Water stands in the doorway, waiting.",
+  "when": "F3: bump the water doorway (4,8) before the bowl is lit"
+ },
+ {
+  "key": "blocked_cellgate",
+  "text": "Locked. The captain keeps the key.",
+  "when": "F4: bump the cell-wing door (13,5) without captain_key"
+ },
+ {
+  "key": "blocked_stairs_f4",
+  "text": "The stair is drowned shut. For now.",
+  "when": "F4: bump the stairs (5,9) before start_escape"
+ },
+ {
+  "key": "enter_stores",
+  "text": "A storeroom. Sacks and fallen shelves.",
+  "when": "F2: first step into the stores nook"
+ },
+ {
+  "key": "enter_cistern",
+  "text": "The cistern, drained. Rats left behind.",
+  "when": "F2: first step into the drained cistern"
+ },
+ {
+  "key": "gate_unlocked",
+  "text": "The captain's key turns. The bars lift.",
+  "when": "F4: use captain_key on the cell-wing door (13,5)"
+ },
+ {
+  "key": "goal_new",
+  "text": "Journal: new goal.",
+  "when": "a goal from story/goals_act1.json becomes active"
+ },
+ {
+  "key": "punch_air",
+  "text": "{hero} punches thin air. Feels good.",
+  "when": "an empty-hand tap with nothing in front"
+ },
+ {
+  "key": "webbed",
+  "text": "{hero} is stuck in web!",
+  "when": "a hero is webbed and can't act"
+ },
+ {
+  "key": "sand_miss",
+  "text": "Sand in its eyes. It swings at nothing.",
+  "when": "a monster misses because of pocket sand"
+ },
+ {
+  "key": "monster_flank_left",
+  "text": "{monster}: attacks from the left!",
+  "when": "a monster attacks the party from a side or behind it isn't facing (red edge flash)"
+ },
+ {
+  "key": "monster_flank_right",
+  "text": "{monster}: attacks from the right!",
+  "when": "a monster attacks the party from a side or behind it isn't facing (red edge flash)"
+ },
+ {
+  "key": "monster_flank_behind",
+  "text": "{monster}: attacks from behind!",
+  "when": "a monster attacks the party from a side or behind it isn't facing (red edge flash)"
  }
 ]

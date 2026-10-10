@@ -1,0 +1,1828 @@
+{
+ "what": "foot line per monster frame. footRow = last row (0-based, from top) with any opaque pixel; gapBelow = empty rows under it. A billboard anchored at its bottom edge stands on the floor when gapBelow is 0.",
+ "howToUse": "world y of the quad bottom = floorY - gapBelow * (quadHeight / imageHeight). Or simply ignore: the worst case is 1 px, which is under 2% of the sprite height.",
+ "canvas": {
+  "near": [
+   80,
+   60
+  ],
+  "mid": [
+   50,
+   40
+  ],
+  "far": [
+   30,
+   25
+  ]
+ },
+ "summary": {
+  "keep_rat": {
+   "near": {
+    "frames": 13,
+    "gapBelow": [
+     0
+    ],
+    "consistent": true,
+    "offFrames": []
+   },
+   "mid": {
+    "frames": 13,
+    "gapBelow": [
+     0
+    ],
+    "consistent": true,
+    "offFrames": []
+   },
+   "far": {
+    "frames": 13,
+    "gapBelow": [
+     0
+    ],
+    "consistent": true,
+    "offFrames": []
+   }
+  },
+  "rust_crab": {
+   "near": {
+    "frames": 13,
+    "gapBelow": [
+     0
+    ],
+    "consistent": true,
+    "offFrames": []
+   },
+   "mid": {
+    "frames": 13,
+    "gapBelow": [
+     0
+    ],
+    "consistent": true,
+    "offFrames": []
+   },
+   "far": {
+    "frames": 13,
+    "gapBelow": [
+     0,
+     1
+    ],
+    "consistent": false,
+    "offFrames": [
+     "rust_crab_far.png",
+     "rust_crab_hurt_1_far.png",
+     "rust_crab_idle_1_far.png",
+     "rust_crab_idle_3_far.png"
+    ]
+   }
+  },
+  "bog_leeches": {
+   "near": {
+    "frames": 13,
+    "gapBelow": [
+     0,
+     1
+    ],
+    "consistent": false,
+    "offFrames": [
+     "bog_leeches_attack_1_near.png",
+     "bog_leeches_attack_2_near.png",
+     "bog_leeches_attack_3_near.png",
+     "bog_leeches_death_1_near.png",
+     "bog_leeches_idle_1_near.png",
+     "bog_leeches_idle_2_near.png",
+     "bog_leeches_idle_3_near.png",
+     "bog_leeches_idle_4_near.png",
+     "bog_leeches_near.png"
+    ]
+   },
+   "mid": {
+    "frames": 13,
+    "gapBelow": [
+     0
+    ],
+    "consistent": true,
+    "offFrames": []
+   },
+   "far": {
+    "frames": 13,
+    "gapBelow": [
+     0
+    ],
+    "consistent": true,
+    "offFrames": []
+   }
+  },
+  "slime": {
+   "near": {
+    "frames": 13,
+    "gapBelow": [
+     0
+    ],
+    "consistent": true,
+    "offFrames": []
+   },
+   "mid": {
+    "frames": 13,
+    "gapBelow": [
+     0
+    ],
+    "consistent": true,
+    "offFrames": []
+   },
+   "far": {
+    "frames": 13,
+    "gapBelow": [
+     0
+    ],
+    "consistent": true,
+    "offFrames": []
+   }
+  },
+  "cellar_spider": {
+   "near": {
+    "frames": 13,
+    "gapBelow": [
+     0,
+     1
+    ],
+    "consistent": false,
+    "offFrames": [
+     "cellar_spider_attack_3_near.png",
+     "cellar_spider_idle_4_near.png"
+    ]
+   },
+   "mid": {
+    "frames": 13,
+    "gapBelow": [
+     0,
+     1
+    ],
+    "consistent": false,
+    "offFrames": [
+     "cellar_spider_attack_2_mid.png",
+     "cellar_spider_attack_3_mid.png",
+     "cellar_spider_hurt_1_mid.png"
+    ]
+   },
+   "far": {
+    "frames": 13,
+    "gapBelow": [
+     0,
+     1
+    ],
+    "consistent": false,
+    "offFrames": [
+     "cellar_spider_attack_1_far.png",
+     "cellar_spider_attack_2_far.png",
+     "cellar_spider_attack_3_far.png",
+     "cellar_spider_death_1_far.png",
+     "cellar_spider_far.png",
+     "cellar_spider_hurt_1_far.png",
+     "cellar_spider_idle_1_far.png",
+     "cellar_spider_idle_2_far.png",
+     "cellar_spider_idle_3_far.png",
+     "cellar_spider_idle_4_far.png"
+    ]
+   }
+  },
+  "captain_dural": {
+   "near": {
+    "frames": 13,
+    "gapBelow": [
+     0
+    ],
+    "consistent": true,
+    "offFrames": []
+   },
+   "mid": {
+    "frames": 13,
+    "gapBelow": [
+     0
+    ],
+    "consistent": true,
+    "offFrames": []
+   },
+   "far": {
+    "frames": 13,
+    "gapBelow": [
+     0
+    ],
+    "consistent": true,
+    "offFrames": []
+   }
+  },
+  "drowned_dwarf": {
+   "near": {
+    "frames": 13,
+    "gapBelow": [
+     0
+    ],
+    "consistent": true,
+    "offFrames": []
+   },
+   "mid": {
+    "frames": 13,
+    "gapBelow": [
+     0
+    ],
+    "consistent": true,
+    "offFrames": []
+   },
+   "far": {
+    "frames": 13,
+    "gapBelow": [
+     0
+    ],
+    "consistent": true,
+    "offFrames": []
+   }
+  },
+  "tide_spawn": {
+   "near": {
+    "frames": 13,
+    "gapBelow": [
+     0
+    ],
+    "consistent": true,
+    "offFrames": []
+   },
+   "mid": {
+    "frames": 13,
+    "gapBelow": [
+     0
+    ],
+    "consistent": true,
+    "offFrames": []
+   },
+   "far": {
+    "frames": 13,
+    "gapBelow": [
+     0
+    ],
+    "consistent": true,
+    "offFrames": []
+   }
+  }
+ },
+ "files": {
+  "keep_rat_attack_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 26
+  },
+  "keep_rat_attack_2_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 18
+  },
+  "keep_rat_attack_3_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 21
+  },
+  "keep_rat_death_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 26
+  },
+  "keep_rat_death_2_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 36
+  },
+  "keep_rat_death_3_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 47
+  },
+  "keep_rat_death_4_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 56
+  },
+  "keep_rat_hurt_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 24
+  },
+  "keep_rat_idle_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 23
+  },
+  "keep_rat_idle_2_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 24
+  },
+  "keep_rat_idle_3_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 23
+  },
+  "keep_rat_idle_4_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 22
+  },
+  "keep_rat_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 23
+  },
+  "keep_rat_attack_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 17
+  },
+  "keep_rat_attack_2_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 12
+  },
+  "keep_rat_attack_3_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 14
+  },
+  "keep_rat_death_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 17
+  },
+  "keep_rat_death_2_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 24
+  },
+  "keep_rat_death_3_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 31
+  },
+  "keep_rat_death_4_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 37
+  },
+  "keep_rat_hurt_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 16
+  },
+  "keep_rat_idle_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 15
+  },
+  "keep_rat_idle_2_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 16
+  },
+  "keep_rat_idle_3_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 15
+  },
+  "keep_rat_idle_4_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 14
+  },
+  "keep_rat_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 15
+  },
+  "keep_rat_attack_1_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 11
+  },
+  "keep_rat_attack_2_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 8
+  },
+  "keep_rat_attack_3_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 9
+  },
+  "keep_rat_death_1_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 11
+  },
+  "keep_rat_death_2_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 15
+  },
+  "keep_rat_death_3_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 19
+  },
+  "keep_rat_death_4_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 23
+  },
+  "keep_rat_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 10
+  },
+  "keep_rat_hurt_1_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 10
+  },
+  "keep_rat_idle_1_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 10
+  },
+  "keep_rat_idle_2_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 10
+  },
+  "keep_rat_idle_3_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 10
+  },
+  "keep_rat_idle_4_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 9
+  },
+  "rust_crab_attack_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 29
+  },
+  "rust_crab_attack_2_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 23
+  },
+  "rust_crab_attack_3_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 25
+  },
+  "rust_crab_death_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 30
+  },
+  "rust_crab_death_2_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 39
+  },
+  "rust_crab_death_3_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 48
+  },
+  "rust_crab_death_4_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 56
+  },
+  "rust_crab_hurt_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 28
+  },
+  "rust_crab_idle_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 27
+  },
+  "rust_crab_idle_2_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 28
+  },
+  "rust_crab_idle_3_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 27
+  },
+  "rust_crab_idle_4_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 26
+  },
+  "rust_crab_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 27
+  },
+  "rust_crab_attack_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 21
+  },
+  "rust_crab_attack_2_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 17
+  },
+  "rust_crab_attack_3_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 19
+  },
+  "rust_crab_death_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 21
+  },
+  "rust_crab_death_2_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 27
+  },
+  "rust_crab_death_3_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 33
+  },
+  "rust_crab_death_4_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 38
+  },
+  "rust_crab_hurt_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 20
+  },
+  "rust_crab_idle_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 20
+  },
+  "rust_crab_idle_2_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 20
+  },
+  "rust_crab_idle_3_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 20
+  },
+  "rust_crab_idle_4_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 19
+  },
+  "rust_crab_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 20
+  },
+  "rust_crab_attack_1_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 14
+  },
+  "rust_crab_attack_2_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 11
+  },
+  "rust_crab_attack_3_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 12
+  },
+  "rust_crab_death_1_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 14
+  },
+  "rust_crab_death_2_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 17
+  },
+  "rust_crab_death_3_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 21
+  },
+  "rust_crab_death_4_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 23
+  },
+  "rust_crab_far.png": {
+   "footRow": 23,
+   "gapBelow": 1,
+   "topRow": 13
+  },
+  "rust_crab_hurt_1_far.png": {
+   "footRow": 23,
+   "gapBelow": 1,
+   "topRow": 13
+  },
+  "rust_crab_idle_1_far.png": {
+   "footRow": 23,
+   "gapBelow": 1,
+   "topRow": 13
+  },
+  "rust_crab_idle_2_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 13
+  },
+  "rust_crab_idle_3_far.png": {
+   "footRow": 23,
+   "gapBelow": 1,
+   "topRow": 13
+  },
+  "rust_crab_idle_4_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 13
+  },
+  "bog_leeches_attack_1_near.png": {
+   "footRow": 58,
+   "gapBelow": 1,
+   "topRow": 13
+  },
+  "bog_leeches_attack_2_near.png": {
+   "footRow": 58,
+   "gapBelow": 1,
+   "topRow": 24
+  },
+  "bog_leeches_attack_3_near.png": {
+   "footRow": 58,
+   "gapBelow": 1,
+   "topRow": 20
+  },
+  "bog_leeches_death_1_near.png": {
+   "footRow": 58,
+   "gapBelow": 1,
+   "topRow": 40
+  },
+  "bog_leeches_death_2_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 41
+  },
+  "bog_leeches_death_3_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 42
+  },
+  "bog_leeches_death_4_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 47
+  },
+  "bog_leeches_hurt_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 19
+  },
+  "bog_leeches_idle_1_near.png": {
+   "footRow": 58,
+   "gapBelow": 1,
+   "topRow": 17
+  },
+  "bog_leeches_idle_2_near.png": {
+   "footRow": 58,
+   "gapBelow": 1,
+   "topRow": 17
+  },
+  "bog_leeches_idle_3_near.png": {
+   "footRow": 58,
+   "gapBelow": 1,
+   "topRow": 17
+  },
+  "bog_leeches_idle_4_near.png": {
+   "footRow": 58,
+   "gapBelow": 1,
+   "topRow": 17
+  },
+  "bog_leeches_near.png": {
+   "footRow": 58,
+   "gapBelow": 1,
+   "topRow": 17
+  },
+  "bog_leeches_attack_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 11
+  },
+  "bog_leeches_attack_2_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 18
+  },
+  "bog_leeches_attack_3_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 15
+  },
+  "bog_leeches_death_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 27
+  },
+  "bog_leeches_death_2_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 28
+  },
+  "bog_leeches_death_3_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 29
+  },
+  "bog_leeches_death_4_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 32
+  },
+  "bog_leeches_hurt_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 15
+  },
+  "bog_leeches_idle_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 13
+  },
+  "bog_leeches_idle_2_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 13
+  },
+  "bog_leeches_idle_3_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 13
+  },
+  "bog_leeches_idle_4_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 13
+  },
+  "bog_leeches_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 13
+  },
+  "bog_leeches_attack_1_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 8
+  },
+  "bog_leeches_attack_2_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 12
+  },
+  "bog_leeches_attack_3_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 10
+  },
+  "bog_leeches_death_1_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 18
+  },
+  "bog_leeches_death_2_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 18
+  },
+  "bog_leeches_death_3_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 18
+  },
+  "bog_leeches_death_4_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 20
+  },
+  "bog_leeches_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 9
+  },
+  "bog_leeches_hurt_1_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 10
+  },
+  "bog_leeches_idle_1_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 9
+  },
+  "bog_leeches_idle_2_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 9
+  },
+  "bog_leeches_idle_3_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 9
+  },
+  "bog_leeches_idle_4_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 9
+  },
+  "slime_attack_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 15
+  },
+  "slime_attack_2_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 6
+  },
+  "slime_attack_3_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 10
+  },
+  "slime_death_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 16
+  },
+  "slime_death_2_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 29
+  },
+  "slime_death_3_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 43
+  },
+  "slime_death_4_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 55
+  },
+  "slime_hurt_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 13
+  },
+  "slime_idle_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 12
+  },
+  "slime_idle_2_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 14
+  },
+  "slime_idle_3_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 12
+  },
+  "slime_idle_4_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 10
+  },
+  "slime_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 12
+  },
+  "slime_attack_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 12
+  },
+  "slime_attack_2_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 6
+  },
+  "slime_attack_3_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 9
+  },
+  "slime_death_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 12
+  },
+  "slime_death_2_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 21
+  },
+  "slime_death_3_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 29
+  },
+  "slime_death_4_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 37
+  },
+  "slime_hurt_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 11
+  },
+  "slime_idle_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 10
+  },
+  "slime_idle_2_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 11
+  },
+  "slime_idle_3_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 10
+  },
+  "slime_idle_4_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 9
+  },
+  "slime_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 10
+  },
+  "slime_attack_1_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 8
+  },
+  "slime_attack_2_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 5
+  },
+  "slime_attack_3_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 6
+  },
+  "slime_death_1_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 9
+  },
+  "slime_death_2_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 14
+  },
+  "slime_death_3_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 18
+  },
+  "slime_death_4_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 23
+  },
+  "slime_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 7
+  },
+  "slime_hurt_1_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 8
+  },
+  "slime_idle_1_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 7
+  },
+  "slime_idle_2_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 8
+  },
+  "slime_idle_3_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 7
+  },
+  "slime_idle_4_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 6
+  },
+  "cellar_spider_attack_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 20
+  },
+  "cellar_spider_attack_2_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 12
+  },
+  "cellar_spider_attack_3_near.png": {
+   "footRow": 58,
+   "gapBelow": 1,
+   "topRow": 15
+  },
+  "cellar_spider_death_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 21
+  },
+  "cellar_spider_death_2_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 33
+  },
+  "cellar_spider_death_3_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 45
+  },
+  "cellar_spider_death_4_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 55
+  },
+  "cellar_spider_hurt_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 18
+  },
+  "cellar_spider_idle_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 17
+  },
+  "cellar_spider_idle_2_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 19
+  },
+  "cellar_spider_idle_3_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 17
+  },
+  "cellar_spider_idle_4_near.png": {
+   "footRow": 58,
+   "gapBelow": 1,
+   "topRow": 16
+  },
+  "cellar_spider_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 17
+  },
+  "cellar_spider_attack_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 14
+  },
+  "cellar_spider_attack_2_mid.png": {
+   "footRow": 38,
+   "gapBelow": 1,
+   "topRow": 8
+  },
+  "cellar_spider_attack_3_mid.png": {
+   "footRow": 38,
+   "gapBelow": 1,
+   "topRow": 10
+  },
+  "cellar_spider_death_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 14
+  },
+  "cellar_spider_death_2_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 22
+  },
+  "cellar_spider_death_3_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 30
+  },
+  "cellar_spider_death_4_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 37
+  },
+  "cellar_spider_hurt_1_mid.png": {
+   "footRow": 38,
+   "gapBelow": 1,
+   "topRow": 12
+  },
+  "cellar_spider_idle_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 12
+  },
+  "cellar_spider_idle_2_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 13
+  },
+  "cellar_spider_idle_3_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 12
+  },
+  "cellar_spider_idle_4_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 11
+  },
+  "cellar_spider_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 12
+  },
+  "cellar_spider_attack_1_far.png": {
+   "footRow": 23,
+   "gapBelow": 1,
+   "topRow": 9
+  },
+  "cellar_spider_attack_2_far.png": {
+   "footRow": 23,
+   "gapBelow": 1,
+   "topRow": 6
+  },
+  "cellar_spider_attack_3_far.png": {
+   "footRow": 23,
+   "gapBelow": 1,
+   "topRow": 7
+  },
+  "cellar_spider_death_1_far.png": {
+   "footRow": 23,
+   "gapBelow": 1,
+   "topRow": 9
+  },
+  "cellar_spider_death_2_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 14
+  },
+  "cellar_spider_death_3_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 19
+  },
+  "cellar_spider_death_4_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 23
+  },
+  "cellar_spider_far.png": {
+   "footRow": 23,
+   "gapBelow": 1,
+   "topRow": 8
+  },
+  "cellar_spider_hurt_1_far.png": {
+   "footRow": 23,
+   "gapBelow": 1,
+   "topRow": 8
+  },
+  "cellar_spider_idle_1_far.png": {
+   "footRow": 23,
+   "gapBelow": 1,
+   "topRow": 8
+  },
+  "cellar_spider_idle_2_far.png": {
+   "footRow": 23,
+   "gapBelow": 1,
+   "topRow": 8
+  },
+  "cellar_spider_idle_3_far.png": {
+   "footRow": 23,
+   "gapBelow": 1,
+   "topRow": 8
+  },
+  "cellar_spider_idle_4_far.png": {
+   "footRow": 23,
+   "gapBelow": 1,
+   "topRow": 7
+  },
+  "captain_dural_attack_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 6
+  },
+  "captain_dural_attack_2_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 0
+  },
+  "captain_dural_attack_3_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 0
+  },
+  "captain_dural_death_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 7
+  },
+  "captain_dural_death_2_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 23
+  },
+  "captain_dural_death_3_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 39
+  },
+  "captain_dural_death_4_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 53
+  },
+  "captain_dural_hurt_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 4
+  },
+  "captain_dural_idle_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 2
+  },
+  "captain_dural_idle_2_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 4
+  },
+  "captain_dural_idle_3_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 2
+  },
+  "captain_dural_idle_4_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 0
+  },
+  "captain_dural_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 2
+  },
+  "captain_dural_attack_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 4
+  },
+  "captain_dural_attack_2_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 0
+  },
+  "captain_dural_attack_3_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 0
+  },
+  "captain_dural_death_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 4
+  },
+  "captain_dural_death_2_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 15
+  },
+  "captain_dural_death_3_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 26
+  },
+  "captain_dural_death_4_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 36
+  },
+  "captain_dural_hurt_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 2
+  },
+  "captain_dural_idle_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 1
+  },
+  "captain_dural_idle_2_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 3
+  },
+  "captain_dural_idle_3_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 1
+  },
+  "captain_dural_idle_4_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 0
+  },
+  "captain_dural_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 1
+  },
+  "captain_dural_attack_1_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 3
+  },
+  "captain_dural_attack_2_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 0
+  },
+  "captain_dural_attack_3_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 0
+  },
+  "captain_dural_death_1_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 3
+  },
+  "captain_dural_death_2_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 10
+  },
+  "captain_dural_death_3_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 16
+  },
+  "captain_dural_death_4_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 22
+  },
+  "captain_dural_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 1
+  },
+  "captain_dural_hurt_1_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 2
+  },
+  "captain_dural_idle_1_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 1
+  },
+  "captain_dural_idle_2_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 2
+  },
+  "captain_dural_idle_3_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 1
+  },
+  "captain_dural_idle_4_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 0
+  },
+  "drowned_dwarf_attack_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 11
+  },
+  "drowned_dwarf_attack_2_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 1
+  },
+  "drowned_dwarf_attack_3_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 5
+  },
+  "drowned_dwarf_death_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 12
+  },
+  "drowned_dwarf_death_2_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 26
+  },
+  "drowned_dwarf_death_3_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 41
+  },
+  "drowned_dwarf_death_4_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 54
+  },
+  "drowned_dwarf_hurt_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 9
+  },
+  "drowned_dwarf_idle_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 7
+  },
+  "drowned_dwarf_idle_2_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 9
+  },
+  "drowned_dwarf_idle_3_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 7
+  },
+  "drowned_dwarf_idle_4_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 5
+  },
+  "drowned_dwarf_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 7
+  },
+  "drowned_dwarf_attack_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 7
+  },
+  "drowned_dwarf_attack_2_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 1
+  },
+  "drowned_dwarf_attack_3_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 3
+  },
+  "drowned_dwarf_death_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 8
+  },
+  "drowned_dwarf_death_2_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 18
+  },
+  "drowned_dwarf_death_3_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 27
+  },
+  "drowned_dwarf_death_4_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 36
+  },
+  "drowned_dwarf_hurt_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 6
+  },
+  "drowned_dwarf_idle_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 5
+  },
+  "drowned_dwarf_idle_2_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 6
+  },
+  "drowned_dwarf_idle_3_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 5
+  },
+  "drowned_dwarf_idle_4_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 4
+  },
+  "drowned_dwarf_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 5
+  },
+  "drowned_dwarf_attack_1_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 5
+  },
+  "drowned_dwarf_attack_2_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 0
+  },
+  "drowned_dwarf_attack_3_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 2
+  },
+  "drowned_dwarf_death_1_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 5
+  },
+  "drowned_dwarf_death_2_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 11
+  },
+  "drowned_dwarf_death_3_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 17
+  },
+  "drowned_dwarf_death_4_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 23
+  },
+  "drowned_dwarf_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 3
+  },
+  "drowned_dwarf_hurt_1_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 4
+  },
+  "drowned_dwarf_idle_1_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 3
+  },
+  "drowned_dwarf_idle_2_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 4
+  },
+  "drowned_dwarf_idle_3_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 3
+  },
+  "drowned_dwarf_idle_4_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 2
+  },
+  "tide_spawn_attack_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 20
+  },
+  "tide_spawn_attack_2_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 12
+  },
+  "tide_spawn_attack_3_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 15
+  },
+  "tide_spawn_death_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 20
+  },
+  "tide_spawn_death_2_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 32
+  },
+  "tide_spawn_death_3_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 44
+  },
+  "tide_spawn_death_4_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 55
+  },
+  "tide_spawn_hurt_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 18
+  },
+  "tide_spawn_idle_1_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 17
+  },
+  "tide_spawn_idle_2_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 19
+  },
+  "tide_spawn_idle_3_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 17
+  },
+  "tide_spawn_idle_4_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 15
+  },
+  "tide_spawn_near.png": {
+   "footRow": 59,
+   "gapBelow": 0,
+   "topRow": 17
+  },
+  "tide_spawn_attack_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 15
+  },
+  "tide_spawn_attack_2_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 10
+  },
+  "tide_spawn_attack_3_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 12
+  },
+  "tide_spawn_death_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 15
+  },
+  "tide_spawn_death_2_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 23
+  },
+  "tide_spawn_death_3_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 30
+  },
+  "tide_spawn_death_4_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 37
+  },
+  "tide_spawn_hurt_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 14
+  },
+  "tide_spawn_idle_1_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 13
+  },
+  "tide_spawn_idle_2_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 14
+  },
+  "tide_spawn_idle_3_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 13
+  },
+  "tide_spawn_idle_4_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 12
+  },
+  "tide_spawn_mid.png": {
+   "footRow": 39,
+   "gapBelow": 0,
+   "topRow": 13
+  },
+  "tide_spawn_attack_1_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 10
+  },
+  "tide_spawn_attack_2_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 7
+  },
+  "tide_spawn_attack_3_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 8
+  },
+  "tide_spawn_death_1_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 10
+  },
+  "tide_spawn_death_2_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 15
+  },
+  "tide_spawn_death_3_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 19
+  },
+  "tide_spawn_death_4_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 23
+  },
+  "tide_spawn_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 9
+  },
+  "tide_spawn_hurt_1_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 9
+  },
+  "tide_spawn_idle_1_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 9
+  },
+  "tide_spawn_idle_2_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 10
+  },
+  "tide_spawn_idle_3_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 9
+  },
+  "tide_spawn_idle_4_far.png": {
+   "footRow": 24,
+   "gapBelow": 0,
+   "topRow": 8
+  }
+ }
+}

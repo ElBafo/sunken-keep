@@ -104,7 +104,7 @@
  {
   "trigger": "deep_water",
   "speaker": "ilsevar",
-  "text": "Είναι... ζεστό; Άσ' το καλύτερα.",
+  "text": "Ζεστό. Εσείς οι μαλακόπετσοι θα το λέγατε μπάνιο.",
   "face": "neutral",
   "tier": "flavour"
  },
@@ -389,7 +389,7 @@
   "face": "shocked",
   "listener": "mags",
   "listenerFace": "smirk",
-  "tier": "story"
+  "tier": "flavour"
  },
  {
   "trigger": "first_sight_rust_crab",
@@ -398,35 +398,35 @@
   "face": "smirk",
   "listener": "brannoc",
   "listenerFace": "wince",
-  "tier": "story"
+  "tier": "flavour"
  },
  {
   "trigger": "first_sight_rust_crab",
   "speaker": "ilsevar",
   "text": "Συμπεριφορά ερημίτη. Νάνου ερημίτη.",
   "face": "neutral",
-  "tier": "story"
+  "tier": "flavour"
  },
  {
   "trigger": "first_sight_bog_leeches",
   "speaker": "wren",
   "text": "Βδέλλες. Φλόγα, φύλαξέ μας.",
   "face": "wince",
-  "tier": "story"
+  "tier": "flavour"
  },
  {
   "trigger": "first_sight_bog_leeches",
   "speaker": "mags",
   "text": "Κανείς δεν ρουφάει τίποτα δικό μου.",
   "face": "shocked",
-  "tier": "story"
+  "tier": "flavour"
  },
  {
   "trigger": "first_sight_bog_leeches",
   "speaker": "ilsevar",
   "text": "Θεραπευτικές, τυπικά. Και πάλι όχι.",
   "face": "wince",
-  "tier": "story"
+  "tier": "flavour"
  },
  {
   "trigger": "leech_latch",
@@ -452,7 +452,7 @@
  {
   "trigger": "leech_latch",
   "speaker": "ilsevar",
-  "text": "Με συμπαθεί. Αυτό είναι χειρότερο.",
+  "text": "Δεν περνάει τα λέπια. Αλλά προσπαθεί.",
   "face": "wince",
   "tier": "flavour"
  },
@@ -756,5 +756,88 @@
   "listenerFace": "smirk",
   "listenerText": "Ο παππούς σου έπρεπε να ζητάει νοίκι.",
   "tier": "flavour"
+ },
+ {
+  "trigger": "f1_start",
+  "speaker": "mags",
+  "text": "Ο Ταμ μπήκε εδώ την άνοιξη. Αν είναι μέσα, θα τον βρω.",
+  "face": "neutral",
+  "tier": "story",
+  "listener": "brannoc",
+  "listenerText": "Κι αν το φρούριο είναι στεγνό, θα μάθω γιατί."
+ },
+ {
+  "trigger": "hobb_shout",
+  "speaker": "hobb",
+  "text": "Ε! Είναι κανείς εκεί; Κόλλησα στην αποθήκη! Προσοχή στους μοχλούς!",
+  "face": "neutral",
+  "tier": "story",
+  "offscreen": true
+ },
+ {
+  "trigger": "stores_frogs",
+  "speaker": "mags",
+  "text": "Βατραχόδιχτα. Άδεια. Όλοι οι βάτραχοι του βάλτου σώπασαν φέτος.",
+  "face": "wince",
+  "tier": "flavour",
+  "listener": "ilsevar",
+  "listenerText": "Κατέβηκαν. Το άκουσαν κι αυτοί."
+ },
+ {
+  "trigger": "escape_tam_saved",
+  "speaker": "mags",
+  "text": "Κράτα ρυθμό, Ταμ! Κολύμπα αν χρειαστεί!",
+  "face": "shocked",
+  "tier": "story",
+  "listener": "tam",
+  "listenerText": "Είναι ώρα για φαγητό;",
+  "condition": {
+   "saved_tam": true
+  }
+ },
+ {
+  "trigger": "escape_tam_saved_2",
+  "speaker": "tam",
+  "text": "Μάγκι, το νερό μιλάει πάλι.",
+  "face": "neutral",
+  "tier": "story",
+  "listener": "mags",
+  "listenerText": "Μην το ακούς. Άκου εμένα.",
+  "condition": {
+   "saved_tam": true
+  }
+ },
+ {
+  "trigger": "idle",
+  "speaker": "mags",
+  "text": "Μη. Μετράω σκαλιά. Βοηθάει.",
+  "face": "neutral",
+  "tier": "flavour",
+  "condition": {
+   "saved_tam": false
+  },
+  "act": 2
+ },
+ {
+  "trigger": "loot",
+  "speaker": "mags",
+  "text": "Πάρ' το. Δεν το θέλω.",
+  "face": "neutral",
+  "tier": "flavour",
+  "condition": {
+   "saved_tam": false
+  },
+  "act": 2
+ },
+ {
+  "trigger": "low_health",
+  "speaker": "mags",
+  "text": "Καλά είμαι. Προχώρα.",
+  "face": "wince",
+  "tier": "flavour",
+  "condition": {
+   "saved_tam": false
+  },
+  "act": 2
  }
 ]

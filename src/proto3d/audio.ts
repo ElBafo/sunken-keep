@@ -6,6 +6,8 @@ import {
   SCONCE_FRONT_OFFSET_TILES,
   STEP_VOLUME,
   WATER_SURFACE_Y,
+  HERO_VOICES,
+  HERO_HURT_VOICE_GAP,
   isWaterTile
 } from './constants';
 import { QUALITY_PRESETS, QualityLevel } from './quality';
@@ -19,7 +21,8 @@ interface PositionalVoice {
   object: THREE.Object3D;
   loop: boolean;
   baseVolume: number;
-  kind: 'torch' | 'drip' | 'far' | 'door' | 'chain' | 'banner' | 'wind' | 'bones' | 'leech' | 'water' | 'presence';
+  kind: 'torch' | 'drip' | 'far' | 'door' | 'chain' | 'banner' | 'wind' | 'bones' | 'leech' | 'water' | 'presence' | 'named';
+  name?: string;
 }
 
 export class AudioManager {
@@ -55,11 +58,19 @@ export class AudioManager {
   private lastStepVariant: Record<string, string> = {};
   private lastStepName: string | null = null;
   private lastUiNames: string[] = [];
+  private lastCombatVariant: Record<string, string> = {};
+  private lastHeroHurt: Record<string, string> = {};
+  private nextHeroHurtAt = 0;
+  lastHeroVoice: string | null = null;
+  private windups = new Map<string, PositionalVoice>();
+  private combatPool: PositionalVoice[] = [];
+  private resumeWired = false;
 
   constructor(camera: THREE.Camera, quality: QualityLevel) {
     this.listener = new THREE.AudioListener();
     camera.add(this.listener);
     this.quality = quality;
+    this.wireResume();
   }
 
   async init() {
@@ -68,9 +79,22 @@ export class AudioManager {
 
   unlock() {
     const ctx = this.listener.context;
-    if (ctx && ctx.state === 'suspended') {
-      ctx.resume();
+    if (ctx && ctx.state !== 'running') {
+      void ctx.resume();
     }
+  }
+
+  private wireResume() {
+    if (this.resumeWired || typeof document === 'undefined') return;
+    this.resumeWired = true;
+    const resume = () => this.unlock();
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') resume();
+    });
+    window.addEventListener('pageshow', resume);
+    document.addEventListener('pointerdown', resume, true);
+    document.addEventListener('touchstart', resume, true);
+    document.addEventListener('click', resume, true);
   }
 
   private async loadBuffer(loader: THREE.AudioLoader, path: string): Promise<AudioBuffer> {
@@ -149,7 +173,71 @@ export class AudioManager {
       ['torch_dunk', 'audio/sfx_torch_dunk.mp3'],
       ['ui_log_line', 'audio/sfx_ui_log_line.mp3'],
       ['ui_button_denied', 'audio/sfx_ui_button_denied.mp3'],
-      ['ui_inventory_move', 'audio/sfx_ui_inventory_move.mp3']
+      ['ui_inventory_move', 'audio/sfx_ui_inventory_move.mp3'],
+      ['hit', 'audio/sfx_hit.mp3'],
+      ['hit_2', 'audio/sfx_hit_2.mp3'],
+      ['hit_3', 'audio/sfx_hit_3.mp3'],
+      ['act_miss', 'audio/sfx_act_miss.mp3'],
+      ['act_miss_2', 'audio/sfx_act_miss_2.mp3'],
+      ['act_miss_3', 'audio/sfx_act_miss_3.mp3'],
+      ['hurt', 'audio/sfx_hurt.mp3'],
+      ['hurt_2', 'audio/sfx_hurt_2.mp3'],
+      ['hurt_3', 'audio/sfx_hurt_3.mp3'],
+      ['hit_crit', 'audio/sfx_hit_crit.mp3'],
+      ['hit_crit_2', 'audio/sfx_hit_crit_2.mp3'],
+      ['hit_crit_3', 'audio/sfx_hit_crit_3.mp3'],
+      ['hit_resist', 'audio/sfx_hit_resist_1.mp3'],
+      ['hit_resist_2', 'audio/sfx_hit_resist_2.mp3'],
+      ['hit_weak', 'audio/sfx_hit_weak_1.mp3'],
+      ['hit_weak_2', 'audio/sfx_hit_weak_2.mp3'],
+      ['hero_down', 'audio/sfx_hero_down.mp3'],
+      ['hero_revive', 'audio/sfx_hero_revive.mp3'],
+      ['game_over', 'audio/sfx_game_over.mp3'],
+      ['level_up', 'audio/sfx_level_up.mp3'],
+      ['potion', 'audio/sfx_potion.mp3'],
+      ['mana_empty', 'audio/sfx_mana_empty.mp3'],
+      ['keep_rat_alert', 'audio/sfx_keep_rat_alert.mp3'],
+      ['keep_rat_attack', 'audio/sfx_keep_rat_attack.mp3'],
+      ['keep_rat_hurt', 'audio/sfx_keep_rat_hurt.mp3'],
+      ['keep_rat_death', 'audio/sfx_keep_rat_death.mp3'],
+      ['rust_crab_alert', 'audio/sfx_rust_crab_alert.mp3'],
+      ['rust_crab_attack', 'audio/sfx_rust_crab_attack.mp3'],
+      ['rust_crab_hurt', 'audio/sfx_rust_crab_hurt.mp3'],
+      ['rust_crab_death', 'audio/sfx_rust_crab_death.mp3'],
+      ['rust_crab_windup', 'audio/sfx_rust_crab_windup.mp3'],
+      ['slime_alert', 'audio/sfx_slime_alert.mp3'],
+      ['slime_attack', 'audio/sfx_slime_attack.mp3'],
+      ['slime_hurt', 'audio/sfx_slime_hurt.mp3'],
+      ['slime_death', 'audio/sfx_slime_death.mp3'],
+      ['bog_leeches_alert', 'audio/sfx_bog_leeches_alert.mp3'],
+      ['bog_leeches_attack', 'audio/sfx_bog_leeches_attack.mp3'],
+      ['bog_leeches_hurt', 'audio/sfx_bog_leeches_hurt.mp3'],
+      ['bog_leeches_death', 'audio/sfx_bog_leeches_death.mp3'],
+      ['drowned_dwarf_alert', 'audio/sfx_drowned_dwarf_alert.mp3'],
+      ['drowned_dwarf_hurt', 'audio/sfx_drowned_dwarf_hurt.mp3'],
+      ['drowned_dwarf_death', 'audio/sfx_drowned_dwarf_death.mp3'],
+      ['drowned_dwarf_windup', 'audio/sfx_drowned_dwarf_windup.mp3'],
+      ['drowned_dwarf_attack', 'audio/sfx_drowned_dwarf_attack.mp3'],
+      ['tide_spawn_alert', 'audio/sfx_tide_spawn_alert.mp3'],
+      ['tide_spawn_attack', 'audio/sfx_tide_spawn_attack.mp3'],
+      ['tide_spawn_hurt', 'audio/sfx_tide_spawn_hurt.mp3'],
+      ['tide_spawn_death', 'audio/sfx_tide_spawn_death.mp3'],
+      ['captain_dural_alert', 'audio/sfx_drowned_dwarf_alert.mp3'],
+      ['captain_dural_hurt', 'audio/sfx_drowned_dwarf_hurt.mp3'],
+      ['captain_dural_death', 'audio/sfx_drowned_dwarf_death.mp3'],
+      ['dural_windup', 'audio/sfx_dural_windup.mp3'],
+      ['vox_brannoc_hurt_1', 'audio/vox_brannoc_hurt_1.mp3'],
+      ['vox_brannoc_hurt_2', 'audio/vox_brannoc_hurt_2.mp3'],
+      ['vox_brannoc_down', 'audio/vox_brannoc_down.mp3'],
+      ['vox_wren_hurt_1', 'audio/vox_wren_hurt_1.mp3'],
+      ['vox_wren_hurt_2', 'audio/vox_wren_hurt_2.mp3'],
+      ['vox_wren_down', 'audio/vox_wren_down.mp3'],
+      ['vox_ilsevar_hurt_1', 'audio/vox_ilsevar_hurt_1.mp3'],
+      ['vox_ilsevar_hurt_2', 'audio/vox_ilsevar_hurt_2.mp3'],
+      ['vox_ilsevar_down', 'audio/vox_ilsevar_down.mp3'],
+      ['vox_mags_hurt_1', 'audio/vox_mags_hurt_1.mp3'],
+      ['vox_mags_hurt_2', 'audio/vox_mags_hurt_2.mp3'],
+      ['vox_mags_down', 'audio/vox_mags_down.mp3']
     ];
 
     const results = await Promise.all(
@@ -223,33 +311,82 @@ export class AudioManager {
     this.nextChainAt = performance.now() + 8000 + Math.random() * 12000;
     this.nextBannerAt = performance.now() + 10000 + Math.random() * 15000;
 
+    for (let i = 0; i < 8; i++) {
+      const object = new THREE.Object3D();
+      const audio = new THREE.PositionalAudio(this.listener);
+      audio.setRefDistance(2.4);
+      audio.setMaxDistance(12);
+      audio.setRolloffFactor(1);
+      object.add(audio);
+      scene.add(object);
+      this.combatPool.push({ audio, object, loop: false, baseVolume: 1, kind: 'presence' });
+    }
+
     this.loaded = true;
   }
 
   attachLeeches(scene: THREE.Scene, floorData: FloorData) {
+    this.scene = scene;
+    this.syncLeechLoops(floorData);
+  }
+
+  /** Drop every leech idle, including a stray copy left over from a previous start. */
+  clearLeechLoops() {
+    const leechBuf = this.buffers.get('leech_idle');
+    const extra = this.voices.filter(
+      (v) => v.kind === 'leech' || v.name === 'leech_idle' || (!!leechBuf && v.audio.buffer === leechBuf)
+    );
+    for (const voice of extra) {
+      if (voice.audio.isPlaying) voice.audio.stop();
+      voice.object.parent?.remove(voice.object);
+      this.voices = this.voices.filter((v) => v !== voice);
+      for (const [id, named] of this.namedLoops) {
+        if (named === voice) this.namedLoops.delete(id);
+      }
+    }
+  }
+
+  /** Rebind leech idle loops to the squares that currently hold bog_leeches. */
+  syncLeechLoops(floorData: FloorData) {
+    this.clearLeechLoops();
     const buf = this.buffers.get('leech_idle');
-    if (!buf) return;
-    const range = 2 * CELL_SIZE;
+    const scene = this.scene;
+    if (!buf || !scene) return;
+    const spots: Array<{ x: number; y: number; floorY: number }> = [];
     const { tiles, width, height } = floorData;
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
+        if (tiles[y][x].monster !== 'bog_leeches') continue;
         const tile = tiles[y][x];
-        if (tile.monster !== 'bog_leeches') continue;
-        const floorY = tile.deepWater || tile.shallowWater ? WATER_SURFACE_Y : 0;
-        const object = new THREE.Object3D();
-        object.position.set(x * CELL_SIZE, floorY + 0.2, y * CELL_SIZE);
-        const audio = new THREE.PositionalAudio(this.listener);
-        audio.setBuffer(buf);
-        audio.setRefDistance(CELL_SIZE);
-        audio.setMaxDistance(range);
-        audio.setRolloffFactor(1);
-        audio.setLoop(true);
-        audio.setVolume(0.4);
-        object.add(audio);
-        scene.add(object);
-        audio.play();
-        this.voices.push({ audio, object, loop: true, baseVolume: 0.4, kind: 'leech' });
+        spots.push({
+          x,
+          y,
+          floorY: tile.deepWater || tile.shallowWater ? WATER_SURFACE_Y : 0
+        });
       }
+    }
+    const range = 2 * CELL_SIZE;
+    for (const spot of spots) {
+      const object = new THREE.Object3D();
+      const audio = new THREE.PositionalAudio(this.listener);
+      audio.setBuffer(buf);
+      audio.setRefDistance(CELL_SIZE);
+      audio.setMaxDistance(range);
+      audio.setRolloffFactor(1);
+      audio.setLoop(true);
+      audio.setVolume(0.4);
+      object.add(audio);
+      scene.add(object);
+      audio.play();
+      this.voices.push({
+        audio,
+        object,
+        loop: true,
+        baseVolume: 0.4,
+        kind: 'leech',
+        name: 'leech_idle'
+      });
+      object.position.set(spot.x * CELL_SIZE, spot.floorY + 0.2, spot.y * CELL_SIZE);
     }
   }
 
@@ -299,7 +436,7 @@ export class AudioManager {
         object.add(audio);
         scene.add(object);
         audio.play();
-        this.voices.push({ audio, object, loop: true, baseVolume: 0.35, kind: 'water' });
+        this.voices.push({ audio, object, loop: true, baseVolume: 0.35, kind: 'water', name: 'water_lap' });
       }
     }
   }
@@ -323,7 +460,7 @@ export class AudioManager {
       object.add(audio);
       scene.add(object);
       audio.play();
-      this.voices.push({ audio, object, loop: true, baseVolume: 0.28, kind: 'wind' });
+      this.voices.push({ audio, object, loop: true, baseVolume: 0.28, kind: 'wind', name: 'crack_wind' });
     }
   }
 
@@ -333,6 +470,179 @@ export class AudioManager {
 
   lanternLoop(): { mode: 'oil' | 'ember' | 'off'; playing: boolean } {
     return { mode: this.lanternMode, playing: !!this.lanternSound?.isPlaying };
+  }
+
+  private combatFamilies: Record<string, string[]> = {
+    hit: ['hit', 'hit_2', 'hit_3'],
+    act_miss: ['act_miss', 'act_miss_2', 'act_miss_3'],
+    hurt: ['hurt', 'hurt_2', 'hurt_3'],
+    hit_crit: ['hit_crit', 'hit_crit_2', 'hit_crit_3'],
+    hit_resist: ['hit_resist', 'hit_resist_2'],
+    hit_weak: ['hit_weak', 'hit_weak_2']
+  };
+
+  playCombat(name: string, volume = 1, x?: number, y?: number, id?: string) {
+    const family = this.combatFamilies[name];
+    const pick = family ? this.pickVariant(name, family) : name;
+    const rate = 0.95 + Math.random() * 0.1;
+    if (name.endsWith('_windup')) {
+      const key = id ?? name;
+      this.stopWindup(key);
+      const buf = this.buffers.get(pick);
+      const scene = this.scene;
+      if (!buf || !scene) return;
+      const object = new THREE.Object3D();
+      const wx = x != null ? x * CELL_SIZE : 0;
+      const wz = y != null ? y * CELL_SIZE : 0;
+      object.position.set(wx, 0.8, wz);
+      const audio = new THREE.PositionalAudio(this.listener);
+      audio.setBuffer(buf);
+      audio.setRefDistance(2.4);
+      audio.setMaxDistance(14);
+      audio.setRolloffFactor(1);
+      audio.setVolume(1);
+      object.add(audio);
+      scene.add(object);
+      audio.play();
+      this.windups.set(key, { audio, object, loop: false, baseVolume: 1, kind: 'presence' });
+      return;
+    }
+    if (x != null && y != null) {
+      this.playCombatAt(pick, x, y, volume, rate);
+      return;
+    }
+    this.playUi(pick, volume, rate);
+  }
+
+  stopWindup(id?: string) {
+    if (id) {
+      const voice = this.windups.get(id);
+      if (!voice) return;
+      if (voice.audio.isPlaying) voice.audio.stop();
+      voice.object.parent?.remove(voice.object);
+      this.windups.delete(id);
+      return;
+    }
+    for (const key of [...this.windups.keys()]) this.stopWindup(key);
+  }
+
+  private playCombatAt(name: string, x: number, y: number, volume: number, rate = 1) {
+    const buf = this.buffers.get(name);
+    if (!buf) return;
+    let voice = this.combatPool.find((v) => !v.audio.isPlaying);
+    if (!voice) voice = this.combatPool[0];
+    if (!voice) {
+      this.playUi(name, volume, rate);
+      return;
+    }
+    if (voice.audio.isPlaying) voice.audio.stop();
+    voice.object.position.set(x * CELL_SIZE, 0.8, y * CELL_SIZE);
+    voice.audio.setBuffer(buf);
+    voice.audio.setPlaybackRate(rate);
+    voice.baseVolume = volume;
+    voice.audio.setVolume(Math.min(1, Math.max(0, volume)));
+    voice.audio.play();
+  }
+
+  /** Stop music and looping ambience without cutting one-shot voices (downed, UI). */
+  stopFloorLoops() {
+    this.ambientSound?.stop();
+    this.musicSound?.stop();
+    this.lanternSound?.stop();
+    this.lanternMode = 'off';
+    for (const v of this.voices) {
+      if (v.loop && v.audio.isPlaying) v.audio.stop();
+    }
+  }
+
+  startFloorLoops(hasOil: boolean) {
+    if (this.ambientSound && !this.ambientSound.isPlaying) {
+      this.ambientSound.setVolume(this.trueDark ? this.ambVolume * 10 ** (-DARK_AMB_DUCK_DB / 20) : this.ambVolume);
+      this.ambientSound.play();
+    }
+    if (this.musicSound && !this.musicSound.isPlaying) {
+      this.musicSound.setVolume(this.musicVolume);
+      this.musicSound.play();
+    }
+    this.startLanternLoop(hasOil);
+    for (const v of this.voices) {
+      if (v.loop && v.kind !== 'presence' && !v.audio.isPlaying) {
+        v.audio.setVolume(v.baseVolume);
+        v.audio.play();
+      }
+    }
+  }
+
+  stopPresenceLoops() {
+    for (const [id, voice] of [...this.namedLoops.entries()]) {
+      if (voice.kind !== 'presence') continue;
+      if (voice.audio.isPlaying) voice.audio.stop();
+      voice.object.parent?.remove(voice.object);
+      this.namedLoops.delete(id);
+      this.voices = this.voices.filter((v) => v !== voice);
+    }
+  }
+
+  playingLoops(): { count: number; kinds: string[] } {
+    return this.loopKit(true);
+  }
+
+  /** Floor-kit loops. Pass `playingOnly` to count voices that are actually audible. */
+  loopKit(playingOnly = false): { count: number; kinds: string[]; names: string[] } {
+    const kinds: string[] = [];
+    const names: string[] = [];
+    const keep = (exists: boolean, playing: boolean | undefined, kind: string, name: string) => {
+      if (exists && (!playingOnly || playing)) {
+        kinds.push(kind);
+        names.push(name);
+      }
+    };
+    keep(!!this.ambientSound, this.ambientSound?.isPlaying, 'ambient', 'ambience');
+    keep(!!this.musicSound, this.musicSound?.isPlaying, 'music', 'music_act1');
+    keep(!!this.lanternSound, this.lanternSound?.isPlaying, `lantern:${this.lanternMode}`, `lantern:${this.lanternMode}`);
+    for (const v of this.voices) {
+      if (!v.loop || v.kind === 'presence') continue;
+      if (playingOnly && !v.audio.isPlaying) continue;
+      kinds.push(v.kind);
+      names.push(v.name ?? v.kind);
+    }
+    return { count: kinds.length, kinds, names };
+  }
+
+  private pickVariant(family: string, names: string[]): string {
+    const available = names.filter((n) => this.buffers.has(n));
+    const pool = available.length ? available : names;
+    const last = this.lastCombatVariant[family];
+    const choices = pool.length > 1 ? pool.filter((n) => n !== last) : pool;
+    const pick = choices[(Math.random() * choices.length) | 0];
+    this.lastCombatVariant[family] = pick;
+    return pick;
+  }
+
+  playHeroHurt(hero: string, nowSec: number) {
+    if (!HERO_VOICES) return;
+    if (nowSec < this.nextHeroHurtAt) return;
+    this.nextHeroHurtAt = nowSec + HERO_HURT_VOICE_GAP;
+    const names = [`vox_${hero}_hurt_1`, `vox_${hero}_hurt_2`];
+    const last = this.lastHeroHurt[hero];
+    const choices = names.filter((n) => n !== last && this.buffers.has(n));
+    const pool = choices.length ? choices : names.filter((n) => this.buffers.has(n));
+    if (!pool.length) return;
+    const pick = pool[(Math.random() * pool.length) | 0];
+    this.lastHeroHurt[hero] = pick;
+    this.lastHeroVoice = pick;
+    this.playUi(pick, 1);
+  }
+
+  playHeroDown(hero: string) {
+    if (!HERO_VOICES) return;
+    const name = `vox_${hero}_down`;
+    this.lastHeroVoice = name;
+    this.playUi(name, 1);
+  }
+
+  setFightDuck(on: boolean) {
+    if (this.musicSound) this.musicSound.setVolume(on ? 0.12 : this.musicVolume);
   }
 
   playUi(name: string, volume = 1, rate = 1) {
@@ -381,11 +691,18 @@ export class AudioManager {
     if (this.musicSound) this.musicSound.setVolume(on ? 0.15 : this.musicVolume);
   }
 
-  startNamedLoop(name: string, x: number, y: number, z: number, volume: number): string {
+  startNamedLoop(
+    name: string,
+    x: number,
+    y: number,
+    z: number,
+    volume: number,
+    kind: PositionalVoice['kind'] = 'presence'
+  ): string {
     const id = `loop-${this.nextLoopId++}`;
     const buf = this.buffers.get(name);
     const scene = this.scene;
-    if (!buf || !scene) return id;
+    if (!buf || !scene) return '';
     const object = new THREE.Object3D();
     object.position.set(x, y, z);
     const audio = new THREE.PositionalAudio(this.listener);
@@ -398,7 +715,7 @@ export class AudioManager {
     object.add(audio);
     scene.add(object);
     audio.play();
-    const voice: PositionalVoice = { audio, object, loop: true, baseVolume: volume, kind: 'presence' };
+    const voice: PositionalVoice = { audio, object, loop: true, baseVolume: volume, kind, name };
     this.voices.push(voice);
     this.namedLoops.set(id, voice);
     return id;
@@ -467,7 +784,7 @@ export class AudioManager {
     object.add(audio);
     scene.add(object);
     audio.play();
-    const voice: PositionalVoice = { audio, object, loop: true, baseVolume: 0.42, kind: 'torch' };
+    const voice: PositionalVoice = { audio, object, loop: true, baseVolume: 0.42, kind: 'torch', name: 'torch' };
     this.voices.push(voice);
     this.torchVoices.set(key, voice);
   }
@@ -602,11 +919,11 @@ export class AudioManager {
   }
 
   stopAll() {
-    this.ambientSound?.stop();
-    this.musicSound?.stop();
-    this.lanternSound?.stop();
+    this.stopWindup();
+    this.stopFloorLoops();
     for (const sound of this.uiPool) sound.stop();
     for (const v of this.voices) v.audio.stop();
+    for (const v of this.combatPool) v.audio.stop();
     this.namedLoops.clear();
   }
 }
