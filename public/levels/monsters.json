@@ -21,6 +21,9 @@
       "counter": "green potion pulls them off; fire damage makes them let go",
       "stationary": true,
       "stationary_note": "stay in their water; only fight when the party is next to them"
+    },
+    "size": {
+      "worldHeight": 0.15
     }
   },
   "keep_rat": {
@@ -37,6 +40,9 @@
       "detail": "every 3rd attack bites a random back-row hero instead of the front",
       "tell": "rat squeaks and ducks low first",
       "counter": "kill it first; Mags's speed"
+    },
+    "size": {
+      "worldHeight": 0.2
     }
   },
   "rust_crab": {
@@ -58,6 +64,9 @@
         5,
         8
       ]
+    },
+    "size": {
+      "worldHeight": 0.3
     }
   },
   "slime": {
@@ -77,6 +86,9 @@
       "counter": "Ilsevar's frost, Wren swapping forward",
       "stationary": true,
       "stationary_note": "never chases; it blocks the arch to the guard hall so the crab and slime are separate fights"
+    },
+    "size": {
+      "worldHeight": 0.55
     }
   },
   "drowned_dwarf": {
@@ -94,6 +106,9 @@
       "detail": "every 3rd attack: 1.2s overhead slam for 8-12",
       "tell": "hammer raised overhead + sfx",
       "counter": "shield block, or pocket sand cancels it"
+    },
+    "size": {
+      "worldHeight": 0.6
     }
   },
   "tide_spawn": {
@@ -103,7 +118,10 @@
       4,
       9
     ],
-    "_note": "moved to Act 2 (Homes); keeps the song loop and Ilsevar's 'It's singing.'"
+    "_note": "moved to Act 2 (Homes); keeps the song loop and Ilsevar's 'It's singing.'",
+    "size": {
+      "worldHeight": 0.85
+    }
   },
   "cellar_spider": {
     "floor": 2,
@@ -120,6 +138,9 @@
       "detail": "25% on hit: webs a front hero, who can't act for 3s",
       "tell": "web over the hero's portrait",
       "counter": "tap Mags's dagger on the webbed hero's portrait to cut them free instantly"
+    },
+    "size": {
+      "worldHeight": 0.3
     }
   },
   "captain_dural": {
@@ -138,6 +159,10 @@
       "detail": "phase 1: plain sword hits. Below 50% HP: every 3rd attack is a 1.5s telegraphed cleave hitting both front heroes for 6-11",
       "tell": "blade flash + sfx",
       "counter": "shield wall (or block) and heal timing"
+    },
+    "size": {
+      "worldHeight": 0.68
     }
-  }
+  },
+  "_size_note": "size.worldHeight = monster height as a fraction of wall height (Levie). Dwarves are about 0.6 of a keep wall; Brannoc is the scale reference."
 }

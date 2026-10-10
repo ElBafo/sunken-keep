@@ -10,18 +10,24 @@ import {
 import type { HitKind } from '../core/types';
 import { FloorData, Tile } from './types';
 
-/** World height from ART_CONSISTENCY_AUDIT.md; width = height × 80/60 so texels stay square. */
-const SPRITE_ASPECT = 80 / 60;
-const MONSTER_HEIGHT: Record<string, number> = {
-  keep_rat: 0.45,
-  rust_crab: 0.55,
-  bog_leeches: 0.35,
-  slime: 0.9,
-  cellar_spider: 0.8,
-  drowned_dwarf: 1.15,
-  captain_dural: 1.35,
-  tide_spawn: 1.2
+/** Item billboards keep the old 80×60 texel ratio. Monster quads use each set's own ratio. */
+const ITEM_ASPECT = 80 / 60;
+/** Wall-fraction defaults when `size.worldHeight` is missing from monsters.json. */
+const DEFAULT_WORLD_HEIGHT: Record<string, number> = {
+  bog_leeches: 0.15,
+  keep_rat: 0.2,
+  rust_crab: 0.3,
+  cellar_spider: 0.3,
+  slime: 0.55,
+  drowned_dwarf: 0.6,
+  captain_dural: 0.68,
+  tide_spawn: 0.85
 };
+const V2_FOLDER = 'art/dungeon/monsters_v2';
+const V1_FOLDER = 'art/dungeon';
+const LOD_NAMES = ['close', 'near', 'mid', 'far'] as const;
+export type LodName = (typeof LOD_NAMES)[number];
+type AnimName = 'idle' | 'attack' | 'hurt' | 'death' | 'windup';
 const ITEM_HEIGHT: Record<string, number> = {
   potion_red: 0.22,
   potion_blue: 0.22,
@@ -37,8 +43,39 @@ const ITEM_HEIGHT: Record<string, number> = {
   ashmantle_hammer: 0.6
 };
 
-export function billboardSize(height: number): { w: number; h: number } {
-  return { w: height * SPRITE_ASPECT, h: height };
+export function billboardSize(height: number, aspect = ITEM_ASPECT): { w: number; h: number } {
+  return { w: height * aspect, h: height };
+}
+
+/** Quad size: visible height is `worldHeight` walls; width follows that set's pixel ratio. */
+export function quadForWorldHeight(
+  worldHeight: number,
+  wallSize: number,
+  imageW: number,
+  imageH: number
+): { w: number; h: number } {
+  const h = worldHeight * wallSize;
+  const aspect = imageH > 0 ? imageW / imageH : ITEM_ASPECT;
+  return { w: h * aspect, h };
+}
+
+export function monsterLodName(dist: number, hasClose: boolean): LodName {
+  if (dist <= 1) return hasClose ? 'close' : 'near';
+  if (dist === 2) return 'near';
+  if (dist === 3) return 'mid';
+  return 'far';
+}
+
+function lodFromFile(file: string): LodName {
+  if (file.includes('_close')) return 'close';
+  if (file.includes('_far')) return 'far';
+  if (file.includes('_mid')) return 'mid';
+  return 'near';
+}
+
+function texSize(tex: THREE.Texture | undefined): { w: number; h: number } {
+  const img = tex?.image as { width?: number; height?: number } | undefined;
+  return { w: img?.width ?? 80, h: img?.height ?? 60 };
 }
 
 const ITEM_SPRITE: Record<string, { file: string; h: number; base?: string; prefix?: string }> = {
@@ -61,19 +98,8 @@ const ITEM_SPRITE: Record<string, { file: string; h: number; base?: string; pref
 const OWN_SQUARE_SCALE = 0.72;
 /** Must be in the visible floor strip (near plane hits y=0 at ~1.0 in front of the camera). */
 const OWN_SQUARE_FORWARD = 1.18;
-/**
- * Adjacent billboards sit on this camera-forward floor line so their
- * `monster_anchor.json` feet land near the bottom of the 3D view (EOB close range).
- */
-const CLOSE_RANGE_FORWARD = 1.28;
-const FACING = [
-  [0, -1],
-  [1, 0],
-  [0, 1],
-  [-1, 0]
-] as const;
-/** Adjacent near frames only: whole-number 2× with nearest-pixel filtering. */
-const ADJACENT_INTEGER_SCALE = 2;
+/** Items on other squares sit in the front half (toward the camera). */
+const ITEM_FRONT_HALF = CELL_SIZE * 0.25;
 const SPRITE_RENDER_ORDER = 10;
 const HITFX_RENDER_ORDER = 12;
 const MONSTER_TEXEL_W = 80;
@@ -138,7 +164,12 @@ interface SpriteInfo {
   imageH: number;
   gapBelow: number;
   frames?: THREE.Texture[];
-  sets?: Partial<Record<'idle' | 'attack' | 'hurt' | 'death' | 'windup', THREE.Texture[]>>;
+  sets?: Partial<Record<AnimName, THREE.Texture[]>>;
+  lodSets?: Partial<Record<LodName, Partial<Record<AnimName, THREE.Texture[]>>>>;
+  lodSize?: Partial<Record<LodName, { w: number; h: number }>>;
+  currentLod?: LodName;
+  v2?: boolean;
+  worldHeight?: number;
   lod?: THREE.Texture[];
   currentFrame: number;
   animSpeed: number;
@@ -231,7 +262,9 @@ function makeBillboard(
 export class SpriteManager {
   sprites: SpriteInfo[] = [];
   camera: THREE.Camera;
-  private anchors = new Map<string, { gapBelow: number; imageH: number }>();
+  private anchors = new Map<string, { gapBelow: number; imageH: number; imageW: number; topRow: number; footRow: number }>();
+  private v2Px = new Map<string, Partial<Record<LodName, [number, number]>>>();
+  private heights = new Map<string, number>();
   private hitFx = new Map<string, HitFxSpec>();
   private bodyAnchors = new Map<string, BodyAnchor>();
   private playingFx: HitFxPlay[] = [];
@@ -239,7 +272,7 @@ export class SpriteManager {
   private scene: THREE.Scene | null = null;
   private chestOpenLod: THREE.Texture[] | null = null;
   private chestClosedLod = new Map<string, THREE.Texture[]>();
-  adjacentScale = ADJACENT_INTEGER_SCALE;
+  adjacentScale = 1;
 
   constructor(camera: THREE.Camera) {
     this.camera = camera;
@@ -371,6 +404,7 @@ export class SpriteManager {
     };
 
     this.scene = scene;
+    await this.loadHeights(baseUrl);
     await this.loadHitFx(loadTex, baseUrl);
     try {
       this.chestOpenLod = await Promise.all([
@@ -390,13 +424,27 @@ export class SpriteManager {
 
         if (tile.monster) {
           const kind = tile.monster;
-          const idle = await this.loadSet(loadTex, kind, 'idle', 4);
-          const attack = await this.loadSet(loadTex, kind, 'attack', 3);
-          const hurt = await this.loadSet(loadTex, kind, 'hurt', 1);
-          const death = await this.loadSet(loadTex, kind, 'death', 4);
-          const frames = idle.length ? idle : [await loadTex(`art/dungeon/${kind}_near.png`)];
-          const size = billboardSize(MONSTER_HEIGHT[kind] ?? 0.9);
-          const feet = this.feetFor(`${kind}_idle_1_near.png`, size.h, feetY);
+          const v2 = this.v2Px.has(kind);
+          const folder = v2 ? V2_FOLDER : V1_FOLDER;
+          const lodSets: NonNullable<SpriteInfo['lodSets']> = {};
+          const lodSize: NonNullable<SpriteInfo['lodSize']> = {};
+          const worldHeight = this.wallHeightOf(kind);
+          const lods = v2 ? LOD_NAMES : (['near', 'mid', 'far'] as const);
+          for (const lod of lods) {
+            const idle = await this.loadSet(loadTex, folder, kind, 'idle', 4, lod);
+            if (!idle.length) continue;
+            const attack = await this.loadSet(loadTex, folder, kind, 'attack', 3, lod);
+            const hurt = await this.loadSet(loadTex, folder, kind, 'hurt', 1, lod);
+            const death = await this.loadSet(loadTex, folder, kind, 'death', 4, lod);
+            lodSets[lod] = { idle, attack, hurt, death, windup: attack.length ? [attack[0]] : idle };
+            lodSize[lod] = this.quadForLod(kind, lod, worldHeight, idle[0]);
+          }
+          const startLod: LodName = lodSets.near ? 'near' : ((Object.keys(lodSets)[0] as LodName | undefined) ?? 'near');
+          const startSets = lodSets[startLod] ?? {};
+          const frames = startSets.idle ?? [];
+          if (!frames.length) continue;
+          const size = lodSize[startLod] ?? quadForWorldHeight(worldHeight, CELL_SIZE, 80, 60);
+          const feet = this.feetFor(`${kind}_idle_1_${startLod}.png`, size.h, feetY);
           const mat = makeSpriteMaterial(frames[0]);
           const sprite = makeBillboard(mat, x * CELL_SIZE, feet, y * CELL_SIZE, size.w, size.h);
           scene.add(sprite);
@@ -410,14 +458,19 @@ export class SpriteManager {
             monsterKind: kind,
             spawnX: x,
             spawnY: y,
+            v2,
+            worldHeight,
             baseW: size.w,
             baseH: size.h,
             floorY: feet,
             tileFloorY: feetY,
-            imageH: 60,
-            gapBelow: this.anchors.get(`${kind}_idle_1_near.png`)?.gapBelow ?? 0,
+            imageH: this.anchors.get(`${kind}_idle_1_${startLod}.png`)?.imageH ?? texSize(frames[0]).h,
+            gapBelow: this.anchors.get(`${kind}_idle_1_${startLod}.png`)?.gapBelow ?? 0,
             frames,
-            sets: { idle: frames, attack, hurt, death, windup: attack.length ? [attack[0]] : frames },
+            sets: startSets,
+            lodSets,
+            lodSize,
+            currentLod: startLod,
             currentFrame: 0,
             animSpeed: 200,
             lastFrameTime: 0,
@@ -472,20 +525,12 @@ export class SpriteManager {
     }
   }
 
-  setAdjacentScale(n: number) {
-    this.adjacentScale = n >= 2 ? ADJACENT_INTEGER_SCALE : 1;
+  setAdjacentScale(_n: number) {
+    this.adjacentScale = 1;
   }
 
   integerAdjacentScale(): number {
-    return this.adjacentScale >= 2 ? ADJACENT_INTEGER_SCALE : 1;
-  }
-
-  private nearFile(sprite: SpriteInfo): string {
-    if (sprite.kind === 'monster' && sprite.monsterKind) {
-      const anim = sprite.anim === 'windup' ? 'attack' : sprite.anim;
-      return `${sprite.monsterKind}_${anim}_${sprite.currentFrame + 1}_near.png`;
-    }
-    return '';
+    return 1;
   }
 
   layoutItems(playerX: number, playerY: number, dir: number) {
@@ -499,63 +544,115 @@ export class SpriteManager {
     const fz = -Math.cos(rotY);
     const camX = playerX * CELL_SIZE + ox;
     const camZ = playerY * CELL_SIZE + oz;
-    const adjScale = this.integerAdjacentScale();
 
     for (const sprite of this.sprites) {
       if (!sprite.object.visible) continue;
-      if (sprite.kind !== 'item' && sprite.kind !== 'monster') continue;
-
-      const onOwn = sprite.kind === 'item' && sprite.x === playerX && sprite.y === playerY;
-      if (onOwn) {
-        sprite.object.position.set(
-          camX + fx * OWN_SQUARE_FORWARD,
-          sprite.floorY,
-          camZ + fz * OWN_SQUARE_FORWARD
-        );
-        sprite.object.scale.set(sprite.baseW * OWN_SQUARE_SCALE, sprite.baseH * OWN_SQUARE_SCALE, 1);
-        if (sprite.lod) {
-          sprite.material.map = sprite.lod[0];
-          sprite.material.needsUpdate = true;
-        }
+      if (sprite.kind === 'item') {
+        this.placeItem(sprite, playerX, playerY, camX, camZ, fx, fz);
         continue;
       }
+      if (sprite.kind === 'monster') this.placeMonster(sprite, playerX, playerY);
+    }
+  }
 
-      const manh = Math.abs(sprite.x - playerX) + Math.abs(sprite.y - playerY);
-      if (manh === 1) {
-        const [fdx, fdy] = FACING[dir] ?? [0, 0];
-        const ahead = sprite.x === playerX + fdx && sprite.y === playerY + fdy;
-        let wx: number;
-        let wz: number;
-        if (ahead) {
-          wx = camX + fx * CLOSE_RANGE_FORWARD;
-          wz = camZ + fz * CLOSE_RANGE_FORWARD;
-        } else {
-          wx = sprite.x * CELL_SIZE + Math.sign(playerX - sprite.x) * (CELL_SIZE / 2);
-          wz = sprite.y * CELL_SIZE + Math.sign(playerY - sprite.y) * (CELL_SIZE / 2);
-        }
-        const h = sprite.baseH * adjScale;
-        const w = sprite.baseW * adjScale;
-        const file = this.nearFile(sprite);
-        const floor = sprite.tileFloorY ?? sprite.floorY;
-        const feet = file ? this.feetFor(file, h, floor) : floor;
-        sprite.object.position.set(wx, feet, wz);
-        sprite.object.scale.set(w, h, 1);
-        if (sprite.lod) {
-          sprite.material.map = sprite.lod[0];
-          sprite.material.needsUpdate = true;
-        }
-        continue;
-      }
+  private placeMonster(sprite: SpriteInfo, playerX: number, playerY: number) {
+    const dist = Math.max(Math.abs(sprite.x - playerX), Math.abs(sprite.y - playerY));
+    this.applyMonsterLod(sprite, dist);
+    const size = sprite.lodSize?.[sprite.currentLod ?? 'near'] ?? { w: sprite.baseW, h: sprite.baseH };
+    sprite.baseW = size.w;
+    sprite.baseH = size.h;
+    const file = this.frameFile(sprite);
+    const floor = sprite.tileFloorY ?? sprite.floorY;
+    const feet = file ? this.feetFor(file, size.h, floor) : floor;
+    sprite.object.position.set(sprite.x * CELL_SIZE, feet, sprite.y * CELL_SIZE);
+    sprite.object.scale.set(size.w, size.h, 1);
+  }
 
-      sprite.object.position.set(sprite.x * CELL_SIZE, sprite.floorY, sprite.y * CELL_SIZE);
-      sprite.object.scale.set(sprite.baseW, sprite.baseH, 1);
+  private placeItem(
+    sprite: SpriteInfo,
+    playerX: number,
+    playerY: number,
+    camX: number,
+    camZ: number,
+    fx: number,
+    fz: number
+  ) {
+    const onOwn = sprite.x === playerX && sprite.y === playerY;
+    if (onOwn) {
+      sprite.object.position.set(
+        camX + fx * OWN_SQUARE_FORWARD,
+        sprite.floorY,
+        camZ + fz * OWN_SQUARE_FORWARD
+      );
+      sprite.object.scale.set(sprite.baseW * OWN_SQUARE_SCALE, sprite.baseH * OWN_SQUARE_SCALE, 1);
       if (sprite.lod) {
-        const dist = Math.max(Math.abs(sprite.x - playerX), Math.abs(sprite.y - playerY));
-        const lodIndex = dist <= 1 ? 0 : dist === 2 ? 1 : 2;
-        sprite.material.map = sprite.lod[lodIndex];
+        sprite.material.map = sprite.lod[0];
         sprite.material.needsUpdate = true;
       }
+      return;
     }
+    sprite.object.position.set(
+      sprite.x * CELL_SIZE - fx * ITEM_FRONT_HALF,
+      sprite.floorY,
+      sprite.y * CELL_SIZE - fz * ITEM_FRONT_HALF
+    );
+    sprite.object.scale.set(sprite.baseW, sprite.baseH, 1);
+    if (sprite.lod) {
+      const dist = Math.max(Math.abs(sprite.x - playerX), Math.abs(sprite.y - playerY));
+      const lodIndex = dist <= 1 ? 0 : dist === 2 ? 1 : 2;
+      sprite.material.map = sprite.lod[lodIndex];
+      sprite.material.needsUpdate = true;
+    }
+  }
+
+  private applyMonsterLod(sprite: SpriteInfo, dist: number) {
+    const hasClose = !!sprite.lodSets?.close;
+    const lod = monsterLodName(dist, hasClose);
+    if (sprite.currentLod === lod && sprite.sets === sprite.lodSets?.[lod]) return;
+    const sets = sprite.lodSets?.[lod] ?? sprite.lodSets?.near;
+    if (!sets) return;
+    sprite.currentLod = lod;
+    sprite.sets = sets;
+    const frames = sets[sprite.anim] ?? sets.idle;
+    if (!frames?.length) return;
+    sprite.frames = frames;
+    sprite.currentFrame = Math.min(sprite.currentFrame, frames.length - 1);
+    sprite.material.map = frames[sprite.currentFrame];
+    sprite.material.needsUpdate = true;
+  }
+
+  private frameFile(sprite: SpriteInfo): string {
+    if (sprite.kind !== 'monster' || !sprite.monsterKind) return '';
+    const anim = sprite.anim === 'windup' ? 'attack' : sprite.anim;
+    const lod = sprite.currentLod ?? 'near';
+    return `${sprite.monsterKind}_${anim}_${sprite.currentFrame + 1}_${lod}.png`;
+  }
+
+  screenRect(sprite: SpriteInfo, viewW: number, viewH: number) {
+    const obj = sprite.object;
+    obj.updateMatrixWorld();
+    const cam = this.camera;
+    const toScreen = (lx: number, ly: number) => {
+      const v = new THREE.Vector3(lx, ly, 0).applyMatrix4(obj.matrixWorld).project(cam);
+      return { x: ((v.x + 1) / 2) * viewW, y: ((-v.y + 1) / 2) * viewH };
+    };
+    const feet = toScreen(0, 0);
+    const top = toScreen(0, 1);
+    const left = toScreen(-0.5, 0.5);
+    const right = toScreen(0.5, 0.5);
+    return {
+      feetY: feet.y,
+      topY: top.y,
+      height: feet.y - top.y,
+      width: Math.abs(right.x - left.x),
+      worldX: obj.position.x,
+      worldY: obj.position.y,
+      worldZ: obj.position.z,
+      scaleX: obj.scale.x,
+      scaleY: obj.scale.y,
+      lod: sprite.currentLod ?? null,
+      v2: !!sprite.v2
+    };
   }
 
   update(time: number, playerX?: number, playerY?: number, dir?: number) {
@@ -594,32 +691,100 @@ export class SpriteManager {
     try {
       const res = await fetch(`${baseUrl}art/dungeon/monster_anchor.json`);
       if (!res.ok) return;
-      const json = (await res.json()) as { files?: Record<string, { gapBelow?: number }>; canvas?: { near?: [number, number] } };
-      const imageH = json.canvas?.near?.[1] ?? 60;
-      for (const [file, info] of Object.entries(json.files ?? {})) {
-        this.anchors.set(file, { gapBelow: info.gapBelow ?? 0, imageH });
+      const json = (await res.json()) as {
+        files?: Record<string, { gapBelow?: number; topRow?: number; footRow?: number; imageW?: number; imageH?: number }>;
+        canvas?: Partial<Record<LodName, [number, number]>>;
+        distanceFrames?: {
+          monsters?: Record<string, Partial<Record<LodName, { px?: [number, number] }>>>;
+          files?: Record<string, { gapBelow?: number; topRow?: number; footRow?: number; imageW?: number; imageH?: number }>;
+        };
+      };
+      const canvas: Record<LodName, [number, number]> = {
+        close: json.canvas?.close ?? json.canvas?.near ?? [80, 60],
+        near: json.canvas?.near ?? [80, 60],
+        mid: json.canvas?.mid ?? [50, 40],
+        far: json.canvas?.far ?? [30, 25]
+      };
+      const addFile = (
+        file: string,
+        info: { gapBelow?: number; topRow?: number; footRow?: number; imageW?: number; imageH?: number }
+      ) => {
+        const lod = lodFromFile(file);
+        const [cw, ch] = canvas[lod];
+        const imageW = info.imageW ?? cw;
+        const imageH = info.imageH ?? ch;
+        this.anchors.set(file, {
+          gapBelow: info.gapBelow ?? 0,
+          imageW,
+          imageH,
+          topRow: info.topRow ?? 0,
+          footRow: info.footRow ?? imageH - 1
+        });
+      };
+      for (const [file, info] of Object.entries(json.files ?? {})) addFile(file, info);
+      for (const [file, info] of Object.entries(json.distanceFrames?.files ?? {})) addFile(file, info);
+      for (const [kind, sets] of Object.entries(json.distanceFrames?.monsters ?? {})) {
+        const px: Partial<Record<LodName, [number, number]>> = {};
+        for (const lod of LOD_NAMES) {
+          const pair = sets[lod]?.px;
+          if (pair && pair.length >= 2) px[lod] = [pair[0], pair[1]];
+        }
+        if (Object.keys(px).length) this.v2Px.set(kind, px);
       }
     } catch {
       // keep gap 0
     }
   }
 
+  private async loadHeights(baseUrl: string) {
+    try {
+      const res = await fetch(`${baseUrl}levels/monsters.json`);
+      if (!res.ok) return;
+      const json = (await res.json()) as Record<string, { size?: { worldHeight?: number } }>;
+      for (const [id, raw] of Object.entries(json)) {
+        if (id.startsWith('_') || !raw || typeof raw !== 'object') continue;
+        const h = raw.size?.worldHeight;
+        if (typeof h === 'number' && h > 0) this.heights.set(id, h);
+      }
+    } catch {
+      // defaults
+    }
+  }
+
+  private wallHeightOf(kind: string): number {
+    return this.heights.get(kind) ?? DEFAULT_WORLD_HEIGHT[kind] ?? 0.55;
+  }
+
+  private quadForLod(kind: string, lod: LodName, worldHeight: number, tex?: THREE.Texture): { w: number; h: number } {
+    const v2 = this.v2Px.get(kind)?.[lod];
+    if (v2) return quadForWorldHeight(worldHeight, CELL_SIZE, v2[0], v2[1]);
+    const file = `${kind}_idle_1_${lod}.png`;
+    const a = this.anchors.get(file);
+    const fallback = texSize(tex);
+    const imageW = a?.imageW ?? fallback.w;
+    const imageH = a?.imageH ?? fallback.h;
+    return quadForWorldHeight(worldHeight, CELL_SIZE, imageW, imageH);
+  }
+
   private feetFor(file: string, quadH: number, floorY: number): number {
     const a = this.anchors.get(file);
-    if (!a) return floorY;
+    if (!a || !a.imageH) return floorY;
     return floorY - a.gapBelow * (quadH / a.imageH);
   }
 
   private async loadSet(
     loadTex: (path: string) => Promise<THREE.Texture>,
+    folder: string,
     kind: string,
     anim: string,
-    count: number
+    count: number,
+    lod: LodName
   ): Promise<THREE.Texture[]> {
     const out: THREE.Texture[] = [];
     for (let i = 1; i <= count; i++) {
+      const name = `${kind}_${anim}_${i}_${lod}.png`;
       try {
-        out.push(await loadTex(`art/dungeon/${kind}_${anim}_${i}_near.png`));
+        out.push(await loadTex(`${folder}/${name}`));
       } catch {
         break;
       }
@@ -669,7 +834,8 @@ export class SpriteManager {
   }
 
   private playAnimAt(s: SpriteInfo, anim: SpriteInfo['anim'], now: number) {
-    const frames = s.sets?.[anim] ?? s.sets?.idle ?? s.frames;
+    const lodSets = s.lodSets?.[s.currentLod ?? 'near'] ?? s.sets;
+    const frames = lodSets?.[anim] ?? lodSets?.idle ?? s.sets?.[anim] ?? s.frames;
     if (!frames?.length) return;
     s.anim = anim;
     s.frames = frames;

@@ -4,6 +4,7 @@ import { AudioManager } from './audio';
 import {
   BRIGHT_MAX,
   BRIGHT_MIN,
+  CAMERA_SPEC,
   CELL_SIZE,
   DOOR_UNLOCK_LEAD_MS,
   HERO_VOICES,
@@ -1264,8 +1265,17 @@ class Game {
           depthTest: (s.material as THREE.Material).depthTest,
           item: s.object.userData.item,
           frames: s.frames?.length ?? 0,
-          currentFrame: s.currentFrame
+          currentFrame: s.currentFrame,
+          lod: s.currentLod ?? null,
+          v2: !!s.v2
         })),
+      spriteScreen: (kind: 'monster' | 'item', x: number, y: number) => {
+        this.renderer.render();
+        const s = this.spriteManager.sprites.find((sp) => sp.kind === kind && sp.x === x && sp.y === y && !sp.hidden);
+        if (!s) return null;
+        return this.spriteManager.screenRect(s, this.renderer.canvas.width, this.renderer.canvas.height);
+      },
+      cameraSpec: () => CAMERA_SPEC,
       regionStats: (x0: number, y0: number, x1: number, y1: number) => {
         this.renderer.render();
         const gl = this.renderer.renderer.getContext();

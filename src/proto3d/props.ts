@@ -234,10 +234,9 @@ export class PropBuilder {
     });
     const sprite = new THREE.Sprite(mat);
     sprite.center.set(0.5, 0);
-    // Stand by the desk — slightly west of cell centre, on the floor.
-    const baseX = x * CELL_SIZE - 0.55;
+    const baseX = x * CELL_SIZE;
     const baseY = 0.02;
-    const baseZ = y * CELL_SIZE + 0.15;
+    const baseZ = y * CELL_SIZE;
     sprite.position.set(baseX, baseY, baseZ);
     sprite.scale.set(LAMP_W, LAMP_H, 1);
     sprite.frustumCulled = false;
@@ -255,29 +254,14 @@ export class PropBuilder {
     this.group.add(sprite);
   }
 
-  /** Pull an adjacent floor prop to the near edge at an integer 2× scale. */
-  layoutAdjacent(playerX: number, playerY: number, adjacentScale = 2) {
-    const scale = adjacentScale >= 2 ? 2 : 1;
+  /** Keep floor props at their square centre and a consistent world size. */
+  layoutAdjacent(_playerX: number, _playerY: number, _adjacentScale = 1) {
     this.group.traverse((obj) => {
       if (obj.userData.kind !== 'lamp_capped') return;
-      const gx = obj.userData.lightX as number;
-      const gy = obj.userData.lightY as number;
-      const dist = Math.abs(gx - playerX) + Math.abs(gy - playerY);
       const baseW = (obj.userData.baseW as number) ?? LAMP_W;
       const baseH = (obj.userData.baseH as number) ?? LAMP_H;
-      if (dist === 1) {
-        const toX = Math.sign(playerX - gx);
-        const toY = Math.sign(playerY - gy);
-        obj.position.set(
-          gx * CELL_SIZE + toX * (CELL_SIZE / 2),
-          (obj.userData.baseY as number) ?? 0.02,
-          gy * CELL_SIZE + toY * (CELL_SIZE / 2)
-        );
-        obj.scale.set(baseW * scale, baseH * scale, 1);
-      } else {
-        obj.position.set(obj.userData.baseX, obj.userData.baseY, obj.userData.baseZ);
-        obj.scale.set(baseW, baseH, 1);
-      }
+      obj.position.set(obj.userData.baseX, obj.userData.baseY, obj.userData.baseZ);
+      obj.scale.set(baseW, baseH, 1);
     });
   }
 }

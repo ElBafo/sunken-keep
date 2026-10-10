@@ -1,17 +1,21 @@
+import cameraSpec from '../../public/proto3d/camera.json';
 import { Sconce, Tile } from './types';
 
-/** World units per grid tile. Wall quads are CELL_SIZE × CELL_SIZE. */
-export const CELL_SIZE = 2;
+export const CAMERA_SPEC = cameraSpec;
 
+/** World units per grid tile. Wall quads are CELL_SIZE × CELL_SIZE. */
+export const CELL_SIZE = cameraSpec.cellSize;
 /** Tiles behind cell centre along the facing direction (EOB-style floor strip). */
-export const CAMERA_BACK_OFFSET_TILES = 0.5;
+export const CAMERA_BACK_OFFSET_TILES = cameraSpec.backOffsetTiles;
 /** ~0.47 of wall height (walls are CELL_SIZE). */
-export const CAMERA_EYE_HEIGHT = 0.94;
+export const CAMERA_EYE_HEIGHT = cameraSpec.eyeHeight;
 /** Slight look-down only — floor strip comes mostly from back-offset + FOV. */
-export const CAMERA_PITCH = (-3.5 * Math.PI) / 180;
-export const CAMERA_FOV = 80;
-export const CAMERA_NEAR = 0.08;
-export const CAMERA_FAR = 32;
+export const CAMERA_PITCH = (cameraSpec.pitchDeg * Math.PI) / 180;
+export const CAMERA_FOV = cameraSpec.fov;
+export const CAMERA_NEAR = cameraSpec.near;
+export const CAMERA_FAR = cameraSpec.far;
+/** Logical 3D view size in pixels [width, height]. */
+export const CAMERA_VIEW = cameraSpec.view as [number, number];
 export const STEP_BOB_AMPLITUDE = 0.038;
 
 /** Shallow flooded bed. Deep lane sinks further; the translucent surface sits at y 0. */

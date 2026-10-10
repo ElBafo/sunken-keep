@@ -1,0 +1,25 @@
+{
+  "what": "Proto3d first-person camera. The eye sits at the back of the party's square, looking forward with a fixed vertical FOV. Pixelartie: size close/near/mid/far frames from unitSpriteHeightPx (1 world-unit-tall floor-anchored billboard) or wallSpriteHeightPx (1 wall = cellSize world units). Monster worldHeight in levels/monsters.json is a fraction of one wall.",
+  "cellSize": 2,
+  "wallHeight": 2,
+  "eyeHeight": 0.94,
+  "backOffsetTiles": 0.5,
+  "pitchDeg": -3.5,
+  "fov": 80,
+  "near": 0.08,
+  "far": 32,
+  "view": [270, 380],
+  "spriteSurfaceLift": 0.04,
+  "unitSpriteHeightPx": {
+    "1": 74.26,
+    "2": 44.88,
+    "3": 32.16,
+    "4": 25.05
+  },
+  "wallSpriteHeightPx": {
+    "1": 148.51,
+    "2": 89.75,
+    "3": 64.31,
+    "4": 50.11
+  }
+}
