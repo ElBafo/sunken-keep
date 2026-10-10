@@ -45,6 +45,9 @@ export function simulateFloor1(actions: unknown, monsters: unknown, seed: number
         if (!engine.heroes.mags.downed && now >= engine.heroes.mags.recovery.main) {
           apply(engine.useHand('mags', 'main', now), kills, levelUps);
         }
+        if (!engine.heroes.ilsevar.downed && now >= engine.heroes.ilsevar.recovery.main) {
+          apply(engine.useHand('ilsevar', 'main', now), kills, levelUps);
+        }
       }
     }
     if (engine.gameOver) {

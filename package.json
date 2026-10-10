@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "check:public": "node scripts/check-public.mjs",
+    "build": "tsc && node scripts/check-public.mjs && vite build",
     "preview": "vite preview",
     "test": "vitest",
     "test:e2e": "playwright test"

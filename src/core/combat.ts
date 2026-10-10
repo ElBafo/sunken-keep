@@ -6,6 +6,7 @@ import type {
   HandSlot,
   HeroId,
   HeroState,
+  HitKind,
   MonsterDef,
   MonsterState,
   Occupancy,
@@ -67,6 +68,7 @@ export class CombatEngine {
   private chaseReadyAt = 0;
   private openMap: Occupancy | null = null;
   pendingPerks: Array<{ hero: HeroId; level: number }> = [];
+  private notReadyAt: Partial<Record<HeroId, number>> = {};
 
   constructor(data: RulesData, rng: Rng) {
     this.data = data;
@@ -288,9 +290,23 @@ export class CombatEngine {
     const b = this.def(kind)?.behavior;
     if (!b || b.habit !== 'resist_blades') return 1;
     const dtype = damageType(item);
-    if (dtype === 'frost' || item === 'scroll') return 1 + (b.frostBonus ?? 0.25);
+    if (dtype === 'frost' || item === 'scroll' || item === 'wand') return 1 + (b.frostBonus ?? 0.25);
     if (dtype === 'blade' || dtype === 'pierce' || b.halfDamage?.includes(item)) return 0.5;
     return 1;
+  }
+
+  private hitKind(crit: boolean, mul: number): HitKind {
+    if (crit) return 'crit';
+    if (mul < 1) return 'resist';
+    if (mul > 1) return 'weak';
+    return 'hit';
+  }
+
+  private hitSfx(kind: HitKind): string {
+    if (kind === 'crit') return 'hit_crit';
+    if (kind === 'resist') return 'hit_resist';
+    if (kind === 'weak') return 'hit_weak';
+    return 'hit';
   }
 
   private applyDamageToHero(h: HeroState, raw: number, now: number, opts?: { ignoreHalf?: boolean }): number {
@@ -443,7 +459,13 @@ export class CombatEngine {
     }
     if (now < hero.recovery[hand]) {
       this.emit({ type: 'denied', hero: heroId, reason: 'not_ready' });
-      this.emit({ type: 'log', key: 'not_ready', vars: { hero: heroId } });
+      if (this.fight) {
+        const last = this.notReadyAt[heroId] ?? -99;
+        if (now - last >= 1.5) {
+          this.notReadyAt[heroId] = now;
+          this.emit({ type: 'log', key: 'not_ready', vars: { hero: heroId } });
+        }
+      }
       return this.flush();
     }
 
@@ -564,10 +586,20 @@ export class CombatEngine {
 
     let dmg = Math.max(1, Math.round(this.rng.int(dlo, dhi) * this.damageScale(hero.level)));
     if (crit) dmg *= 2;
-    dmg = Math.max(1, Math.floor(dmg * this.resistMul(target.kind, item)));
+    const mul = this.resistMul(target.kind, item);
+    dmg = Math.max(1, Math.floor(dmg * mul));
     target.hp -= dmg;
-    this.emit({ type: 'monster_anim', id: target.id, anim: 'hurt' });
+    const kind = this.hitKind(crit, mul);
+    if (kind !== 'resist') this.emit({ type: 'monster_anim', id: target.id, anim: 'hurt' });
     this.emit({ type: 'sfx', name: `${target.kind}_hurt`, x: target.x, y: target.y, combat: true });
+    this.emit({
+      type: 'hit_type',
+      kind,
+      id: target.id,
+      x: target.x,
+      y: target.y,
+      monster: target.kind
+    });
     if (item === 'scroll') {
       this.emit({ type: 'log', key: 'frost_bolt', vars: { n: dmg } });
     } else if (item === 'torch_lit') {
@@ -577,7 +609,7 @@ export class CombatEngine {
     } else {
       this.emit({ type: 'log', key: 'hit', vars: { hero: heroId, monster: target.kind, n: dmg } });
     }
-    this.emit({ type: 'sfx', name: crit ? 'hit_crit' : 'hit', combat: true });
+    this.emit({ type: 'sfx', name: this.hitSfx(kind), x: target.x, y: target.y, combat: true });
 
     if (damageType(item) === 'fire') {
       for (const id of HERO_IDS) {
@@ -789,9 +821,9 @@ export class CombatEngine {
       if (kind === 'pinch' && shielded && def.behavior.block === 'halve') {
         dmg = Math.max(1, Math.floor(dmg / 2));
         this.emit({ type: 'log', key: 'block_hit', vars: { n: dmg } });
-        this.applyDamageToHero(target, dmg, now, { ignoreHalf: true });
-        this.emit({ type: 'log', key: 'monster_hit', vars: { monster: m.kind, hero: target.id, n: dmg } });
-        this.emit({ type: 'sfx', name: 'hurt', combat: true });
+        const dealt = this.applyDamageToHero(target, dmg, now, { ignoreHalf: true });
+        this.emit({ type: 'log', key: 'monster_hit', vars: { monster: m.kind, hero: target.id, n: dealt } });
+        if (dealt > 0) this.emit({ type: 'sfx', name: 'hurt', combat: true });
         return;
       }
       this.monsterHitHero(m, target, now, dmg, false);
@@ -816,7 +848,7 @@ export class CombatEngine {
   private monsterHitHero(m: MonsterState, target: HeroState, now: number, dmg: number, canLatch: boolean) {
     const dealt = this.applyDamageToHero(target, dmg, now);
     this.emit({ type: 'log', key: 'monster_hit', vars: { monster: m.kind, hero: target.id, n: dealt } });
-    this.emit({ type: 'sfx', name: 'hurt', combat: true });
+    if (dealt > 0) this.emit({ type: 'sfx', name: 'hurt', combat: true });
     const b = this.def(m.kind)?.behavior;
     if (canLatch && b?.habit === 'latch' && !target.downed && this.rng.chance(b.chance ?? 0.25)) {
       target.latched = true;

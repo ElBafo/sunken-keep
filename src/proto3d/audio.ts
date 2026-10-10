@@ -21,7 +21,7 @@ interface PositionalVoice {
   object: THREE.Object3D;
   loop: boolean;
   baseVolume: number;
-  kind: 'torch' | 'drip' | 'far' | 'door' | 'chain' | 'banner' | 'wind' | 'bones' | 'leech' | 'water' | 'presence';
+  kind: 'torch' | 'drip' | 'far' | 'door' | 'chain' | 'banner' | 'wind' | 'bones' | 'leech' | 'water' | 'presence' | 'named';
 }
 
 export class AudioManager {
@@ -185,6 +185,10 @@ export class AudioManager {
       ['hit_crit', 'audio/sfx_hit_crit.mp3'],
       ['hit_crit_2', 'audio/sfx_hit_crit_2.mp3'],
       ['hit_crit_3', 'audio/sfx_hit_crit_3.mp3'],
+      ['hit_resist', 'audio/sfx_hit_resist_1.mp3'],
+      ['hit_resist_2', 'audio/sfx_hit_resist_2.mp3'],
+      ['hit_weak', 'audio/sfx_hit_weak_1.mp3'],
+      ['hit_weak_2', 'audio/sfx_hit_weak_2.mp3'],
       ['hero_down', 'audio/sfx_hero_down.mp3'],
       ['hero_revive', 'audio/sfx_hero_revive.mp3'],
       ['game_over', 'audio/sfx_game_over.mp3'],
@@ -321,17 +325,35 @@ export class AudioManager {
   }
 
   attachLeeches(scene: THREE.Scene, floorData: FloorData) {
+    this.scene = scene;
+    this.syncLeechLoops(floorData);
+  }
+
+  /** Rebind leech idle loops to the squares that currently hold bog_leeches. */
+  syncLeechLoops(floorData: FloorData) {
     const buf = this.buffers.get('leech_idle');
-    if (!buf) return;
-    const range = 2 * CELL_SIZE;
+    const scene = this.scene;
+    if (!buf || !scene) return;
+    const spots: Array<{ x: number; y: number; floorY: number }> = [];
     const { tiles, width, height } = floorData;
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
+        if (tiles[y][x].monster !== 'bog_leeches') continue;
         const tile = tiles[y][x];
-        if (tile.monster !== 'bog_leeches') continue;
-        const floorY = tile.deepWater || tile.shallowWater ? WATER_SURFACE_Y : 0;
+        spots.push({
+          x,
+          y,
+          floorY: tile.deepWater || tile.shallowWater ? WATER_SURFACE_Y : 0
+        });
+      }
+    }
+    const existing = this.voices.filter((v) => v.kind === 'leech');
+    const range = 2 * CELL_SIZE;
+    for (let i = 0; i < spots.length; i++) {
+      const spot = spots[i];
+      let voice = existing[i];
+      if (!voice) {
         const object = new THREE.Object3D();
-        object.position.set(x * CELL_SIZE, floorY + 0.2, y * CELL_SIZE);
         const audio = new THREE.PositionalAudio(this.listener);
         audio.setBuffer(buf);
         audio.setRefDistance(CELL_SIZE);
@@ -341,9 +363,16 @@ export class AudioManager {
         audio.setVolume(0.4);
         object.add(audio);
         scene.add(object);
-        audio.play();
-        this.voices.push({ audio, object, loop: true, baseVolume: 0.4, kind: 'leech' });
+        voice = { audio, object, loop: true, baseVolume: 0.4, kind: 'leech' };
+        this.voices.push(voice);
       }
+      voice.object.position.set(spot.x * CELL_SIZE, spot.floorY + 0.2, spot.y * CELL_SIZE);
+    }
+    for (let i = spots.length; i < existing.length; i++) {
+      const extra = existing[i];
+      if (extra.audio.isPlaying) extra.audio.stop();
+      extra.object.parent?.remove(extra.object);
+      this.voices = this.voices.filter((v) => v !== extra);
     }
   }
 
@@ -433,7 +462,9 @@ export class AudioManager {
     hit: ['hit', 'hit_2', 'hit_3'],
     act_miss: ['act_miss', 'act_miss_2', 'act_miss_3'],
     hurt: ['hurt', 'hurt_2', 'hurt_3'],
-    hit_crit: ['hit_crit', 'hit_crit_2', 'hit_crit_3']
+    hit_crit: ['hit_crit', 'hit_crit_2', 'hit_crit_3'],
+    hit_resist: ['hit_resist', 'hit_resist_2'],
+    hit_weak: ['hit_weak', 'hit_weak_2']
   };
 
   playCombat(name: string, volume = 1, x?: number, y?: number, id?: string) {
@@ -463,7 +494,7 @@ export class AudioManager {
       return;
     }
     if (x != null && y != null) {
-      this.playCombatAt(pick, x, y, volume);
+      this.playCombatAt(pick, x, y, volume, rate);
       return;
     }
     this.playUi(pick, volume, rate);
@@ -481,18 +512,19 @@ export class AudioManager {
     for (const key of [...this.windups.keys()]) this.stopWindup(key);
   }
 
-  private playCombatAt(name: string, x: number, y: number, volume: number) {
+  private playCombatAt(name: string, x: number, y: number, volume: number, rate = 1) {
     const buf = this.buffers.get(name);
     if (!buf) return;
     let voice = this.combatPool.find((v) => !v.audio.isPlaying);
     if (!voice) voice = this.combatPool[0];
     if (!voice) {
-      this.playUi(name, volume);
+      this.playUi(name, volume, rate);
       return;
     }
     if (voice.audio.isPlaying) voice.audio.stop();
     voice.object.position.set(x * CELL_SIZE, 0.8, y * CELL_SIZE);
     voice.audio.setBuffer(buf);
+    voice.audio.setPlaybackRate(rate);
     voice.baseVolume = volume;
     voice.audio.setVolume(Math.min(1, Math.max(0, volume)));
     voice.audio.play();
@@ -520,11 +552,32 @@ export class AudioManager {
     }
     this.startLanternLoop(hasOil);
     for (const v of this.voices) {
-      if (v.loop && !v.audio.isPlaying) {
+      if (v.loop && v.kind !== 'presence' && !v.audio.isPlaying) {
         v.audio.setVolume(v.baseVolume);
         v.audio.play();
       }
     }
+  }
+
+  stopPresenceLoops() {
+    for (const [id, voice] of [...this.namedLoops.entries()]) {
+      if (voice.kind !== 'presence') continue;
+      if (voice.audio.isPlaying) voice.audio.stop();
+      voice.object.parent?.remove(voice.object);
+      this.namedLoops.delete(id);
+      this.voices = this.voices.filter((v) => v !== voice);
+    }
+  }
+
+  playingLoops(): { count: number; kinds: string[] } {
+    const kinds: string[] = [];
+    if (this.ambientSound?.isPlaying) kinds.push('ambient');
+    if (this.musicSound?.isPlaying) kinds.push('music');
+    if (this.lanternSound?.isPlaying) kinds.push(`lantern:${this.lanternMode}`);
+    for (const v of this.voices) {
+      if (v.loop && v.audio.isPlaying) kinds.push(v.kind);
+    }
+    return { count: kinds.length, kinds };
   }
 
   private pickVariant(family: string, names: string[]): string {
@@ -609,11 +662,18 @@ export class AudioManager {
     if (this.musicSound) this.musicSound.setVolume(on ? 0.15 : this.musicVolume);
   }
 
-  startNamedLoop(name: string, x: number, y: number, z: number, volume: number): string {
+  startNamedLoop(
+    name: string,
+    x: number,
+    y: number,
+    z: number,
+    volume: number,
+    kind: PositionalVoice['kind'] = 'presence'
+  ): string {
     const id = `loop-${this.nextLoopId++}`;
     const buf = this.buffers.get(name);
     const scene = this.scene;
-    if (!buf || !scene) return id;
+    if (!buf || !scene) return '';
     const object = new THREE.Object3D();
     object.position.set(x, y, z);
     const audio = new THREE.PositionalAudio(this.listener);
@@ -626,7 +686,7 @@ export class AudioManager {
     object.add(audio);
     scene.add(object);
     audio.play();
-    const voice: PositionalVoice = { audio, object, loop: true, baseVolume: volume, kind: 'presence' };
+    const voice: PositionalVoice = { audio, object, loop: true, baseVolume: volume, kind };
     this.voices.push(voice);
     this.namedLoops.set(id, voice);
     return id;

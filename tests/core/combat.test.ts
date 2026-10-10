@@ -55,7 +55,8 @@ describe('src/core combat rules', () => {
     expect(rules.monsters.keep_rat.behavior.every).toBe(3);
     expect(rules.monsters.rust_crab.behavior.habit).toBe('wind_up');
     expect(rules.monsters.rust_crab.behavior.every).toBe(3);
-    expect(rules.monsters.rust_crab.behavior.specialDamage).toEqual([6, 10]);
+    expect(rules.monsters.rust_crab.behavior.specialDamage).toEqual([5, 8]);
+    expect(rules.monsters.slime.interval).toBe(2.5);
     expect(rules.monsters.rust_crab.behavior.block).toBe('halve');
     expect(rules.monsters.slime.behavior.habit).toBe('resist_blades');
     expect(rules.monsters.slime.behavior.frostBonus).toBe(0.25);
@@ -190,12 +191,18 @@ describe('src/core combat rules', () => {
     frostE.useHand('ilsevar', 'off', 0);
     const frostDmg = 40 - slimeF.hp;
     expect(frostDmg).toBe(Math.floor(8 * 1.25));
+
+    const wandE = mk();
+    const slimeW = fight(wandE, 'slime');
+    const wandEv = wandE.useHand('ilsevar', 'main', 0);
+    expect(wandEv.some((x) => x.type === 'hit_type' && x.kind === 'weak')).toBe(true);
+    expect(40 - slimeW.hp).toBe(Math.floor(3 * 1.25));
   });
 
   it('crab wind-up on every 3rd attack is halved by a raised shield', () => {
     const e = new CombatEngine(rules, {
       d20: () => 18,
-      int: (a: number, b: number) => (a === 6 && b === 10 ? 8 : a === 2 && b === 5 ? 4 : a),
+      int: (a: number, b: number) => (a === 5 && b === 8 ? 8 : a === 2 && b === 5 ? 4 : a),
       next: () => 0,
       pick: <T>(xs: T[]) => xs[0],
       chance: () => false
@@ -409,6 +416,59 @@ describe('src/core combat rules', () => {
   });
 });
 
+describe('hit types and small combat bugs', () => {
+  it('marks slime blade hits resist, frost weak, and keeps nat 20 as crit', () => {
+    const resistE = new CombatEngine(rules, {
+      d20: () => 18,
+      int: (a: number) => a,
+      next: () => 0,
+      pick: <T>(xs: T[]) => xs[0],
+      chance: () => false
+    } as unknown as Rng);
+    const slimeR = fight(resistE, 'slime');
+    const resist = resistE.useHand('brannoc', 'main', 0);
+    expect(resist.some((x) => x.type === 'hit_type' && x.kind === 'resist')).toBe(true);
+    expect(resist.some((x) => x.type === 'sfx' && x.name === 'hit_resist')).toBe(true);
+    expect(resist.some((x) => x.type === 'monster_anim' && x.anim === 'hurt')).toBe(false);
+    expect(slimeR.hp).toBeLessThan(40);
+
+    const critE = new CombatEngine(rules, {
+      d20: () => 20,
+      int: (a: number) => a,
+      next: () => 0,
+      pick: <T>(xs: T[]) => xs[0],
+      chance: () => false
+    } as unknown as Rng);
+    fight(critE, 'slime');
+    const crit = critE.useHand('brannoc', 'main', 0);
+    expect(crit.some((x) => x.type === 'hit_type' && x.kind === 'crit')).toBe(true);
+    expect(crit.some((x) => x.type === 'sfx' && x.name === 'hit_crit')).toBe(true);
+    expect(crit.some((x) => x.type === 'sfx' && x.name === 'hit_resist')).toBe(false);
+  });
+
+  it('does not play hurt on 0 damage', () => {
+    const e = new CombatEngine(rules, {
+      d20: () => 18,
+      int: () => 0,
+      next: () => 0,
+      pick: <T>(xs: T[]) => xs[0],
+      chance: () => false
+    } as unknown as Rng);
+    fight(e, 'keep_rat', 0);
+    const ev = e.tick(0.5);
+    expect(logs(ev, 'monster_hit').length).toBe(1);
+    expect(ev.some((x) => x.type === 'sfx' && x.name === 'hurt')).toBe(false);
+  });
+
+  it('skips not_ready log outside combat', () => {
+    const e = engine();
+    e.useHand('brannoc', 'main', 0);
+    const again = e.useHand('brannoc', 'main', 0.1);
+    expect(again.some((x) => x.type === 'denied' && x.reason === 'not_ready')).toBe(true);
+    expect(logs(again, 'not_ready').length).toBe(0);
+  });
+});
+
 describe('floor 1 scripted playthrough', () => {
   it('reports HP lost for a fixed seed (target ~24)', () => {
     const result = simulateFloor1(actions, monsters, 21);
@@ -419,22 +479,23 @@ describe('floor 1 scripted playthrough', () => {
     expect(result.hpLost).toBeLessThan(50);
   });
 
-  it('summarises 20 seeds for balance', () => {
-    const runs = Array.from({ length: 20 }, (_, i) => simulateFloor1(actions, monsters, i + 1));
-    const lost = runs.map((r) => r.hpLost);
+  it('keeps 500 seeds under 40 p90 HP loss with no wipes', () => {
+    const runs = Array.from({ length: 500 }, (_, i) => simulateFloor1(actions, monsters, i + 1));
+    const lost = runs.map((r) => r.hpLost).sort((a, b) => a - b);
     const avg = lost.reduce((s, n) => s + n, 0) / lost.length;
-    const worst = runs.reduce((a, b) => (b.hpLost > a.hpLost ? b : a));
+    const p90 = lost[Math.floor(0.9 * (lost.length - 1))];
+    const worst = lost[lost.length - 1];
     const wipes = runs.filter((r) => r.wipe);
     console.log(
-      'FLOOR1_SIM_20',
+      'FLOOR1_SIM_500',
       JSON.stringify({
         avg: Math.round(avg * 10) / 10,
-        min: Math.min(...lost),
-        max: Math.max(...lost),
-        wipes: wipes.map((r) => r.seed),
-        worst: { seed: worst.seed, hpLost: worst.hpLost, remaining: worst.remaining }
+        p90,
+        worst,
+        wipes: wipes.length
       })
     );
-    expect(runs).toHaveLength(20);
+    expect(wipes.length, `wipes at seeds ${wipes.map((r) => r.seed).join(',')}`).toBe(0);
+    expect(p90).toBeLessThanOrEqual(40);
   });
 });

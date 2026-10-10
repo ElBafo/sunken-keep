@@ -52,6 +52,10 @@ function parseBehavior(kind: string, raw: Record<string, unknown>): MonsterBehav
   const latch = asRecord(raw.latch);
   const habit = (typeof b.habit === 'string' ? b.habit : 'none') as HabitId;
   const detail = typeof b.detail === 'string' ? b.detail : '';
+  const explicitSpecial =
+    Array.isArray(b.specialDamage) && b.specialDamage.length >= 2
+      ? (pair(b.specialDamage, [0, 0]) as [number, number])
+      : undefined;
   const behavior: MonsterBehavior = {
     habit,
     detail,
@@ -70,7 +74,7 @@ function parseBehavior(kind: string, raw: Record<string, unknown>): MonsterBehav
   if (habit === 'wind_up') {
     behavior.every = parseEvery(detail) ?? 3;
     behavior.windup = parseSec(detail) ?? 1;
-    behavior.specialDamage = parseRange(detail);
+    behavior.specialDamage = explicitSpecial ?? parseRange(detail);
     behavior.block = /halve/i.test(String(b.counter ?? '')) ? 'halve' : 'negate';
   }
   if (habit === 'resist_blades') {
@@ -86,11 +90,12 @@ function parseBehavior(kind: string, raw: Record<string, unknown>): MonsterBehav
   if (habit === 'boss_two_phase') {
     behavior.every = parseEvery(detail) ?? 3;
     behavior.windup = parseSec(detail) ?? 1.5;
-    behavior.specialDamage = parseRange(detail);
+    behavior.specialDamage = explicitSpecial ?? parseRange(detail);
     behavior.phaseHpFrac = /below\s+(\d+)%/i.test(detail)
       ? Number(detail.match(/below\s+(\d+)%/i)![1]) / 100
       : 0.5;
   }
+  if (explicitSpecial) behavior.specialDamage = explicitSpecial;
   void kind;
   return behavior;
 }

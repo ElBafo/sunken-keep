@@ -49,9 +49,13 @@
     "interval": 2.5,
     "behavior": {
       "habit": "wind_up",
-      "detail": "every 3rd attack: 1.0s claw-raise, then a pinch for 6-10",
+      "detail": "every 3rd attack: 1.0s claw-raise, then a pinch for 5-8",
       "tell": "claws rise + sfx wind-up",
-      "counter": "Brannoc's shield block during the wind-up halves it"
+      "counter": "Brannoc's shield block during the wind-up halves it",
+      "specialDamage": [
+        5,
+        8
+      ]
     }
   },
   "slime": {
@@ -63,7 +67,7 @@
     ],
     "_role": "toughest thing on floor 1",
     "ac": 11,
-    "interval": 2.0,
+    "interval": 2.5,
     "behavior": {
       "habit": "resist_blades",
       "detail": "axe and dagger deal half damage; mace and frost deal full, frost +25%",

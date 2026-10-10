@@ -75,6 +75,7 @@ class Game {
   private swapTimer: ReturnType<typeof setTimeout> | null = null;
   bag: BagEntry[] = [];
   lastMessage = '';
+  lastHitType: string | null = null;
   lampNote = { title: '', text: '' };
   noteOpen = false;
   interactCount = 0;
@@ -408,6 +409,12 @@ class Game {
         case 'sfx_stop':
           this.audioManager?.stopWindup(e.id);
           break;
+        case 'hit_type':
+          this.lastHitType = e.kind;
+          this.hud.lastHitType = e.kind;
+          this.spriteManager.playHitFx(e.id, e.kind, nowMs);
+          if (e.kind === 'resist') this.hud.armFrostHint();
+          break;
         case 'monster_anim':
           this.spriteManager.playAnimId(e.id, e.anim, nowMs);
           break;
@@ -445,6 +452,7 @@ class Game {
           break;
         case 'fight_end':
           this.audioManager?.setFightDuck(false);
+          this.hud.hideFrostHint();
           break;
         case 'game_over':
           this.showGameOver();
@@ -452,6 +460,9 @@ class Game {
         case 'hand_used':
           this.hud.lastHand = { hero: e.hero, hand: e.hand };
           this.hud.handTapCount += 1;
+          if (e.hero === 'ilsevar' && (e.item === 'wand' || e.item === 'scroll')) {
+            this.hud.dismissFrostHint();
+          }
           break;
         case 'out_of_reach':
         case 'denied':
@@ -516,11 +527,15 @@ class Game {
     this.vertexLighting.relight();
     this.updateOilHud();
     this.updateDoorButton();
+    this.audioManager?.stopPresenceLoops();
     this.audioManager?.startFloorLoops(this.oil > 0);
+    this.audioManager?.syncLeechLoops(floor1);
     for (const sconce of floor1Sconces) {
       if (sconce.lit) this.audioManager?.startTorchLoop(sconce);
       else this.audioManager?.stopTorchLoop(sconce);
     }
+    this.lastHitType = null;
+    this.hud.hideFrostHint();
   }
 
   updateOilHud() {
@@ -1021,6 +1036,12 @@ class Game {
       },
       hasKey: () => this.player.hasKey,
       lastMessage: () => this.lastMessage,
+      lastHitType: () => this.lastHitType ?? this.spriteManager.lastHitType,
+      playingLoops: () => this.audioManager.playingLoops(),
+      playHitFx: (id: string, kind: 'resist' | 'weak' | 'crit' | 'hit') =>
+        this.spriteManager.playHitFx(id, kind, performance.now()),
+      hitFxPlaying: () => this.spriteManager.hitFxPlaying(),
+      frostHint: () => this.hud.frostHintState(),
       lastNote: () => this.lampNote,
       noteOpen: () => this.noteOpen,
       getOil: () => this.oil,
@@ -1188,7 +1209,8 @@ class Game {
           11 * CELL_SIZE,
           0.55,
           9 * CELL_SIZE,
-          0.38
+          0.38,
+          'named'
         );
       } catch (err) {
         console.warn('Audio init failed', err);

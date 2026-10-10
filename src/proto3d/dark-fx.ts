@@ -305,14 +305,15 @@ export class DarkFx {
         }
         continue;
       }
-      if (!eye.presenceId) {
-        eye.presenceId = audio.startNamedLoop(
+      if (!eye.presenceId && lighting.getAmbientFloor() >= 3) {
+        const id = audio.startNamedLoop(
           'dark_presence',
           eye.x * CELL_SIZE,
           eye.sprite.position.y,
           eye.y * CELL_SIZE,
           0.3
         );
+        if (id) eye.presenceId = id;
       }
       if (now >= eye.nextAt) {
         if (eye.resting) {

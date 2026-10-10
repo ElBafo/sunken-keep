@@ -78,6 +78,11 @@ export class PartyHud {
   private onCancel: () => void;
   private levelFlash: { id: HeroId; started: number } | null = null;
   private readyArmed: Record<string, boolean> = {};
+  private notReadyAt: Partial<Record<HeroId, number>> = {};
+  private frostHintDismissed = false;
+  private frostHintArmed = false;
+  private swapArmed = false;
+  lastHitType: string | null = null;
 
   constructor(
     story: StoryText,
@@ -200,6 +205,10 @@ export class PartyHud {
       cache('oil2', 'art/ui/oil/oil_gauge_2.png'),
       cache('oil3', 'art/ui/oil/oil_gauge_3.png'),
       cache('oil4', 'art/ui/oil/oil_gauge_4.png'),
+      cache('hint1', 'art/ui/hands/hand_glow_hint_1.png'),
+      cache('hint2', 'art/ui/hands/hand_glow_hint_2.png'),
+      cache('hint3', 'art/ui/hands/hand_glow_hint_3.png'),
+      cache('hint4', 'art/ui/hands/hand_glow_hint_4.png'),
       ...portraitFiles.map((name) => cache(name, `art/portraits/${name}.png`)),
       ...[...this.icons.values()].map((file) => cache(file, `art/ui/hands/${file}`))
     ]);
@@ -323,12 +332,35 @@ export class PartyHud {
   }
 
   setSwapHighlight(armed: boolean) {
+    this.swapArmed = armed;
     document.querySelectorAll<HTMLElement>('.hand-btn').forEach((el) => {
       const hero = el.dataset.hero as HeroId | undefined;
       const hand = el.dataset.hand as HandSlot | undefined;
       const skip = !!(hero && hand && this.isGuaranteedLantern(hero, hand));
       el.classList.toggle('swap-armed', armed && !skip);
     });
+    this.draw(performance.now());
+  }
+
+  armFrostHint() {
+    if (this.frostHintDismissed) return;
+    this.frostHintArmed = true;
+    this.draw(performance.now());
+  }
+
+  dismissFrostHint() {
+    this.frostHintDismissed = true;
+    this.frostHintArmed = false;
+    this.draw(performance.now());
+  }
+
+  hideFrostHint() {
+    this.frostHintArmed = false;
+    this.draw(performance.now());
+  }
+
+  frostHintState() {
+    return { armed: this.frostHintArmed, dismissed: this.frostHintDismissed };
   }
 
   carriedTorch(): { hero: HeroId; hand: HandSlot; lit: boolean } | null {
@@ -369,7 +401,11 @@ export class PartyHud {
     if (!hero) return false;
     const now = performance.now();
     if (hero.recovery[hand] > now) {
-      this.pushLog(this.story.log('not_ready', { hero: this.story.heroName(heroId) }));
+      const last = this.notReadyAt[heroId] ?? -1e9;
+      if (now - last >= 1500) {
+        this.notReadyAt[heroId] = now;
+        this.pushLog(this.story.log('not_ready', { hero: this.story.heroName(heroId) }));
+      }
       this.playUi('ui_button_denied');
       return false;
     }
@@ -539,6 +575,36 @@ export class PartyHud {
       ctx.lineTo(x + 4, y + h - 4);
       ctx.stroke();
     }
+    this.drawFrostHint(ctx, hero, hand, rect, now, recovering);
+  }
+
+  private frostHintHand(hero: HeroHud): HandSlot | null {
+    if (hero.equipment.main === 'wand' || hero.equipment.main === 'scroll') return 'main';
+    if (hero.equipment.off === 'wand' || hero.equipment.off === 'scroll') return 'off';
+    return null;
+  }
+
+  private drawFrostHint(
+    ctx: CanvasRenderingContext2D,
+    hero: HeroHud,
+    hand: HandSlot,
+    rect: Rect,
+    now: number,
+    recovering: boolean
+  ) {
+    if (hero.id !== 'ilsevar') return;
+    if (!this.frostHintArmed || this.frostHintDismissed || this.swapArmed) return;
+    if (this.frostHintHand(hero) !== hand) return;
+    if (recovering || hero.downed || hero.hp <= 0) return;
+    const item = hero.equipment[hand];
+    if (item === 'scroll' && hero.mana <= 0) return;
+    const reduced =
+      typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    const frame = reduced ? 3 : (Math.floor(now / 500) % 4) + 1;
+    const img = this.images.get(`hint${frame}`);
+    if (!img) return;
+    const [x, y, w, h] = rect;
+    ctx.drawImage(img, x, y, w, h);
   }
 
   private drawLog() {

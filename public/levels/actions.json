@@ -121,7 +121,18 @@
       "empty_hand"
     ]
   },
-  "_expected_floor1": "Sim (levels/tools/sim_floor1.py, 5000 runs, no shield/sand/potions, monsters swing first at 0.5s, player first tap after 1-2s): leeches 2s, rat 3s, crab 6s, slime 8-9s, guard-hall rat 3s; total HP lost mean 22-26, 90th pct 32-37; a front hero drops to 0 in 1-3% of runs without potions. If monsters do NOT get the opening swing it falls to ~13 HP lost, too easy.",
+  "_expected_floor1": {
+    "sim": "PR #16 engine, 500 seeds, Brannoc+Mags+Ilsevar wand tapped when ready, no shield/sand/potions",
+    "mean_hp_lost": 19.2,
+    "p90": 34,
+    "worst": 62,
+    "wipes": 0,
+    "front_two_only": {
+      "mean": 59.7,
+      "wipe_pct": 18.6
+    },
+    "tuning": "slime interval 2.5, crab pinch 5-8"
+  },
   "items": {
     "_note": "Act 1 loot and puzzle items (Levie).",
     "torch": {

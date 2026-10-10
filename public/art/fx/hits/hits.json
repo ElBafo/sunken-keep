@@ -1,0 +1,442 @@
+{
+ "what": "Hit FX drawn over a monster when a hero's hit lands. Floor 1 teaches: the slime resists blades (axe, dagger), Ilsevar's frost wand is its counter.",
+ "map": {
+  "resist": "resist_goo",
+  "weak": "weak_frost",
+  "normal": null
+ },
+ "whenToUse": {
+  "resist": "combat resistMul(...) < 1 (resist_blades monster hit by blade/pierce: axe, dagger). Play resist_goo INSTEAD of the monster's pale 'hurt' flash frame; keep the HP loss and the sfx. That's what makes it read weaker than a normal hit.",
+  "weak": "combat resistMul(...) > 1 (frost: wand, scroll). Play the normal 'hurt' frame AND weak_frost on top.",
+  "normal": "resistMul == 1: unchanged (hurt frame only, no hit FX)."
+ },
+ "effects": {
+  "resist_goo": {
+   "frames": 4,
+   "fps": 12,
+   "loop": false,
+   "files": "resist_goo_{frame}_{scale}.png",
+   "sizes": {
+    "near": [
+     41,
+     30
+    ],
+    "mid": [
+     25,
+     19
+    ],
+    "far": [
+     15,
+     12
+    ]
+   },
+   "blend": "normal (alpha 0/255, palette64 colours). Never additive: it has to read dull.",
+   "pivotInImage": {
+    "x": 0.5,
+    "yFromTop": 0.62,
+    "note": "the ripple centre (the dent) sits at 62% down the image; droplets rise above it"
+   }
+  },
+  "weak_frost": {
+   "frames": 5,
+   "fps": 12,
+   "loop": false,
+   "files": "weak_frost_{frame}_{scale}.png",
+   "sizes": {
+    "near": [
+     57,
+     45
+    ],
+    "mid": [
+     35,
+     29
+    ],
+    "far": [
+     21,
+     17
+    ]
+   },
+   "blend": "ADDITIVE (THREE.AdditiveBlending, depthWrite false, unlit / MeshBasic or SpriteMaterial with fog false, toneMapped false, alphaTest 0). Alpha carries the falloff (60..255); with normal blending it still reads, just flatter.",
+   "pivotInImage": {
+    "x": 0.5,
+    "yFromTop": 0.5
+   }
+  }
+ },
+ "scales": "near / mid / far use the same 80:50:30 ratio as the monster billboards. Pick the scale the monster sprite is using. proto3d currently only loads *_near monster frames and lets three.js shrink them: then use the _near FX too.",
+ "worldSize": "same texel density as the monster: fxWorldW = monster.baseW * fxImageW / monsterImageW (near: /80), fxWorldH = monster.baseH * fxImageH / monsterImageH (near: /60).",
+ "anchor": "put the FX pivot on the monster's body centre: worldX = sprite centre + (u - 0.5) * baseW, worldY = sprite bottom (floor y) + vFromBottom * baseH. Draw it 0.01 in front of the monster (towards the camera), renderOrder above the monster. bodyCentrePx is the average idle bbox centre, measured from the shipped sprites (alpha > 150).",
+ "bodyAnchors": {
+  "keep_rat": {
+   "near": {
+    "bbox": [
+     19,
+     23,
+     61,
+     60
+    ],
+    "bodyCentrePx": [
+     40.0,
+     41.5
+    ],
+    "u": 0.5,
+    "vFromBottom": 0.308
+   },
+   "mid": {
+    "bbox": [
+     11,
+     15,
+     40,
+     40
+    ],
+    "bodyCentrePx": [
+     25.5,
+     27.5
+    ],
+    "u": 0.51,
+    "vFromBottom": 0.312
+   },
+   "far": {
+    "bbox": [
+     6,
+     10,
+     24,
+     25
+    ],
+    "bodyCentrePx": [
+     15.0,
+     17.5
+    ],
+    "u": 0.5,
+    "vFromBottom": 0.3
+   }
+  },
+  "rust_crab": {
+   "near": {
+    "bbox": [
+     16,
+     27,
+     64,
+     60
+    ],
+    "bodyCentrePx": [
+     40.0,
+     43.5
+    ],
+    "u": 0.5,
+    "vFromBottom": 0.275
+   },
+   "mid": {
+    "bbox": [
+     11,
+     20,
+     40,
+     40
+    ],
+    "bodyCentrePx": [
+     25.5,
+     30.0
+    ],
+    "u": 0.51,
+    "vFromBottom": 0.25
+   },
+   "far": {
+    "bbox": [
+     6,
+     13,
+     24,
+     24
+    ],
+    "bodyCentrePx": [
+     15.0,
+     18.5
+    ],
+    "u": 0.5,
+    "vFromBottom": 0.26
+   }
+  },
+  "bog_leeches": {
+   "near": {
+    "bbox": [
+     3,
+     17,
+     76,
+     59
+    ],
+    "bodyCentrePx": [
+     39.5,
+     38.0
+    ],
+    "u": 0.494,
+    "vFromBottom": 0.367
+   },
+   "mid": {
+    "bbox": [
+     2,
+     13,
+     48,
+     40
+    ],
+    "bodyCentrePx": [
+     25.0,
+     26.5
+    ],
+    "u": 0.5,
+    "vFromBottom": 0.338
+   },
+   "far": {
+    "bbox": [
+     1,
+     9,
+     28,
+     25
+    ],
+    "bodyCentrePx": [
+     14.5,
+     17.0
+    ],
+    "u": 0.483,
+    "vFromBottom": 0.32
+   }
+  },
+  "slime": {
+   "near": {
+    "bbox": [
+     5,
+     12,
+     75,
+     60
+    ],
+    "bodyCentrePx": [
+     40.0,
+     36.0
+    ],
+    "u": 0.5,
+    "vFromBottom": 0.4
+   },
+   "mid": {
+    "bbox": [
+     3,
+     10,
+     47,
+     40
+    ],
+    "bodyCentrePx": [
+     25.0,
+     25.0
+    ],
+    "u": 0.5,
+    "vFromBottom": 0.375
+   },
+   "far": {
+    "bbox": [
+     2,
+     7,
+     28,
+     25
+    ],
+    "bodyCentrePx": [
+     15.0,
+     16.0
+    ],
+    "u": 0.5,
+    "vFromBottom": 0.36
+   }
+  },
+  "cellar_spider": {
+   "near": {
+    "bbox": [
+     14,
+     17,
+     66,
+     60
+    ],
+    "bodyCentrePx": [
+     40.0,
+     38.5
+    ],
+    "u": 0.5,
+    "vFromBottom": 0.358
+   },
+   "mid": {
+    "bbox": [
+     8,
+     12,
+     43,
+     40
+    ],
+    "bodyCentrePx": [
+     25.5,
+     26.0
+    ],
+    "u": 0.51,
+    "vFromBottom": 0.35
+   },
+   "far": {
+    "bbox": [
+     5,
+     8,
+     26,
+     24
+    ],
+    "bodyCentrePx": [
+     15.5,
+     16.0
+    ],
+    "u": 0.517,
+    "vFromBottom": 0.36
+   }
+  },
+  "captain_dural": {
+   "near": {
+    "bbox": [
+     14,
+     2,
+     66,
+     60
+    ],
+    "bodyCentrePx": [
+     40.0,
+     31.0
+    ],
+    "u": 0.5,
+    "vFromBottom": 0.483
+   },
+   "mid": {
+    "bbox": [
+     8,
+     1,
+     43,
+     40
+    ],
+    "bodyCentrePx": [
+     25.5,
+     20.5
+    ],
+    "u": 0.51,
+    "vFromBottom": 0.488
+   },
+   "far": {
+    "bbox": [
+     4,
+     1,
+     26,
+     25
+    ],
+    "bodyCentrePx": [
+     15.0,
+     13.0
+    ],
+    "u": 0.5,
+    "vFromBottom": 0.48
+   }
+  },
+  "drowned_dwarf": {
+   "near": {
+    "bbox": [
+     12,
+     7,
+     68,
+     60
+    ],
+    "bodyCentrePx": [
+     40.0,
+     33.5
+    ],
+    "u": 0.5,
+    "vFromBottom": 0.442
+   },
+   "mid": {
+    "bbox": [
+     7,
+     5,
+     44,
+     40
+    ],
+    "bodyCentrePx": [
+     25.5,
+     22.5
+    ],
+    "u": 0.51,
+    "vFromBottom": 0.438
+   },
+   "far": {
+    "bbox": [
+     4,
+     3,
+     27,
+     25
+    ],
+    "bodyCentrePx": [
+     15.5,
+     14.0
+    ],
+    "u": 0.517,
+    "vFromBottom": 0.44
+   }
+  },
+  "tide_spawn": {
+   "near": {
+    "bbox": [
+     5,
+     17,
+     75,
+     60
+    ],
+    "bodyCentrePx": [
+     40.0,
+     38.5
+    ],
+    "u": 0.5,
+    "vFromBottom": 0.358
+   },
+   "mid": {
+    "bbox": [
+     3,
+     13,
+     47,
+     40
+    ],
+    "bodyCentrePx": [
+     25.0,
+     26.5
+    ],
+    "u": 0.5,
+    "vFromBottom": 0.338
+   },
+   "far": {
+    "bbox": [
+     2,
+     9,
+     28,
+     25
+    ],
+    "bodyCentrePx": [
+     15.0,
+     17.0
+    ],
+    "u": 0.5,
+    "vFromBottom": 0.32
+   }
+  }
+ },
+ "hintGlow": {
+  "files": "art/ui/hands/hand_glow_hint_{1..4}.png",
+  "size": [
+   31,
+   31
+  ],
+  "drawAt": "exactly on the hand button rect from layout585.json (Ilsevar hand_main = [137, 447, 31, 31]), after the icon and the recovery overlay. blend normal (source-over).",
+  "fps": 2,
+  "order": [
+   1,
+   2,
+   3,
+   4
+  ],
+  "loop": "1-2-3-4 at 2 fps (2 s per breath). Frames are a smooth breath: 85% -> 95% -> 100% -> 90% brightness of frame 3; max change 15%, never off, so no blinking.",
+  "reducedMotion": "if prefers-reduced-motion (or a no-flicker option), hold frame 3 still.",
+  "showWhen": "after the FIRST resisted blade hit (map.resist) in a fight, on the hand slot of Ilsevar that holds 'wand' (else 'scroll'). Only while that hand is ready (not recovering, has mana, Ilsevar not downed); hiding while recovering is fine because his tap ends the hint anyway.",
+  "hideWhen": "the first time Ilsevar's wand/scroll hand is tapped (save a flag, e.g. hints.frostWand = true, and never show it again), or the fight ends. Torch swap mode (gold .swap-armed) wins: hide the hint while swap mode is armed."
+ }
+}

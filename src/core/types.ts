@@ -3,6 +3,7 @@ export type HandSlot = 'main' | 'off';
 export type FormationRow = 'front' | 'back';
 export type DamageType = 'blade' | 'pierce' | 'blunt' | 'frost' | 'fire' | 'magic' | 'none';
 export type MonsterAnim = 'idle' | 'attack' | 'hurt' | 'death' | 'windup';
+export type HitKind = 'hit' | 'crit' | 'resist' | 'weak';
 export type HabitId =
   | 'latch'
   | 'dart'
@@ -143,6 +144,7 @@ export type CombatEvent =
   | { type: 'fight_start'; monsterId: string; kind: string }
   | { type: 'fight_end' }
   | { type: 'game_over' }
+  | { type: 'hit_type'; kind: HitKind; id: string; x: number; y: number; monster: string }
   | { type: 'hand_used'; hero: HeroId; hand: HandSlot; item: string }
   | { type: 'out_of_reach'; hero: HeroId; hand: HandSlot }
   | { type: 'denied'; hero: HeroId; reason: 'not_ready' | 'downed' | 'no_mana' | 'webbed' | 'heal_none' }
@@ -192,7 +194,7 @@ export const DAMAGE_TYPE: Record<string, DamageType> = {
   fist: 'blunt',
   ashmantle_hammer: 'blunt',
   scroll: 'frost',
-  wand: 'magic',
+  wand: 'frost',
   torch_lit: 'fire',
   torch: 'fire',
   shield: 'none',

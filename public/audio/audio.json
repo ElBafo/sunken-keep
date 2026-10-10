@@ -214,6 +214,18 @@
   "vox_mags_hurt_variants": [
    "vox_mags_hurt_1",
    "vox_mags_hurt_2"
+  ],
+  "hit_resist_1": "sfx_hit_resist_1",
+  "hit_resist_2": "sfx_hit_resist_2",
+  "hit_weak_1": "sfx_hit_weak_1",
+  "hit_weak_2": "sfx_hit_weak_2",
+  "hit_resist_variants": [
+   "sfx_hit_resist_1",
+   "sfx_hit_resist_2"
+  ],
+  "hit_weak_variants": [
+   "sfx_hit_weak_1",
+   "sfx_hit_weak_2"
   ]
  },
  "music": {
@@ -326,6 +338,7 @@
   "downed": "Levie's progression rules. Natural 20: sfx_hit_crit instead of sfx_hit. Hero hits 0 HP: sfx_hero_down. Revived by heal/potion or staggering up after a fight: sfx_hero_revive. All four down: stop music and loops, play sfx_game_over with Pixelartie's sinking screen, then silence until the button. Level up keeps sfx_level_up.",
   "combat_variants": "hit, act_miss, hurt and hit_crit each have 3 variants (base, _2 lower, _3 brighter). Pick randomly, never the same twice in a row, plus playbackRate 0.95-1.05, so long fights don't get tiring.",
   "windups": "Monster attack telegraphs. Play <monster>_windup when the visual tell starts (crab claw-raise, dwarf overhead wind-up, Dural's flash); the attack lands at its end: rust_crab and drowned_dwarf 1.0 s, dural 1.3 s, then play the attack sound (dural uses drowned_dwarf_attack until it has its own). Positional from the monster, combat priority, never ducked or voice-stolen. If the monster is interrupted or dies, stop the wind-up at once.",
-  "hero_voices": "Wordless party hero voices (work in English and Greek). Not positional (party sounds), Effects bus, combat priority. Hero takes damage: play a random vox_<hero>_hurt_variants entry, never the same one twice in a row for that hero, alongside the usual sfx_hurt; at most one hero hurt voice every 0.6 s across the whole party (drop extras, don't queue); optional: skip it for chip damage under 2 HP. Hero hits 0 HP: play vox_<hero>_down layered with sfx_hero_down (start together; the down voice is never skipped by the 0.6 s limit). Brannoc: low, gruff, creaky. Wren: warm mid voice. Ilsevar: calm, dry, with a throat rattle and a hiss. Mags: high, quick, bright. Hurts about -20 LUFS, downs about -19 LUFS, play at 1.0. hero ids match names.json (brannoc, wren, ilsevar, mags)."
+  "hero_voices": "Wordless party hero voices (work in English and Greek). Not positional (party sounds), Effects bus, combat priority. Hero takes damage: play a random vox_<hero>_hurt_variants entry, never the same one twice in a row for that hero, alongside the usual sfx_hurt; at most one hero hurt voice every 0.6 s across the whole party (drop extras, don't queue); optional: skip it for chip damage under 2 HP. Hero hits 0 HP: play vox_<hero>_down layered with sfx_hero_down (start together; the down voice is never skipped by the 0.6 s limit). Brannoc: low, gruff, creaky. Wren: warm mid voice. Ilsevar: calm, dry, with a throat rattle and a hiss. Mags: high, quick, bright. Hurts about -20 LUFS, downs about -19 LUFS, play at 1.0. hero ids match names.json (brannoc, wren, ilsevar, mags).",
+  "hit_types": "Damage-type hits (teach the slime lesson). When the target resists the attack's damage type (e.g. slime vs blades), play a random hit_resist_variants entry instead of hit; when the target is weak to it (e.g. slime vs Ilsevar's frost wand), play a random hit_weak_variants entry instead of hit. A natural 20 still overrides both with hit_crit. Same rule as the other combat variants: random, never the same one twice in a row, playbackRate 0.95-1.05. Positional from the monster, combat priority. Resist ~0.36 s, about -22 LUFS (dull wet thunk, sits under hit on purpose); weak ~0.52 s, about -19 LUFS (bright icy crack + shatter)."
  }
 }

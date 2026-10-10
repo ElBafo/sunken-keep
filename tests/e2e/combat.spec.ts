@@ -11,7 +11,7 @@ type Proto3d = {
   useHand: (id: string, hand: 'main' | 'off') => boolean;
   inCombat: () => boolean;
   combatHeroes: () => Array<{ id: string; hp: number; maxHp: number; downed: boolean; level: number; xp: number }>;
-  combatMonsters: () => Array<{ kind: string; x: number; y: number; hp: number; alive: boolean; windup: string | null }>;
+  combatMonsters: () => Array<{ id: string; kind: string; x: number; y: number; hp: number; alive: boolean; windup: string | null }>;
   pendingPerks: () => Array<{ hero: string; level: number }>;
   perkHooks: () => Array<{ hero: string; level: number }>;
   perkScreenOpen: () => boolean;
@@ -19,6 +19,10 @@ type Proto3d = {
   lastHeroVoice: () => string | null;
   forceWipe: () => void;
   restartFloor: () => void;
+  lastHitType: () => string | null;
+  playingLoops: () => { count: number; kinds: string[] };
+  playHitFx: (id: string, kind: 'resist' | 'weak' | 'crit' | 'hit') => void;
+  hitFxPlaying: () => Array<{ hostId: string; frames: number }>;
   addXp: (n: number) => void;
   finishFight: () => void;
   forceWindup: () => boolean;
@@ -54,7 +58,17 @@ test('proto3d combat: block square, first swing, voices, perks, game over', asyn
     { timeout: 25000 }
   );
   await page.locator('#tap-to-start').tap();
-  await page.waitForTimeout(400);
+  await page.waitForFunction(
+    () => {
+      const p = (window as unknown as { __proto3d?: Proto3d }).__proto3d;
+      return (p?.playingLoops().count ?? 0) >= 10;
+    },
+    null,
+    { timeout: 15000 }
+  );
+  const freshLoops = await page.evaluate(() =>
+    (window as unknown as { __proto3d: Proto3d }).__proto3d.playingLoops()
+  );
 
   const voicesOn = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.heroVoices());
   expect(voicesOn, 'HERO_VOICES is the single on-switch').toBe(true);
@@ -80,6 +94,28 @@ test('proto3d combat: block square, first swing, voices, perks, game over', asyn
   expect(slimeBump.slime?.x).toBe(7);
   expect(slimeBump.slime?.y).toBe(2);
   expect(slimeBump.slimeSprite?.visible, 'slime is lit and visible one square ahead').toBe(true);
+
+  const resistShot = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    p.useHand('brannoc', 'main');
+    const slime = p.combatMonsters().find((m) => m.kind === 'slime');
+    if (slime) p.playHitFx(slime.id, 'resist');
+    return { hit: p.lastHitType(), fx: p.hitFxPlaying() };
+  });
+  expect(resistShot.fx.length, 'resist goo plays on the slime').toBeGreaterThan(0);
+  await page.waitForTimeout(90);
+  await page.screenshot({ path: `${OUT}/combat-slime-resist.png`, fullPage: false });
+
+  const frostShot = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    p.useHand('ilsevar', 'main');
+    const slime = p.combatMonsters().find((m) => m.kind === 'slime');
+    if (slime) p.playHitFx(slime.id, 'weak');
+    return { hit: p.lastHitType(), fx: p.hitFxPlaying() };
+  });
+  expect(frostShot.fx.length, 'weak frost plays on the slime').toBeGreaterThan(0);
+  await page.waitForTimeout(90);
+  await page.screenshot({ path: `${OUT}/combat-slime-frost.png`, fullPage: false });
 
   const startHp = await page.evaluate(() =>
     (window as unknown as { __proto3d: Proto3d }).__proto3d.combatHeroes().reduce((s, h) => s + h.hp, 0)
@@ -188,6 +224,12 @@ test('proto3d combat: block square, first swing, voices, perks, game over', asyn
   expect(restarted.overlay, 'restart hides game over').toBe(false);
   expect(restarted.fighting).toBe(false);
   expect(restarted.heroes.every((h) => h.hp === h.maxHp && !h.downed), 'party is restored').toBe(true);
+  const restartedLoops = await page.evaluate(() =>
+    (window as unknown as { __proto3d: Proto3d }).__proto3d.playingLoops()
+  );
+  expect(restartedLoops.count, `restart loops ${restartedLoops.kinds} vs fresh ${freshLoops.kinds}`).toBe(
+    freshLoops.count
+  );
 
   const rat = await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;

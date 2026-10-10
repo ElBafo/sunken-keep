@@ -7,6 +7,7 @@ import {
   isWaterTile,
   tileBedY
 } from './constants';
+import type { HitKind } from '../core/types';
 import { FloorData, Tile } from './types';
 
 /** World height from ART_CONSISTENCY_AUDIT.md; width = height × 80/60 so texels stay square. */
@@ -55,6 +56,37 @@ const OWN_SQUARE_SCALE = 0.72;
 /** Must be in the visible floor strip (near plane hits y=0 at ~1.0 in front of the camera). */
 const OWN_SQUARE_FORWARD = 1.18;
 const SPRITE_RENDER_ORDER = 10;
+const HITFX_RENDER_ORDER = 12;
+const MONSTER_TEXEL_W = 80;
+const MONSTER_TEXEL_H = 60;
+
+interface HitFxSpec {
+  frames: THREE.Texture[];
+  fps: number;
+  additive: boolean;
+  imgW: number;
+  imgH: number;
+  pivotX: number;
+  pivotYFromTop: number;
+}
+
+interface HitFxPlay {
+  sprite: THREE.Sprite;
+  material: THREE.SpriteMaterial;
+  frames: THREE.Texture[];
+  started: number;
+  fps: number;
+  hostId: string;
+  imgW: number;
+  imgH: number;
+  pivotX: number;
+  pivotYFromTop: number;
+}
+
+interface BodyAnchor {
+  u: number;
+  vFromBottom: number;
+}
 
 function spriteFeetY(tile: Tile): number {
   if (isWaterTile(tile)) return WATER_SURFACE_Y + SPRITE_SURFACE_LIFT;
@@ -136,6 +168,11 @@ export class SpriteManager {
   sprites: SpriteInfo[] = [];
   camera: THREE.Camera;
   private anchors = new Map<string, { gapBelow: number; imageH: number }>();
+  private hitFx = new Map<string, HitFxSpec>();
+  private bodyAnchors = new Map<string, BodyAnchor>();
+  private playingFx: HitFxPlay[] = [];
+  lastHitType: HitKind | null = null;
+  private scene: THREE.Scene | null = null;
 
   constructor(camera: THREE.Camera) {
     this.camera = camera;
@@ -184,6 +221,9 @@ export class SpriteManager {
         );
       });
     };
+
+    this.scene = scene;
+    await this.loadHitFx(loadTex, baseUrl);
 
     const { tiles, width, height } = floorData;
     for (let y = 0; y < height; y++) {
@@ -335,6 +375,7 @@ export class SpriteManager {
         }
       }
     }
+    this.updateHitFx(time);
     if (playerX !== undefined && playerY !== undefined && dir !== undefined) {
       this.layoutItems(playerX, playerY, dir);
     }
@@ -455,6 +496,171 @@ export class SpriteManager {
       s.monsterId = undefined;
       this.playAnimAt(s, 'idle', 0);
     }
+    this.clearHitFx();
     void floor;
+  }
+
+  playHitFx(id: string, kind: HitKind, now: number) {
+    this.lastHitType = kind;
+    const specName = kind === 'resist' ? 'resist' : kind === 'weak' ? 'weak' : null;
+    if (!specName) return;
+    const spec = this.hitFx.get(specName);
+    const host = this.spriteByMonsterId(id);
+    const scene = this.scene;
+    if (!spec || !host || !scene || !spec.frames.length) return;
+
+    const existing = this.playingFx.find((fx) => fx.hostId === id);
+    if (existing) this.removeHitFx(existing);
+
+    const mat = new THREE.SpriteMaterial({
+      map: spec.frames[0],
+      color: 0xffffff,
+      transparent: true,
+      depthTest: true,
+      depthWrite: false,
+      sizeAttenuation: true,
+      fog: false,
+      toneMapped: false,
+      blending: spec.additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+      alphaTest: spec.additive ? 0 : 0.01
+    });
+    const sprite = new THREE.Sprite(mat);
+    sprite.center.set(spec.pivotX, 1 - spec.pivotYFromTop);
+    sprite.frustumCulled = false;
+    sprite.renderOrder = HITFX_RENDER_ORDER;
+    sprite.userData.isSprite = true;
+    sprite.userData.skipVertexLighting = true;
+    sprite.userData.kind = 'hitfx';
+    const w = host.baseW * (spec.imgW / MONSTER_TEXEL_W);
+    const h = host.baseH * (spec.imgH / MONSTER_TEXEL_H);
+    sprite.scale.set(w, h, 1);
+    scene.add(sprite);
+    const play: HitFxPlay = {
+      sprite,
+      material: mat,
+      frames: spec.frames,
+      started: now,
+      fps: spec.fps,
+      hostId: id,
+      imgW: spec.imgW,
+      imgH: spec.imgH,
+      pivotX: spec.pivotX,
+      pivotYFromTop: spec.pivotYFromTop
+    };
+    this.playingFx.push(play);
+    this.placeHitFx(play, host);
+  }
+
+  private async loadHitFx(
+    loadTex: (path: string) => Promise<THREE.Texture>,
+    baseUrl: string
+  ) {
+    try {
+      const res = await fetch(`${baseUrl}art/fx/hits/hits.json`);
+      if (!res.ok) return;
+      const json = (await res.json()) as {
+        effects?: Record<
+          string,
+          {
+            frames?: number;
+            fps?: number;
+            blend?: string;
+            sizes?: { near?: [number, number] };
+            pivotInImage?: { x?: number; yFromTop?: number };
+          }
+        >;
+        map?: { resist?: string; weak?: string };
+        bodyAnchors?: Record<string, { near?: { u?: number; vFromBottom?: number } }>;
+      };
+      for (const [kind, near] of Object.entries(json.bodyAnchors ?? {})) {
+        this.bodyAnchors.set(kind, {
+          u: near.near?.u ?? 0.5,
+          vFromBottom: near.near?.vFromBottom ?? 0.4
+        });
+      }
+      const loadEffect = async (key: 'resist' | 'weak', effectName: string) => {
+        const fx = json.effects?.[effectName];
+        if (!fx) return;
+        const n = fx.frames ?? 4;
+        const frames: THREE.Texture[] = [];
+        for (let i = 1; i <= n; i++) {
+          try {
+            frames.push(await loadTex(`art/fx/hits/${effectName}_${i}_near.png`));
+          } catch {
+            break;
+          }
+        }
+        const size = fx.sizes?.near ?? [40, 30];
+        this.hitFx.set(key, {
+          frames,
+          fps: fx.fps ?? 12,
+          additive: /additive/i.test(fx.blend ?? ''),
+          imgW: size[0],
+          imgH: size[1],
+          pivotX: fx.pivotInImage?.x ?? 0.5,
+          pivotYFromTop: fx.pivotInImage?.yFromTop ?? 0.5
+        });
+      };
+      await loadEffect('resist', json.map?.resist ?? 'resist_goo');
+      await loadEffect('weak', json.map?.weak ?? 'weak_frost');
+    } catch {
+      // optional art
+    }
+  }
+
+  private placeHitFx(fx: HitFxPlay, host: SpriteInfo) {
+    const anchor = this.bodyAnchors.get(host.monsterKind ?? '') ?? { u: 0.5, vFromBottom: 0.4 };
+    const wx = host.object.position.x + (anchor.u - 0.5) * host.baseW;
+    const wy = host.floorY + anchor.vFromBottom * host.baseH;
+    const wz = host.object.position.z;
+    const cam = this.camera.position;
+    const dx = cam.x - wx;
+    const dz = cam.z - wz;
+    const len = Math.hypot(dx, dz) || 1;
+    fx.sprite.position.set(wx + (dx / len) * 0.01, wy, wz + (dz / len) * 0.01);
+    const w = host.baseW * (fx.imgW / MONSTER_TEXEL_W);
+    const h = host.baseH * (fx.imgH / MONSTER_TEXEL_H);
+    fx.sprite.scale.set(w, h, 1);
+    fx.sprite.visible = host.object.visible && !host.hidden;
+  }
+
+  private updateHitFx(time: number) {
+    const live: HitFxPlay[] = [];
+    for (const fx of this.playingFx) {
+      const host = this.spriteByMonsterId(fx.hostId);
+      if (!host) {
+        this.removeHitFx(fx);
+        continue;
+      }
+      this.placeHitFx(fx, host);
+      const frame = Math.floor(((time - fx.started) / 1000) * fx.fps);
+      if (frame >= fx.frames.length) {
+        this.removeHitFx(fx);
+        continue;
+      }
+      const tex = fx.frames[Math.max(0, frame)];
+      if (fx.material.map !== tex) {
+        fx.material.map = tex;
+        fx.material.needsUpdate = true;
+      }
+      live.push(fx);
+    }
+    this.playingFx = live;
+  }
+
+  private removeHitFx(fx: HitFxPlay) {
+    fx.sprite.visible = false;
+    fx.sprite.parent?.remove(fx.sprite);
+    fx.material.dispose();
+  }
+
+  private clearHitFx() {
+    for (const fx of this.playingFx) this.removeHitFx(fx);
+    this.playingFx = [];
+    this.lastHitType = null;
+  }
+
+  hitFxPlaying(): Array<{ hostId: string; frames: number }> {
+    return this.playingFx.map((fx) => ({ hostId: fx.hostId, frames: fx.frames.length }));
   }
 }
