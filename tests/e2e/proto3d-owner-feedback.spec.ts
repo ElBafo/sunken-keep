@@ -186,9 +186,10 @@ test('proto3d owner feedback: occluded light, hidden back torch, snuff, water st
     p.setPosition(1, 6, 3);
     p.interact();
   });
+  await expect(page.locator('#torch-choice')).toHaveClass(/show/);
+  await page.locator('#btn-torch-snuff').tap();
   const immediately = await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-    p.interact();
     return {
       lit: p.torchLit(0, 6),
       msg: p.lastMessage(),

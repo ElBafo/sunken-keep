@@ -1,0 +1,293 @@
+{
+ "_note": "Player-facing UI strings for Gamie's overnight steps (party panel, combat, inventory, title/saves). Greek copy of story/ui_text.json, same keys. Button labels aim for <=8 chars; where one language runs over, a sibling '<key>_short' exists in both files. Placeholders: {hero} {target} {monster} {item} {n} {max} {date}; names come from story/names.json. Combat/inventory log lines live in log.json. Reuse, don't duplicate: title_text.json (title buttons, slots, overwrite, saved, save_blocked, areas, language), log.json (hit, miss, monster_hit, out_of_reach, not_ready, hero_down, party_dead, drink_potion, chest_open, chest_empty, pickup_*, oil_pickup, torch_*), barks.json (tut_*).",
+ "step1_party_panel": {
+  "_about": "Party panel, hand buttons, bars, Wren's oil gauge, wall-torch choice.",
+  "torch_choice": {
+   "prompt": "Αναμμένη δάδα.",
+   "take": "Πάρε",
+   "snuff": "Σβήσε",
+   "take_hint": "Κουβάλα τη. Χτυπά με φωτιά.",
+   "snuff_hint": "Σβήσ' τη. Ξανάναμμα: 1 λάδι.",
+   "hands_full": "Κανένα ελεύθερο χέρι. Πάτα ένα για αλλαγή."
+  },
+  "bars": {
+   "hp": "Ζωή",
+   "mana": "Μαγεία",
+   "oil": "Λάδι",
+   "oil_readout": "Λάδι {n}/{max}",
+   "ember": "Σπίθα",
+   "hp_readout": "{n}/{max}"
+  },
+  "hands": {
+   "_about": "Action name shown on/under a hand button, by gear id (art/ui/hands/hands.json).",
+   "fist": "Μπουνιά",
+   "axe": "Κόψε",
+   "shield": "Άμυνα",
+   "iron_shield": "Άμυνα",
+   "mace": "Κοπάνα",
+   "prayer_lantern": "Γιατρειά",
+   "prayer_lantern_ember": "Γιατρειά",
+   "wand": "Ρίξε",
+   "scroll": "Πάγος",
+   "dagger": "Κάρφωσε",
+   "tricks_pouch": "Κόλπο",
+   "torch_lit": "Κάψε",
+   "torch_burnt": "Μπαμ",
+   "ashmantle_hammer": "Λιώσε"
+  },
+  "hand_state": {
+   "recovering": "Περίμενε",
+   "no_mana": "Άδειο",
+   "back_row": "Μακριά",
+   "empty": "Άδειο"
+  },
+  "sheet": {
+   "_about": "Hero sheet (tap a portrait).",
+   "level": "Επίπεδο {n}",
+   "level_short": "Επ. {n}",
+   "xp": "Εμπ. {n}/{max}",
+   "ac": "Θωρ.",
+   "ac_long": "Θωράκιση",
+   "to_hit": "Ευστοχία",
+   "damage": "Ζημιά",
+   "recovery": "Ανάκαμψη {n}δ",
+   "row_front": "Μπροστά",
+   "row_back": "Πίσω",
+   "swap_hint": "Σύρε ένα πρόσωπο για αλλαγή θέσης.",
+   "close": "Κλείσε",
+   "down": "Εκτός"
+  },
+  "controls": {
+   "door": "Πόρτα"
+  }
+ },
+ "step2_combat": {
+  "_about": "Combat floaters and short labels. Log lines are in log.json (see STORY_HOOKUP.md).",
+  "float": {
+   "miss": "Άστοχο",
+   "crit": "Κρίσιμο!",
+   "block": "Μπλοκ",
+   "dodge": "Ξέφυγε",
+   "level_up": "Επίπεδο!",
+   "xp_gain": "+{n} Εμπ.",
+   "burn": "Καψ!",
+   "heal": "+{n}",
+   "level_up_short": "Επίπεδο!"
+  },
+  "level_up": {
+   "title": "{hero}: επίπεδο {n}!",
+   "hp": "Μέγ. ζωή +{n}",
+   "to_hit": "Ευστοχία +1",
+   "damage": "Ζημιά +10%",
+   "ok": "Πάμε"
+  },
+  "game_over": {
+   "title": "Το νερό σας παίρνει όλους.",
+   "body": "Το κάστρο σας κρατά. Προς το παρόν.",
+   "load_last": "Πρόσφατη",
+   "title_screen": "Αρχική",
+   "load_floor": "Σκάλες"
+  }
+ },
+ "step3_inventory": {
+  "_about": "Bag UI, item names and descriptions. name = full name, short = <=8 for slots/buttons, desc = flavour, effect = rules line.",
+  "bag": {
+   "title": "Σάκος",
+   "use": "Χρήση",
+   "drop": "Πέτα",
+   "give": "Δώσε",
+   "equip": "Πιάσε",
+   "unequip": "Βγάλε",
+   "close": "Κλείσε",
+   "empty_slot": "Άδειο",
+   "empty_bag": "Τίποτα. Μόνο χνούδι.",
+   "pick_hero": "Πάτα έναν ήρωα.",
+   "who_drinks": "Ποιος πίνει;",
+   "count": "x{n}",
+   "drop_confirm": "Να το πετάξεις εδώ;",
+   "drop_yes": "Πέτα",
+   "drop_no": "Κράτα",
+   "slot_hand": "Χέρι",
+   "slot_body": "Σώμα",
+   "slot_bag": "Σάκος"
+  },
+  "items": {
+   "key": {
+    "name": "Σκουριασμένο κλειδί",
+    "short": "Κλειδί",
+    "desc": "Σκουριασμένο. Σαν τη γοητεία του Μπράννοκ.",
+    "effect": "Ανοίγει μια κλειδωμένη πόρτα εδώ γύρω."
+   },
+   "potion_red": {
+    "name": "Κόκκινο φίλτρο",
+    "short": "Κόκκινο",
+    "desc_log": "desc_potion_red",
+    "effect": "Γιατρεύει 15 ζωή."
+   },
+   "potion_blue": {
+    "name": "Μπλε φίλτρο",
+    "short": "Μπλε",
+    "desc_log": "desc_potion_blue",
+    "effect": "Δίνει 8 μαγεία. Ρεν ή Ιλσεβάρ."
+   },
+   "potion_green": {
+    "name": "Πράσινο φίλτρο",
+    "short": "Πράσινο",
+    "desc_log": "desc_potion_green",
+    "effect": "Ξεκολλά βδέλλες, γιατρεύει δηλητήριο, +5 ζωή."
+   },
+   "oil_flask": {
+    "name": "Φλασκί λάδι",
+    "short": "Λάδι",
+    "desc": "Οι νάνοι το φύλαγαν όπως οι άλλοι το κρασί.",
+    "effect": "+1 λάδι στο φανάρι της Ρεν (μέγ. 4)."
+   },
+   "torch": {
+    "name": "Δάδα",
+    "short": "Δάδα",
+    "desc": "Η φωτιά μπροστά. ΜΠΡΟΣΤΑ, Μπράννοκ.",
+    "effect": "Χτυπά με φωτιά. Μπαίνει σε άδεια θήκη."
+   },
+   "torch_burnt": {
+    "name": "Καμένη δάδα",
+    "short": "Ξύλο",
+    "desc": "Ένα ξύλο με παρελθόν.",
+    "effect": "Χτυπά ακόμα. Χωρίς φωτιά."
+   },
+   "journal_page": {
+    "name": "Σελίδα ημερολογίου",
+    "short": "Σελίδα",
+    "desc": "Γραφή του Όρρουν. Μουσκεμένη, αλλά διαβάζεται.",
+    "effect": "Πάτα για ανάγνωση."
+   },
+   "captain_key": {
+    "name": "Κλειδί του λοχαγού",
+    "short": "Κλειδί",
+    "desc": "Του Ντούραλ. Τώρα ανοίγει μόνο αναμνήσεις.",
+    "effect": "Ενθύμιο."
+   },
+   "iron_shield": {
+    "name": "Σιδερένια ασπίδα",
+    "short": "Ασπίδα",
+    "desc": "Βαθουλωμένη, βαριά, τίμια.",
+    "effect": "Άμυνα: +3 θωράκιση, το επόμενο χτύπημα μισό. Μαγκς ή Ιλσεβάρ."
+   },
+   "chain_mail": {
+    "name": "Αλυσιδωτός θώρακας",
+    "short": "Θώρακας",
+    "desc": "Εξήντα χρόνια σε υγρό στρατώνα. Τσιμπάει.",
+    "effect": "+2 θωράκιση. Ο Ιλσεβάρ δεν κάνει μάγια μ' αυτόν."
+   },
+   "ashmantle_hammer": {
+    "name": "Σφυρί των Άσμαντλ",
+    "short": "Σφυρί",
+    "desc": "Δύο σφυριά, μικρή. Αυτό είναι το ένα.",
+    "effect": "Μόνο για τον Μπράννοκ. Βαρύ χτύπημα, αργό."
+   },
+   "axe": {
+    "name": "Τσεκούρι",
+    "short": "Τσεκούρι",
+    "desc": "Του Μπράννοκ. Πιο παλιό από τη Μαγκς, και πιο κοφτερό.",
+    "effect": "Μπροστινή σειρά. Γερά χτυπήματα."
+   },
+   "shield": {
+    "name": "Νάνικη ασπίδα",
+    "short": "Ασπίδα",
+    "desc": "Βελανιδιά και σίδερο. Κρύβει ολόκληρο νάνο.",
+    "effect": "Άμυνα: +4 θωράκιση, το επόμενο χτύπημα σε όλους μισό."
+   },
+   "mace": {
+    "name": "Ρόπαλο",
+    "short": "Ρόπαλο",
+    "desc": "Για τα πιο άμεσα κηρύγματα της Φλόγας.",
+    "effect": "Μπροστινή σειρά. Σταθερά χτυπήματα."
+   },
+   "prayer_lantern": {
+    "name": "Φανάρι προσευχής",
+    "short": "Φανάρι",
+    "desc": "Της Ρεν. Η τελευταία φωτιά που εμπιστεύεται.",
+    "effect": "Γιατρεύει τον πιο χτυπημένο 6-10. 4 μαγεία."
+   },
+   "wand": {
+    "name": "Ραβδί από καλάμι",
+    "short": "Ραβδί",
+    "desc": "Καλάμι του βάλτου και υπομονή. Κυρίως υπομονή.",
+    "effect": "Από απόσταση. Δουλεύει κι από πίσω."
+   },
+   "scroll": {
+    "name": "Πάπυρος του πάγου",
+    "short": "Πάπυρος",
+    "desc": "Κρύα λόγια. Ο Ιλσεβάρ τα διαβάζει αργά.",
+    "effect": "Παγωμένο βέλος 8-14, αγνοεί θωράκιση. 5 μαγεία."
+   },
+   "dagger": {
+    "name": "Στιλέτο",
+    "short": "Στιλέτο",
+    "desc": "Της Μαγκς. Μη ρωτάς πού έχει μπει.",
+    "effect": "Μπροστινή σειρά. Γρήγορο."
+   },
+   "tricks_pouch": {
+    "name": "Σακούλι με κόλπα",
+    "short": "Κόλπα",
+    "desc": "Άμμος, σπάγκος κι ένα μυστήριο κουμπί.",
+    "effect": "Άμμος στα μάτια: το επόμενο χτύπημα αστοχεί. Ανοίγει κλειδαριές."
+   },
+   "fist": {
+    "name": "Γροθιά",
+    "short": "Γροθιά",
+    "desc": "Δωρεάν, και πάντα πρόχειρη.",
+    "effect": "1-2 ζημιά. Καλύτερα από τίποτα. Μόλις."
+   }
+  }
+ },
+ "step4_title_saves": {
+  "_about": "Adds to story/title_text.json (buttons, slot, overwrite, areas, saved, save_blocked already exist there).",
+  "buttons": {
+   "save": "Σώσε",
+   "delete": "Σβήσε",
+   "menu": "Μενού",
+   "resume": "Συνέχεια",
+   "quit": "Αρχική",
+   "yes": "Ναι",
+   "no": "Όχι",
+   "ok": "OK"
+  },
+  "slot": {
+   "label": "Θέση {n}",
+   "autosave": "Αυτόματη",
+   "autosave_tag": "Αυτόμ.",
+   "date": "{date}",
+   "corrupt": "Αυτή η αποθήκευση βράχηκε.",
+   "corrupt_sub": "Δεν φορτώνει."
+  },
+  "status": {
+   "saving": "Αποθήκευση...",
+   "loading": "Φόρτωση...",
+   "autosaved": "Αυτόματη αποθήκευση.",
+   "loaded": "Το παιχνίδι φορτώθηκε.",
+   "save_failed": "Δεν αποθηκεύτηκε. Ο χώρος γέμισε.",
+   "no_saves": "Καμία αποθήκευση ακόμα.",
+   "load_failed": "Το κάστρο δεν ανοίγει. Ξαναδοκίμασε."
+  },
+  "confirm": {
+   "new_game_title": "Νέο παιχνίδι;",
+   "new_game_body": "Διάλεξε θέση. Το κάστρο έχει υπομονή.",
+   "load_title": "Φόρτωση αυτής της αποθήκευσης;",
+   "load_body": "Ό,τι έγινε μετά την τελευταία αποθήκευση βουλιάζει.",
+   "delete_title": "Σβήσιμο αυτής της αποθήκευσης;",
+   "delete_body": "Χάνεται για πάντα. Σαν τα μαλλιά του Μπράννοκ.",
+   "quit_title": "Πίσω στην αρχική;",
+   "quit_body": "Ό,τι δεν αποθηκεύτηκε χάνεται."
+  },
+  "settings": {
+   "title": "Ρυθμίσεις",
+   "music": "Μουσική",
+   "effects": "Εφέ",
+   "ambience": "Ατμόσφαιρα",
+   "on": "Ναι",
+   "off": "Όχι",
+   "ambience_short": "Ατμόσφ."
+  },
+  "tap_to_start": "Πάτα για να αρχίσεις"
+ }
+}

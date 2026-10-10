@@ -1,0 +1,79 @@
+{
+ "what": "Choice shown when the party taps a lit WALL torch: Take (carry it, goes to a hand) or Snuff (put it out). No text is baked in.",
+ "size": [
+  52,
+  31
+ ],
+ "sizeNote": "52x31 px = 76x45 pt on iPhone 15 (1.456 pt/px; 30 px would be 43.7 pt, so 31). Text room at 52 px = 43 px (7 glyphs + shadow). An 8-glyph label is 47 px + 1 shadow, so stretch to 56 px (rule below). Current labels are at most 5 glyphs.",
+ "stretch": {
+  "normal": "button_9slice.png",
+  "pressed": "button_pressed_9slice.png",
+  "sliceMargin": 4,
+  "rule": "draw at any w x h (w >= 52, h >= 31): corners 4x4 unscaled, edges/centre stretched NEAREST; width = max(52, textWidth + 9) where textWidth = glyphs*6-1 (+1 shadow, +8 frame)"
+ },
+ "prebaked": {
+  "blank": [
+   "btn_choice.png",
+   "btn_choice_pressed.png"
+  ],
+  "icon": {
+   "take": [
+    "btn_take_icon.png",
+    "btn_take_icon_pressed.png"
+   ],
+   "snuff": [
+    "btn_snuff_icon.png",
+    "btn_snuff_icon_pressed.png"
+   ]
+  },
+  "bareIcons": {
+   "take": "icon_take.png (17x21: fist gripping a lit torch)",
+   "snuff": "icon_snuff.png (17x21: smoke curl off a dead torch head)"
+  }
+ },
+ "labelByCode": {
+  "source": "story/ui_text.json + story/el/ui_text.el.json, keys \"take\" / \"snuff\"",
+  "font": "font/font_5x7.png via font_5x7.json glyphs (Greek included; look Greek up by glyphs, not the ASCII formula)",
+  "colour": "#d8ccb0",
+  "shadow": "#1a1210 at +1,+1",
+  "advance": 6,
+  "position": "x = (w - textWidth)//2 (+1 if textWidth is even), y = 12 = top of the 5x9 glyph box (caps on rows 12-18, Greek lower-case accents in box rows 0-1, descenders rows 19-20); pressed: +1 px down"
+ },
+ "labels": {
+  "en": {
+   "take": "Take",
+   "snuff": "Snuff"
+  },
+  "el": {
+   "take": "Πάρε",
+   "snuff": "Σβήσε"
+  }
+ },
+ "labelWidthsPx": {
+  "en.take": 23,
+  "en.snuff": 29,
+  "el.take": 23,
+  "el.snuff": 29
+ },
+ "widest": {
+  "en.snuff": 29
+ },
+ "missingGlyphs": [],
+ "suggestedPlacement": {
+  "note": "in the 3D view just above the panel, centred, clear of the arrows and hand buttons (all at y>=442)",
+  "take": [
+   80,
+   343,
+   52,
+   31
+  ],
+  "snuff": [
+   138,
+   343,
+   52,
+   31
+  ],
+  "gap": 6,
+  "tapRule": "consume the tap so it does not also hit the torch/view behind; ignore taps ~1 s after a flare/snuff like the torch tap lock"
+ }
+}

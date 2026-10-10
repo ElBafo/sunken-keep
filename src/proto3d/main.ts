@@ -12,6 +12,7 @@ import {
   OIL_TORCH_COST,
   parseAmbientFloor,
   STEP_VOLUME,
+  SWAP_ARM_MS,
   TORCH_IGNITE_FLARE_MS
 } from './constants';
 import { Dressing } from './dressing';
@@ -29,6 +30,16 @@ import { VertexLightingManager } from './vertex-lighting';
 import { WaterSystem } from './water';
 import { DarkFx } from './dark-fx';
 import { PropBuilder } from './props';
+import { StoryText } from './i18n';
+import { loadLayout585 } from './layout585';
+import { PartyHud, type GearId, type HandSlot } from './party-hud';
+import type { HeroId } from '../constants';
+
+export interface BagEntry {
+  item: GearId;
+  count: number;
+  from?: { hero: HeroId; hand: HandSlot };
+}
 
 class Game {
   renderer!: PixelRenderer;
@@ -48,16 +59,21 @@ class Game {
   bright = 1;
   oil = OIL_START;
   persist = true;
-  oilPickupText = 'Oil flask. Wren\'s lantern drinks it.';
-  private logLines = new Map<string, string>();
+  story = new StoryText();
+  hud!: PartyHud;
+  private torchChoice: { sconce: Sconce } | null = null;
+  private swapSconce: Sconce | null = null;
+  private swapUntil = 0;
+  private swapTimer: ReturnType<typeof setTimeout> | null = null;
+  bag: BagEntry[] = [];
   lastMessage = '';
-  lampNote = { title: "Lamp-keeper's note", text: '' };
+  lampNote = { title: '', text: '' };
   noteOpen = false;
   interactCount = 0;
   messageTimer = 0;
 
   lastTime = 0;
-  fpsCounter = document.getElementById('fps-counter')!;
+  fpsCounter: HTMLElement | null = null;
   fpsFrames = 0;
   fpsLastTime = 0;
   lastFps = 0;
@@ -78,10 +94,20 @@ class Game {
     }
     this.oil = loadProgress(floor1Sconces, this.persist);
 
-    this.renderer = new PixelRenderer(canvas);
+    await this.story.load('en');
+    this.applyStoryLabels();
+
+    const layout = await loadLayout585();
+    this.renderer = new PixelRenderer(canvas, layout.view[2], layout.view[3]);
     await this.renderer.loadPalette();
     if (params.get('palette') === '0') this.renderer.setPaletteEnabled(false);
-    if (params.get('debug') === '1') this.fpsCounter.style.display = 'block';
+    if (params.get('debug') === '1') {
+      const el = document.createElement('div');
+      el.id = 'fps-counter';
+      el.textContent = 'FPS: --';
+      document.body.appendChild(el);
+      this.fpsCounter = el;
+    }
 
     this.atmosphere = new Atmosphere(this.quality);
     this.atmosphere.applyFog(this.renderer.scene, this.renderer.renderer);
@@ -127,15 +153,31 @@ class Game {
     await this.spriteManager.loadSprites(this.renderer.scene, floor1);
     this.darkFx = new DarkFx();
     await this.darkFx.load(this.renderer.scene, floor1, this.spriteManager);
+    this.hud = new PartyHud(this.story, () => this.oil, layout, {
+      onUse: (hero, hand) => this.handleHandTap(hero, hand),
+      onLog: () => this.audioManager?.playUi('ui_log_line'),
+      playUi: (name) => this.audioManager?.playUi(name),
+      onCancel: () => {
+        this.cancelSwap();
+        this.hideTorchChoice();
+      }
+    });
+    this.loadLampNote();
     this.updateOilHud();
-    await Promise.all([this.loadLogText(), this.loadLampNote()]);
+    await this.hud.load();
+    this.wireTorchChoice();
+    this.renderer.resize();
 
     this.audioManager = new AudioManager(this.renderer.camera, this.quality);
     await this.audioManager.init();
     this.atmosphere.setSplashHandler((x, y, z) => this.audioManager.playDrip(x, y, z));
 
     this.inputManager = new InputManager(this.player, {
-      onMove: (result) => this.handleMove(result),
+      onMove: (result) => {
+        this.cancelSwap();
+        this.hideTorchChoice();
+        this.handleMove(result);
+      },
       onInteract: () => this.interact()
     });
 
@@ -145,12 +187,14 @@ class Game {
   }
 
   handleMove(result: MoveResult) {
+    this.cancelSwap();
     if (result === 'ok') {
       this.playFootstep(this.player.moveToX, this.player.moveToY);
+      this.maybeDunkTorch(this.player.moveToX, this.player.moveToY);
       return;
     }
     if (result === 'busy') return;
-    this.audioManager.playUi('bump', 0.65);
+    this.audioManager.playUi('bump');
   }
 
   playFootstep(x: number, y: number) {
@@ -181,12 +225,18 @@ class Game {
   }
 
   showMessage(text: string) {
+    if (!text) return;
     this.lastMessage = text;
+    this.hud?.pushLog(text);
     const el = document.getElementById('message-toast');
     if (!el) return;
     el.textContent = text;
     el.classList.add('show');
     this.messageTimer = performance.now() + 1200;
+  }
+
+  private storyLog(key: string, vars?: Record<string, string | number>): string {
+    return this.story.log(key, vars);
   }
 
   pickupKeyAt(x: number, y: number): boolean {
@@ -197,7 +247,7 @@ class Game {
     this.spriteManager.hideItemAt(x, y);
     this.darkFx.hideItemAt(x, y);
     this.audioManager.playUi('key', 0.8);
-    this.showMessage('Key.');
+    this.showMessage(this.storyLog('pickup_key'));
     return true;
   }
 
@@ -206,59 +256,37 @@ class Game {
     if (!tile || (tile.item !== 'oil' && tile.item !== 'oil_flask')) return false;
     tile.item = undefined;
     this.spriteManager.hideItemAt(x, y);
-    this.audioManager.playUi('oil_pickup', 0.85);
-    window.setTimeout(() => this.audioManager.playUi('lantern_refill', 0.8), 280);
+    this.audioManager.playUi('oil_pickup');
+    window.setTimeout(() => this.audioManager.playUi('lantern_refill'), 280);
     const wasEmpty = this.oil <= 0;
     this.oil = Math.min(OIL_MAX, this.oil + OIL_FLASK);
     if (wasEmpty) this.audioManager.startLanternLoop(true);
     this.updateOilHud();
     saveProgress(floor1Sconces, this.oil, this.persist);
     this.vertexLighting.updateAllMeshes(this.renderer.scene);
-    this.showMessage(this.oilPickupText);
+    this.showMessage(wasEmpty ? this.storyLog('lantern_lit') : this.storyLog('oil_pickup'));
     return true;
+  }
+
+  private applyStoryLabels() {
+    const tap = document.getElementById('tap-to-start-text');
+    if (tap) tap.textContent = this.story.uiText('tap_to_start');
+    const door = document.getElementById('btn-door');
+    if (door) door.textContent = this.story.uiText('controls.door');
   }
 
   updateOilHud() {
     const el = document.getElementById('oil-readout');
     if (!el) return;
-    el.textContent = `Oil ${this.oil}/${OIL_MAX}`;
+    const text =
+      this.story.uiText('step1_party_panel.bars.oil_readout', { n: this.oil, max: OIL_MAX }) || this.story.log('no_oil');
+    el.textContent = text;
+    this.hud?.draw(performance.now());
   }
 
-  async loadLogText() {
-    try {
-      const baseUrl = import.meta.env.BASE_URL;
-      const res = await fetch(`${baseUrl}log.json`);
-      const lines = (await res.json()) as Array<{ key: string; text: string }>;
-      for (const line of lines) this.logLines.set(line.key, line.text);
-      const oil = this.logLines.get('oil_pickup');
-      if (oil) this.oilPickupText = oil;
-    } catch {
-      // keep fallback
-    }
-  }
-
-  private logLine(key: string, replacements?: Record<string, string>): string {
-    let text = this.logLines.get(key) ?? '';
-    if (!text && key === 'torch_snuffed') text = '{hero} snuffs the torch. It hisses.';
-    if (replacements) {
-      for (const [k, v] of Object.entries(replacements)) {
-        text = text.replace(new RegExp(`\\{${k}\\}`, 'g'), v);
-      }
-    }
-    return text;
-  }
-
-  async loadLampNote() {
-    try {
-      const baseUrl = import.meta.env.BASE_URL;
-      const res = await fetch(`${baseUrl}story/note_lampkeeper.json`);
-      const note = (await res.json()) as { title?: string; text?: string };
-      if (note.title) this.lampNote.title = note.title;
-      if (note.text) this.lampNote.text = note.text;
-    } catch {
-      this.lampNote.text =
-        "They took the lamps first. Then the oil. Thane's orders. I kept one. Don't tell him. - Pell, lamp-keeper";
-    }
+  loadLampNote() {
+    this.lampNote.title = this.story.noteTitle();
+    this.lampNote.text = this.story.noteText();
   }
 
   showNote() {
@@ -299,7 +327,7 @@ class Game {
     const prev = this.oil;
     this.oil = next;
     if (prev > 0 && next <= 0) {
-      this.audioManager.playUi('oil_empty', 0.85);
+      this.audioManager.playUi('oil_empty');
       this.audioManager.startLanternLoop(false);
     } else if (prev <= 0 && next > 0) {
       this.audioManager.startLanternLoop(true);
@@ -307,6 +335,7 @@ class Game {
     this.updateOilHud();
     saveProgress(floor1Sconces, this.oil, this.persist);
     this.vertexLighting.updateAllMeshes(this.renderer.scene);
+    if (prev > 0 && next <= 0) this.showMessage(this.storyLog('lantern_out'));
   }
 
   handleFacingTorch(): boolean {
@@ -314,12 +343,16 @@ class Game {
     if (!sconce) return false;
     if (sconce.capped) {
       this.audioManager.playDoor('door_locked', sconce.x, sconce.y);
-      this.showMessage('Sealed.');
+      this.showMessage(this.storyLog('torch_capped'));
       return true;
     }
     if (this.torches.isTapLocked(sconce)) return true;
     if (sconce.lit) {
-      this.snuffTorch(sconce);
+      this.showTorchChoice(sconce);
+      return true;
+    }
+    if (this.hud.hasLitCarriedTorch()) {
+      this.placeCarriedTorch(sconce);
       return true;
     }
     this.relightTorch(sconce);
@@ -336,30 +369,36 @@ class Game {
     this.torches.snuff(sconce, now);
     this.vertexLighting.relight();
     const pos = torchWorldPos(sconce);
-    this.audioManager.playPositional('torch_extinguish', pos.x, pos.y, pos.z, 0.7);
+    this.audioManager.playPositional('torch_extinguish', pos.x, pos.y, pos.z, 1);
     this.audioManager.stopTorchLoop(sconce);
     saveProgress(floor1Sconces, this.oil, this.persist);
-    this.showMessage(this.logLine('torch_snuffed', { hero: 'Wren' }));
+    this.showMessage(this.storyLog('torch_snuffed', { hero: this.story.heroName(this.hud.actingFrontHero()) }));
   }
 
   private relightTorch(sconce: Sconce) {
     if (sconce.lit) return;
     if (this.oil < OIL_TORCH_COST) {
-      this.showMessage('No oil to spare.');
+      this.showMessage(this.storyLog('no_oil'));
       return;
     }
     const now = performance.now();
     this.torches.ignite(sconce, now);
     this.vertexLighting.relight();
     const pos = torchWorldPos(sconce);
-    this.audioManager.playPositional('torch_ignite', pos.x, pos.y, pos.z, 0.8);
+    this.audioManager.playPositional('torch_ignite', pos.x, pos.y, pos.z, 1);
     window.setTimeout(() => this.audioManager.startTorchLoop(sconce), TORCH_IGNITE_FLARE_MS);
     this.setOil(this.oil - OIL_TORCH_COST);
     this.water.addSconceGlint(sconce);
+    this.showMessage(this.storyLog('torch_relit'));
   }
 
   interact() {
     this.interactCount += 1;
+    if (this.cancelSwap()) return;
+    if (this.torchChoice) {
+      this.hideTorchChoice();
+      return;
+    }
     if (this.pickupKeyAt(this.player.x, this.player.y)) return;
     if (this.pickupOilAt(this.player.x, this.player.y)) return;
     const facing = this.player.facingPos(1);
@@ -369,8 +408,182 @@ class Game {
     if (this.readFacingDesk()) return;
 
     const ahead = this.doorAhead();
-    if (ahead) this.handleDoor(ahead.x, ahead.y);
+    if (ahead)     this.handleDoor(ahead.x, ahead.y);
     else this.hideNote();
+  }
+
+  private wireTorchChoice() {
+    const take = document.getElementById('btn-torch-take');
+    const snuff = document.getElementById('btn-torch-snuff');
+    const stop = (e: Event) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    take?.addEventListener('pointerup', (e) => {
+      if (!(e as PointerEvent).isPrimary) return;
+      stop(e);
+      this.confirmTake();
+    });
+    snuff?.addEventListener('pointerup', (e) => {
+      if (!(e as PointerEvent).isPrimary) return;
+      stop(e);
+      this.confirmSnuff();
+    });
+    take?.addEventListener('click', stop);
+    snuff?.addEventListener('click', stop);
+  }
+
+  private showTorchChoice(sconce: Sconce) {
+    this.torchChoice = { sconce };
+    const el = document.getElementById('torch-choice');
+    if (el) {
+      el.hidden = false;
+      el.classList.add('show');
+    }
+  }
+
+  hideTorchChoice() {
+    this.torchChoice = null;
+    const el = document.getElementById('torch-choice');
+    if (el) {
+      el.hidden = true;
+      el.classList.remove('show');
+    }
+  }
+
+  private confirmTake() {
+    const sconce = this.torchChoice?.sconce;
+    this.hideTorchChoice();
+    if (sconce) this.takeWallTorch(sconce);
+  }
+
+  private confirmSnuff() {
+    const sconce = this.torchChoice?.sconce;
+    this.hideTorchChoice();
+    if (sconce) this.snuffTorch(sconce);
+  }
+
+  isSwapArmed(): boolean {
+    return this.swapSconce != null && performance.now() < this.swapUntil;
+  }
+
+  cancelSwap(): boolean {
+    const was = this.swapSconce != null;
+    if (this.swapTimer != null) {
+      clearTimeout(this.swapTimer);
+      this.swapTimer = null;
+    }
+    this.swapSconce = null;
+    this.swapUntil = 0;
+    this.hud?.setSwapHighlight(false);
+    return was;
+  }
+
+  private armSwap(sconce: Sconce) {
+    if (this.swapTimer != null) clearTimeout(this.swapTimer);
+    this.swapSconce = sconce;
+    this.swapUntil = performance.now() + SWAP_ARM_MS;
+    this.hud.setSwapHighlight(true);
+    this.swapTimer = setTimeout(() => {
+      this.swapTimer = null;
+      this.cancelSwap();
+    }, SWAP_ARM_MS);
+  }
+
+  private takeBagFrom(hero: HeroId, hand: HandSlot): GearId | null {
+    const i = this.bag.findIndex((slot) => slot.from?.hero === hero && slot.from?.hand === hand);
+    if (i < 0) return null;
+    const [slot] = this.bag.splice(i, 1);
+    return slot.item;
+  }
+
+  private giveTorchTo(sconce: Sconce, hero: HeroId, hand: HandSlot) {
+    if (!sconce.lit || sconce.capped) {
+      this.cancelSwap();
+      return;
+    }
+    if (this.hud.isGuaranteedLantern(hero, hand)) return;
+    const current = this.hud.heroes[hero]?.equipment[hand];
+    let stashed = false;
+    if (current && current !== 'empty_hand') {
+      this.bag.push({ item: current, count: 1, from: { hero, hand } });
+      stashed = true;
+      this.showMessage(
+        this.storyLog('unequip', {
+          hero: this.story.heroName(hero),
+          item: this.story.itemName(current)
+        })
+      );
+    }
+    this.torches.takeOffWall(sconce);
+    this.audioManager.stopTorchLoop(sconce);
+    this.hud.setHand(hero, hand, 'torch_lit');
+    this.cancelSwap();
+    this.vertexLighting.relight();
+    this.syncCarriedLight();
+    saveProgress(floor1Sconces, this.oil, this.persist);
+    this.audioManager.playUi('torch_take');
+    if (stashed) this.audioManager.playUi('ui_inventory_move');
+    this.showMessage(this.storyLog('torch_take', { hero: this.story.heroName(hero) }));
+  }
+
+  private takeWallTorch(sconce: Sconce) {
+    if (!sconce.lit || sconce.capped) return;
+    const slot = this.hud.findFreeHand();
+    if (!slot) {
+      this.armSwap(sconce);
+      this.showMessage(this.story.uiText('torch_choice.hands_full') || this.storyLog('hands_full'));
+      return;
+    }
+    this.giveTorchTo(sconce, slot.hero, slot.hand);
+  }
+
+  private placeCarriedTorch(sconce: Sconce) {
+    const held = this.hud.carriedTorch();
+    if (!held || !held.lit || sconce.lit || sconce.capped) return;
+    const now = performance.now();
+    const restored = this.takeBagFrom(held.hero, held.hand);
+    this.hud.setHand(held.hero, held.hand, restored ?? 'empty_hand');
+    this.torches.ignite(sconce, now);
+    this.vertexLighting.relight();
+    this.syncCarriedLight();
+    const pos = torchWorldPos(sconce);
+    this.audioManager.playUi('torch_place');
+    if (restored) this.audioManager.playUi('ui_inventory_move');
+    window.setTimeout(() => this.audioManager.startTorchLoop(sconce), TORCH_IGNITE_FLARE_MS);
+    saveProgress(floor1Sconces, this.oil, this.persist);
+    this.showMessage(this.storyLog('torch_place', { hero: this.story.heroName(held.hero) }));
+    void pos;
+  }
+
+  private maybeDunkTorch(x: number, y: number) {
+    const tile = this.player.tileAt(x, y);
+    if (!tile?.deepWater) return;
+    const dunked = this.hud.dunkCarriedTorches();
+    if (!dunked.length) return;
+    this.audioManager.playUi('torch_dunk');
+    this.syncCarriedLight();
+    this.showMessage(this.storyLog('torch_dunk', { hero: this.story.heroName(dunked[0].hero) }));
+  }
+
+  private syncCarriedLight() {
+    this.vertexLighting.setCarriedTorch(this.hud.hasLitCarriedTorch());
+    this.vertexLighting.updateAllMeshes(this.renderer.scene);
+  }
+
+  handleHandTap(hero: HeroId, hand: HandSlot) {
+    this.hideTorchChoice();
+    if (this.isSwapArmed() && this.swapSconce) {
+      if (this.hud.isGuaranteedLantern(hero, hand)) return;
+      this.giveTorchTo(this.swapSconce, hero, hand);
+      return;
+    }
+    this.cancelSwap();
+    this.useHand(hero, hand);
+  }
+
+  useHand(hero: HeroId, hand: HandSlot): boolean {
+    return this.hud.useHand(hero, hand);
   }
 
   handleDoor(x: number, y: number) {
@@ -382,7 +595,7 @@ class Game {
     if (tile.doorLocked && !tile.doorOpen) {
       if (!this.player.hasKey) {
         this.audioManager.playDoor('door_locked', x, y);
-        this.showMessage('Locked.');
+        this.showMessage(this.storyLog('door_locked'));
         return;
       }
       this.player.hasKey = false;
@@ -402,9 +615,11 @@ class Game {
     (window as unknown as { __proto3d: unknown }).__proto3d = {
       ready: true,
       setPosition: (x: number, y: number, dir: number) => {
+        this.cancelSwap();
+        this.hideTorchChoice();
         this.player.setPosition(x, y, dir);
         this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
-        this.vertexLighting.updateAllMeshes(this.renderer.scene);
+        this.syncCarriedLight();
         this.torches.setParty(this.player.x, this.player.y, this.player.dir);
         this.torches.update(performance.now(), this.player.x, this.player.y, this.player.dir);
         this.dressing.update(performance.now(), this.player.x, this.player.y, this.player.dir);
@@ -581,7 +796,32 @@ class Game {
       },
       darkFx: () => this.darkFx.snapshot(),
       lightFacingTorch: () => this.handleFacingTorch(),
-      snuffFacing: () => this.handleFacingTorch(),
+      snuffFacing: () => {
+        const sconce = this.torches.facingTorch(this.player.x, this.player.y, this.player.dir);
+        if (sconce?.lit) this.snuffTorch(sconce);
+      },
+      takeFacingTorch: () => {
+        const sconce = this.torches.facingTorch(this.player.x, this.player.y, this.player.dir);
+        if (sconce?.lit) this.takeWallTorch(sconce);
+      },
+      torchChoiceVisible: () => !!this.torchChoice,
+      hideTorchChoice: () => this.hideTorchChoice(),
+      setHeroHp: (id: HeroId, hp: number) => this.hud.setHeroHp(id, hp),
+      setHand: (id: HeroId, hand: HandSlot, item: string) => this.hud.setHand(id, hand, item as never),
+      getHands: () => this.hud.getHands(),
+      useHand: (id: HeroId, hand: HandSlot) => this.useHand(id, hand),
+      lastHand: () => this.hud.lastHand,
+      handTapCount: () => this.hud.handTapCount,
+      carriedTorch: () => this.hud.carriedTorch(),
+      hasCarriedTorchLight: () => this.vertexLighting.hasCarriedTorch(),
+      getBag: () => this.bag.map((slot) => ({ ...slot, from: slot.from ? { ...slot.from } : undefined })),
+      swapArmed: () => this.isSwapArmed(),
+      swapHighlightCount: () => document.querySelectorAll('.hand-btn.swap-armed').length,
+      lastUi: () => this.audioManager.lastUi(),
+      lanternLoop: () => this.audioManager.lanternLoop(),
+      playLevelUp: (id: HeroId) => this.hud.playLevelUp(id),
+      logLines: () => this.hud.logLines.slice(),
+      layout: () => this.hud.layout,
       tryMoveForward: () => {
         const before = { x: this.player.x, y: this.player.y };
         const result = this.player.moveForward();
@@ -591,8 +831,16 @@ class Game {
           : { x: this.player.x, y: this.player.y, dir: this.player.dir };
         return { result, before, after: dest };
       },
-      tryTurnLeft: () => this.player.turnLeft(),
-      tryTurnRight: () => this.player.turnRight(),
+      tryTurnLeft: () => {
+        this.cancelSwap();
+        this.hideTorchChoice();
+        return this.player.turnLeft();
+      },
+      tryTurnRight: () => {
+        this.cancelSwap();
+        this.hideTorchChoice();
+        return this.player.turnRight();
+      },
       doorOpen: (x: number, y: number) => !!this.sceneBuilder.doors.get(x, y)?.tile.doorOpen,
       openDoor: (x: number, y: number) => {
         const visual = this.sceneBuilder.doors.get(x, y);
@@ -629,6 +877,7 @@ class Game {
       this.lastTime = performance.now();
       this.fpsLastTime = this.lastTime;
       requestAnimationFrame(() => this.gameLoop());
+      this.audioManager.startLanternLoop(this.oil > 0);
       try {
         await this.audioManager.loadSounds(this.renderer.scene, floor1Sconces);
         this.audioManager.startLanternLoop(this.oil > 0);
@@ -644,6 +893,7 @@ class Game {
         );
       } catch (err) {
         console.warn('Audio init failed', err);
+        this.audioManager.startLanternLoop(this.oil > 0);
       }
     };
     tapToStart.addEventListener('click', start);
@@ -687,6 +937,7 @@ class Game {
     this.spriteManager.update(now, this.player.x, this.player.y, this.player.dir);
     this.darkFx.update(now, this.vertexLighting, this.spriteManager, this.audioManager, this.player.x, this.player.y);
     this.vertexLighting.setFlickerTime(now);
+    this.hud?.draw(now);
 
     if (this.messageTimer && now >= this.messageTimer) {
       this.messageTimer = 0;
@@ -699,7 +950,7 @@ class Game {
     this.fpsFrames++;
     if (now - this.fpsLastTime >= 1000) {
       const fps = Math.round((this.fpsFrames * 1000) / (now - this.fpsLastTime));
-      this.fpsCounter.textContent = `FPS: ${fps}`;
+      if (this.fpsCounter) this.fpsCounter.textContent = `FPS: ${fps}`;
       this.lastFps = fps;
       this.fpsFrames = 0;
       this.fpsLastTime = now;
@@ -712,5 +963,5 @@ class Game {
 const game = new Game();
 game.init().catch((err) => {
   console.error('Failed to initialize game:', err);
-  alert('Failed to load game. Check console for details.');
+  alert(game.story.uiText('status.load_failed'));
 });

@@ -1,0 +1,31 @@
+{
+ "_note": "Greek copy of story/journal_act1.json. Same keys; lines <=41 chars.",
+ "pages": {
+  "1": {
+   "floor": 1,
+   "at": [
+    5,
+    1
+   ],
+   "where": "behind the secret wall, under the carving \"We gave much. We need more.\"",
+   "lines": [
+    "Η Παλίρροια ζητά μόνο φωτιά.",
+    "Όροφο τον όροφο, της τη δίνουμε.",
+    "- Ό.Σ."
+   ]
+  },
+  "2": {
+   "floor": 2,
+   "at": [
+    3,
+    9
+   ],
+   "where": "SW stores nook (floods if the RIGHT vent lever is pulled first)",
+   "lines": [
+    "Τα λυχνάρια πάνε. Μετά το λάδι.",
+    "Οι δικοί μου ανασαίνουν. Οι περισσότεροι.",
+    "- Ό.Σ."
+   ]
+  }
+ }
+}

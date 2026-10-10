@@ -1,0 +1,18 @@
+{
+ "tiers": {
+  "tutorial": "Always plays, once, the first time the condition happens.",
+  "story": "Always plays, once. Never suppressed by the cooldown.",
+  "flavour": "Optional. Only plays if no bark of any tier played in the last 120 s, and at most 1 per 180 s. Repeating triggers (loot, idle, low_health, new_monster, secret_wall, deep_water, leech_latch) pick a random line not used yet, then stop once their pool is spent."
+ },
+ "flavour_gap_s": 120,
+ "flavour_min_interval_s": 180,
+ "never_during": [
+  "dialogue",
+  "combat_round_with_story_bark"
+ ],
+ "first_sight": "first_sight_<monster> is story tier: one random line from its pool, once per save, the first time that monster type is in view. When it fires, new_monster is suppressed for that sighting; new_monster only covers types with no first_sight_ lines (slime, cellar_spider, tide_spawn, captain_dural).",
+ "condition": "A line may carry condition {flag: value}. Only lines whose flags match the save are eligible (unset counts as false).",
+ "act": "A line with act: N is ignored before act N (torch_draws_monster is act 2).",
+ "puzzle_barks": "Barks under <puzzle>.barks in story/puzzles_act1.json use the same tiers and must be merged with barks.json by the loader.",
+ "fire_rules": "When each trigger fires: story/triggers_act1.json."
+}

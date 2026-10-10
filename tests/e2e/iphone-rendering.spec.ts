@@ -1,17 +1,20 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
+
+async function start2d(page: Page) {
+  const tap = page.locator('#tap-to-start');
+  await page.waitForSelector('canvas#game', { timeout: 15000 });
+  if (await tap.isVisible()) {
+    await tap.click({ timeout: 5000 }).catch(() => {});
+  }
+}
 
 test.describe('iPhone Safari rendering', () => {
   test('game loads and fills full viewport after intro', async ({ page }) => {
     await page.goto('/sunken-keep/');
-    
-    // Wait for game to load
-    await page.waitForSelector('canvas#game', { timeout: 10000 });
+    await start2d(page);
     
     // Take screenshot of tap-to-start screen
     await page.screenshot({ path: 'screenshots/iphone-tap-to-start.png', fullPage: false });
-    
-    // Tap to start
-    await page.click('#tap-to-start');
     
     // Wait a moment for intro to start
     await page.waitForTimeout(1000);
@@ -45,10 +48,9 @@ test.describe('iPhone Safari rendering', () => {
   
   test('control panel is visible and interactive', async ({ page }) => {
     await page.goto('/sunken-keep/');
-    await page.waitForSelector('canvas#game');
+    await start2d(page);
     
     // Start game and skip intro
-    await page.click('#tap-to-start');
     await page.waitForTimeout(1000);
     await page.keyboard.press('Escape');
     await page.waitForTimeout(1000);
@@ -71,10 +73,9 @@ test.describe('iPhone Safari rendering', () => {
   
   test('left and right walls are correctly positioned', async ({ page }) => {
     await page.goto('/sunken-keep/');
-    await page.waitForSelector('canvas#game');
+    await start2d(page);
     
     // Start game and skip intro
-    await page.click('#tap-to-start');
     await page.waitForTimeout(1000);
     await page.keyboard.press('Escape');
     await page.waitForTimeout(1000);

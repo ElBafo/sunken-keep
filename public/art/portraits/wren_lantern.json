@@ -1,0 +1,62 @@
+{
+ "source": "relit from wren_healthy.png (64x64); lantern flame centre at (34.5,58)",
+ "note": "Portrait shown in Wren's party slot; swap by lantern state. Health-state portraits (wounded/near_death) still apply when lantern is bright; when guttering/out the lantern portrait takes priority unless near_death.",
+ "states": {
+  "bright": {
+   "file": "wren_lantern_bright.png",
+   "desc": "warm orange glow on face/hood, lantern bright",
+   "audio": "lantern lit loop"
+  },
+  "gutter": {
+   "file": "wren_lantern_gutter.png",
+   "frames": [
+    "wren_lantern_gutter_1.png",
+    "wren_lantern_gutter_2.png",
+    "wren_lantern_gutter_3.png"
+   ],
+   "desc": "dimmer, unsteady warm light; frame 2 is the dip, frame 3 the flare",
+   "flicker": {
+    "fps": 8,
+    "mode": "random",
+    "rule": "each tick pick a frame != current; weights 1:0.5:0.8 (1:2:3); every 1-3 s hold frame 2 for 3-5 ticks (sputter, sync the sputter sfx)"
+   },
+   "audio": "lantern sputter"
+  },
+  "out": {
+   "file": "wren_lantern_out.png",
+   "desc": "cold green-blue shadowed face, lantern glass dark, faint smoke wisp",
+   "audio": "lantern out (one-shot)"
+  },
+  "ember": {
+   "file": "wren_lantern_ember.png",
+   "frames": [
+    "wren_lantern_ember.png",
+    "wren_lantern_ember_2.png"
+   ],
+   "desc": "0 oil, ember only: small blue-white glow low in the lantern glass, face in cold dim light",
+   "pulse": {
+    "fps": 1.5,
+    "mode": "pingpong",
+    "rule": "slow breathing glow; optional (static frame 1 is fine)"
+   },
+   "hand_icon": "../ui/hands/hand_prayer_lantern_ember.png"
+  }
+ },
+ "transitions": {
+  "bright->gutter": "cut",
+  "gutter->out": "show gutter_2 for 2 ticks then cut to out",
+  "out->bright": "gutter_3 for 1 tick then bright",
+  "bright->ember": "gutter_2 for 2 ticks, then ember (sync sfx_lantern_sputter)",
+  "ember->bright": "gutter_3 for 1 tick, then bright (oil added)"
+ },
+ "oilStates": {
+  "note": "Pick Wren's portrait by oil (max 4). oil>=1 -> bright (wren_lantern_bright.png = lantern lit with oil). oil==0 -> ember. gutter/out are kept for scripted moments (lantern dying, doused).",
+  "oil_1_to_4": "bright",
+  "oil_0": "ember",
+  "priority": "near_death portrait overrides both; otherwise lantern state overrides healthy/wounded",
+  "hand": {
+   "oil_1_to_4": "../ui/hands/hand_prayer_lantern.png",
+   "oil_0": "../ui/hands/hand_prayer_lantern_ember.png"
+  }
+ }
+}

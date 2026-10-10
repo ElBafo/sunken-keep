@@ -4,8 +4,6 @@ import { CAMERA_FAR, CAMERA_FOV, CAMERA_NEAR, FOG_COLOR, FOG_FAR, FOG_NEAR } fro
 // Enable Three.js color management for proper sRGB handling
 THREE.ColorManagement.enabled = true;
 
-const RENDER_WIDTH = 270;
-const DEFAULT_RENDER_HEIGHT = 380;
 const MIN_BUTTON_PX = 44;
 
 export class PixelRenderer {
@@ -19,9 +17,14 @@ export class PixelRenderer {
   canvas: HTMLCanvasElement;
   palette: string[] = [];
   paletteEnabled = true;
+  /** Logical 3D view size from layout585.json `view`. */
+  viewWidth: number;
+  viewHeight: number;
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, viewWidth: number, viewHeight: number) {
     this.canvas = canvas;
+    this.viewWidth = viewWidth;
+    this.viewHeight = viewHeight;
     
     // Main scene
     this.scene = new THREE.Scene();
@@ -47,8 +50,8 @@ export class PixelRenderer {
     this.renderer.setClearColor(FOG_COLOR, 1);
     this.renderer.outputColorSpace = THREE.LinearSRGBColorSpace; // No conversion on final quad
     
-    // Low-res render target — 270×380 logical, nearest-neighbour upscaled in CSS
-    this.renderTarget = new THREE.WebGLRenderTarget(RENDER_WIDTH, DEFAULT_RENDER_HEIGHT, {
+    // Low-res render target — layout585 view size, nearest-neighbour upscaled in CSS
+    this.renderTarget = new THREE.WebGLRenderTarget(this.viewWidth, this.viewHeight, {
       minFilter: THREE.NearestFilter,
       magFilter: THREE.NearestFilter,
       format: THREE.RGBAFormat,
@@ -220,13 +223,14 @@ export class PixelRenderer {
   resize() {
     const vw = window.innerWidth;
     const vh = window.innerHeight;
-    const scale = vw / RENDER_WIDTH;
+    const scale = vw / this.viewWidth;
 
     const bodyStyle = getComputedStyle(document.body);
     const padTop = parseFloat(bodyStyle.paddingTop) || 0;
     const padBottom = parseFloat(bodyStyle.paddingBottom) || 0;
 
     const controls = document.getElementById('controls');
+    const hud = document.getElementById('party-hud');
     let controlsSpace = MIN_BUTTON_PX * 2 + 16;
     if (controls) {
       const cs = getComputedStyle(controls);
@@ -235,9 +239,16 @@ export class PixelRenderer {
         (parseFloat(cs.marginTop) || 0) +
         (parseFloat(cs.marginBottom) || 0);
     }
+    if (hud) {
+      const hs = getComputedStyle(hud);
+      controlsSpace +=
+        hud.offsetHeight +
+        (parseFloat(hs.marginTop) || 0) +
+        (parseFloat(hs.marginBottom) || 0);
+    }
 
     const available = Math.max(1, vh - padTop - padBottom - controlsSpace);
-    let cssHeight = DEFAULT_RENDER_HEIGHT * scale;
+    let cssHeight = this.viewHeight * scale;
     // Prefer shrinking the view over overlapping the D-pad on short screens
     if (cssHeight > available) {
       cssHeight = available;
@@ -245,12 +256,12 @@ export class PixelRenderer {
 
     const renderHeight = Math.max(1, Math.round((cssHeight / scale)));
 
-    this.renderTarget.setSize(RENDER_WIDTH, renderHeight);
-    this.camera.aspect = RENDER_WIDTH / renderHeight;
+    this.renderTarget.setSize(this.viewWidth, renderHeight);
+    this.camera.aspect = this.viewWidth / renderHeight;
     this.camera.updateProjectionMatrix();
 
-    // Drawing buffer stays 270×logicalH; CSS upscales nearest-neighbour to the viewport
-    this.renderer.setSize(RENDER_WIDTH, renderHeight, false);
+    // Drawing buffer stays viewW×logicalH; CSS upscales nearest-neighbour to the viewport
+    this.renderer.setSize(this.viewWidth, renderHeight, false);
     this.canvas.style.width = `${vw}px`;
     this.canvas.style.height = `${cssHeight}px`;
   }
@@ -278,7 +289,7 @@ export class PixelRenderer {
       // Also check render target
       this.renderer.setRenderTarget(this.renderTarget);
       const rtPixels = new Uint8Array(4);
-      const rtCenterX = Math.floor(RENDER_WIDTH / 2);
+      const rtCenterX = Math.floor(this.viewWidth / 2);
       const rtCenterY = Math.floor(this.renderTarget.height / 2);
       gl.readPixels(rtCenterX, rtCenterY, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, rtPixels);
       console.log(`Render target center pixel RGB: ${rtPixels[0]}, ${rtPixels[1]}, ${rtPixels[2]}, ${rtPixels[3]}`);

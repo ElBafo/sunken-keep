@@ -1,0 +1,135 @@
+{
+ "_note": "Greek copy of puzzles_act1.json. Same keys; log lines <=41 chars.",
+ "floor2_vents": {
+  "lever_plate": "ΑΡΙΣΤΕΡΑ: ΑΠΟΘΗΚΗ. ΔΕΞΙΑ: ΣΤΕΡΝΑ.",
+  "lever_pulled_dry": "Ο αέρας βρυχάται. Κάπου, νερό στραγγίζει.",
+  "lever_pulled_flood": "Ο αέρας βρυχάται. Κάπου, νερό ανεβαίνει.",
+  "barks": [
+   {
+    "trigger": "vent_lever_first",
+    "speaker": "brannoc",
+    "text": "Κι ο αέρας ποτάμι είναι. Απλώς τον κατευθύνεις.",
+    "face": "smirk",
+    "tier": "tutorial"
+   },
+   {
+    "trigger": "vent_page_flooded",
+    "speaker": "mags",
+    "text": "Ωραία. Πνίξαμε το μόνο που θέλαμε.",
+    "face": "wince",
+    "tier": "story"
+   }
+  ]
+ },
+ "floor3_offering": {
+  "lantern_carving": [
+   "Φωτιά στο μπολ,",
+   "και το νερό υποκλίνεται."
+  ],
+  "bowl_examine": "Πέτρινο μπολ, μαύρο από παλιά κάπνα.",
+  "bowl_lit": "Το νερό στην πόρτα ανοίγει.",
+  "room_dark": "Πίσω σας, η τραπεζαρία σκοτεινιάζει.",
+  "barks": [
+   {
+    "trigger": "bowl_first_sight",
+    "speaker": "wren",
+    "text": "Ένα μπολ προσφορών. Της έδιναν φωτιά.",
+    "face": "neutral",
+    "tier": "tutorial"
+   },
+   {
+    "trigger": "bowl_lit",
+    "speaker": "ilsevar",
+    "text": "Πήρε τον δαυλό. Του άρεσε ο δαυλός.",
+    "face": "neutral",
+    "tier": "story"
+   },
+   {
+    "trigger": "bowl_lit",
+    "speaker": "mags",
+    "text": "Δηλαδή τώρα κάνουμε κι εμείς συμφωνίες. Τέλεια.",
+    "face": "wince",
+    "tier": "story"
+   }
+  ]
+ },
+ "floor4_riddle_door": {
+  "carving": [
+   "Δίνομαι και δεν επιστρέφω.",
+   "Μικρή στην αρχή, ύστερα τα πάντα.",
+   "Η Παλίρροια ποτέ δεν μ' αρνείται."
+  ],
+  "answer_item": "torch",
+  "answer_alternatives": [
+   "Και το φανάρι της Ρεν στον βωμό"
+  ],
+  "wrong_item": "Ο βωμός μένει κρύος.",
+  "solved": "Η αίθουσα του λοχαγού ανοίγει.",
+  "barks": [
+   {
+    "trigger": "riddle_first_sight",
+    "speaker": "mags",
+    "text": "Πόρτα με γρίφο. Οι νάνοι δεν ξέρουν από πλάκα.",
+    "face": "smirk",
+    "tier": "story"
+   },
+   {
+    "trigger": "riddle_first_sight",
+    "speaker": "brannoc",
+    "text": "Ξέρουμε. Απλώς τη σκαλίζουμε.",
+    "face": "neutral",
+    "tier": "story"
+   },
+   {
+    "trigger": "riddle_wrong",
+    "speaker": "ilsevar",
+    "text": "Τι θέλει πάντα το νερό;",
+    "face": "neutral",
+    "tier": "tutorial"
+   },
+   {
+    "trigger": "riddle_solved",
+    "speaker": "wren",
+    "text": "Φωτιά. Φυσικά και είναι φωτιά.",
+    "face": "wince",
+    "tier": "story"
+   }
+  ]
+ },
+ "floor4_drill_tiles": {
+  "wall_carving": [
+   "Η άσκηση της φρουράς Άσμαντλ:",
+   "Ασπίδα. Σφυρί. Σφυρί. Όρκος."
+  ],
+  "tile_symbols": [
+   "shield",
+   "hammer",
+   "oath"
+  ],
+  "order": [
+   "shield",
+   "hammer",
+   "hammer",
+   "oath"
+  ],
+  "step_ok": "Η πλάκα κάνει κλικ και κρατά.",
+  "step_wrong": "Οι πλάκες επανέρχονται με ένα βογκητό.",
+  "solved": "Ένα κρυφό ράφι ανοίγει.",
+  "barks": [
+   {
+    "trigger": "drill_wrong",
+    "speaker": "brannoc",
+    "text": "Δύο σφυριά, μικρή. Οι νάνοι χτυπάνε πάντα δύο φορές.",
+    "face": "smirk",
+    "tier": "tutorial"
+   },
+   {
+    "trigger": "drill_solved",
+    "speaker": "mags",
+    "text": "Θα χαιρετούσα, αλλά κουράστηκαν τα χέρια μου.",
+    "face": "smirk",
+    "tier": "flavour"
+   }
+  ]
+ }
+}

@@ -289,7 +289,7 @@ export class DarkFx {
       const dist = Math.max(Math.abs(g.x - partyX), Math.abs(g.y - partyY));
       if (!g.heard && dist <= 4) {
         g.heard = true;
-        audio.playUi('glint', 0.45);
+        audio.playUi('glint');
       }
       if (now >= g.nextAt) {
         if (g.resting) {
