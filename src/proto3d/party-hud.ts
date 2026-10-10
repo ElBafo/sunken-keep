@@ -8,6 +8,7 @@ import {
 import { ITEM_ACT_SFX } from '../core/types';
 import { HAND_COOLDOWN_MS, OIL_MAX } from './constants';
 import { StoryText } from './i18n';
+import { drawFont5x7, type FontGlyphs } from './font5x7';
 import {
   panelContentHeight,
   toPanelLocal,
@@ -27,6 +28,7 @@ export interface HeroHud {
   maxMana: number;
   formation: 'front' | 'back';
   equipment: { main: GearId; off: GearId };
+  armour?: string;
   recovery: { main: number; off: number };
   downed?: boolean;
   pendingPerk: number | null;
@@ -71,12 +73,16 @@ export class PartyHud {
   private fontReady = false;
   private fontImg: HTMLImageElement | null = null;
   private fontCellW = 6;
-  private fontCols = 16;
+  private fontGlyphs: FontGlyphs = {};
   private oilFn: () => number;
   private onUse: (hero: HeroId, hand: HandSlot) => void;
   private onLog: (text: string) => void;
   private playUi: (name: string) => void;
   private onCancel: () => void;
+  private onPortrait: ((hero: HeroId) => void) | null = null;
+  private onBag: (() => void) | null = null;
+  private onPotion: ((kind: 'health' | 'mana') => void) | null = null;
+  pickHero = false;
   private levelFlash: { id: HeroId; started: number } | null = null;
   private readyArmed: Record<string, boolean> = {};
   private notReadyAt: Partial<Record<HeroId, number>> = {};
@@ -94,6 +100,9 @@ export class PartyHud {
       onLog: (text: string) => void;
       playUi: (name: string) => void;
       onCancel: () => void;
+      onPortrait?: (hero: HeroId) => void;
+      onBag?: () => void;
+      onPotion?: (kind: 'health' | 'mana') => void;
     }
   ) {
     this.story = story;
@@ -103,6 +112,9 @@ export class PartyHud {
     this.onLog = hooks.onLog;
     this.playUi = hooks.playUi;
     this.onCancel = hooks.onCancel;
+    this.onPortrait = hooks.onPortrait ?? null;
+    this.onBag = hooks.onBag ?? null;
+    this.onPotion = hooks.onPotion ?? null;
     this.heroes = this.createHeroes();
     this.panelTop = layout.panelTop;
     this.designWidth = layout.canvas[0];
@@ -170,12 +182,13 @@ export class PartyHud {
       fetch(`${base}art/font/font_5x7.json`).then((r) => r.json()) as Promise<{
         columns?: number;
         cellWidth?: number;
+        glyphs?: FontGlyphs;
       }>
     ]);
 
     if (Array.isArray(hands.size) && Number.isFinite(hands.size[0])) this.iconSize = hands.size[0];
-    if (Number.isFinite(fontMeta.columns)) this.fontCols = fontMeta.columns!;
     if (Number.isFinite(fontMeta.cellWidth)) this.fontCellW = fontMeta.cellWidth!;
+    if (fontMeta.glyphs) this.fontGlyphs = fontMeta.glyphs;
     for (const [id, file] of Object.entries(hands.icons ?? {})) this.icons.set(id, file);
 
     const portraitFiles = [
@@ -222,6 +235,7 @@ export class PartyHud {
     this.fontImg = this.images.get('font') ?? null;
     this.fontReady = !!this.fontImg;
     this.mountHandButtons();
+    this.mountChromeButtons();
     this.mountChoiceLabels();
     this.draw(performance.now());
   }
@@ -242,16 +256,88 @@ export class PartyHud {
       host.addEventListener('pointerup', (e) => {
         if (!e.isPrimary) return;
         const target = e.target as HTMLElement | null;
-        if (target?.closest('.hand-btn')) return;
+        if (target?.closest('.hand-btn, .portrait-btn, .hud-chrome-btn')) return;
         this.onCancel();
       });
     }
     for (const id of HERO_ORDER) {
       const layout = this.layoutHeroes.get(id);
       if (!layout) continue;
+      this.placePortraitBtn(host, id, layout.portrait);
       this.placeHandBtn(host, id, 'main', layout.handMain);
       this.placeHandBtn(host, id, 'off', layout.handOff);
     }
+  }
+
+  private mountChromeButtons() {
+    const host = document.getElementById('party-hud');
+    if (!host) return;
+    host.querySelectorAll('.hud-chrome-btn').forEach((el) => el.remove());
+    const bag = this.placeChromeBtn(host, toPanelLocal(this.layout.inventory, this.panelTop), 'bag');
+    bag.setAttribute('aria-label', this.story.uiText('bag.title'));
+    bag.addEventListener('pointerup', (e) => {
+      if (!e.isPrimary) return;
+      e.preventDefault();
+      e.stopPropagation();
+      this.onBag?.();
+    });
+    const health = this.placeChromeBtn(host, toPanelLocal(this.layout.potionHealth, this.panelTop), 'potion-health');
+    health.setAttribute('aria-label', this.story.itemName('potion_red'));
+    health.addEventListener('pointerup', (e) => {
+      if (!e.isPrimary) return;
+      e.preventDefault();
+      e.stopPropagation();
+      this.onPotion?.('health');
+    });
+    const mana = this.placeChromeBtn(host, toPanelLocal(this.layout.potionMana, this.panelTop), 'potion-mana');
+    mana.setAttribute('aria-label', this.story.itemName('potion_blue'));
+    mana.addEventListener('pointerup', (e) => {
+      if (!e.isPrimary) return;
+      e.preventDefault();
+      e.stopPropagation();
+      this.onPotion?.('mana');
+    });
+  }
+
+  private placePortraitBtn(host: HTMLElement, hero: HeroId, rect: Rect) {
+    const [x, y, w, h] = rect;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'portrait-btn';
+    btn.dataset.hero = hero;
+    btn.setAttribute('aria-label', this.story.heroName(hero));
+    btn.style.left = `${(x / this.designWidth) * 100}%`;
+    btn.style.top = `${(y / this.designHeight) * 100}%`;
+    btn.style.width = `${(w / this.designWidth) * 100}%`;
+    btn.style.height = `${(h / this.designHeight) * 100}%`;
+    btn.addEventListener('pointerup', (e) => {
+      if (!e.isPrimary) return;
+      e.preventDefault();
+      e.stopPropagation();
+      this.onPortrait?.(hero);
+    });
+    host.appendChild(btn);
+  }
+
+  private placeChromeBtn(host: HTMLElement, rect: Rect, name: string) {
+    const [x, y, w, h] = rect;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'hud-chrome-btn';
+    btn.dataset.name = name;
+    btn.style.left = `${(x / this.designWidth) * 100}%`;
+    btn.style.top = `${(y / this.designHeight) * 100}%`;
+    btn.style.width = `${(w / this.designWidth) * 100}%`;
+    btn.style.height = `${(h / this.designHeight) * 100}%`;
+    host.appendChild(btn);
+    return btn;
+  }
+
+  setPickHero(on: boolean) {
+    this.pickHero = on;
+    document.querySelectorAll<HTMLElement>('.portrait-btn').forEach((el) => {
+      el.classList.toggle('pick-hero', on);
+    });
   }
 
   private placeHandBtn(host: HTMLElement, hero: HeroId, hand: HandSlot, rect: Rect) {
@@ -301,6 +387,13 @@ export class PartyHud {
     const hero = this.heroes[id];
     if (!hero) return;
     hero.equipment[hand] = item;
+    this.draw(performance.now());
+  }
+
+  setArmour(id: HeroId, item: string | undefined) {
+    const hero = this.heroes[id];
+    if (!hero) return;
+    hero.armour = item;
     this.draw(performance.now());
   }
 
@@ -669,22 +762,15 @@ export class PartyHud {
   }
 
   private drawFont(text: string, x: number, y: number) {
-    const ctx = this.ctx;
-    if (!this.fontReady || !this.fontImg) {
-      ctx.fillStyle = '#d8ccb0';
-      ctx.font = '8px monospace';
-      ctx.textBaseline = 'top';
-      ctx.fillText(text, x, y);
-      return;
-    }
-    const font = this.fontImg;
-    for (let i = 0; i < text.length; i++) {
-      const index = text.charCodeAt(i) - 32;
-      if (index < 0 || index > 94) continue;
-      const sx = (index % this.fontCols) * this.fontCellW;
-      const sy = Math.floor(index / this.fontCols) * 10;
-      ctx.drawImage(font, sx, sy, 5, 9, x + i * this.fontCellW, y, 5, 9);
-    }
+    drawFont5x7(
+      this.ctx,
+      this.fontReady ? this.fontImg : null,
+      text,
+      x,
+      y,
+      this.fontGlyphs,
+      this.fontCellW
+    );
   }
 }
 

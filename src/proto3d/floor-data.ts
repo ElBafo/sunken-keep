@@ -65,7 +65,7 @@ export const floor1: FloorData = {
     ],
     [
       { wall: true }, {}, {}, {}, { wall: true },
-      { chest: true }, {}, { item: 'potion_green' }, { wall: true }, { wall: true },
+      { chest: true, chestItems: ['potion_red'] }, {}, { item: 'potion_green' }, { wall: true }, { wall: true },
       { wall: true }, {}, { wall: true }, { wall: true }, { wall: true }
     ],
     [

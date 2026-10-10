@@ -11,6 +11,20 @@ export interface LayoutHero {
   manaBar: LayoutRect | null;
 }
 
+export interface InventoryPaperdoll {
+  main: LayoutRect;
+  off: LayoutRect;
+  armour: LayoutRect;
+  trinket: LayoutRect;
+}
+
+export interface InventoryScreenLayout {
+  slots: LayoutRect[];
+  paperdoll: Record<HeroId, Array<Partial<InventoryPaperdoll> & Record<string, LayoutRect>>>;
+  close: LayoutRect;
+  desc: LayoutRect;
+}
+
 export interface Layout585 {
   canvas: [number, number];
   view: LayoutRect;
@@ -18,6 +32,10 @@ export interface Layout585 {
   oilBar: LayoutRect;
   log: LayoutRect;
   heroes: LayoutHero[];
+  inventory: LayoutRect;
+  potionHealth: LayoutRect;
+  potionMana: LayoutRect;
+  inventoryScreen: InventoryScreenLayout;
 }
 
 function isRect(value: unknown): value is LayoutRect {
@@ -56,13 +74,44 @@ export async function loadLayout585(): Promise<Layout585> {
       manaBar: h.manaBar == null ? null : requireRect(h.manaBar, `heroes[${i}].manaBar`)
     };
   });
+  const screenRaw = (raw.inventory_screen ?? {}) as Record<string, unknown>;
+  const slotsRaw = screenRaw.slots;
+  const slots: LayoutRect[] = Array.isArray(slotsRaw)
+    ? slotsRaw.map((s, i) => requireRect(s, `inventory_screen.slots[${i}]`))
+    : [];
+  const dollsRaw = (screenRaw.paperdoll ?? {}) as Record<string, unknown>;
+  const paperdoll: InventoryScreenLayout['paperdoll'] = {
+    brannoc: [],
+    wren: [],
+    ilsevar: [],
+    mags: []
+  };
+  for (const id of ['brannoc', 'wren', 'ilsevar', 'mags'] as HeroId[]) {
+    const list = dollsRaw[id];
+    if (!Array.isArray(list)) continue;
+    paperdoll[id] = list.map((entry, i) => {
+      const rec = entry as Record<string, unknown>;
+      const out: Record<string, LayoutRect> = {};
+      for (const [k, v] of Object.entries(rec)) out[k] = requireRect(v, `inventory_screen.paperdoll.${id}[${i}].${k}`);
+      return out;
+    });
+  }
   return {
     canvas: [Number(canvas[0]), Number(canvas[1])],
     view: requireRect(raw.view, 'view'),
     panelTop: Number(raw.panelTop),
     oilBar: requireRect(raw.oilBar, 'oilBar'),
     log: requireRect(raw.log, 'log'),
-    heroes
+    heroes,
+    inventory: requireRect(raw.inventory, 'inventory'),
+    potionHealth: requireRect(raw.potion_health, 'potion_health'),
+    potionMana: requireRect(raw.potion_mana, 'potion_mana'),
+    inventoryScreen: {
+      slots,
+      paperdoll,
+      close: requireRect(screenRaw.close, 'inventory_screen.close'),
+      desc: requireRect(screenRaw.desc, 'inventory_screen.desc')
+    }
   };
 }
 
@@ -72,7 +121,7 @@ export function toPanelLocal(rect: LayoutRect, panelTop: number): LayoutRect {
 
 /** Height of the proto3d HUD strip: portraits through the 3-line log (not the 2D D-pad). */
 export function panelContentHeight(layout: Layout585): number {
-  const rects: LayoutRect[] = [layout.log, layout.oilBar];
+  const rects: LayoutRect[] = [layout.log, layout.oilBar, layout.inventory, layout.potionHealth, layout.potionMana];
   for (const hero of layout.heroes) {
     rects.push(hero.portrait_opens_sheet, hero.hand_main, hero.hand_off, hero.hpBar);
     if (hero.manaBar) rects.push(hero.manaBar);

@@ -109,7 +109,10 @@
    "drop_no": "Κράτα",
    "slot_hand": "Χέρι",
    "slot_body": "Σώμα",
-   "slot_bag": "Σάκος"
+   "slot_bag": "Σάκος",
+   "compare_better": "Καλύτερο",
+   "compare_worse": "Χειρότερο",
+   "compare_same": "Ίδιο"
   },
   "items": {
    "key": {

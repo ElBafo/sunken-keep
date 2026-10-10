@@ -235,7 +235,10 @@ export class PropBuilder {
     const sprite = new THREE.Sprite(mat);
     sprite.center.set(0.5, 0);
     // Stand by the desk — slightly west of cell centre, on the floor.
-    sprite.position.set(x * CELL_SIZE - 0.55, 0.02, y * CELL_SIZE + 0.15);
+    const baseX = x * CELL_SIZE - 0.55;
+    const baseY = 0.02;
+    const baseZ = y * CELL_SIZE + 0.15;
+    sprite.position.set(baseX, baseY, baseZ);
     sprite.scale.set(LAMP_W, LAMP_H, 1);
     sprite.frustumCulled = false;
     sprite.renderOrder = 8;
@@ -244,11 +247,45 @@ export class PropBuilder {
     sprite.userData.kind = 'lamp_capped';
     sprite.userData.lightX = x;
     sprite.userData.lightY = y;
+    sprite.userData.baseX = baseX;
+    sprite.userData.baseY = baseY;
+    sprite.userData.baseZ = baseZ;
+    sprite.userData.baseW = LAMP_W;
+    sprite.userData.baseH = LAMP_H;
     this.group.add(sprite);
+  }
+
+  /** Pull an adjacent floor prop to the near edge at an integer 2× scale. */
+  layoutAdjacent(playerX: number, playerY: number, adjacentScale = 2) {
+    const scale = adjacentScale >= 2 ? 2 : 1;
+    this.group.traverse((obj) => {
+      if (obj.userData.kind !== 'lamp_capped') return;
+      const gx = obj.userData.lightX as number;
+      const gy = obj.userData.lightY as number;
+      const dist = Math.abs(gx - playerX) + Math.abs(gy - playerY);
+      const baseW = (obj.userData.baseW as number) ?? LAMP_W;
+      const baseH = (obj.userData.baseH as number) ?? LAMP_H;
+      if (dist === 1) {
+        const toX = Math.sign(playerX - gx);
+        const toY = Math.sign(playerY - gy);
+        obj.position.set(
+          gx * CELL_SIZE + toX * (CELL_SIZE / 2),
+          (obj.userData.baseY as number) ?? 0.02,
+          gy * CELL_SIZE + toY * (CELL_SIZE / 2)
+        );
+        obj.scale.set(baseW * scale, baseH * scale, 1);
+      } else {
+        obj.position.set(obj.userData.baseX, obj.userData.baseY, obj.userData.baseZ);
+        obj.scale.set(baseW, baseH, 1);
+      }
+    });
   }
 }
 
+export function isFloorProp(tile: Tile | undefined): boolean {
+  return !!tile?.prop;
+}
+
 export function blocksMovement(tile: Tile | undefined): boolean {
-  if (!tile?.prop) return false;
-  return tile.prop === 'beams_fallen' || tile.prop === 'desk';
+  return isFloorProp(tile);
 }

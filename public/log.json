@@ -562,5 +562,10 @@
   "key": "monster_flank_behind",
   "text": "{monster}: attacks from behind!",
   "when": "a monster attacks the party from a side or behind it isn't facing (red edge flash)"
+ },
+ {
+  "key": "chest_loot_all",
+  "text": "Chest: {n} things. All in the bag.",
+  "when": "one tap loots a chest with 2+ items; use instead of one chest_item line per item"
  }
 ]

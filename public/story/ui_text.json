@@ -109,7 +109,10 @@
    "drop_no": "Keep",
    "slot_hand": "Hand",
    "slot_body": "Body",
-   "slot_bag": "Bag"
+   "slot_bag": "Bag",
+   "compare_better": "Better",
+   "compare_worse": "Worse",
+   "compare_same": "Same"
   },
   "items": {
    "key": {

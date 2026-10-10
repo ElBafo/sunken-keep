@@ -57,7 +57,9 @@
       image-rendering: -moz-crisp-edges;
       image-rendering: crisp-edges;
     }
-    .hand-btn {
+    .hand-btn,
+    .portrait-btn,
+    .hud-chrome-btn {
       position: absolute;
       min-width: 44px;
       min-height: 44px;
@@ -68,6 +70,50 @@
       touch-action: none;
       -webkit-tap-highlight-color: transparent;
       z-index: 20;
+    }
+    .portrait-btn.pick-hero {
+      outline: 2px solid #f0d060;
+      outline-offset: 1px;
+      background: rgba(240, 208, 96, 0.28);
+    }
+    #inventory-screen {
+      position: absolute;
+      inset: 0;
+      z-index: 90;
+      display: none;
+      background: rgba(8, 6, 4, 0.2);
+      touch-action: none;
+    }
+    #inventory-screen.show { display: block; }
+    #inventory-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
+    }
+    .inv-slot,
+    .inv-action,
+    .inv-close {
+      position: absolute;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: #d8ccb0;
+      font-family: monospace;
+      font-size: 11px;
+      cursor: pointer;
+      touch-action: none;
+      -webkit-tap-highlight-color: transparent;
+      z-index: 91;
+    }
+    .inv-action,
+    .inv-close {
+      background: rgba(42, 36, 32, 0.92);
+      border: 1px solid #8a7348;
     }
     .hand-btn.swap-armed {
       outline: 2px solid #f0d060;
@@ -357,6 +403,9 @@
     <div id="torch-choice">
       <button id="btn-torch-take" class="hud-choice-btn" type="button"></button>
       <button id="btn-torch-snuff" class="hud-choice-btn" type="button"></button>
+    </div>
+    <div id="inventory-screen" hidden>
+      <canvas id="inventory-canvas"></canvas>
     </div>
   </div>
   <div id="party-hud">

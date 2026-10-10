@@ -42,12 +42,18 @@ export function billboardSize(height: number): { w: number; h: number } {
 }
 
 const ITEM_SPRITE: Record<string, { file: string; h: number; base?: string; prefix?: string }> = {
-  key: { file: 'item_key_near.png', h: ITEM_HEIGHT.key },
-  potion_red: { file: 'item_potion_red_near.png', h: ITEM_HEIGHT.potion_red },
-  potion_blue: { file: 'item_potion_blue_near.png', h: ITEM_HEIGHT.potion_blue },
-  potion_green: { file: 'item_potion_green_near.png', h: ITEM_HEIGHT.potion_green },
-  chest: { file: 'item_chest_near.png', h: ITEM_HEIGHT.chest },
-  scroll: { file: 'item_scroll_near.png', h: ITEM_HEIGHT.scroll },
+  key: { file: 'item_key_near.png', h: ITEM_HEIGHT.key, prefix: 'item_key' },
+  potion_red: { file: 'item_potion_red_near.png', h: ITEM_HEIGHT.potion_red, prefix: 'item_potion_red' },
+  potion_blue: { file: 'item_potion_blue_near.png', h: ITEM_HEIGHT.potion_blue, prefix: 'item_potion_blue' },
+  potion_green: { file: 'item_potion_green_near.png', h: ITEM_HEIGHT.potion_green, prefix: 'item_potion_green' },
+  chest: { file: 'item_chest_near.png', h: ITEM_HEIGHT.chest, prefix: 'item_chest' },
+  chest_open: { file: 'item_chest_open_near.png', h: ITEM_HEIGHT.chest, prefix: 'item_chest_open' },
+  scroll: { file: 'item_scroll_near.png', h: ITEM_HEIGHT.scroll, prefix: 'item_scroll' },
+  journal_page: { file: 'item_journal_page_near.png', h: ITEM_HEIGHT.journal_page, prefix: 'item_journal_page' },
+  iron_shield: { file: 'item_iron_shield_near.png', h: ITEM_HEIGHT.iron_shield, prefix: 'item_iron_shield' },
+  chain_mail: { file: 'item_chain_mail_near.png', h: ITEM_HEIGHT.chain_mail, prefix: 'item_chain_mail' },
+  ashmantle_hammer: { file: 'item_ashmantle_hammer_near.png', h: ITEM_HEIGHT.ashmantle_hammer, prefix: 'item_ashmantle_hammer' },
+  captain_key: { file: 'item_captain_key_near.png', h: ITEM_HEIGHT.key, prefix: 'item_captain_key' },
   oil: { file: 'item_oil_near.png', h: ITEM_HEIGHT.oil, base: 'proto3d/tex3d/torch', prefix: 'item_oil' },
   oil_flask: { file: 'item_oil_near.png', h: ITEM_HEIGHT.oil_flask, base: 'proto3d/tex3d/torch', prefix: 'item_oil' }
 };
@@ -55,13 +61,17 @@ const ITEM_SPRITE: Record<string, { file: string; h: number; base?: string; pref
 const OWN_SQUARE_SCALE = 0.72;
 /** Must be in the visible floor strip (near plane hits y=0 at ~1.0 in front of the camera). */
 const OWN_SQUARE_FORWARD = 1.18;
+/** Adjacent near frames only: whole-number 2× with nearest-pixel filtering. */
+const ADJACENT_INTEGER_SCALE = 2;
 const SPRITE_RENDER_ORDER = 10;
 const HITFX_RENDER_ORDER = 12;
 const MONSTER_TEXEL_W = 80;
 const MONSTER_TEXEL_H = 60;
 const FROST_HOLD_FRAMES = 2;
 const FROST_HOLD_FPS = 6;
-const FROST_TINT = 0xb8d8ff;
+/** Mix the sprite's own colours 60% toward this cold blue (lerp, not additive). */
+const FROST_COLOR = 0x6fa8e8;
+const FROST_LERP = 0.6;
 
 interface HitFxSpec {
   frames: THREE.Texture[];
@@ -113,6 +123,7 @@ interface SpriteInfo {
   baseW: number;
   baseH: number;
   floorY: number;
+  tileFloorY: number;
   imageH: number;
   gapBelow: number;
   frames?: THREE.Texture[];
@@ -125,6 +136,8 @@ interface SpriteInfo {
   animOnce: boolean;
   pickedUp?: boolean;
   hidden?: boolean;
+  itemId?: string;
+  frostAmount?: number;
 }
 
 function configureSpriteTexture(tex: THREE.Texture) {
@@ -139,7 +152,7 @@ function configureSpriteTexture(tex: THREE.Texture) {
 }
 
 function makeSpriteMaterial(map: THREE.Texture) {
-  return new THREE.SpriteMaterial({
+  const mat = new THREE.SpriteMaterial({
     map,
     color: 0xffffff,
     transparent: true,
@@ -150,6 +163,39 @@ function makeSpriteMaterial(map: THREE.Texture) {
     fog: false,
     toneMapped: false
   });
+  patchFrostLerp(mat);
+  return mat;
+}
+
+function patchFrostLerp(material: THREE.SpriteMaterial) {
+  if (material.userData.frostPatched) return;
+  material.userData.frostPatched = true;
+  material.userData.frostAmount = 0;
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.frostAmount = { value: material.userData.frostAmount ?? 0 };
+    shader.uniforms.frostColor = { value: new THREE.Color(FROST_COLOR) };
+    material.userData.frostUniforms = shader.uniforms;
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+uniform float frostAmount;
+uniform vec3 frostColor;`
+      )
+      .replace(
+        '#include <opaque_fragment>',
+        `#include <opaque_fragment>
+  gl_FragColor.rgb = mix(gl_FragColor.rgb, frostColor, frostAmount);`
+      );
+  };
+  material.customProgramCacheKey = () => 'frost-lerp-60';
+}
+
+function setFrostAmount(material: THREE.SpriteMaterial, amount: number) {
+  material.userData.frostAmount = amount;
+  const uniforms = material.userData.frostUniforms as { frostAmount?: { value: number } } | undefined;
+  if (uniforms?.frostAmount) uniforms.frostAmount.value = amount;
+  material.needsUpdate = true;
 }
 
 function makeBillboard(
@@ -180,6 +226,9 @@ export class SpriteManager {
   private playingFx: HitFxPlay[] = [];
   lastHitType: HitKind | null = null;
   private scene: THREE.Scene | null = null;
+  private chestOpenLod: THREE.Texture[] | null = null;
+  private chestClosedLod = new Map<string, THREE.Texture[]>();
+  adjacentScale = ADJACENT_INTEGER_SCALE;
 
   constructor(camera: THREE.Camera) {
     this.camera = camera;
@@ -187,11 +236,92 @@ export class SpriteManager {
 
   hideItemAt(x: number, y: number) {
     for (const sprite of this.sprites) {
-      if (sprite.kind === 'item' && sprite.x === x && sprite.y === y) {
+      if (sprite.kind === 'item' && sprite.x === x && sprite.y === y && sprite.itemId !== 'chest' && sprite.itemId !== 'chest_open') {
         sprite.pickedUp = true;
         sprite.object.visible = false;
       }
     }
+  }
+
+  openChestAt(x: number, y: number) {
+    for (const sprite of this.sprites) {
+      if (sprite.kind !== 'item' || sprite.x !== x || sprite.y !== y) continue;
+      if (sprite.itemId !== 'chest' && sprite.itemId !== 'chest_open') continue;
+      if (sprite.lod) this.chestClosedLod.set(`${x},${y}`, sprite.lod);
+      if (this.chestOpenLod) {
+        sprite.lod = this.chestOpenLod;
+        sprite.material.map = this.chestOpenLod[0];
+        sprite.material.needsUpdate = true;
+      }
+      sprite.itemId = 'chest_open';
+      sprite.object.userData.item = 'chest';
+      sprite.pickedUp = false;
+      sprite.object.visible = true;
+    }
+  }
+
+  resetItems(floor: FloorData) {
+    for (const sprite of this.sprites) {
+      if (sprite.kind !== 'item') continue;
+      const tile = floor.tiles[sprite.y]?.[sprite.x];
+      const key = `${sprite.x},${sprite.y}`;
+      const closed = this.chestClosedLod.get(key);
+      if (tile?.chest) {
+        sprite.itemId = tile.chestOpen ? 'chest_open' : 'chest';
+        sprite.pickedUp = false;
+        sprite.hidden = false;
+        if (!tile.chestOpen && closed) {
+          sprite.lod = closed;
+          sprite.material.map = closed[0];
+          sprite.material.needsUpdate = true;
+        }
+        sprite.object.visible = !(tile.secret && !tile.secretOpen);
+        continue;
+      }
+      const present = !!tile?.item && !(tile.secret && !tile.secretOpen);
+      sprite.pickedUp = !present;
+      sprite.hidden = !present;
+      sprite.object.visible = present;
+    }
+  }
+
+  hitItem(
+    canvas: HTMLCanvasElement,
+    clientX: number,
+    clientY: number,
+    playerX: number,
+    playerY: number,
+    dir: number
+  ): { x: number; y: number; item: string } | null {
+    const rect = canvas.getBoundingClientRect();
+    const px = clientX - rect.left;
+    const py = clientY - rect.top;
+    const cam = this.camera;
+    const v = new THREE.Vector3();
+    let best: { x: number; y: number; item: string; d: number } | null = null;
+    const [fdx, fdy] = [
+      [0, -1],
+      [1, 0],
+      [0, 1],
+      [-1, 0]
+    ][dir & 3];
+    for (const sprite of this.sprites) {
+      if (sprite.kind !== 'item' || sprite.pickedUp || !sprite.object.visible) continue;
+      const own = sprite.x === playerX && sprite.y === playerY;
+      const facing = sprite.x === playerX + fdx && sprite.y === playerY + fdy;
+      if (!own && !facing) continue;
+      const pos = sprite.object.position;
+      v.set(pos.x, pos.y + sprite.object.scale.y * 0.5, pos.z).project(cam);
+      const sx = ((v.x + 1) / 2) * rect.width;
+      const sy = ((-v.y + 1) / 2) * rect.height;
+      const hw = Math.max(22, (sprite.object.scale.x / 2) * (rect.width / 4));
+      const hh = Math.max(22, (sprite.object.scale.y / 2) * (rect.height / 3));
+      if (px < sx - hw || px > sx + hw || py < sy - hh || py > sy + hh) continue;
+      const d = (px - sx) ** 2 + (py - sy) ** 2;
+      const item = sprite.itemId ?? (sprite.object.userData.item as string) ?? '';
+      if (!best || d < best.d) best = { x: sprite.x, y: sprite.y, item, d };
+    }
+    return best ? { x: best.x, y: best.y, item: best.item } : null;
   }
 
   isItemPresent(x: number, y: number): boolean {
@@ -231,6 +361,15 @@ export class SpriteManager {
 
     this.scene = scene;
     await this.loadHitFx(loadTex, baseUrl);
+    try {
+      this.chestOpenLod = await Promise.all([
+        loadTex('art/dungeon/item_chest_open_near.png'),
+        loadTex('art/dungeon/item_chest_open_mid.png'),
+        loadTex('art/dungeon/item_chest_open_far.png')
+      ]);
+    } catch {
+      this.chestOpenLod = null;
+    }
 
     const { tiles, width, height } = floorData;
     for (let y = 0; y < height; y++) {
@@ -263,6 +402,7 @@ export class SpriteManager {
             baseW: size.w,
             baseH: size.h,
             floorY: feet,
+            tileFloorY: feetY,
             imageH: 60,
             gapBelow: this.anchors.get(`${kind}_idle_1_near.png`)?.gapBelow ?? 0,
             frames,
@@ -282,16 +422,14 @@ export class SpriteManager {
             h: ITEM_HEIGHT[itemName] ?? 0.3
           };
           const folder = def.base ?? 'art/dungeon';
-          const nearPath = def.prefix ? `${folder}/${def.prefix}_near.png` : `${folder}/${def.file}`;
+          const prefix = def.prefix ?? itemName;
+          const nearPath = `${folder}/${prefix}_near.png`;
           const tex = await loadTex(nearPath);
-          let lod: THREE.Texture[] | undefined;
-          if (def.prefix) {
-            lod = await Promise.all([
-              tex,
-              loadTex(`${folder}/${def.prefix}_mid.png`),
-              loadTex(`${folder}/${def.prefix}_far.png`)
-            ]);
-          }
+          const lod = await Promise.all([
+            tex,
+            loadTex(`${folder}/${prefix}_mid.png`).catch(() => tex),
+            loadTex(`${folder}/${prefix}_far.png`).catch(() => tex)
+          ]);
           const size = billboardSize(def.h);
           const mat = makeSpriteMaterial(tex);
           const sprite = makeBillboard(mat, x * CELL_SIZE, feetY, y * CELL_SIZE, size.w, size.h);
@@ -304,9 +442,11 @@ export class SpriteManager {
             x,
             y,
             kind: 'item',
+            itemId: itemName,
             baseW: size.w,
             baseH: size.h,
             floorY: feetY,
+            tileFloorY: feetY,
             imageH: 60,
             gapBelow: 0,
             lod,
@@ -321,17 +461,40 @@ export class SpriteManager {
     }
   }
 
+  setAdjacentScale(n: number) {
+    this.adjacentScale = n >= 2 ? ADJACENT_INTEGER_SCALE : 1;
+  }
+
+  integerAdjacentScale(): number {
+    return this.adjacentScale >= 2 ? ADJACENT_INTEGER_SCALE : 1;
+  }
+
+  private nearFile(sprite: SpriteInfo): string {
+    if (sprite.kind === 'monster' && sprite.monsterKind) {
+      const anim = sprite.anim === 'windup' ? 'attack' : sprite.anim;
+      return `${sprite.monsterKind}_${anim}_${sprite.currentFrame + 1}_near.png`;
+    }
+    return '';
+  }
+
   layoutItems(playerX: number, playerY: number, dir: number) {
+    this.layoutBillboards(playerX, playerY, dir);
+  }
+
+  layoutBillboards(playerX: number, playerY: number, dir: number) {
     const rotY = (-dir * Math.PI) / 2;
     const [ox, oz] = cameraOffsetXZ(rotY);
     const fx = -Math.sin(rotY);
     const fz = -Math.cos(rotY);
     const camX = playerX * CELL_SIZE + ox;
     const camZ = playerY * CELL_SIZE + oz;
+    const adjScale = this.integerAdjacentScale();
 
     for (const sprite of this.sprites) {
-      if (sprite.kind !== 'item' || !sprite.object.visible) continue;
-      const onOwn = sprite.x === playerX && sprite.y === playerY;
+      if (!sprite.object.visible) continue;
+      if (sprite.kind !== 'item' && sprite.kind !== 'monster') continue;
+
+      const onOwn = sprite.kind === 'item' && sprite.x === playerX && sprite.y === playerY;
       if (onOwn) {
         sprite.object.position.set(
           camX + fx * OWN_SQUARE_FORWARD,
@@ -343,15 +506,36 @@ export class SpriteManager {
           sprite.material.map = sprite.lod[0];
           sprite.material.needsUpdate = true;
         }
-      } else {
-        sprite.object.position.set(sprite.x * CELL_SIZE, sprite.floorY, sprite.y * CELL_SIZE);
-        sprite.object.scale.set(sprite.baseW, sprite.baseH, 1);
+        continue;
+      }
+
+      const manh = Math.abs(sprite.x - playerX) + Math.abs(sprite.y - playerY);
+      if (manh === 1) {
+        const toX = Math.sign(playerX - sprite.x);
+        const toY = Math.sign(playerY - sprite.y);
+        const wx = sprite.x * CELL_SIZE + toX * (CELL_SIZE / 2);
+        const wz = sprite.y * CELL_SIZE + toY * (CELL_SIZE / 2);
+        const h = sprite.baseH * adjScale;
+        const w = sprite.baseW * adjScale;
+        const file = this.nearFile(sprite);
+        const floor = sprite.tileFloorY ?? sprite.floorY;
+        const feet = file ? this.feetFor(file, h, floor) : floor;
+        sprite.object.position.set(wx, feet, wz);
+        sprite.object.scale.set(w, h, 1);
         if (sprite.lod) {
-          const dist = Math.max(Math.abs(sprite.x - playerX), Math.abs(sprite.y - playerY));
-          const lodIndex = dist <= 1 ? 0 : dist === 2 ? 1 : 2;
-          sprite.material.map = sprite.lod[lodIndex];
+          sprite.material.map = sprite.lod[0];
           sprite.material.needsUpdate = true;
         }
+        continue;
+      }
+
+      sprite.object.position.set(sprite.x * CELL_SIZE, sprite.floorY, sprite.y * CELL_SIZE);
+      sprite.object.scale.set(sprite.baseW, sprite.baseH, 1);
+      if (sprite.lod) {
+        const dist = Math.max(Math.abs(sprite.x - playerX), Math.abs(sprite.y - playerY));
+        const lodIndex = dist <= 1 ? 0 : dist === 2 ? 1 : 2;
+        sprite.material.map = sprite.lod[lodIndex];
+        sprite.material.needsUpdate = true;
       }
     }
   }
@@ -384,7 +568,7 @@ export class SpriteManager {
     }
     this.updateHitFx(time);
     if (playerX !== undefined && playerY !== undefined && dir !== undefined) {
-      this.layoutItems(playerX, playerY, dir);
+      this.layoutBillboards(playerX, playerY, dir);
     }
   }
 
@@ -573,7 +757,9 @@ export class SpriteManager {
   private applyHostTint(fx: HitFxPlay, host: SpriteInfo) {
     if (!fx.tintHost) return;
     const hold = fx.frame >= 0 && fx.frame < fx.holdFrames;
-    host.material.color.setHex(hold ? FROST_TINT : 0xffffff);
+    const amount = hold ? FROST_LERP : 0;
+    host.frostAmount = amount;
+    if (host.material instanceof THREE.SpriteMaterial) setFrostAmount(host.material, amount);
   }
 
   private async loadHitFx(
@@ -677,7 +863,10 @@ export class SpriteManager {
 
   private removeHitFx(fx: HitFxPlay) {
     const host = this.spriteByMonsterId(fx.hostId);
-    if (host && fx.tintHost) host.material.color.setHex(0xffffff);
+    if (host && fx.tintHost) {
+      host.frostAmount = 0;
+      if (host.material instanceof THREE.SpriteMaterial) setFrostAmount(host.material, 0);
+    }
     fx.sprite.visible = false;
     fx.sprite.parent?.remove(fx.sprite);
     fx.material.dispose();
@@ -702,6 +891,9 @@ export class SpriteManager {
   }
 
   hostTint(id: string): number {
-    return this.spriteByMonsterId(id)?.material.color.getHex() ?? 0xffffff;
+    const frost = this.playingFx.some(
+      (fx) => fx.hostId === id && fx.tintHost && fx.frame >= 0 && fx.frame < fx.holdFrames
+    );
+    return frost ? FROST_COLOR : 0xffffff;
   }
 }

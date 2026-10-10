@@ -137,7 +137,7 @@ export class Player {
     } else if (tile.monster) {
       return 'monster';
     }
-    if (tile.prop === 'beams_fallen' || tile.prop === 'desk') return 'wall';
+    if (tile.prop) return 'wall';
     return 'ok';
   }
 
