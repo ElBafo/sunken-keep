@@ -40,6 +40,7 @@ import {
 import { TitleScreen } from './title';
 import { IntroPlayer } from './intro';
 import { SpeechBubble } from './bubble';
+import { StoryProgress } from './story-progress';
 import { saveLocale, type Locale } from './i18n';
 import { qualityFromSearch, QualityLevel } from './quality';
 import { PixelRenderer } from './renderer';
@@ -110,6 +111,7 @@ class Game {
   private doorUnlockTimer = 0;
   private pendingUnlock: { x: number; y: number } | null = null;
   private flags = new Set<string>();
+  private storyProgress = new StoryProgress();
   private playStartedAt = 0;
   private playAccMs = 0;
   private escapeRunActive = false;
@@ -151,6 +153,7 @@ class Game {
     const locale = resolveLocale(params, this.persist);
     document.documentElement.lang = locale;
     await this.story.load(locale);
+    await this.storyProgress.load(import.meta.env.BASE_URL);
     this.applyStoryLabels();
 
     const layout = await loadLayout585();
@@ -299,9 +302,11 @@ class Game {
     if (tile.deepWater) {
       this.audioManager.playStep('step_water_deep');
       this.atmosphere.spawnStepSplash(x * CELL_SIZE, y * CELL_SIZE);
+      if (this.storyProgress.fire('water_deep')) this.showMessage(this.storyLog('water_deep'));
     } else if (tile.shallowWater) {
       this.audioManager.playStep('step_water_shallow');
       this.atmosphere.spawnStepSplash(x * CELL_SIZE, y * CELL_SIZE);
+      if (this.storyProgress.fire('water_shallow')) this.showMessage(this.storyLog('water_shallow'));
     } else {
       this.audioManager.playStep('step');
     }
@@ -933,14 +938,7 @@ class Game {
     this.vertexLighting.relight();
     this.updateOilHud();
     this.updateDoorButton();
-    this.audioManager?.stopPresenceLoops();
-    this.audioManager?.clearLeechLoops();
-    this.audioManager?.startFloorLoops(this.oil > 0);
-    this.audioManager?.syncLeechLoops(floor1);
-    for (const sconce of floor1Sconces) {
-      if (sconce.lit) this.audioManager?.startTorchLoop(sconce);
-      else this.audioManager?.stopTorchLoop(sconce);
-    }
+    this.rebuildAudioFromState();
     this.lastHitType = null;
     this.hud.hideFrostHint();
     this.restoreLoot();
@@ -993,6 +991,8 @@ class Game {
       this.messageTimer = 0;
       return true;
     }
+    this.storyProgress.fire('note_lampkeeper');
+    this.flags.add('note_lampkeeper');
     this.showNote();
     return true;
   }
@@ -1223,6 +1223,7 @@ class Game {
     }
     this.torches.takeOffWall(sconce);
     this.audioManager.stopTorchLoop(sconce);
+    this.audioManager.startCarriedTorchLoop();
     this.hud.setHand(hero, hand, 'torch_lit');
     this.combat?.setEquipment(hero, hand, 'torch_lit');
     this.cancelSwap();
@@ -1252,6 +1253,7 @@ class Game {
     const restored = this.takeBagFrom(held.hero, held.hand);
     this.hud.setHand(held.hero, held.hand, restored ?? 'empty_hand');
     this.combat?.setEquipment(held.hero, held.hand, restored ?? 'empty_hand');
+    this.audioManager.stopCarriedTorchLoop();
     this.torches.ignite(sconce, now);
     this.vertexLighting.relight();
     this.syncCarriedLight();
@@ -1271,6 +1273,7 @@ class Game {
     if (!dunked.length) return;
     for (const d of dunked) this.combat?.setEquipment(d.hero, d.hand, 'torch_burnt');
     this.audioManager.playUi('torch_dunk');
+    this.audioManager.stopCarriedTorchLoop();
     this.syncCarriedLight();
     this.showMessage(this.storyLog('torch_dunk', { hero: this.story.heroName(dunked[0].hero) }));
   }
@@ -1346,6 +1349,8 @@ class Game {
         capped: !!s.capped
       })),
       flags: [...this.flags],
+      firedOnce: this.storyProgress.serialize().fired,
+      goals: this.storyProgress.serialize().goals,
       escapeRunActive: this.escapeRunActive,
       leader: 'brannoc'
     };
@@ -1356,6 +1361,7 @@ class Game {
     this.restoreTiles();
     this.restoreSconceDefaults();
     this.flags = new Set(save.flags ?? []);
+    this.storyProgress.restore({ fired: save.firedOnce, goals: save.goals });
     this.playAccMs = save.playTimeMs ?? 0;
     this.playStartedAt = performance.now();
     this.escapeRunActive = !!save.escapeRunActive;
@@ -1422,15 +1428,18 @@ class Game {
     this.hud.hideFrostHint();
     this.clearFlankFlash();
     this.closeBag();
-    this.audioManager?.stopPresenceLoops();
-    this.audioManager?.clearLeechLoops();
-    this.audioManager?.startFloorLoops(this.oil > 0);
-    this.audioManager?.syncLeechLoops(floor1);
-    for (const sconce of floor1Sconces) {
-      if (sconce.lit) this.audioManager?.startTorchLoop(sconce);
-      else this.audioManager?.stopTorchLoop(sconce);
-    }
+    this.rebuildAudioFromState();
     this.audioManager?.updateListener(this.player.x, this.player.y, this.player.dir);
+  }
+
+  private rebuildAudioFromState() {
+    this.audioManager?.stopPresenceLoops();
+    this.audioManager?.rebuildFloorLoops({
+      oil: this.oil,
+      sconces: floor1Sconces,
+      leeches: this.combat.monsters.map((m) => ({ kind: m.kind, x: m.x, y: m.y, alive: m.alive })),
+      carriedTorch: !!this.hud.carriedTorch()?.lit
+    });
   }
 
   canAutosave(): boolean {
@@ -1443,11 +1452,9 @@ class Game {
     return true;
   }
 
-  tryAutosave(reason = 'auto'): boolean {
+  tryAutosave(_reason = 'auto'): boolean {
     if (!this.canAutosave()) return false;
-    const ok = writeAutosave(this.captureSave('autosave'));
-    if (ok && reason !== 'quiet') this.audioManager?.playUi('save', 0.5);
-    return ok;
+    return writeAutosave(this.captureSave('autosave'));
   }
 
   takeFloorSnapshot() {
@@ -1463,7 +1470,7 @@ class Game {
   requestManualSave() {
     const blocked = this.saveBlockedReason();
     if (blocked) {
-      this.showPrompt(this.story.titleText('save_blocked') || this.story.uiText('save_blocked'));
+      this.showPrompt(this.story.titleText('save_blocked'));
       this.audioManager?.playUi('ui_button_denied');
       return;
     }
@@ -1499,7 +1506,7 @@ class Game {
     const tile = this.player.tileAt(x, y);
     if (!tile?.bark) return;
     const key = `bark:${tile.bark}`;
-    if (this.flags.has(key)) return;
+    if (this.flags.has(key) || !this.storyProgress.fire(tile.bark)) return;
     if (this.speakBark(tile.bark)) this.flags.add(key);
   }
 
@@ -1564,24 +1571,21 @@ class Game {
     }
     if (!titleCanvas) return;
     this.title = new TitleScreen(titleCanvas, this.story, (action) => {
-      if (action.type === 'toast') {
-        this.showTitleToast(action.text);
+      if (action.type === 'toast' || action.type === 'language') {
         this.audioManager?.playUi('ui_button_denied');
+        if (action.type === 'toast') this.showTitleToast(action.text);
+        else void this.setLocale(action.locale);
         return;
       }
       this.audioManager?.playUi('ui_button');
-      if (action.type === 'language') {
-        void this.setLocale(action.locale);
-        return;
-      }
       if (action.type === 'new_game') {
         this.startNewGame();
         return;
       }
       if (action.type === 'continue' || action.type === 'load') {
         this.title.hide();
-        this.beginPlay();
         this.applySave(action.payload);
+        this.beginPlay();
         return;
       }
       if (action.type === 'save') this.commitSlot(action.slot);
@@ -1593,6 +1597,9 @@ class Game {
       this.phase = 'title';
       document.getElementById('tap-to-start')?.classList.add('hidden');
       this.title.show('title');
+      void this.audioManager.loadSounds(this.renderer.scene, floor1Sconces).then(() => {
+        this.audioManager.playMenu();
+      });
     }
   }
 
@@ -1621,8 +1628,10 @@ class Game {
     this.flags.clear();
     this.playAccMs = 0;
     this.playStartedAt = performance.now();
+    this.storyProgress.startNewGame();
     this.takeFloorSnapshot();
     this.phase = 'intro';
+    this.audioManager.crossfadeToIntro();
     const overlay = document.getElementById('intro-overlay');
     if (overlay && this.intro) {
       overlay.classList.add('show');
@@ -1641,6 +1650,9 @@ class Game {
   private beginPlay() {
     this.phase = 'play';
     if (!this.playStartedAt) this.playStartedAt = performance.now();
+    if (this.storyProgress.fire('enter_floor1')) this.showMessage(this.storyLog('enter_floor1'));
+    this.storyProgress.fire('f1_start');
+    this.audioManager.crossfadeToAct1();
     this.startLoop();
   }
 
@@ -1655,18 +1667,16 @@ class Game {
     this.lastTime = performance.now();
     this.fpsLastTime = this.lastTime;
     requestAnimationFrame(() => this.gameLoop());
-    this.audioManager.startLanternLoop(this.oil > 0);
     void this.loadFloorAudio();
   }
 
   private async loadFloorAudio() {
     try {
       await this.audioManager.loadSounds(this.renderer.scene, floor1Sconces);
-      this.audioManager.startLanternLoop(this.oil > 0);
       this.audioManager.attachDressing(this.renderer.scene, this.dressing.marks);
-      this.audioManager.attachLeeches(this.renderer.scene, floor1);
       this.audioManager.attachWaterPools(this.renderer.scene, floor1);
       this.audioManager.startNamedLoop('lamp_hooks', 11 * CELL_SIZE, 0.55, 9 * CELL_SIZE, 0.38, 'named');
+      this.rebuildAudioFromState();
     } catch (err) {
       console.warn('Audio init failed', err);
       this.audioManager.startLanternLoop(this.oil > 0);
@@ -1683,7 +1693,7 @@ class Game {
       const fromBag = this.bag.has('key');
       if (!fromBag && !this.player.hasKey) {
         this.audioManager.playDoor('door_locked', x, y);
-        this.showPrompt(this.storyLog('door_locked'));
+        if (this.storyProgress.fire('door_locked')) this.showPrompt(this.storyLog('door_locked'));
         return;
       }
       if (fromBag) this.bag.remove('key', 1);
@@ -2019,7 +2029,22 @@ class Game {
       speakBark: (trigger: string, speaker?: HeroId) => this.speakBark(trigger, speaker),
       bubbleVisible: () => !!this.bubble?.visible,
       flags: () => [...this.flags],
-      addFlag: (f: string) => this.flags.add(f),
+      addFlag: (f: string) => {
+        this.flags.add(f);
+        this.storyProgress.fire(f);
+      },
+      fireOnce: (id: string) => this.storyProgress.fire(id),
+      firedOnce: () => [...this.storyProgress.fired],
+      goals: () => this.storyProgress.snapshotGoals(),
+      setGoal: (id: string, status: 'hidden' | 'active' | 'done' | 'failed') => {
+        this.storyProgress.goals.set(id, status);
+      },
+      loopNames: () =>
+        this.audioManager
+          .loopKit(false)
+          .names.filter((n) => n !== 'menu' && n !== 'intro')
+          .slice()
+          .sort(),
       persistCalled: () => !!(globalThis as { __proto3dPersistCalled?: boolean }).__proto3dPersistCalled,
       killKind: (kind: string) => {
         const m = this.combat.monsters.find((x) => x.kind === kind && x.alive);
@@ -2066,7 +2091,9 @@ class Game {
           hp: m.hp,
           alive: m.alive
         })),
-        flags: [...this.flags]
+        flags: [...this.flags],
+        firedOnce: [...this.storyProgress.fired],
+        goals: this.storyProgress.snapshotGoals()
       }),
       setEscapeRun: (on: boolean) => {
         this.escapeRunActive = on;

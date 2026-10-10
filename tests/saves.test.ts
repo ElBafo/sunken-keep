@@ -24,6 +24,25 @@ describe('save version', () => {
   });
 });
 
+import { StoryProgress } from '../src/proto3d/story-progress';
+
+describe('story once + goals', () => {
+  it('does not re-fire a spent once trigger and keeps goal status', async () => {
+    const p = new StoryProgress();
+    await p.load('/');
+    p.startNewGame();
+    expect(p.fire('door_locked')).toBe(true);
+    expect(p.fire('door_locked')).toBe(false);
+    p.goals.set('g_f1_door', 'active');
+    const snap = p.serialize();
+    const q = new StoryProgress();
+    await q.load('/');
+    q.restore(snap);
+    expect(q.fire('door_locked')).toBe(false);
+    expect(q.snapshotGoals().g_f1_door).toBe('active');
+  });
+});
+
 describe('persistStorage', () => {
   it('calls navigator.storage.persist when available', () => {
     const persist = vi.fn().mockResolvedValue(true);

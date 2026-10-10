@@ -79,10 +79,10 @@ export class IntroPlayer {
       { file: 'shot6_gate.png', panX: [0, 584], duration: 6, effects: ['title'] }
     ];
     this.captions = [
-      { text: this.story.log('intro_keep') || 'Stonevow Keep sank in a single night.', start: 7, end: 11.5 },
-      { text: this.story.log('intro_forges') || 'Its forges went cold.', start: 13, end: 17.5 },
-      { text: this.story.log('intro_people') || 'Its people did not leave.', start: 19.5, end: 23.5 },
-      { text: this.story.log('intro_fools') || 'Four fools have come to find out why.', start: 29, end: 32.5 }
+      { text: this.story.log('intro_keep'), start: 7, end: 11.5 },
+      { text: this.story.log('intro_forges'), start: 13, end: 17.5 },
+      { text: this.story.log('intro_people'), start: 19.5, end: 23.5 },
+      { text: this.story.log('intro_fools'), start: 29, end: 32.5 }
     ];
     this.eyePositions = [
       { x: 430, y: 272, scale: 1, openTime: 18.5 },
@@ -149,14 +149,10 @@ export class IntroPlayer {
     this.renderShot(shot, progress, shotTime);
 
     for (const caption of this.captions) {
-      if (this.currentTime >= caption.start && this.currentTime <= caption.end) {
+      if (caption.text && this.currentTime >= caption.start && this.currentTime <= caption.end) {
         this.renderCaption(caption.text);
       }
     }
-    ctx.fillStyle = '#888';
-    ctx.font = '10px monospace';
-    ctx.textAlign = 'right';
-    ctx.fillText(this.story.titleText('intro_skip') || 'Tap to skip', this.width - 8, 14);
   }
 
   private renderShot(shot: IntroShot, progress: number, shotTime: number) {

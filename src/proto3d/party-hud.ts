@@ -353,7 +353,7 @@ export class PartyHud {
         'btn-save',
         this.layout.save,
         'save',
-        this.story.uiText('buttons.save') || this.story.titleText('buttons.save') || 'Save',
+        this.story.uiText('buttons.save'),
         () => this.onSave?.()
       );
     }

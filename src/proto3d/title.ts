@@ -264,10 +264,12 @@ export class TitleScreen {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     const heading =
-      this.mode === 'save' ? this.story.uiText('buttons.save') || 'Save' : this.story.titleText('load_title') || 'Load Game';
+      this.mode === 'save'
+        ? this.story.uiText('buttons.save')
+        : this.story.titleText('buttons.load');
     ctx.fillText(heading, this.layout.canvas[0] / 2, 50);
     for (let i = 0; i < 3; i++) this.drawSlot(slots[i], SLOT_X, SLOT_Y0 + i * (this.layout.saveSlot.size[1] + SLOT_GAP));
-    this.paintButton('Settings', 'normal', this.story.titleText('buttons.back') || 'Back');
+    this.paintButton('Settings', 'normal', this.story.titleText('buttons.back'));
   }
 
   private drawSlot(entry: SlotSummary, x: number, y: number) {
@@ -436,7 +438,7 @@ export class TitleScreen {
       if (id === 'Continue') {
         const found = newestSlot();
         if (!found) {
-          this.onAction({ type: 'toast', text: this.story.titleText('no_saves') || this.story.uiText('status.no_saves') });
+          this.onAction({ type: 'toast', text: this.story.uiText('status.no_saves') });
           return;
         }
         this.onAction({ type: 'continue', payload: found.payload });

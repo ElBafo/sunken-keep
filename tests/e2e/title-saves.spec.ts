@@ -45,8 +45,15 @@ type Proto3d = {
     sconces: Array<{ x: number; y: number; face?: string; lit: boolean; empty: boolean }>;
     monsters: Array<{ kind: string; alive: boolean; hp: number }>;
     flags: string[];
+    firedOnce?: string[];
+    goals?: Record<string, string>;
     carried?: { hero: string; hand: string; lit: boolean } | null;
   };
+  fireOnce: (id: string) => boolean;
+  firedOnce: () => string[];
+  goals: () => Record<string, string>;
+  setGoal: (id: string, status: string) => void;
+  loopNames: () => string[];
   setHand: (id: string, hand: string, item: string) => void;
   pickupHere: () => boolean;
   pickupFacing: () => boolean;
@@ -104,6 +111,7 @@ async function saveReloadLoad(page: import('@playwright/test').Page, slot = 2) {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
     p.loadFromSlot(n);
   }, slot);
+  await page.waitForTimeout(400);
 }
 
 async function mapState(page: import('@playwright/test').Page) {
@@ -385,8 +393,39 @@ test.describe('proto3d step4 title and saves', () => {
     expect(afterOil.oil).toBe(3);
     expect(afterOil.oil).not.toBe(startOil);
 
-    await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.addFlag('note_lampkeeper'));
+    await page.evaluate(() => {
+      const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+      p.addFlag('note_lampkeeper');
+      p.fireOnce('door_locked');
+      p.fireOnce('guard_hall_enter');
+      p.fireOnce('note_lampkeeper');
+      p.setGoal('g_f1_door', 'active');
+      p.setGoal('g_why', 'active');
+    });
+    const beforeOnce = await page.evaluate(() => {
+      const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+      return { fired: p.firedOnce(), goals: p.goals(), loops: p.loopNames() };
+    });
     await saveReloadLoad(page);
+    const afterOnce = await page.evaluate(() => {
+      const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+      return {
+        fired: p.firedOnce(),
+        goals: p.goals(),
+        loops: p.loopNames(),
+        againDoor: p.fireOnce('door_locked'),
+        againBark: p.fireOnce('guard_hall_enter'),
+        againNote: p.fireOnce('note_lampkeeper')
+      };
+    });
+    expect(afterOnce.fired).toEqual(expect.arrayContaining(['door_locked', 'guard_hall_enter', 'note_lampkeeper']));
+    expect(afterOnce.goals.g_f1_door).toBe('active');
+    expect(afterOnce.goals.g_why).toBe('active');
+    expect(afterOnce.againDoor).toBe(false);
+    expect(afterOnce.againBark).toBe(false);
+    expect(afterOnce.againNote).toBe(false);
+    expect(afterOnce.loops.filter((n) => n.startsWith('torch:0,6')).length).toBe(0);
+    expect(afterOnce.loops.sort()).toEqual(beforeOnce.loops.sort());
     const afterFlags = await mapState(page);
     expect(afterFlags.flags).toEqual(expect.arrayContaining(['secret_found', 'note_lampkeeper']));
     expect(afterFlags.doors.find((d) => d.x === 4 && d.y === 2)?.open).toBe(true);

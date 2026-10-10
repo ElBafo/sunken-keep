@@ -77,6 +77,8 @@ export interface SavePayload {
   tiles: SavedTile[];
   sconces: SavedSconce[];
   flags: string[];
+  firedOnce: string[];
+  goals: Record<string, 'hidden' | 'active' | 'done' | 'failed'>;
   escapeRunActive: boolean;
   leader: HeroId;
 }

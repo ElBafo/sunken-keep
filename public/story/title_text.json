@@ -34,15 +34,12 @@
  },
  "saved": "Game saved.",
  "save_blocked": "No time to save! Run!",
- "no_saves": "No saves yet.",
  "tagline": "Something holds the water back.",
  "game_title": "The Sunken Keep",
  "homescreen_hint": "Always play from the Home Screen icon.",
- "intro_skip": "Tap to skip",
- "load_title": "Load Game",
  "language": {
   "label": "Language",
-  "en": "EN",
-  "el": "EL"
+  "en": "English",
+  "el": "Ελληνικά"
  }
 }
