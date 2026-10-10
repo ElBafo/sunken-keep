@@ -412,6 +412,8 @@ class Game {
     this.inventory.pickHero = null;
     this.hud.setPickHero(false);
     this.inventory.redraw();
+    document.getElementById('message-toast')?.classList.remove('show');
+    this.messageTimer = 0;
   }
 
   private wireInventoryControls() {

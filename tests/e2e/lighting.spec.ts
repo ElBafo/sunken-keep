@@ -31,6 +31,8 @@ type Proto3d = {
   tileBrightness: (x: number, y: number) => number;
   regionStats: (x0: number, y0: number, x1: number, y1: number) => { luma: number; fogRatio: number; n: number };
   sprites: () => Array<{ item?: string; x: number; y: number; kind: string }>;
+  getBag: () => Array<{ item: string; count: number }>;
+  useBagSlot: (i: number) => void;
 };
 
 test.use(devices['iPhone 15']);
@@ -208,11 +210,18 @@ test('proto3d lighting: pools, relight, oil, no 404s', async ({ page }) => {
     p.setPosition(6, 6, 0);
     p.interact();
   });
-  await page.waitForTimeout(400);
-  expect(await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.getOil())).toBe(2);
+  await page.waitForTimeout(200);
   expect(await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.lastMessage())).toContain(
     'Oil flask'
   );
+  await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    const bag = p.getBag();
+    const i = bag.findIndex((s) => s.item === 'oil_flask' || s.item === 'oil');
+    if (i >= 0) p.useBagSlot(i);
+  });
+  await page.waitForTimeout(200);
+  expect(await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.getOil())).toBe(2);
   await expect(oilHud).toHaveText('Oil 2/4');
 
   await page.evaluate(() => {

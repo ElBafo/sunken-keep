@@ -151,7 +151,7 @@ test('proto3d step3 inventory: pickup, chest loot-all, bag, potions, key, oil, g
   await page.locator('#btn-potion-health').tap();
   await page.waitForTimeout(80);
   await page.locator('.portrait-btn[data-hero="brannoc"]').tap();
-  await page.waitForTimeout(80);
+  await page.waitForTimeout(200);
   const afterPotion = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.logLines());
   expect(afterPotion.some((l) => /potion|heals|HP|φίλτρο|ζωή/i.test(l) || l.length > 0)).toBe(true);
   await page.screenshot({ path: `${OUT}/step3-potion-use.png`, fullPage: false });
