@@ -232,9 +232,19 @@ test.describe('proto3d step4 title and saves', () => {
     await page.waitForTimeout(200);
     const blocked = await page.evaluate(() => {
       const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-      return { msg: p.lastMessage(), ui: p.lastUi() };
+      return {
+        msg: p.lastMessage(),
+        ui: p.lastUi(),
+        logs: p.logLines(),
+        combat: p.inCombat(),
+        title: p.titleVisible()
+      };
     });
-    expect(/No time to save|Τρέξε|save/i.test(blocked.msg)).toBe(true);
+    expect(blocked.combat).toBe(true);
+    expect(blocked.title).toBe(false);
+    expect(
+      blocked.logs.some((l) => /No time to save|Τρέξε/.test(l)) || /No time to save|Τρέξε/.test(blocked.msg)
+    ).toBe(true);
     expect(blocked.ui.some((n) => /denied/.test(n))).toBe(true);
     await page.screenshot({ path: `${OUT}/save-blocked-combat.png`, fullPage: false });
 
