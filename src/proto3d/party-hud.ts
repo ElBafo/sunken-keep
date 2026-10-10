@@ -1,6 +1,7 @@
 import {
   DEFAULT_EQUIPMENT,
   DEFAULT_FORMATION,
+  MELEE_ITEMS,
   type HeroId,
   type ItemType
 } from '../constants';
@@ -26,6 +27,7 @@ export interface HeroHud {
   formation: 'front' | 'back';
   equipment: { main: GearId; off: GearId };
   recovery: { main: number; off: number };
+  downed?: boolean;
 }
 
 const HERO_ORDER: HeroId[] = ['brannoc', 'wren', 'ilsevar', 'mags'];
@@ -89,6 +91,7 @@ export class PartyHud {
   private onLog: (text: string) => void;
   private playUi: (name: string) => void;
   private onCancel: () => void;
+  private levelFlash: { id: HeroId; started: number } | null = null;
 
   constructor(
     story: StoryText,
@@ -204,6 +207,8 @@ export class PartyHud {
       cache('font', 'art/font/font_5x7.png'),
       cache('downed', 'art/ui/panel/portrait_downed.png'),
       cache('levelup1', 'art/ui/panel/portrait_levelup_1.png'),
+      cache('levelup2', 'art/ui/panel/portrait_levelup_2.png'),
+      cache('levelup3', 'art/ui/panel/portrait_levelup_3.png'),
       cache('oil0', 'art/ui/oil/oil_gauge_0.png'),
       cache('oil1', 'art/ui/oil/oil_gauge_1.png'),
       cache('oil2', 'art/ui/oil/oil_gauge_2.png'),
@@ -391,9 +396,26 @@ export class PartyHud {
     return true;
   }
 
-  /** Step-2 hook: play the level-up overlay frames over a portrait. */
-  playLevelUp(_id: HeroId) {
-    // filled in step 2
+  playLevelUp(id: HeroId) {
+    this.levelFlash = { id, started: performance.now() };
+    this.draw(performance.now());
+  }
+
+  syncHero(
+    id: HeroId,
+    state: { hp: number; maxHp: number; mana: number; maxMana: number; downed?: boolean; recovery?: { main: number; off: number } }
+  ) {
+    const hero = this.heroes[id];
+    if (!hero) return;
+    hero.hp = state.hp;
+    hero.maxHp = state.maxHp;
+    hero.mana = state.mana;
+    hero.maxMana = state.maxMana;
+    hero.downed = !!state.downed;
+    if (state.recovery) {
+      hero.recovery.main = state.recovery.main * 1000;
+      hero.recovery.off = state.recovery.off * 1000;
+    }
   }
 
   portraitKey(hero: HeroHud): string {
@@ -443,7 +465,7 @@ export class PartyHud {
       ctx.fillStyle = '#333';
       ctx.fillRect(x, y, w, h);
     }
-    if (hero.hp <= 0) {
+    if (hero.hp <= 0 || hero.downed) {
       const downed = this.images.get('downed');
       if (downed) {
         ctx.save();
@@ -453,6 +475,13 @@ export class PartyHud {
         ctx.drawImage(downed, x, y, w, h);
         ctx.restore();
       }
+    }
+    if (this.levelFlash && this.levelFlash.id === hero.id) {
+      const t = (performance.now() - this.levelFlash.started) / 180;
+      const frame = Math.min(2, Math.floor(t));
+      const flash = this.images.get(`levelup${frame + 1}`);
+      if (flash) ctx.drawImage(flash, x, y, w, h);
+      if (t >= 3) this.levelFlash = null;
     }
     ctx.lineWidth = hero.formation === 'front' ? 2 : 1;
     ctx.strokeStyle = hero.formation === 'front' ? '#cd7f32' : '#8a8a8a';
@@ -482,17 +511,29 @@ export class PartyHud {
     const file = this.icons.get(iconKey) ?? `hand_${iconKey}.png`;
     const img = this.images.get(file);
     const recovering = hero.recovery[hand] > now;
+    const melee = MELEE_ITEMS.includes(item as ItemType) || item === 'torch_lit' || item === 'torch_burnt';
+    const outOfReach = hero.formation === 'back' && melee && item !== 'wand' && item !== 'scroll';
     if (img) {
       const size = Math.min(this.iconSize, w, h);
       const ix = x + (w - size) / 2;
       const iy = y + (h - size) / 2;
-      if (recovering) ctx.globalAlpha = 0.4;
+      if (recovering || outOfReach || hero.downed) ctx.globalAlpha = 0.35;
       ctx.drawImage(img, ix, iy, size, size);
       ctx.globalAlpha = 1;
     }
     if (recovering) {
       ctx.fillStyle = 'rgba(0, 0, 0, 0.5)';
       ctx.fillRect(x, y, w, h);
+    }
+    if (outOfReach) {
+      ctx.strokeStyle = '#8a3a3a';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x + 4, y + 4);
+      ctx.lineTo(x + w - 4, y + h - 4);
+      ctx.moveTo(x + w - 4, y + 4);
+      ctx.lineTo(x + 4, y + h - 4);
+      ctx.stroke();
     }
   }
 

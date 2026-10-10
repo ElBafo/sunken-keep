@@ -6,6 +6,7 @@ import {
   BRIGHT_MIN,
   CELL_SIZE,
   DOOR_UNLOCK_LEAD_MS,
+  HERO_VOICES,
   OIL_FLASK,
   OIL_MAX,
   OIL_START,
@@ -15,6 +16,7 @@ import {
   SWAP_ARM_MS,
   TORCH_IGNITE_FLARE_MS
 } from './constants';
+import { CombatEngine, HERO_IDS, openGrid, parseRules, Rng, type CombatEvent } from '../core';
 import { Dressing } from './dressing';
 import { floor1, floor1Sconces } from './floor-data';
 import { InputManager } from './input';
@@ -61,6 +63,9 @@ class Game {
   persist = true;
   story = new StoryText();
   hud!: PartyHud;
+  combat!: CombatEngine;
+  private perkHooks: Array<{ hero: string; level: number }> = [];
+  private perkScreenOpen = false;
   private torchChoice: { sconce: Sconce } | null = null;
   private swapSconce: Sconce | null = null;
   private swapUntil = 0;
@@ -162,10 +167,13 @@ class Game {
         this.hideTorchChoice();
       }
     });
+    await this.initCombat(params);
     this.loadLampNote();
     this.updateOilHud();
     await this.hud.load();
+    this.syncPartyHud();
     this.wireTorchChoice();
+    this.wireGameOver();
     this.renderer.resize();
 
     this.audioManager = new AudioManager(this.renderer.camera, this.quality);
@@ -188,12 +196,17 @@ class Game {
 
   handleMove(result: MoveResult) {
     this.cancelSwap();
+    if (this.combat?.gameOver) return;
     if (result === 'ok') {
       this.playFootstep(this.player.moveToX, this.player.moveToY);
       this.maybeDunkTorch(this.player.moveToX, this.player.moveToY);
       return;
     }
     if (result === 'busy') return;
+    if (result === 'monster') {
+      const { x, y } = this.player.facingPos(1);
+      this.applyEvents(this.combat.bump(x, y, this.nowSec()));
+    }
     this.audioManager.playUi('bump');
   }
 
@@ -273,6 +286,192 @@ class Game {
     if (tap) tap.textContent = this.story.uiText('tap_to_start');
     const door = document.getElementById('btn-door');
     if (door) door.textContent = this.story.uiText('controls.door');
+    const goTitle = document.getElementById('gameover-title');
+    if (goTitle) goTitle.textContent = this.story.uiText('game_over.title');
+    const goSave = document.getElementById('btn-go-autosave');
+    if (goSave) goSave.textContent = this.story.uiText('game_over.load_last');
+    const goFloor = document.getElementById('btn-go-floor');
+    if (goFloor) goFloor.textContent = this.story.uiText('game_over.load_floor');
+  }
+
+  private nowSec() {
+    return performance.now() / 1000;
+  }
+
+  private async initCombat(params: URLSearchParams) {
+    const base = import.meta.env.BASE_URL;
+    const [actions, monsters] = await Promise.all([
+      fetch(`${base}levels/actions.json`).then((r) => r.json()),
+      fetch(`${base}levels/monsters.json`).then((r) => r.json())
+    ]);
+    const seedRaw = params.get('seed');
+    const seed = seedRaw != null && seedRaw !== '' && Number.isFinite(Number(seedRaw)) ? Number(seedRaw) : Date.now() >>> 0;
+    this.combat = new CombatEngine(parseRules(actions, monsters), new Rng(seed));
+    const testMode = params.get('test') === '1';
+    const combatOn = params.get('combat') === '1';
+    this.combat.setChaseEnabled(!testMode || combatOn);
+    this.combat.setOccupancy(
+      openGrid((x, y) => {
+        const tile = floor1.tiles[y]?.[x];
+        if (!tile || tile.wall) return true;
+        if (tile.secret && !tile.secretOpen) return true;
+        if (tile.door && !tile.doorOpen) return true;
+        if (tile.prop === 'beams_fallen' || tile.prop === 'desk') return true;
+        return false;
+      }, floor1.width, floor1.height)
+    );
+    this.player.isOccupiedByMonster = (x, y) => !!this.combat.monsterAt(x, y);
+    this.spawnFloorMonsters();
+    this.combat.setPartyPos(this.player.x, this.player.y, this.player.dir);
+    this.syncEquipmentToCombat();
+  }
+
+  private spawnFloorMonsters() {
+    this.combat.clearMonsters();
+    for (let y = 0; y < floor1.height; y++) {
+      for (let x = 0; x < floor1.width; x++) {
+        const tile = floor1.tiles[y][x];
+        if (!tile.monster) continue;
+        const m = this.combat.spawnMonster(tile.monster, x, y, tile.monsterHp);
+        this.spriteManager.bindMonster(x, y, m.id);
+      }
+    }
+  }
+
+  private syncEquipmentToCombat() {
+    if (!this.combat || !this.hud) return;
+    for (const id of HERO_IDS) {
+      const h = this.hud.heroes[id];
+      this.combat.setEquipment(id, 'main', h.equipment.main);
+      this.combat.setEquipment(id, 'off', h.equipment.off);
+    }
+  }
+
+  private syncPartyHud() {
+    if (!this.hud || !this.combat) return;
+    for (const id of HERO_IDS) {
+      this.hud.syncHero(id, this.combat.heroes[id]);
+    }
+    this.hud.draw(performance.now());
+  }
+
+  private logVars(vars?: Record<string, string | number>) {
+    if (!vars) return vars;
+    const out: Record<string, string | number> = { ...vars };
+    if (typeof out.hero === 'string') out.hero = this.story.heroName(out.hero);
+    if (typeof out.monster === 'string') out.monster = this.story.monsterName(out.monster);
+    if (typeof out.target === 'string') out.target = this.story.heroName(out.target);
+    return out;
+  }
+
+  private combatLog(key: string, vars?: Record<string, string | number>) {
+    const text = this.story.log(key, this.logVars(vars));
+    if (!text) return;
+    this.lastMessage = text;
+    this.hud?.pushLog(text);
+  }
+
+  private applyEvents(events: CombatEvent[]) {
+    if (!events.length) return;
+    const nowMs = performance.now();
+    const nowSec = this.nowSec();
+    for (const e of events) {
+      switch (e.type) {
+        case 'log':
+          this.combatLog(e.key, e.vars);
+          break;
+        case 'sfx':
+          if (e.name === 'hero_down') break;
+          this.audioManager?.playCombat(e.name, e.volume ?? 1);
+          break;
+        case 'sfx_stop':
+          this.audioManager?.stopWindup();
+          break;
+        case 'monster_anim':
+          this.spriteManager.playAnimId(e.id, e.anim, nowMs);
+          break;
+        case 'monster_move':
+          this.spriteManager.moveMonsterId(e.id, e.to.x, e.to.y);
+          this.darkFx.moveEye(e.from.x, e.from.y, e.to.x, e.to.y, this.audioManager);
+          break;
+        case 'monster_dead':
+          this.spriteManager.playAnimId(e.id, 'death', nowMs);
+          this.darkFx.hideEye(e.x, e.y, this.audioManager);
+          this.audioManager?.stopWindup();
+          break;
+        case 'hero':
+        case 'hero_revive':
+          break;
+        case 'hero_hurt':
+          this.audioManager?.playHeroHurt(e.hero, nowSec);
+          break;
+        case 'hero_down':
+          this.audioManager?.playCombat('hero_down');
+          this.audioManager?.playHeroDown(e.hero);
+          break;
+        case 'perk_pending':
+          this.perkScreenOpen = false;
+          break;
+        case 'level_up':
+          this.hud.playLevelUp(e.hero);
+          break;
+        case 'perk_hook':
+          this.perkHooks.push({ hero: e.hero, level: e.level });
+          this.perkScreenOpen = false;
+          break;
+        case 'fight_start':
+          this.audioManager?.setFightDuck(true);
+          break;
+        case 'fight_end':
+          this.audioManager?.setFightDuck(false);
+          break;
+        case 'game_over':
+          this.showGameOver();
+          break;
+        case 'hand_used':
+          this.hud.lastHand = { hero: e.hero, hand: e.hand };
+          this.hud.handTapCount += 1;
+          break;
+        case 'out_of_reach':
+        case 'denied':
+          this.audioManager?.playUi('ui_button_denied');
+          break;
+        default:
+          break;
+      }
+    }
+    this.syncPartyHud();
+  }
+
+  private wireGameOver() {
+    const reload = () => this.restartFloor();
+    document.getElementById('btn-go-autosave')?.addEventListener('click', reload);
+    document.getElementById('btn-go-floor')?.addEventListener('click', reload);
+  }
+
+  private showGameOver() {
+    this.audioManager?.setFightDuck(false);
+    this.audioManager?.stopWindup();
+    this.audioManager?.playUi('game_over');
+    const el = document.getElementById('gameover');
+    if (el) el.classList.add('show');
+  }
+
+  restartFloor() {
+    document.getElementById('gameover')?.classList.remove('show');
+    this.perkHooks = [];
+    this.perkScreenOpen = false;
+    this.combat.resetParty();
+    this.spriteManager.resetMonsters(floor1);
+    this.darkFx.resetEyes(this.audioManager);
+    this.spawnFloorMonsters();
+    this.player.setPosition(floor1.startX, floor1.startY, floor1.startDir);
+    this.combat.setPartyPos(this.player.x, this.player.y, this.player.dir);
+    this.syncEquipmentToCombat();
+    this.syncPartyHud();
+    this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
+    this.torches.setParty(this.player.x, this.player.y, this.player.dir);
+    this.updateDoorButton();
   }
 
   updateOilHud() {
@@ -518,6 +717,7 @@ class Game {
     this.torches.takeOffWall(sconce);
     this.audioManager.stopTorchLoop(sconce);
     this.hud.setHand(hero, hand, 'torch_lit');
+    this.combat?.setEquipment(hero, hand, 'torch_lit');
     this.cancelSwap();
     this.vertexLighting.relight();
     this.syncCarriedLight();
@@ -544,6 +744,7 @@ class Game {
     const now = performance.now();
     const restored = this.takeBagFrom(held.hero, held.hand);
     this.hud.setHand(held.hero, held.hand, restored ?? 'empty_hand');
+    this.combat?.setEquipment(held.hero, held.hand, restored ?? 'empty_hand');
     this.torches.ignite(sconce, now);
     this.vertexLighting.relight();
     this.syncCarriedLight();
@@ -561,6 +762,7 @@ class Game {
     if (!tile?.deepWater) return;
     const dunked = this.hud.dunkCarriedTorches();
     if (!dunked.length) return;
+    for (const d of dunked) this.combat?.setEquipment(d.hero, d.hand, 'torch_burnt');
     this.audioManager.playUi('torch_dunk');
     this.syncCarriedLight();
     this.showMessage(this.storyLog('torch_dunk', { hero: this.story.heroName(dunked[0].hero) }));
@@ -583,7 +785,11 @@ class Game {
   }
 
   useHand(hero: HeroId, hand: HandSlot): boolean {
-    return this.hud.useHand(hero, hand);
+    if (!this.combat || this.combat.gameOver) return false;
+    this.syncEquipmentToCombat();
+    const before = this.hud.handTapCount;
+    this.applyEvents(this.combat.useHand(hero, hand, this.nowSec()));
+    return this.hud.handTapCount > before;
   }
 
   handleDoor(x: number, y: number) {
@@ -618,6 +824,7 @@ class Game {
         this.cancelSwap();
         this.hideTorchChoice();
         this.player.setPosition(x, y, dir);
+        this.combat?.setPartyPos(this.player.x, this.player.y, this.player.dir);
         this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
         this.syncCarriedLight();
         this.torches.setParty(this.player.x, this.player.y, this.player.dir);
@@ -806,8 +1013,15 @@ class Game {
       },
       torchChoiceVisible: () => !!this.torchChoice,
       hideTorchChoice: () => this.hideTorchChoice(),
-      setHeroHp: (id: HeroId, hp: number) => this.hud.setHeroHp(id, hp),
-      setHand: (id: HeroId, hand: HandSlot, item: string) => this.hud.setHand(id, hand, item as never),
+      setHeroHp: (id: HeroId, hp: number) => {
+        this.combat?.debugSetHp(id, hp);
+        this.hud.setHeroHp(id, hp);
+        this.syncPartyHud();
+      },
+      setHand: (id: HeroId, hand: HandSlot, item: string) => {
+        this.hud.setHand(id, hand, item as never);
+        this.combat?.setEquipment(id, hand, item);
+      },
       getHands: () => this.hud.getHands(),
       useHand: (id: HeroId, hand: HandSlot) => this.useHand(id, hand),
       lastHand: () => this.hud.lastHand,
@@ -820,6 +1034,40 @@ class Game {
       lastUi: () => this.audioManager.lastUi(),
       lanternLoop: () => this.audioManager.lanternLoop(),
       playLevelUp: (id: HeroId) => this.hud.playLevelUp(id),
+      inCombat: () => !!this.combat?.fight,
+      combatHeroes: () =>
+        HERO_IDS.map((id) => {
+          const h = this.combat.heroes[id];
+          return { id, hp: h.hp, maxHp: h.maxHp, downed: h.downed, level: h.level, xp: h.xp };
+        }),
+      combatMonsters: () =>
+        this.combat.monsters.map((m) => ({
+          id: m.id,
+          kind: m.kind,
+          x: m.x,
+          y: m.y,
+          hp: m.hp,
+          alive: m.alive,
+          windup: m.windup?.kind ?? null
+        })),
+      pendingPerks: () => this.combat.pendingPerks.slice(),
+      perkHooks: () => this.perkHooks.slice(),
+      perkScreenOpen: () => this.perkScreenOpen,
+      heroVoices: () => HERO_VOICES,
+      lastHeroVoice: () => this.audioManager.lastHeroVoice,
+      forceWipe: () => this.applyEvents(this.combat.forceWipe()),
+      restartFloor: () => this.restartFloor(),
+      addXp: (n: number) => this.applyEvents(this.combat.debugAddXp(n, this.nowSec())),
+      finishFight: () => this.applyEvents(this.combat.finishFight(this.nowSec())),
+      forceWindup: () => {
+        const m = this.combat.adjacentMonster() ?? this.combat.fightMonster();
+        if (!m) return false;
+        m.attackCount = 2;
+        m.nextAttackAt = this.nowSec();
+        this.applyEvents(this.combat.tick(this.nowSec()));
+        return !!m.windup;
+      },
+      gameOverVisible: () => !!document.getElementById('gameover')?.classList.contains('show'),
       logLines: () => this.hud.logLines.slice(),
       layout: () => this.hud.layout,
       tryMoveForward: () => {
@@ -909,11 +1157,20 @@ class Game {
     const prevY = this.player.y;
     this.player.update(deltaTime);
 
+    if (this.combat) {
+      this.combat.setPartyPos(this.player.x, this.player.y, this.player.dir);
+    }
+
     if (this.player.x !== prevX || this.player.y !== prevY) {
+      this.combat?.noteStep(this.nowSec());
       this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
       this.vertexLighting.updateAllMeshes(this.renderer.scene);
       this.audioManager.checkBones(this.player.x, this.player.y);
       this.updateDoorButton();
+    }
+
+    if (this.combat && !this.combat.gameOver) {
+      this.applyEvents(this.combat.tick(this.nowSec()));
     }
 
     if (this.pendingUnlock && now >= this.doorUnlockTimer) {

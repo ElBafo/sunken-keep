@@ -263,7 +263,7 @@
  {
   "key": "torch_dunk",
   "text": "{hero} dunks the torch. Hiss. Gone.",
-  "when": "on dropping a held torch into water"
+  "when": "on stepping into deep water while holding a lit torch (shallow water never puts it out)"
  },
  {
   "key": "carving_bowl",

@@ -202,6 +202,46 @@
       0%, 100% { opacity: 1; }
       50% { opacity: 0.5; }
     }
+    #gameover {
+      position: fixed;
+      inset: 0;
+      z-index: 2000;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      background: #0a1210 url('%BASE_URL%art/ui/gameover/gameover_bg.png') top center / 100% auto no-repeat;
+      image-rendering: pixelated;
+    }
+    #gameover.show { display: flex; }
+    #gameover-title {
+      margin-top: 40%;
+      width: min(88vw, 360px);
+      color: #d8ccb0;
+      font-family: monospace;
+      font-size: 16px;
+      text-align: center;
+      text-shadow: 1px 1px 0 #1a1210;
+      pointer-events: none;
+    }
+    #gameover-buttons {
+      margin-top: auto;
+      margin-bottom: 18%;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .gameover-btn {
+      min-width: 146px;
+      min-height: 44px;
+      padding: 8px 16px;
+      border: 1px solid #6a5a40;
+      background: #2a2420;
+      color: #d8ccb0;
+      font-family: monospace;
+      font-size: 14px;
+      cursor: pointer;
+    }
     #fps-counter {
       position: fixed;
       top: 10px;
@@ -287,6 +327,13 @@
     <div id="note-text"></div>
   </div>
   <div id="oil-readout"></div>
+  <div id="gameover">
+    <div id="gameover-title"></div>
+    <div id="gameover-buttons">
+      <button id="btn-go-autosave" class="gameover-btn" type="button"></button>
+      <button id="btn-go-floor" class="gameover-btn" type="button"></button>
+    </div>
+  </div>
   <script type="module" src="/src/proto3d/main.ts"></script>
 </body>
 </html>

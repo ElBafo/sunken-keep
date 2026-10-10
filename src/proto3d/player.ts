@@ -26,6 +26,8 @@ export class Player {
   camera: THREE.Camera;
   floorData: FloorData;
   hasKey = false;
+  /** Live combat occupancy; when set, this overrides the static tile.monster flag. */
+  isOccupiedByMonster: ((x: number, y: number) => boolean) | null = null;
 
   isMoving = false;
   moveStartTime = 0;
@@ -130,7 +132,11 @@ export class Player {
     if (tile.wall) return 'wall';
     if (tile.secret && !tile.secretOpen) return 'secret';
     if (tile.door && !tile.doorOpen) return 'door';
-    if (tile.monster) return 'monster';
+    if (this.isOccupiedByMonster) {
+      if (this.isOccupiedByMonster(x, y)) return 'monster';
+    } else if (tile.monster) {
+      return 'monster';
+    }
     if (tile.prop === 'beams_fallen' || tile.prop === 'desk') return 'wall';
     return 'ok';
   }

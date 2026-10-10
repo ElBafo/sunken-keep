@@ -113,28 +113,7 @@ function relocateLeechesOffDoor(floor: FloorData) {
   delete front.monsterAnimTime;
 }
 
-/**
- * Proto3d only. Slime at (7,2) blocks the arch into the guard hall; stairs at
- * (13,4) must be reachable without combat, so park it on (7,3).
- */
-function relocateSlimeOffArch(floor: FloorData) {
-  const from = floor.tiles[2][7];
-  const dest = floor.tiles[3][7];
-  if (from.monster !== 'slime' || dest.monster) return;
-  dest.monster = from.monster;
-  dest.monsterHp = from.monsterHp;
-  dest.monsterMaxHp = from.monsterMaxHp;
-  dest.monsterState = from.monsterState;
-  dest.monsterAnimTime = from.monsterAnimTime;
-  delete from.monster;
-  delete from.monsterHp;
-  delete from.monsterMaxHp;
-  delete from.monsterState;
-  delete from.monsterAnimTime;
-}
-
 relocateLeechesOffDoor(floor1);
-relocateSlimeOffArch(floor1);
 
 export const floor1Sconces: Sconce[] = [
   { x: 0, y: 6, face: 'E', lit: true, capped: false },

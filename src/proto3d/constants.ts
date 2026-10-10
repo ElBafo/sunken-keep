@@ -130,6 +130,9 @@ export const CARRIED_TORCH_INTENSITY = 1.05;
 export const HAND_COOLDOWN_MS = 900;
 /** After "hands full", the next hand tap swaps the torch in. Disarms on its own. */
 export const SWAP_ARM_MS = 3000;
+/** Flip to false to mute party hurt/down voices in one line. */
+export const HERO_VOICES = true;
+export const HERO_HURT_VOICE_GAP = 0.6;
 /** 585-layout sizes live in art/ui/layout585/layout585.json (view, oilBar, hands, log). */
 export const FACE_SEGMENTS = 4;
 export const CUTOUT_ALPHA_TEST = 0.5;

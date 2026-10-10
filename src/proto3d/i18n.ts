@@ -87,7 +87,7 @@ export class StoryText {
   }
 
   uiText(path: string, vars?: Record<string, string | number>): string {
-    const prefixes = ['', 'step1_party_panel.', 'step4_title_saves.'];
+    const prefixes = ['', 'step1_party_panel.', 'step2_combat.', 'step4_title_saves.'];
     for (const prefix of prefixes) {
       const raw = getPath(this.ui, `${prefix}${path}`);
       if (typeof raw === 'string') return fill(raw, vars);
@@ -116,6 +116,15 @@ export class StoryText {
       if (typeof name === 'string') return name;
     }
     return id;
+  }
+
+  monsterName(id: string): string {
+    const monsters = this.names.monsters;
+    if (monsters && typeof monsters === 'object') {
+      const name = (monsters as Json)[id];
+      if (typeof name === 'string') return name;
+    }
+    return id.replace(/_/g, ' ');
   }
 
   itemName(id: string): string {

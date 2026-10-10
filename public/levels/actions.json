@@ -99,7 +99,10 @@
   "potions": {
     "health": "restores 15 HP",
     "mana": "restores 8 mana",
-    "floor1_supply": "1 red, 1 blue, 1 green"
+    "floor1_supply": "2 red (floor + pantry chest), 1 blue, 1 green",
+    "potion_red": "health: restores 15 HP to the tapped hero",
+    "potion_blue": "mana: restores 8 mana (Wren or Ilsevar)",
+    "potion_green": "cleanse: removes attached leeches and cures poison on the tapped hero, plus 5 HP. No poison in Act 1 yet besides leeches, so it's the leech answer."
   },
   "formation": {
     "front": [
@@ -118,18 +121,208 @@
       "empty_hand"
     ]
   },
-  "_expected_floor1": "With the front-two rule: leeches ~3s, rat ~3s, crab ~8s, slime ~10s. About 24 HP lost across the floor before potions.",
+  "_expected_floor1": "Sim (levels/tools/sim_floor1.py, 5000 runs, no shield/sand/potions, monsters swing first at 0.5s, player first tap after 1-2s): leeches 2s, rat 3s, crab 6s, slime 8-9s, guard-hall rat 3s; total HP lost mean 22-26, 90th pct 32-37; a front hero drops to 0 in 1-3% of runs without potions. If monsters do NOT get the opening swing it falls to ~13 HP lost, too easy.",
   "items": {
+    "_note": "Act 1 loot and puzzle items (Levie).",
+    "torch": {
+      "slot": "hand",
+      "from": "lit sconce (tap it)",
+      "attack": {
+        "toHit": 2,
+        "damage": [
+          1,
+          3
+        ],
+        "recovery": 2.0
+      },
+      "light": 1,
+      "use": "puzzle fuel for offering bowls and the floor 4 altar; used up when placed",
+      "rules": "Tap a lit wall torch: Take or Snuff. Taken: bracket becomes empty; held torch only swings (fire damage). Put it in any empty bracket to light that spot, or drop it in water to put it out. Snuff costs 1 oil to relight."
+    },
+    "iron_shield": {
+      "slot": "hand",
+      "floor": 3,
+      "for": "mags or ilsevar",
+      "effect": "block: +3 AC and the next hit on the holder is halved",
+      "duration": 4,
+      "recovery": 6.0
+    },
+    "chain_mail": {
+      "slot": "body",
+      "floor": 3,
+      "ac": 2,
+      "for": "anyone but ilsevar (blocks spellcasting if worn by him)"
+    },
+    "ashmantle_hammer": {
+      "slot": "hand",
+      "floor": 4,
+      "for": "brannoc",
+      "attack": {
+        "toHit": 5,
+        "damage": [
+          5,
+          11
+        ],
+        "recovery": 3.5
+      },
+      "note": "optional reward from the floor 4 drill tiles"
+    },
     "oil_flask": {
       "slot": "bag",
       "use": "tap: +1 oil to Wren's lantern (max 4)"
     }
   },
   "oil": {
-    "_note": "Wren's lantern oil. 1 oil lights 1 dead torch. Her ember never goes out.",
+    "_note": "Wren's lantern oil (Levie). 1 oil lights 1 dead torch. Her ember never goes out, so puzzles and dark stretches always stay playable with 0 oil.",
     "lanternStart": 2,
     "lanternMax": 4,
     "torchCost": 1,
-    "flask": 1
+    "flask": 1,
+    "act1": {
+      "relightableTorches": {
+        "f1": 4,
+        "f2": 4,
+        "f3": 4,
+        "f4": 5,
+        "total": 17
+      },
+      "oilAvailable": {
+        "start": 2,
+        "flasks": {
+          "f1": 2,
+          "f2": 2,
+          "f3": 3,
+          "f4": 2
+        },
+        "total": 11
+      },
+      "ratio": "11 of 17, about two-thirds"
+    }
+  },
+  "progression": {
+    "_note": "Levie. Simple on purpose. XP is shared: every hero gets the full amount.",
+    "critical": "natural 20 always hits and doubles damage; natural 1 always misses. Same rule for monsters.",
+    "xp_per_kill": "equals the monster's max HP (bog leeches 12, rat 14, crab 24, slime 40, spider 20, drowned dwarf 35, Dural 60)",
+    "xp_other": {
+      "puzzle_solved": 25,
+      "secret_found": 10,
+      "npc_saved": 25
+    },
+    "level_thresholds": {
+      "2": 100,
+      "3": 220,
+      "4": 380,
+      "5": 600
+    },
+    "act1_target": "about level 2 after floor 1, level 4 by the end of Act 1",
+    "per_level": {
+      "hp": {
+        "brannoc": 6,
+        "mags": 5,
+        "wren": 5,
+        "ilsevar": 4
+      },
+      "mana": {
+        "wren": 2,
+        "ilsevar": 3
+      },
+      "toHit": "+1 every 2 levels",
+      "damage": "+10% per level",
+      "heal_on_level_up": "no, only the new max HP is added to current HP"
+    },
+    "downed": "at 0 HP a hero is down: can't act, isn't targeted. If both front heroes are down, monsters hit the back row. Wren's heal or a red potion tapped on a downed hero brings them back with that amount. After a fight, downed heroes get up on 1 HP so you can never be stuck. All four down = game over, with two buttons: 'Last autosave' and 'Start of floor'.",
+    "bag": "12 slots. Potions, oil flasks and keys stack up to 5 per slot; gear takes one slot each.",
+    "autosave_rules": "Autosave only out of combat, with no monster within 2 squares, and never when every hero is under 25% HP. Keep the 2 most recent autosaves. A separate floor-start snapshot is taken on arriving down the stairs and is always offered on game over. Until saves exist (before step 4), game over restarts the floor from that snapshot.",
+    "perks": {
+      "_rule": "At level 3 and level 5 each hero picks one of two perks. Picks are permanent and saved. Each perk changes a number you can feel in a fight.",
+      "brannoc": {
+        "3": [
+          {
+            "id": "shield_wall",
+            "effect": "shield block covers both front heroes, not just Brannoc"
+          },
+          {
+            "id": "cleave",
+            "effect": "axe hits also deal half damage to a second monster in the same fight"
+          }
+        ],
+        "5": [
+          {
+            "id": "stubborn",
+            "effect": "once per fight, a hit that would down him leaves him at 1 HP"
+          },
+          {
+            "id": "heavy_swing",
+            "effect": "axe damage +3, recovery +0.5s"
+          }
+        ]
+      },
+      "mags": {
+        "3": [
+          {
+            "id": "quick_hands",
+            "effect": "dagger recovery 2.0s -> 1.5s"
+          },
+          {
+            "id": "dirty_tricks",
+            "effect": "pocket sand also makes the monster skip its wind-up attack; recovery 8s -> 6s"
+          }
+        ],
+        "5": [
+          {
+            "id": "backstab",
+            "effect": "dagger crits on 18-20"
+          },
+          {
+            "id": "light_fingers",
+            "effect": "opens chests and locks without a key once per floor, and finds 1 extra potion per chest"
+          }
+        ]
+      },
+      "wren": {
+        "3": [
+          {
+            "id": "mercy",
+            "effect": "heal also lifts a downed hero, for the full heal amount"
+          },
+          {
+            "id": "steady_flame",
+            "effect": "every second torch she relights costs no oil"
+          }
+        ],
+        "5": [
+          {
+            "id": "sanctuary",
+            "effect": "heal hits the two most hurt heroes for 6-10 each, 6 mana"
+          },
+          {
+            "id": "ember_ward",
+            "effect": "on the ember alone her light reaches a full extra square, and leeches won't latch on her"
+          }
+        ]
+      },
+      "ilsevar": {
+        "3": [
+          {
+            "id": "deep_frost",
+            "effect": "frost bolt also slows the monster: its next attack comes 1.5s later"
+          },
+          {
+            "id": "tidecaller",
+            "effect": "wand damage +2 against anything standing in water"
+          }
+        ],
+        "5": [
+          {
+            "id": "shatter",
+            "effect": "frost bolt crits on 17-20 and ignores slime resistance"
+          },
+          {
+            "id": "cold_blood",
+            "effect": "mana regenerates 1 per 6 steps instead of 10"
+          }
+        ]
+      }
+    }
   }
 }
