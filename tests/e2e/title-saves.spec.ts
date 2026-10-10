@@ -396,16 +396,23 @@ test.describe('proto3d step4 title and saves', () => {
     await page.evaluate(() => {
       const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
       p.addFlag('note_lampkeeper');
-      p.fireOnce('door_locked');
       p.fireOnce('guard_hall_enter');
-      p.fireOnce('note_lampkeeper');
-      p.setGoal('g_f1_door', 'active');
-      p.setGoal('g_why', 'active');
+      p.fireOnce('water_shallow');
+      p.fireOnce('journal_page_1');
+      p.fireOnce('door_locked');
+      p.fireOnce('door_unlocked');
     });
     const beforeOnce = await page.evaluate(() => {
       const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
       return { fired: p.firedOnce(), goals: p.goals(), loops: p.loopNames() };
     });
+    expect(beforeOnce.fired).toEqual(
+      expect.arrayContaining(['enter_floor1', 'guard_hall_enter', 'water_shallow', 'journal_page_1', 'door_unlocked'])
+    );
+    expect(beforeOnce.fired).not.toContain('door_locked');
+    expect(beforeOnce.goals.g_why).toBe('active');
+    expect(beforeOnce.goals.g_f1_down).toBe('active');
+    expect(beforeOnce.goals.g_f1_door).toBe('done');
     await saveReloadLoad(page);
     const afterOnce = await page.evaluate(() => {
       const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
@@ -413,17 +420,24 @@ test.describe('proto3d step4 title and saves', () => {
         fired: p.firedOnce(),
         goals: p.goals(),
         loops: p.loopNames(),
-        againDoor: p.fireOnce('door_locked'),
         againBark: p.fireOnce('guard_hall_enter'),
-        againNote: p.fireOnce('note_lampkeeper')
+        againLog: p.fireOnce('water_shallow'),
+        againNote: p.fireOnce('journal_page_1'),
+        againUnlock: p.fireOnce('door_unlocked'),
+        againEvery: p.fireOnce('door_locked')
       };
     });
-    expect(afterOnce.fired).toEqual(expect.arrayContaining(['door_locked', 'guard_hall_enter', 'note_lampkeeper']));
-    expect(afterOnce.goals.g_f1_door).toBe('active');
+    expect(afterOnce.fired).toEqual(
+      expect.arrayContaining(['enter_floor1', 'guard_hall_enter', 'water_shallow', 'journal_page_1', 'door_unlocked'])
+    );
     expect(afterOnce.goals.g_why).toBe('active');
-    expect(afterOnce.againDoor).toBe(false);
+    expect(afterOnce.goals.g_f1_down).toBe('active');
+    expect(afterOnce.goals.g_f1_door).toBe('done');
     expect(afterOnce.againBark).toBe(false);
+    expect(afterOnce.againLog).toBe(false);
     expect(afterOnce.againNote).toBe(false);
+    expect(afterOnce.againUnlock).toBe(false);
+    expect(afterOnce.againEvery).toBe(true);
     expect(afterOnce.loops.filter((n) => n.startsWith('torch:0,6')).length).toBe(0);
     expect(afterOnce.loops.sort()).toEqual(beforeOnce.loops.sort());
     const afterFlags = await mapState(page);

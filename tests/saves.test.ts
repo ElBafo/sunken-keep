@@ -24,22 +24,45 @@ describe('save version', () => {
   });
 });
 
-import { StoryProgress } from '../src/proto3d/story-progress';
+import { ONCE_TRIGGER_IDS, StoryProgress } from '../src/proto3d/story-progress';
 
 describe('story once + goals', () => {
-  it('does not re-fire a spent once trigger and keeps goal status', async () => {
+  it('does not re-fire a spent once bark, log, or note and keeps goal page state', async () => {
     const p = new StoryProgress();
     await p.load('/');
     p.startNewGame();
+    expect(p.snapshotGoals().g_why).toBe('active');
+    expect(p.fire('guard_hall_enter')).toBe(true);
+    expect(p.fire('water_shallow')).toBe(true);
+    expect(p.fire('journal_page_1')).toBe(true);
     expect(p.fire('door_locked')).toBe(true);
-    expect(p.fire('door_locked')).toBe(false);
-    p.goals.set('g_f1_door', 'active');
+    expect(p.fire('door_locked')).toBe(true);
+    expect(p.snapshotGoals().g_f1_door).toBe('active');
+    expect(p.fire('door_unlocked')).toBe(true);
+    expect(p.snapshotGoals().g_f1_door).toBe('done');
     const snap = p.serialize();
+    expect(snap.fired).toEqual(
+      expect.arrayContaining(['guard_hall_enter', 'water_shallow', 'journal_page_1', 'door_unlocked'])
+    );
+    expect(snap.fired).not.toContain('door_locked');
     const q = new StoryProgress();
     await q.load('/');
     q.restore(snap);
-    expect(q.fire('door_locked')).toBe(false);
-    expect(q.snapshotGoals().g_f1_door).toBe('active');
+    expect(q.fire('guard_hall_enter')).toBe(false);
+    expect(q.fire('water_shallow')).toBe(false);
+    expect(q.fire('journal_page_1')).toBe(false);
+    expect(q.fire('door_unlocked')).toBe(false);
+    expect(q.fire('door_locked')).toBe(true);
+    expect(q.snapshotGoals().g_why).toBe('active');
+    expect(q.snapshotGoals().g_f1_door).toBe('done');
+  });
+
+  it('catalogs every once-marked bark, log, and note', () => {
+    expect(ONCE_TRIGGER_IDS).toEqual(
+      expect.arrayContaining(['guard_hall_enter', 'water_shallow', 'journal_page_1', 'enter_floor1', 'act1_end'])
+    );
+    expect(ONCE_TRIGGER_IDS).not.toContain('door_locked');
+    expect(ONCE_TRIGGER_IDS).not.toContain('note_lampkeeper');
   });
 });
 

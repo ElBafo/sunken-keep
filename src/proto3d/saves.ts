@@ -138,7 +138,10 @@ export function parseSave(raw: unknown): SavePayload | null {
   if (rec.version !== SAVE_VERSION) return null;
   if (!Array.isArray(rec.party) || !Array.isArray(rec.monsters)) return null;
   if (!rec.position || typeof rec.position !== 'object') return null;
-  return rec as unknown as SavePayload;
+  const payload = rec as unknown as SavePayload;
+  if (!Array.isArray(payload.firedOnce)) payload.firedOnce = [];
+  if (!payload.goals || typeof payload.goals !== 'object') payload.goals = {};
+  return payload;
 }
 
 export function slotOccupied(slot: number): boolean {

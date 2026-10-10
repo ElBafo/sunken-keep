@@ -154,6 +154,7 @@ class Game {
     document.documentElement.lang = locale;
     await this.story.load(locale);
     await this.storyProgress.load(import.meta.env.BASE_URL);
+    if (this.skipTitle) this.storyProgress.startNewGame();
     this.applyStoryLabels();
 
     const layout = await loadLayout585();
@@ -1536,7 +1537,7 @@ class Game {
       )
     );
     this.vertexLighting.relight();
-    this.showMessage(this.storyLog('secret_found'));
+    if (this.storyProgress.fire('secret_found')) this.showMessage(this.storyLog('secret_found'));
     this.speakBark('secret_wall', 'brannoc');
     return true;
   }
