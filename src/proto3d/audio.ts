@@ -200,6 +200,8 @@ export class AudioManager {
       ['torch_dunk', 'audio/sfx_torch_dunk.mp3'],
       ['ui_log_line', 'audio/sfx_ui_log_line.mp3'],
       ['ui_button_denied', 'audio/sfx_ui_button_denied.mp3'],
+      ['save', 'audio/sfx_save.mp3'],
+      ['ui_button', 'audio/sfx_ui_button.mp3'],
       ['ui_inventory_move', 'audio/sfx_ui_inventory_move.mp3'],
       ['pickup', 'audio/sfx_pickup.mp3'],
       ['chest', 'audio/sfx_chest.mp3'],

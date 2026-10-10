@@ -73,7 +73,7 @@ function capitalizeLog(text: string): string {
 export class StoryText {
   locale: Locale = 'en';
   private logs = new Map<string, string>();
-  private barks = new Map<string, string>();
+  private barks = new Map<string, { text: string; speaker?: string }>();
   private names: Json = {};
   private ui: Json = {};
   private title: Json = {};
@@ -88,7 +88,7 @@ export class StoryText {
       this.fetchJson<Json>(this.url(base, 'ui_text.json', locale)),
       this.fetchJson<Json>(this.url(base, 'title_text.json', locale)),
       this.fetchJson<Json>(this.url(base, 'note_lampkeeper.json', locale)),
-      this.fetchJson<Array<{ trigger?: string; text?: string }>>(this.url(base, 'barks.json', locale))
+      this.fetchJson<Array<{ trigger?: string; text?: string; speaker?: string }>>(this.url(base, 'barks.json', locale))
     ]);
     this.logs.clear();
     for (const entry of log ?? []) {
@@ -101,7 +101,9 @@ export class StoryText {
     }
     this.barks.clear();
     for (const entry of barks ?? []) {
-      if (entry?.trigger && typeof entry.text === 'string') this.barks.set(entry.trigger, entry.text);
+      if (entry?.trigger && typeof entry.text === 'string' && !this.barks.has(entry.trigger)) {
+        this.barks.set(entry.trigger, { text: entry.text, speaker: entry.speaker });
+      }
     }
     this.names = names ?? {};
     this.ui = ui ?? {};
@@ -139,7 +141,11 @@ export class StoryText {
   }
 
   bark(trigger: string): string {
-    return this.barks.get(trigger) ?? '';
+    return this.barks.get(trigger)?.text ?? '';
+  }
+
+  barkEntry(trigger: string): { text: string; speaker?: string } | null {
+    return this.barks.get(trigger) ?? null;
   }
 
   uiText(path: string, vars?: Record<string, string | number>): string {

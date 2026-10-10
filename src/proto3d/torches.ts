@@ -215,6 +215,7 @@ export class TorchSystem {
     if (!visual) return;
     sconce.lit = true;
     sconce.capped = false;
+    sconce.empty = false;
     this.applyBracket(visual, 'lit');
     visual.lighting = true;
     visual.snuffing = false;
@@ -230,6 +231,7 @@ export class TorchSystem {
   takeOffWall(sconce: Sconce) {
     const visual = this.visuals.find((v) => v.sconce === sconce);
     sconce.lit = false;
+    sconce.empty = true;
     if (!visual) return;
     this.applyBracket(visual, 'dead');
     visual.lighting = false;
@@ -241,6 +243,7 @@ export class TorchSystem {
   snuff(sconce: Sconce, now: number) {
     const visual = this.visuals.find((v) => v.sconce === sconce);
     sconce.lit = false;
+    sconce.empty = false;
     if (!visual) return;
     this.applyBracket(visual, 'dead');
     visual.lighting = false;
@@ -251,6 +254,17 @@ export class TorchSystem {
     visual.flame.visible = true;
     visual.flameMat.map = this.snuffFrames[0];
     visual.flameMat.needsUpdate = true;
+  }
+
+  syncFromSconce(sconce: Sconce) {
+    const visual = this.visuals.find((v) => v.sconce === sconce);
+    if (!visual) return;
+    const state: TorchVisualState = sconce.capped ? 'capped' : sconce.lit ? 'lit' : 'dead';
+    this.applyBracket(visual, state);
+    visual.lighting = false;
+    visual.snuffing = false;
+    visual.flame.visible = !!sconce.lit && !sconce.capped;
+    visual.flameFrame = 0;
   }
 
   isTapLocked(sconce: Sconce, now = performance.now()): boolean {
