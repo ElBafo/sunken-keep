@@ -1,115 +1,135 @@
 import { describe, expect, it } from 'vitest';
 import {
   CELL_SIZE,
-  LANTERN_HEIGHT,
   LANTERN_INTENSITY,
-  LANTERN_RADIUS_TILES
+  LANTERN_RADIUS_TILES,
+  PROP_LANTERN_INTENSITY,
+  PROP_LANTERN_RADIUS_TILES
 } from '../src/proto3d/constants';
 import { floor1, floor1Sconces } from '../src/proto3d/floor-data';
-import { lanternFalloff, partyDistTiles, VertexLightingManager } from '../src/proto3d/vertex-lighting';
+import { lanternFalloff, partyDistTiles, partyFalloff, VertexLightingManager } from '../src/proto3d/vertex-lighting';
 
-/** Desk top centre at (12,9); party one square west at (11,9). */
 const DESK = { x: 12, y: 9, wy: 0.34 };
-const PARTY = { x: 11, y: 9 };
+const RACK = { x: 9, y: 10, wy: 0.4 };
 const LAMP = { x: 13, y: 9 };
+const PARTY_DESK = { x: 11, y: 9 };
+const PARTY_RACK = { x: 11, y: 10 };
 
-/** Quartic puddle from the first lighting pass (radius 2, intensity 0.64). */
-const OLD_RADIUS = 2;
-const OLD_INTENSITY = 0.64;
-const OLD_CORE = 0.28;
-
-function oldQuarticWeight(dist: number): number {
-  if (dist >= OLD_RADIUS) return 0;
-  if (dist <= OLD_CORE) return OLD_INTENSITY;
-  const t = 1 - (dist - OLD_CORE) / (OLD_RADIUS - OLD_CORE);
-  return OLD_INTENSITY * t * t * t * t;
+function propWeight(dist: number): number {
+  return PROP_LANTERN_INTENSITY * lanternFalloff(dist, PROP_LANTERN_RADIUS_TILES);
 }
 
-function lanternWeight(dist: number): number {
-  return LANTERN_INTENSITY * lanternFalloff(dist, LANTERN_RADIUS_TILES);
+function floorWeight(dist: number): number {
+  return LANTERN_INTENSITY * partyFalloff(dist, LANTERN_RADIUS_TILES);
 }
 
-describe('lantern quadratic puddle', () => {
-  const deskWx = DESK.x * CELL_SIZE;
-  const deskWz = DESK.y * CELL_SIZE;
-
-  it('uses a 2.5-tile oil radius and a wide 1−(d/r)² falloff', () => {
-    expect(LANTERN_RADIUS_TILES).toBe(2.5);
-    expect(LANTERN_INTENSITY).toBe(0.4);
-    expect(lanternFalloff(0, 2.5)).toBe(1);
-    expect(lanternFalloff(2.5, 2.5)).toBe(0);
-    expect(lanternFalloff(1, 2.5)).toBeCloseTo(1 - 1 / (2.5 * 2.5), 5);
-  });
-
-  it('hits ~0.32 / ≥0.25 / ~0.12 lantern light at 0, 1, and 2 tiles', () => {
+describe('lantern: steep floors, soft props', () => {
+  it('keeps the main oil puddle on floors (quartic, r=1.5, I=0.64)', () => {
+    expect(LANTERN_RADIUS_TILES).toBe(1.5);
+    expect(LANTERN_INTENSITY).toBe(0.64);
     const lighting = new VertexLightingManager(floor1, [], { floor: 1, bright: 1, oil: () => 2 });
-    lighting.setPartyPosition(PARTY.x, PARTY.y);
+    lighting.setPartyPosition(PARTY_DESK.x, PARTY_DESK.y);
 
-    const floor0 = lighting.sourceLight(PARTY.x, PARTY.y);
-    const floor1Tile = lighting.sourceLight(DESK.x, DESK.y);
-    const floor2 = lighting.sourceLight(LAMP.x, LAMP.y);
-    const desk = lighting.sampleVertex(deskWx, DESK.wy, deskWz, DESK.x, DESK.y);
-    const luma0 = lighting.calculateBrightness(PARTY.x, PARTY.y, false);
+    const own = lighting.sourceLight(PARTY_DESK.x, PARTY_DESK.y);
+    const one = lighting.sourceLight(DESK.x, DESK.y);
+    const two = lighting.sourceLight(LAMP.x, LAMP.y);
+    const luma0 = lighting.calculateBrightness(PARTY_DESK.x, PARTY_DESK.y, false);
     const luma1 = lighting.calculateBrightness(DESK.x, DESK.y, false);
     const luma2 = lighting.calculateBrightness(LAMP.x, LAMP.y, false);
-    const fill = lighting.ambientBrightness();
 
-    const distDesk = partyDistTiles(deskWx, DESK.wy, deskWz, PARTY.x, PARTY.y);
-    const dist0 = partyDistTiles(PARTY.x * CELL_SIZE, 0.08, PARTY.y * CELL_SIZE, PARTY.x, PARTY.y);
-    const dist1 = partyDistTiles(deskWx, 0.08, deskWz, PARTY.x, PARTY.y);
-    const dist2 = partyDistTiles(LAMP.x * CELL_SIZE, 0.08, LAMP.y * CELL_SIZE, PARTY.x, PARTY.y);
+    console.log('FLOOR_LANTERN', { own, one, two, luma0, luma1, luma2 });
 
-    console.log('LANTERN_FALLOFF', {
-      party: PARTY,
-      before: {
-        deskWeight: oldQuarticWeight(distDesk),
-        floor0: oldQuarticWeight(dist0),
-        floor1: oldQuarticWeight(dist1),
-        floor2: oldQuarticWeight(dist2)
-      },
-      after: {
-        deskWeight: lanternWeight(distDesk),
-        deskLuma: desk.luma,
-        floor0,
-        floor1: floor1Tile,
-        floor2,
-        luma0,
-        luma1,
-        luma2,
-        ambient: fill
-      }
+    expect(own).toBeCloseTo(0.64, 2);
+    expect(luma0).toBeGreaterThan(0.45);
+    expect(one, '1-tile floor stays near-ambient').toBeLessThan(0.08);
+    expect(luma1).toBeLessThan(0.08);
+    expect(two, '2-tile floor is outside the oil puddle').toBe(0);
+    expect(luma2).toBeCloseTo(lighting.ambientBrightness(), 3);
+    expect(floorWeight(1)).toBeLessThan(0.08);
+    expect(floorWeight(2)).toBe(0);
+  });
+
+  it('lights tagged props with 1−(d/r)² at r=2.5 (desk 1 tile, rack 2 tiles)', () => {
+    expect(PROP_LANTERN_RADIUS_TILES).toBe(2.5);
+    expect(PROP_LANTERN_INTENSITY).toBe(0.4);
+
+    const lighting = new VertexLightingManager(floor1, [], { floor: 1, bright: 1, oil: () => 2 });
+
+    lighting.setPartyPosition(PARTY_DESK.x, PARTY_DESK.y);
+    const deskDist = partyDistTiles(
+      DESK.x * CELL_SIZE,
+      DESK.wy,
+      DESK.y * CELL_SIZE,
+      PARTY_DESK.x,
+      PARTY_DESK.y,
+      { prop: true }
+    );
+    const desk = lighting.sampleVertex(
+      DESK.x * CELL_SIZE,
+      DESK.wy,
+      DESK.y * CELL_SIZE,
+      DESK.x,
+      DESK.y,
+      false,
+      true
+    );
+    const deskFloor = lighting.sampleVertex(
+      DESK.x * CELL_SIZE,
+      0.08,
+      DESK.y * CELL_SIZE,
+      DESK.x,
+      DESK.y,
+      false,
+      false
+    );
+
+    lighting.setPartyPosition(PARTY_RACK.x, PARTY_RACK.y);
+    const rackDist = partyDistTiles(
+      RACK.x * CELL_SIZE,
+      RACK.wy,
+      RACK.y * CELL_SIZE,
+      PARTY_RACK.x,
+      PARTY_RACK.y,
+      { prop: true }
+    );
+    const rack = lighting.sampleVertex(
+      RACK.x * CELL_SIZE,
+      RACK.wy,
+      RACK.y * CELL_SIZE,
+      RACK.x,
+      RACK.y,
+      false,
+      true
+    );
+    const rackFloor = lighting.sourceLight(RACK.x, RACK.y);
+
+    console.log('PROP_LANTERN', {
+      desk: { dist: deskDist, weight: propWeight(deskDist), luma: desk.luma, floorLuma: deskFloor.luma },
+      rack: { dist: rackDist, weight: propWeight(rackDist), luma: rack.luma, floorLight: rackFloor }
     });
 
-    expect(floor0, 'party square lantern light ~0.32').toBeGreaterThan(0.3);
-    expect(floor0).toBeLessThan(0.42);
-    expect(luma0, 'party square shade stays ~0.32, not blown out').toBeGreaterThan(0.3);
-    expect(luma0).toBeLessThan(0.36);
+    expect(deskDist).toBeLessThan(1.1);
+    expect(propWeight(deskDist)).toBeGreaterThanOrEqual(0.25);
+    expect(desk.luma, 'desk top at 1 tile').toBeGreaterThanOrEqual(0.25);
+    expect(deskFloor.luma, 'floor under the desk stays on the steep puddle').toBeLessThan(0.08);
 
-    expect(floor1Tile, '1-tile floor lantern light ≥ 0.25').toBeGreaterThanOrEqual(0.25);
-    expect(luma1).toBeGreaterThanOrEqual(0.25);
-    expect(desk.luma, 'desk top 1 tile away is readable').toBeGreaterThanOrEqual(0.25);
-
-    expect(floor2, '2-tile floor lantern light ~0.12').toBeGreaterThan(0.1);
-    expect(floor2).toBeLessThan(0.18);
-    expect(luma2).toBeGreaterThan(0.1);
-    expect(luma2).toBeLessThan(0.16);
-
-    expect(oldQuarticWeight(distDesk), 'previous quartic left the desk near zero').toBeLessThan(0.08);
+    expect(rackDist).toBeGreaterThan(1.9);
+    expect(rackDist).toBeLessThan(PROP_LANTERN_RADIUS_TILES);
+    expect(propWeight(rackDist)).toBeGreaterThan(0.1);
+    expect(propWeight(rackDist)).toBeLessThan(0.18);
+    expect(rack.luma, 'rack at (9,10) from (11,10) — 2 tiles').toBeGreaterThan(0.1);
+    expect(rack.luma).toBeLessThan(0.16);
+    expect(rackFloor, 'floor at the rack stays unlit at 2 tiles').toBe(0);
   });
 
   it("Pell's capped lamp at (13,9) still emits nothing", () => {
     expect(floor1Sconces.some((s) => s.x === LAMP.x && s.y === LAMP.y)).toBe(false);
 
-    const far = new VertexLightingManager(floor1, floor1Sconces, { floor: 1, bright: 1, oil: () => 2 });
-    far.setPartyPosition(1, 7);
-    expect(far.sourceLight(LAMP.x, LAMP.y), 'lamp is not a sconce and is outside the start puddle').toBe(0);
+    const lighting = new VertexLightingManager(floor1, floor1Sconces, { floor: 1, bright: 1, oil: () => 2 });
+    lighting.setPartyPosition(1, 7);
+    expect(lighting.sourceLight(LAMP.x, LAMP.y)).toBe(0);
 
-    const near = new VertexLightingManager(floor1, [], { floor: 1, bright: 1, oil: () => 2 });
-    near.setPartyPosition(PARTY.x, PARTY.y);
-    const lampFromLantern = near.sourceLight(LAMP.x, LAMP.y);
-    expect(lampFromLantern, 'party lantern may graze (13,9); the lamp itself adds nothing').toBeCloseTo(
-      lanternWeight(2),
-      5
-    );
+    lighting.setPartyPosition(PARTY_DESK.x, PARTY_DESK.y);
+    expect(lighting.sourceLight(LAMP.x, LAMP.y), 'lamp tile floor is outside the oil puddle').toBe(0);
   });
 });

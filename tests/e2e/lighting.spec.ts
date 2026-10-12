@@ -136,10 +136,14 @@ test('proto3d lighting: pools, relight, oil, no 404s', async ({ page }) => {
   expect(lantern.oil, 'oil lantern test has oil').toBe(2);
   expect(lantern.pos.x, 'oil lantern test at 7,1').toBe(7);
   expect(lantern.pos.y, 'oil lantern test at 7,1').toBe(1);
-  expect(lantern.own, 'oil lantern keeps the party square around 0.32').toBeGreaterThan(0.3);
-  expect(lantern.own, 'oil lantern party square is not blown out').toBeLessThan(0.36);
-  expect(lantern.ahead, 'oil lantern keeps the next square readable').toBeGreaterThanOrEqual(0.25);
-  expect(lantern.ahead, 'oil lantern next square stays below the party square').toBeLessThan(lantern.own);
+  expect(lantern.own, 'oil lantern keeps the party square readable').toBeGreaterThan(0.3);
+  expect(lantern.ahead, 'oil lantern is near-ambient by the next square').toBeLessThan(0.2);
+  expect(lantern.ahead, 'oil lantern still a little above ambient on the next square').toBeGreaterThan(
+    unlit.fill * 0.8
+  );
+  expect(lantern.ahead, 'oil lantern next square is well below the party square').toBeLessThan(
+    lantern.own * 0.45
+  );
   // East along the south strip — own floor + next square, then near-black. Avoids the slime.
   await shot(1, 7, 1, 'lighting_lantern_oil_east.png');
 
@@ -313,7 +317,7 @@ test('proto3d lighting: ?ambientFloor=3 is near-black beyond the lantern', async
   expect(deep.unlit, 'floor 3+ beyond lights is near-black (not 0)').toBeGreaterThan(0.014);
   expect(deep.unlit, 'floor 3+ beyond lights is near-black (not 0)').toBeLessThan(0.045);
   expect(deep.own, 'lantern still reads the party square on floor 3 ambient').toBeGreaterThan(0.3);
-  expect(deep.ahead, 'lantern still reads the next square on floor 3').toBeGreaterThanOrEqual(0.25);
+  expect(deep.ahead, 'lantern is near-ambient by the next square on floor 3').toBeLessThan(0.2);
 
   await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.setPosition(1, 7, 1));
   await page.waitForTimeout(220);
