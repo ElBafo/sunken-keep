@@ -141,6 +141,65 @@ async function mapState(page: import('@playwright/test').Page) {
 test.describe('proto3d step4 title and saves', () => {
   test.setTimeout(180000);
 
+  test('tap to start waits for stage scale; New Game starts when shot 1 and intro music are ready', async ({
+    page
+  }) => {
+    const preloaded: string[] = [];
+    page.on('request', (req) => {
+      const url = req.url();
+      if (url.includes('/art/intro/shot') || url.includes('music_intro')) preloaded.push(url);
+    });
+    await keepSavesAcrossReload(page);
+    await page.goto(`${BASE_URL}/proto3d.html`);
+    await page.waitForFunction(
+      () => {
+        const api = (window as unknown as { __proto3d?: { ready?: boolean; boot?: () => { tapPromptReady?: boolean } } })
+          .__proto3d;
+        return api?.ready === true && api.boot?.().tapPromptReady === true;
+      },
+      null,
+      { timeout: 30000 }
+    );
+    const beforeTap = await page.evaluate(() => {
+      const stage = document.getElementById('game-stage');
+      const tap = document.getElementById('tap-to-start-text');
+      const api = (window as unknown as { __proto3d: { boot: () => Record<string, unknown> } }).__proto3d;
+      return {
+        transform: stage?.style.transform ?? '',
+        tap: tap?.textContent ?? '',
+        boot: api.boot()
+      };
+    });
+    expect(beforeTap.transform).toMatch(/scale\(/);
+    expect(beforeTap.tap).toMatch(/Tap to start/i);
+    expect(beforeTap.boot.tapPromptReady).toBe(true);
+    await page.locator('#title-canvas').dispatchEvent('pointerdown', { isPrimary: true });
+    await expect(page.locator('#tap-to-start')).toBeHidden();
+    await expect(page.locator('#title-overlay')).toHaveClass(/show/);
+    await page.waitForFunction(
+      () => {
+        const boot = (window as unknown as { __proto3d: { boot: () => { introShot1?: boolean; introMusic?: boolean } } })
+          .__proto3d.boot();
+        return boot.introShot1 === true && boot.introMusic === true;
+      },
+      null,
+      { timeout: 15000 }
+    );
+    const started = Date.now();
+    await page.locator('.title-hit[data-id="New Game"]').tap();
+    await expect(page.locator('#intro-overlay')).toHaveClass(/show/, { timeout: 8000 });
+    const waitMs = Date.now() - started;
+    expect(waitMs).toBeLessThan(3000);
+    expect(preloaded.some((u) => u.includes('shot1_keep'))).toBe(true);
+    expect(preloaded.some((u) => u.includes('music_intro'))).toBe(true);
+    const after = await page.evaluate(() =>
+      (window as unknown as { __proto3d: { boot: () => { introStarted?: boolean } } }).__proto3d.boot()
+    );
+    expect(after.introStarted).toBe(true);
+    await page.locator('#intro-overlay').tap();
+    await expect(page.locator('#intro-overlay')).not.toHaveClass(/show/);
+  });
+
   test('new game plays intro then skip, greek title, continue restore, overwrite, blocked, autosave, game over', async ({
     page
   }) => {
