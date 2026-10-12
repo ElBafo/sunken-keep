@@ -101,7 +101,14 @@ async function rememberSaves(page: import('@playwright/test').Page) {
 
 async function dismissTapOverlay(page: import('@playwright/test').Page) {
   const tap = page.locator('#tap-to-start');
-  if (await tap.isVisible()) await tap.tap();
+  if (!(await tap.isVisible())) return;
+  await tap.tap({ timeout: 3000 }).catch(() => undefined);
+  if (await tap.isVisible()) {
+    await page.evaluate(() => {
+      const api = (window as unknown as { __proto3d?: { dismissTap?: () => void } }).__proto3d;
+      api?.dismissTap?.();
+    });
+  }
 }
 
 async function waitGameReady(page: import('@playwright/test').Page, timeout = 30000) {
@@ -177,9 +184,7 @@ test.describe('proto3d step4 title and saves', () => {
       const canvas = document.getElementById('title-canvas');
       canvas?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, isPrimary: true }));
     });
-    if (await page.locator('#tap-to-start').isVisible()) {
-      await page.locator('#tap-to-start').tap();
-    }
+    await dismissTapOverlay(page);
     await expect(page.locator('#tap-to-start')).toBeHidden();
     await expect(page.locator('#title-overlay')).toHaveClass(/show/);
     await page.waitForFunction(

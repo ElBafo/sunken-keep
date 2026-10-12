@@ -243,7 +243,11 @@ class Game {
     this.pendingTap = false;
     this.hideTapOverlay();
     if (this.title && !this.title.visible) this.title.show('title');
-    this.audioManager.playMenu();
+    try {
+      this.audioManager.playMenu();
+    } catch {
+      // Host audio can refuse playback after the overlay is already gone.
+    }
   }
 
   private consumePlayTap() {
@@ -2478,6 +2482,10 @@ class Game {
       titleVisible: () => !!document.getElementById('title-overlay')?.classList.contains('show'),
       introVisible: () => !!document.getElementById('intro-overlay')?.classList.contains('show'),
       startNewGame: () => this.startNewGame(),
+      dismissTap: () => {
+        if (this.skipTitle) this.consumePlayTap();
+        else this.consumeTitleTap();
+      },
       skipIntro: () => this.skipIntro(),
       setLocale: (locale: Locale) => this.setLocale(locale),
       showTitle: () => this.title.show('title'),
@@ -2593,7 +2601,7 @@ class Game {
     tapToStart.classList.remove('hidden');
     const overlayActive = () => !tapToStart.classList.contains('hidden');
     const onTap = (e: Event) => {
-      if (e instanceof PointerEvent && e.isPrimary === false) return;
+      if (e instanceof PointerEvent && e.type !== 'click' && e.isPrimary === false) return;
       this.audioManager.unlock();
       if (!overlayActive()) return;
       const now = performance.now();
