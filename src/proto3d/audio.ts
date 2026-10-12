@@ -53,6 +53,8 @@ export class AudioManager {
   private loaded = false;
   private menuLoaded = false;
   private soundsPromise: Promise<void> | null = null;
+  private introMusicPromise: Promise<void> | null = null;
+  private introStarted = false;
   private uiPool: THREE.Audio[] = [];
   private lanternSound: THREE.Audio | null = null;
   private lanternMode: 'oil' | 'ember' | 'off' = 'off';
@@ -178,6 +180,43 @@ export class AudioManager {
     this.menuSound.setBuffer(menu);
     this.menuSound.setLoop(true);
     this.menuSound.setVolume(0.7);
+  }
+
+  private ensureIntroSound() {
+    if (this.introSound) return;
+    const intro = this.buffers.get('intro');
+    if (!intro) return;
+    this.introSound = new THREE.Audio(this.listener);
+    this.introSound.setBuffer(intro);
+    this.introSound.setLoop(false);
+    this.introSound.setVolume(0.7);
+  }
+
+  /** Background-load music_intro during the title. Safe to call more than once. */
+  async loadIntroMusic() {
+    if (this.buffers.has('intro')) {
+      this.ensureIntroSound();
+      return;
+    }
+    if (this.introMusicPromise) return this.introMusicPromise;
+    this.introMusicPromise = (async () => {
+      const loader = new THREE.AudioLoader();
+      await this.loadFileList(loader, [['intro', 'audio/music_intro.mp3']]);
+      this.ensureIntroSound();
+    })();
+    try {
+      await this.introMusicPromise;
+    } finally {
+      if (!this.buffers.has('intro')) this.introMusicPromise = null;
+    }
+  }
+
+  whenIntroMusic(): Promise<void> {
+    return this.loadIntroMusic();
+  }
+
+  hasIntroMusic(): boolean {
+    return this.buffers.has('intro');
   }
 
   async loadSounds(scene: THREE.Scene, sconces: readonly Sconce[]) {
@@ -359,15 +398,8 @@ export class AudioManager {
     }
 
     this.ensureMenuSound();
+    this.ensureIntroSound();
     this.menuLoaded = true;
-
-    const intro = this.buffers.get('intro');
-    if (intro) {
-      this.introSound = new THREE.Audio(this.listener);
-      this.introSound.setBuffer(intro);
-      this.introSound.setLoop(false);
-      this.introSound.setVolume(0.7);
-    }
 
     if (!this.uiSound) {
       this.uiSound = new THREE.Audio(this.listener);
@@ -679,12 +711,13 @@ export class AudioManager {
   crossfadeToIntro(ms = 1000) {
     this.unlock();
     this.fadeOut(this.menuSound, ms);
-    if (this.introSound) {
-      if (this.introSound.isPlaying) this.introSound.stop();
-      this.introSound.setVolume(0);
-      this.introSound.play();
-      this.fadeIn(this.introSound, 0.7, ms);
-    }
+    if (this.introStarted || this.introSound?.isPlaying) return;
+    this.introStarted = true;
+    this.ensureIntroSound();
+    if (!this.introSound) return;
+    this.introSound.setVolume(0);
+    this.introSound.play();
+    this.fadeIn(this.introSound, 0.7, ms);
   }
 
   crossfadeToAct1(ms = 1000) {

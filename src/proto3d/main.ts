@@ -131,12 +131,16 @@ class Game {
   private bubble: SpeechBubble | null = null;
   private loopStarted = false;
   private titleReady = false;
+  private tapPromptReady = false;
   private playReady = false;
   private pendingTap = false;
   private skipIntroRequested = false;
   private lastTapAt = 0;
   private worldBoot: Promise<void> = Promise.resolve();
-  private introBoot: Promise<void> = Promise.resolve();
+  private stageFitWired = false;
+  private newGameStarted = false;
+  private pendingNewGameReset = false;
+  private enteringPlay = false;
   currentSlot: number | null = null;
   private tileSnap: Array<{
     x: number;
@@ -166,6 +170,7 @@ class Game {
     persistStorage();
     this.skipTitle = params.get('test') === '1' && params.get('title') !== '1';
 
+    this.fitStage();
     this.audioManager = new AudioManager(this.quality);
     this.setupTapToStart();
 
@@ -183,7 +188,10 @@ class Game {
     if (!this.skipTitle) {
       this.phase = 'title';
       this.title.show('title');
+      this.fitStage();
+      this.tapPromptReady = true;
       this.setTapStatus('tap_to_start');
+      this.beginTitleBackgroundLoads();
       if (this.pendingTap) this.consumeTitleTap();
     }
     this.applyStoryLabels();
@@ -306,8 +314,7 @@ class Game {
     await this.storyProgress.load(import.meta.env.BASE_URL);
     const layout = await loadLayout585();
     this.renderer = new PixelRenderer(canvas, layout.view[2], layout.view[3]);
-    fitGameStage();
-    window.addEventListener('resize', () => fitGameStage());
+    this.fitStage();
     await this.renderer.loadPalette();
     if (params.get('palette') === '0') this.renderer.setPaletteEnabled(false);
     const fpsEl = document.getElementById('fps-counter');
@@ -420,15 +427,27 @@ class Game {
       onInteract: (x, y) => this.interact(x, y)
     });
 
-    this.introBoot = this.intro ? this.intro.load() : Promise.resolve();
     void this.title?.loadRest();
     void this.audioManager.loadSounds(this.renderer.scene, floor1Sconces);
     if (this.bubble) await this.bubble.load();
     this.updateDoorButton();
   }
 
-  private async ensureIntroReady() {
-    await this.introBoot;
+  private fitStage() {
+    fitGameStage();
+    if (this.stageFitWired) return;
+    this.stageFitWired = true;
+    window.addEventListener('resize', () => fitGameStage());
+  }
+
+  private beginTitleBackgroundLoads() {
+    this.intro?.preload();
+    void this.audioManager.loadIntroMusic();
+    void this.title?.loadRest();
+  }
+
+  private async ensureIntroStartReady() {
+    await Promise.all([this.intro ? this.intro.whenShot1() : Promise.resolve(), this.audioManager.whenIntroMusic()]);
   }
 
   private async ensurePlayReady() {
@@ -858,7 +877,7 @@ class Game {
   }
 
   private applyStoryLabels() {
-    if (this.titleReady && !this.skipTitle) this.setTapStatus('tap_to_start');
+    if (this.tapPromptReady && this.titleReady && !this.skipTitle) this.setTapStatus('tap_to_start');
     if (this.playReady && this.skipTitle) this.setTapStatus('tap_to_start');
     const tap = document.getElementById('tap-to-start-text');
     if (tap && !tap.textContent) tap.textContent = this.story.uiText('status.loading');
@@ -1800,9 +1819,14 @@ class Game {
   }
 
   private startNewGame() {
+    if (this.newGameStarted) return;
+    this.newGameStarted = true;
+    this.enteringPlay = false;
     this.title.hide();
     this.audioManager.markPlayStarted();
     this.skipIntroRequested = false;
+    this.pendingNewGameReset = true;
+    this.pendingStartSnapshot = true;
     void this.prefetchFloor();
     void this.runNewGame();
   }
@@ -1815,8 +1839,10 @@ class Game {
     });
   }
 
-  private async runNewGame() {
-    await this.withLoading(Promise.all([this.worldBoot, this.ensureIntroReady()]));
+  private async applyNewGameReset() {
+    await this.worldBoot;
+    if (!this.pendingNewGameReset) return;
+    this.pendingNewGameReset = false;
     this.restoreSconceDefaults();
     this.resetFloorState();
     this.flags.clear();
@@ -1826,22 +1852,27 @@ class Game {
     this.journalPages.clear();
     this.dialogue.clear();
     this.floorStates = {};
-    this.hud.resetFrostHint();
+    this.hud?.resetFrostHint();
     this.pendingStartSnapshot = true;
+  }
+
+  private async runNewGame() {
     this.phase = 'intro';
-    if (this.skipIntroRequested) {
-      this.beginPlay();
-      return;
-    }
-    this.audioManager.crossfadeToIntro();
-    await this.withLoading(this.ensureIntroReady());
+    this.beginTitleBackgroundLoads();
+    await this.withLoading(this.ensureIntroStartReady());
     if (this.skipIntroRequested) {
       this.beginPlay();
       return;
     }
     const overlay = document.getElementById('intro-overlay');
     if (overlay && this.intro) {
+      this.intro.setNeedShot((waiting) => {
+        if (this.skipIntroRequested || this.phase !== 'intro') return;
+        if (waiting) this.showTapOverlay('loading');
+        else this.hideTapOverlay();
+      });
       overlay.classList.add('show');
+      this.audioManager.crossfadeToIntro();
       this.intro.start();
     } else {
       this.beginPlay();
@@ -1860,7 +1891,10 @@ class Game {
   }
 
   private async runBeginPlay() {
+    if (this.enteringPlay) return;
+    this.enteringPlay = true;
     await this.withLoading(this.ensurePlayReady());
+    await this.applyNewGameReset();
     this.phase = 'play';
     if (!this.playStartedAt) this.playStartedAt = performance.now();
     this.audioManager.markPlayStarted();
@@ -1939,8 +1973,12 @@ class Game {
       ready: true,
       boot: () => ({
         titleReady: this.titleReady,
+        tapPromptReady: this.tapPromptReady,
         playReady: this.playReady,
-        monsters: this.spriteManager?.hasMonsters() ?? false
+        monsters: this.spriteManager?.hasMonsters() ?? false,
+        introShot1: this.intro?.hasShot(0) ?? false,
+        introMusic: this.audioManager.hasIntroMusic(),
+        introStarted: this.intro?.hasStarted() ?? false
       }),
       setPosition: (x: number, y: number, dir: number) => {
         this.cancelSwap();
@@ -2553,12 +2591,19 @@ class Game {
   setupTapToStart() {
     const tapToStart = document.getElementById('tap-to-start')!;
     tapToStart.classList.remove('hidden');
+    const overlayActive = () => !tapToStart.classList.contains('hidden');
     const onTap = (e: Event) => {
       if (e instanceof PointerEvent && 'isPrimary' in e && !e.isPrimary) return;
       this.audioManager.unlock();
+      if (!overlayActive()) return;
       const now = performance.now();
       if (now - this.lastTapAt < 400) return;
       this.lastTapAt = now;
+      if (this.phase === 'intro') {
+        if (this.intro?.hasStarted()) this.skipIntro();
+        else this.flashTapFeedback();
+        return;
+      }
       if (this.skipTitle) {
         if (!this.playReady) {
           this.pendingTap = true;
@@ -2573,10 +2618,15 @@ class Game {
         this.flashTapFeedback();
         return;
       }
-      if (!tapToStart.classList.contains('hidden')) this.consumeTitleTap();
+      this.consumeTitleTap();
     };
-    tapToStart.addEventListener('pointerup', onTap);
-    tapToStart.addEventListener('click', onTap);
+    tapToStart.addEventListener('pointerdown', onTap);
+    const onStageTap = (e: Event) => {
+      if (!overlayActive()) return;
+      onTap(e);
+    };
+    document.getElementById('game-stage')?.addEventListener('pointerdown', onStageTap, true);
+    document.getElementById('title-canvas')?.addEventListener('pointerdown', onStageTap);
   }
 
   gameLoop() {

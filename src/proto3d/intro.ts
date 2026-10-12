@@ -20,17 +20,37 @@ interface EyePos {
   openTime: number;
 }
 
+export const INTRO_IMAGE_FILES = [
+  'shot1_keep.png',
+  'shot2_sinking.png',
+  'shot3_forge.png',
+  'shot4_drowned.png',
+  'shot5_swamp.png',
+  'shot6_gate.png',
+  'eyes.png',
+  'boat.png',
+  'title.png'
+] as const;
+
+export const INTRO_SHOT_FILES = INTRO_IMAGE_FILES.slice(0, 6);
+
 export class IntroPlayer {
   private width = 270;
   private height = 480;
   private ctx: CanvasRenderingContext2D;
   private images = new Map<string, HTMLImageElement>();
+  private imageLoads = new Map<string, Promise<HTMLImageElement | null>>();
+  private failed = new Set<string>();
   private shots: IntroShot[] = [];
   private captions: IntroCaption[] = [];
   private currentTime = 0;
-  private startTime = 0;
+  private lastTick = 0;
+  private elapsedMs = 0;
+  private started = false;
   private finished = false;
   private skipped = false;
+  private waitingForShot = false;
+  private needShot: ((waiting: boolean) => void) | null = null;
   private eyePositions: EyePos[] = [];
   private boatFrom = { x: 427, y: 560, scale: 1 };
   private boatTo = { x: 427, y: 345, scale: 0.5 };
@@ -42,34 +62,75 @@ export class IntroPlayer {
     this.story = story;
   }
 
-  async load() {
-    const base = import.meta.env.BASE_URL;
-    const names = [
-      'shot1_keep.png',
-      'shot2_sinking.png',
-      'shot3_forge.png',
-      'shot4_drowned.png',
-      'shot5_swamp.png',
-      'shot6_gate.png',
-      'eyes.png',
-      'boat.png',
-      'title.png'
-    ];
-    await Promise.all(
-      names.map(
-        (name) =>
-          new Promise<void>((resolve, reject) => {
-            const img = new Image();
-            img.onload = () => {
-              this.images.set(name, img);
-              resolve();
-            };
-            img.onerror = () => reject(new Error(name));
-            img.src = `${base}art/intro/${name}`;
-          })
-      )
-    );
+  /** Kick off every intro image. Safe to call more than once. */
+  preload() {
+    this.ensureTimeline();
+    for (const name of INTRO_IMAGE_FILES) void this.loadImage(name);
+  }
 
+  async load() {
+    this.preload();
+    await Promise.all(INTRO_IMAGE_FILES.map((name) => this.loadImage(name)));
+  }
+
+  hasShot(index: number): boolean {
+    this.ensureTimeline();
+    const shot = this.shots[index];
+    return !!shot && (this.images.has(shot.file) || this.failed.has(shot.file));
+  }
+
+  whenShot(index: number): Promise<void> {
+    this.ensureTimeline();
+    const shot = this.shots[index];
+    if (!shot) return Promise.resolve();
+    return this.loadImage(shot.file).then(() => undefined);
+  }
+
+  whenShot1(): Promise<void> {
+    return this.whenShot(0);
+  }
+
+  setNeedShot(handler: ((waiting: boolean) => void) | null) {
+    this.needShot = handler;
+  }
+
+  hasStarted(): boolean {
+    return this.started;
+  }
+
+  start() {
+    if (this.started || this.finished) return;
+    this.started = true;
+    this.ensureTimeline();
+    this.lastTick = performance.now();
+    this.elapsedMs = 0;
+    this.currentTime = 0;
+    this.finished = false;
+    this.skipped = false;
+    this.waitingForShot = false;
+    const tick = () => {
+      if (this.finished) return;
+      this.update();
+      this.render();
+      this.raf = requestAnimationFrame(tick);
+    };
+    this.raf = requestAnimationFrame(tick);
+  }
+
+  skip() {
+    this.skipped = true;
+    this.finished = true;
+    this.started = true;
+    this.setWaiting(false);
+    cancelAnimationFrame(this.raf);
+  }
+
+  isFinished(): boolean {
+    return this.finished;
+  }
+
+  private ensureTimeline() {
+    if (this.shots.length) return;
     this.shots = [
       { file: 'shot1_keep.png', panX: [150, 430], duration: 6, effects: ['sparks'] },
       { file: 'shot2_sinking.png', panX: [430, 150], duration: 6, effects: ['rain', 'shake', 'lightning'] },
@@ -96,35 +157,62 @@ export class IntroPlayer {
     ];
   }
 
-  start() {
-    this.startTime = performance.now();
-    this.currentTime = 0;
-    this.finished = false;
-    this.skipped = false;
-    const tick = () => {
-      if (this.finished) return;
-      this.update();
-      this.render();
-      this.raf = requestAnimationFrame(tick);
-    };
-    this.raf = requestAnimationFrame(tick);
+  private loadImage(name: string): Promise<HTMLImageElement | null> {
+    const existing = this.imageLoads.get(name);
+    if (existing) return existing;
+    const base = import.meta.env.BASE_URL;
+    const pending = new Promise<HTMLImageElement | null>((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        this.images.set(name, img);
+        resolve(img);
+      };
+      img.onerror = () => {
+        this.failed.add(name);
+        resolve(null);
+      };
+      img.src = `${base}art/intro/${name}`;
+    });
+    this.imageLoads.set(name, pending);
+    return pending;
   }
 
-  skip() {
-    this.skipped = true;
-    this.finished = true;
-    cancelAnimationFrame(this.raf);
+  private shotIndexAt(time: number): number {
+    let elapsed = 0;
+    for (let i = 0; i < this.shots.length; i++) {
+      if (time < elapsed + this.shots[i].duration) return i;
+      elapsed += this.shots[i].duration;
+    }
+    return Math.max(0, this.shots.length - 1);
   }
 
-  isFinished(): boolean {
-    return this.finished;
+  private setWaiting(waiting: boolean) {
+    if (this.waitingForShot === waiting) return;
+    this.waitingForShot = waiting;
+    this.needShot?.(waiting);
   }
 
   private update() {
-    this.currentTime = (performance.now() - this.startTime) / 1000;
+    const now = performance.now();
+    if (!this.waitingForShot) {
+      this.elapsedMs += now - this.lastTick;
+      this.currentTime = this.elapsedMs / 1000;
+    }
+    this.lastTick = now;
     if (this.currentTime >= 35 || this.skipped) {
       this.finished = true;
+      this.setWaiting(false);
       cancelAnimationFrame(this.raf);
+      return;
+    }
+    const idx = this.shotIndexAt(this.currentTime);
+    if (!this.hasShot(idx)) {
+      this.setWaiting(true);
+      void this.whenShot(idx).then(() => {
+        if (this.finished || this.skipped) return;
+        this.lastTick = performance.now();
+        this.setWaiting(false);
+      });
     }
   }
 

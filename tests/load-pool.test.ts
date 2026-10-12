@@ -2,6 +2,7 @@ import { readFileSync, statSync } from 'fs';
 import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
 import { titleBootRelPaths } from '../src/proto3d/boot-assets';
+import { INTRO_SHOT_FILES } from '../src/proto3d/intro';
 import { createLimiter, mapPool, SPRITE_LOAD_CONCURRENCY } from '../src/proto3d/load-pool';
 
 describe('mapPool / createLimiter', () => {
@@ -52,6 +53,7 @@ describe('title boot asset list', () => {
     expect(paths).toContain('audio/sfx_ui_button.mp3');
     expect(paths).toContain('audio/sfx_ui_button_denied.mp3');
     expect(paths.some((p) => p.includes('intro/shot'))).toBe(false);
+    expect(paths.some((p) => p.includes('music_intro'))).toBe(false);
     expect(paths.some((p) => p.includes('monsters'))).toBe(false);
     expect(paths).toHaveLength(17);
   });
@@ -87,5 +89,20 @@ describe('title boot asset list', () => {
     expect(el.step4_title_saves.status.loading).toBeTruthy();
     expect(el.step4_title_saves.tap_to_start).toBeTruthy();
     expect(el.step4_title_saves.status.loading).not.toBe(en.step4_title_saves.status.loading);
+  });
+
+  it('keeps intro shots and music_intro out of the title-blocking batch', () => {
+    const root = resolve(__dirname, '../public');
+    const shotBytes = INTRO_SHOT_FILES.reduce((sum, file) => sum + statSync(resolve(root, 'art/intro', file)).size, 0);
+    const shot1 = statSync(resolve(root, 'art/intro/shot1_keep.png')).size;
+    const music = statSync(resolve(root, 'audio/music_intro.mp3')).size;
+    expect(INTRO_SHOT_FILES).toHaveLength(6);
+    expect(shot1).toBeGreaterThan(150_000);
+    expect(shot1).toBeLessThan(250_000);
+    expect(shotBytes).toBeGreaterThan(1_000_000);
+    expect(shotBytes).toBeLessThan(1_400_000);
+    expect(music).toBeGreaterThan(400_000);
+    expect(music).toBeLessThan(500_000);
+    expect(titleBootRelPaths('en')).not.toContain('audio/music_intro.mp3');
   });
 });
