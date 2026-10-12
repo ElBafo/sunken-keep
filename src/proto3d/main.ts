@@ -2623,12 +2623,17 @@ class Game {
     tapToStart.addEventListener('pointerdown', onTap);
     tapToStart.addEventListener('pointerup', onTap);
     tapToStart.addEventListener('click', onTap);
+    tapToStart.addEventListener('touchstart', onTap, { passive: true });
     const onStageTap = (e: Event) => {
       if (!overlayActive()) return;
       onTap(e);
     };
-    document.getElementById('game-stage')?.addEventListener('pointerdown', onStageTap, true);
-    document.getElementById('title-canvas')?.addEventListener('pointerdown', onStageTap);
+    const stage = document.getElementById('game-stage');
+    const titleCanvas = document.getElementById('title-canvas');
+    stage?.addEventListener('pointerdown', onStageTap, true);
+    stage?.addEventListener('touchstart', onStageTap, { capture: true, passive: true });
+    titleCanvas?.addEventListener('pointerdown', onStageTap);
+    titleCanvas?.addEventListener('touchstart', onStageTap, { passive: true });
   }
 
   gameLoop() {

@@ -177,6 +177,9 @@ test.describe('proto3d step4 title and saves', () => {
       const canvas = document.getElementById('title-canvas');
       canvas?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, isPrimary: true }));
     });
+    if (await page.locator('#tap-to-start').isVisible()) {
+      await page.locator('#tap-to-start').tap();
+    }
     await expect(page.locator('#tap-to-start')).toBeHidden();
     await expect(page.locator('#title-overlay')).toHaveClass(/show/);
     await page.waitForFunction(

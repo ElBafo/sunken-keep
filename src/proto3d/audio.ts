@@ -699,7 +699,11 @@ export class AudioManager {
     this.stopIntro();
     if (this.menuSound && !this.menuSound.isPlaying) {
       this.menuSound.setVolume(0.7);
-      this.menuSound.play();
+      try {
+        this.menuSound.play();
+      } catch {
+        // Host audio can refuse playback; the bed is still intended to run.
+      }
     }
   }
 
@@ -716,7 +720,12 @@ export class AudioManager {
     this.ensureIntroSound();
     if (!this.introSound) return;
     this.introSound.setVolume(0);
-    this.introSound.play();
+    try {
+      this.introSound.play();
+    } catch {
+      this.introStarted = false;
+      return;
+    }
     this.fadeIn(this.introSound, 0.7, ms);
   }
 
