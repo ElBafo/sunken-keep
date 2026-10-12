@@ -88,13 +88,16 @@ export const STEP_VOLUME = 0.4;
 /** Lit torch pool — warm, smooth falloff. */
 export const SCONCE_RADIUS_TILES = 2.5;
 export const TORCH_INTENSITY = 1.45;
-/** Wren's lantern with oil — full on the party square, readable on the next. */
-export const LANTERN_RADIUS_TILES = 2.0;
-export const LANTERN_INTENSITY = 0.64;
+/**
+ * Wren's lantern with oil — quadratic 1−(d/r)² so the party square stays
+ * ~0.32, 1 tile stays readable (~0.25+), and 2 tiles still glow (~0.12).
+ */
+export const LANTERN_RADIUS_TILES = 2.5;
+export const LANTERN_INTENSITY = 0.4;
 /** Ember-only lantern — dies just past the next square's near edge. */
 export const EMBER_RADIUS_TILES = 1.1;
 export const EMBER_INTENSITY = 0.4;
-/** Own-square floor stays full; falloff starts near the tile edge. */
+/** Own-square floor stays full for carried-torch quartic; oil uses 1−(d/r)². */
 export const LANTERN_CORE_TILES = 0.28;
 /** Held-lantern height (world Y) so ceilings use 3D falloff. */
 export const LANTERN_HEIGHT = 0.88;

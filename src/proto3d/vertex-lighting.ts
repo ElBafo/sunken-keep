@@ -73,9 +73,17 @@ function smoothFalloff(distTiles: number, radius: number): number {
 }
 
 /**
- * Lantern / ember: full on the party's own square, then a steep quartic drop
- * so the middle of the next square is already near-ambient (oil ~2 tiles,
- * ember ~1.1). Walls and ceiling use 3D distance and fall off with height.
+ * Oil / ember lantern: wide quadratic 1−(d/r)². Peak stays on the party
+ * square; 1 tile is still most of the peak; the tail fades a bit past 2.
+ */
+export function lanternFalloff(distTiles: number, radius: number): number {
+  if (radius <= 0 || distTiles >= radius) return 0;
+  const x = distTiles / radius;
+  return 1 - x * x;
+}
+
+/**
+ * Carried wall-torch: full on the party square, then a steep quartic drop.
  */
 export function partyFalloff(distTiles: number, radius: number, coreTiles = LANTERN_CORE_TILES): number {
   if (radius <= 0 || distTiles >= radius) return 0;
@@ -292,7 +300,7 @@ export class VertexLightingManager {
     const partyDist = partyDistTiles(wx, wy, wz, this.partyX, this.partyY);
     let maxW = 0;
     if (reachAt(this.partyCells, tileX, tileY) !== undefined) {
-      maxW = lantern.intensity * partyFalloff(partyDist, lantern.radius);
+      maxW = lantern.intensity * lanternFalloff(partyDist, lantern.radius);
       if (this.carriedTorch) {
         maxW = Math.max(maxW, CARRIED_TORCH_INTENSITY * partyFalloff(partyDist, CARRIED_TORCH_RADIUS_TILES));
       }
@@ -371,7 +379,7 @@ export class VertexLightingManager {
     const lantern = this.lanternSpec();
     const partyDist = partyDistTiles(wx, wy, wz, this.partyX, this.partyY);
     if (reachAt(this.partyCells, tileX, tileY) !== undefined) {
-      this.accum(rgb, lantern.intensity * partyFalloff(partyDist, lantern.radius), lantern.rgb);
+      this.accum(rgb, lantern.intensity * lanternFalloff(partyDist, lantern.radius), lantern.rgb);
       if (this.carriedTorch) {
         this.accum(
           rgb,
