@@ -122,7 +122,7 @@ export class IntroPlayer {
     this.finished = true;
     this.started = true;
     this.setWaiting(false);
-    cancelAnimationFrame(this.raf);
+    if (this.raf) cancelAnimationFrame(this.raf);
   }
 
   isFinished(): boolean {

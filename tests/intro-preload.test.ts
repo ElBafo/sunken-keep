@@ -79,6 +79,7 @@ describe('IntroPlayer preload', () => {
     vi.stubGlobal('Image', FakeImage);
     const raf = vi.fn().mockReturnValue(1);
     vi.stubGlobal('requestAnimationFrame', raf);
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
     const intro = new IntroPlayer(stubCanvas(), stubStory());
     intro.skip();
     intro.start();
