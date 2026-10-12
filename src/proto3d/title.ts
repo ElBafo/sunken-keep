@@ -1,3 +1,4 @@
+import { titleEssentialImageKeys } from './boot-assets';
 import { StoryText, type Locale } from './i18n';
 import { drawFont5x7, type FontGlyphs } from './font5x7';
 import {
@@ -74,6 +75,7 @@ export type TitleAction =
   | { type: 'new_game' }
   | { type: 'continue'; payload: SavePayload }
   | { type: 'load'; payload: SavePayload }
+  | { type: 'open_load' }
   | { type: 'language'; locale: Locale }
   | { type: 'save'; slot: number }
   | { type: 'toast'; text: string };
@@ -100,6 +102,8 @@ export class TitleScreen {
   private font: HTMLImageElement | null = null;
   private fontGlyphs: FontGlyphs = {};
   visible = false;
+  essentialReady = false;
+  private restPromise: Promise<void> | null = null;
 
   constructor(canvas: HTMLCanvasElement, story: StoryText, onAction: (a: TitleAction) => void) {
     this.ctx = canvas.getContext('2d')!;
@@ -108,17 +112,48 @@ export class TitleScreen {
   }
 
   async load() {
+    await this.loadEssential();
+    await this.loadRest();
+  }
+
+  /** Background, current-language logo, button frames, 5×7 font. Enough to paint the title. */
+  async loadEssential() {
+    if (this.essentialReady) return;
     const base = import.meta.env.BASE_URL;
     const res = await fetch(`${base}art/ui/title/title.json`);
     this.layout = (await res.json()) as TitleLayout;
+    const files = titleEssentialImageKeys(this.story.locale, this.layout);
+    await Promise.all([
+      ...files.map((file) => this.cache(file, this.fileUrl(base, file))),
+      this.loadFontMeta(base)
+    ]);
+    this.font = this.images.get('font_5x7.png') ?? null;
+    this.essentialReady = true;
+  }
+
+  /** Glow, other-language logo, save slots, portraits — fetched while the title is up. */
+  loadRest(): Promise<void> {
+    if (this.restPromise) return this.restPromise;
+    this.restPromise = this.loadRestInner();
+    return this.restPromise;
+  }
+
+  async ensureLogo() {
+    if (!this.layout) return;
+    const file = this.logoFile();
+    if (this.images.has(file)) return;
+    const base = import.meta.env.BASE_URL;
+    await this.cache(file, this.fileUrl(base, file));
+  }
+
+  private async loadRestInner() {
+    if (!this.layout) await this.loadEssential();
+    if (!this.layout) return;
+    const base = import.meta.env.BASE_URL;
     const files = [
-      this.layout.bg,
       this.layout.logo,
       'title_logo_el.png',
       this.layout.windowsGlow ?? 'title_windows_glow.png',
-      this.layout.buttons.normal,
-      this.layout.buttons.pressed,
-      this.layout.buttons.dim,
       this.layout.saveSlot.frame,
       this.layout.saveSlot.exampleEmpty ?? 'save_slot_empty.png',
       this.layout.saveSlot.exampleFilled ?? 'save_slot.png',
@@ -128,18 +163,17 @@ export class TitleScreen {
       'ilsevar_healthy.png',
       'mags_healthy.png'
     ];
-    await Promise.all([
-      ...files.map((file) => {
-        const rel = file.includes('/')
-          ? file
-          : file.endsWith('_healthy.png')
-            ? `art/portraits/${file}`
-            : `art/ui/title/${file}`;
-        return this.cache(file, `${base}${rel}`);
-      }),
-      this.cache('font_5x7.png', `${base}art/font/font_5x7.png`)
-    ]);
-    this.font = this.images.get('font_5x7.png') ?? null;
+    await Promise.all(files.map((file) => this.cache(file, this.fileUrl(base, file))));
+  }
+
+  private fileUrl(base: string, file: string): string {
+    if (file.includes('/')) return `${base}${file}`;
+    if (file.endsWith('_healthy.png')) return `${base}art/portraits/${file}`;
+    if (file === 'font_5x7.png') return `${base}art/font/${file}`;
+    return `${base}art/ui/title/${file}`;
+  }
+
+  private async loadFontMeta(base: string) {
     try {
       const meta = (await fetch(`${base}art/font/font_5x7.json`).then((r) => r.json())) as { glyphs?: FontGlyphs };
       this.fontGlyphs = meta.glyphs ?? {};
@@ -149,6 +183,7 @@ export class TitleScreen {
   }
 
   private cache(key: string, src: string) {
+    if (this.images.has(key)) return Promise.resolve();
     return new Promise<void>((resolve) => {
       const img = new Image();
       img.onload = () => {
@@ -519,7 +554,7 @@ export class TitleScreen {
         return;
       }
       if (id === 'Load') {
-        this.setMode('load');
+        this.onAction({ type: 'open_load' });
         return;
       }
       if (id === 'Settings') {

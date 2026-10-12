@@ -13,6 +13,7 @@ import {
 } from './constants';
 import { QUALITY_PRESETS, QualityLevel } from './quality';
 import { DressingMarks } from './dressing';
+import { TITLE_MENU_AUDIO } from './boot-assets';
 import { FloorData, Sconce } from './types';
 
 const FAR_KEYS = ['far_draught', 'far_groan', 'far_pebbles', 'far_rumble'] as const;
@@ -50,6 +51,8 @@ export class AudioManager {
   private heardBones = new Set<string>();
   private scratchDist: number[] = [];
   private loaded = false;
+  private menuLoaded = false;
+  private soundsPromise: Promise<void> | null = null;
   private uiPool: THREE.Audio[] = [];
   private lanternSound: THREE.Audio | null = null;
   private lanternMode: 'oil' | 'ember' | 'off' = 'off';
@@ -137,8 +140,58 @@ export class AudioManager {
     });
   }
 
+  async loadMenuSounds() {
+    if (this.menuLoaded) return;
+    const loader = new THREE.AudioLoader();
+    await this.loadFileList(loader, TITLE_MENU_AUDIO);
+    this.ensureMenuSound();
+    if (!this.uiSound) {
+      this.uiSound = new THREE.Audio(this.listener);
+      this.uiPool.push(this.uiSound);
+    }
+    this.menuLoaded = true;
+  }
+
+  private async loadFileList(loader: THREE.AudioLoader, files: ReadonlyArray<readonly [string, string]>) {
+    const missing = files.filter(([name]) => !this.buffers.has(name));
+    const results = await Promise.all(
+      missing.map(async ([name, path]) => {
+        try {
+          const buf = await this.loadBuffer(loader, path);
+          return [name, buf] as const;
+        } catch (err) {
+          console.warn('Failed to load', path, err);
+          return null;
+        }
+      })
+    );
+    for (const pair of results) {
+      if (pair) this.buffers.set(pair[0], pair[1]);
+    }
+  }
+
+  private ensureMenuSound() {
+    if (this.menuSound) return;
+    const menu = this.buffers.get('menu');
+    if (!menu) return;
+    this.menuSound = new THREE.Audio(this.listener);
+    this.menuSound.setBuffer(menu);
+    this.menuSound.setLoop(true);
+    this.menuSound.setVolume(0.7);
+  }
+
   async loadSounds(scene: THREE.Scene, sconces: readonly Sconce[]) {
     if (this.loaded) return;
+    if (this.soundsPromise) return this.soundsPromise;
+    this.soundsPromise = this.loadSoundsInner(scene, sconces);
+    try {
+      await this.soundsPromise;
+    } finally {
+      if (!this.loaded) this.soundsPromise = null;
+    }
+  }
+
+  private async loadSoundsInner(scene: THREE.Scene, sconces: readonly Sconce[]) {
     const loader = new THREE.AudioLoader();
     const files: Array<[string, string]> = [
       ['ambience', 'audio/amb_flooded_halls_loop.mp3'],
@@ -287,20 +340,7 @@ export class AudioManager {
       ['vox_mags_down', 'audio/vox_mags_down.mp3']
     ];
 
-    const results = await Promise.all(
-      files.map(async ([name, path]) => {
-        try {
-          const buf = await this.loadBuffer(loader, path);
-          return [name, buf] as const;
-        } catch (err) {
-          console.warn('Failed to load', path, err);
-          return null;
-        }
-      })
-    );
-    for (const pair of results) {
-      if (pair) this.buffers.set(pair[0], pair[1]);
-    }
+    await this.loadFileList(loader, files);
 
     const amb = this.buffers.get('ambience');
     if (amb) {
@@ -318,13 +358,8 @@ export class AudioManager {
       this.musicSound.setVolume(0.3);
     }
 
-    const menu = this.buffers.get('menu');
-    if (menu) {
-      this.menuSound = new THREE.Audio(this.listener);
-      this.menuSound.setBuffer(menu);
-      this.menuSound.setLoop(true);
-      this.menuSound.setVolume(0.7);
-    }
+    this.ensureMenuSound();
+    this.menuLoaded = true;
 
     const intro = this.buffers.get('intro');
     if (intro) {
@@ -334,8 +369,10 @@ export class AudioManager {
       this.introSound.setVolume(0.7);
     }
 
-    this.uiSound = new THREE.Audio(this.listener);
-    this.uiPool.push(this.uiSound);
+    if (!this.uiSound) {
+      this.uiSound = new THREE.Audio(this.listener);
+      this.uiPool.push(this.uiSound);
+    }
     this.scene = scene;
 
     void sconces;

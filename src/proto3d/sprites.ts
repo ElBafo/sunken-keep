@@ -9,6 +9,7 @@ import {
   tileBedY
 } from './constants';
 import type { HitKind } from '../core/types';
+import { createLimiter, mapPool, SPRITE_LOAD_CONCURRENCY } from './load-pool';
 import { FloorData, Tile } from './types';
 
 /** Item billboards keep the old 80×60 texel ratio. Monster quads use each set's own ratio. */
@@ -293,6 +294,10 @@ export class SpriteManager {
   private scene: THREE.Scene | null = null;
   private chestOpenLod: THREE.Texture[] | null = null;
   private chestClosedLod = new Map<string, THREE.Texture[]>();
+  private limitTex = createLimiter(SPRITE_LOAD_CONCURRENCY);
+  private animCache = new Map<string, Promise<THREE.Texture[]>>();
+  private monstersReady = false;
+  private monsterLoad: Promise<void> | null = null;
   adjacentScale = 1;
 
   constructor(camera: THREE.Camera) {
@@ -405,151 +410,191 @@ export class SpriteManager {
     }
   }
 
-  async loadSprites(scene: THREE.Scene, floorData: FloorData) {
+  private loadTex(path: string): Promise<THREE.Texture> {
     const loader = new THREE.TextureLoader();
     const baseUrl = import.meta.env.BASE_URL;
+    return this.limitTex(
+      () =>
+        new Promise((resolve, reject) => {
+          loader.load(
+            `${baseUrl}${path}`,
+            (tex) => {
+              configureSpriteTexture(tex);
+              resolve(tex);
+            },
+            undefined,
+            (err) => reject(new Error(`Failed to load sprite texture ${path}: ${String(err)}`))
+          );
+        })
+    );
+  }
+
+  /** Shared art + floor items. Monster frames stay deferred until `ensureMonsters`. */
+  async loadSprites(scene: THREE.Scene, floorData: FloorData, opts: { monsters?: boolean } = {}) {
+    const baseUrl = import.meta.env.BASE_URL;
     await this.loadAnchors(baseUrl);
-
-    const loadTex = (path: string): Promise<THREE.Texture> => {
-      return new Promise((resolve, reject) => {
-        loader.load(
-          `${baseUrl}${path}`,
-          (tex) => {
-            configureSpriteTexture(tex);
-            resolve(tex);
-          },
-          undefined,
-          (err) => reject(new Error(`Failed to load sprite texture ${path}: ${String(err)}`))
-        );
-      });
-    };
-
     this.scene = scene;
     await this.loadHeights(baseUrl);
-    await this.loadHitFx(loadTex, baseUrl);
+    await this.loadHitFx(baseUrl);
     try {
       this.chestOpenLod = await Promise.all([
-        loadTex('art/dungeon/item_chest_open_near.png'),
-        loadTex('art/dungeon/item_chest_open_mid.png'),
-        loadTex('art/dungeon/item_chest_open_far.png')
+        this.loadTex('art/dungeon/item_chest_open_near.png'),
+        this.loadTex('art/dungeon/item_chest_open_mid.png'),
+        this.loadTex('art/dungeon/item_chest_open_far.png')
       ]);
     } catch {
       this.chestOpenLod = null;
     }
+    await this.loadItems(scene, floorData);
+    if (opts.monsters !== false) await this.ensureMonsters(scene, floorData);
+  }
 
+  hasMonsters(): boolean {
+    return this.monstersReady;
+  }
+
+  /** Load this floor's monster frames (parallel, concurrency-capped) when the floor starts. */
+  ensureMonsters(scene: THREE.Scene, floorData: FloorData): Promise<void> {
+    if (this.monstersReady) return Promise.resolve();
+    if (!this.monsterLoad) this.monsterLoad = this.loadMonsters(scene, floorData);
+    return this.monsterLoad;
+  }
+
+  private async loadItems(scene: THREE.Scene, floorData: FloorData) {
+    const jobs: Array<{ x: number; y: number; tile: Tile; itemName: string; feetY: number }> = [];
     const { tiles, width, height } = floorData;
     for (let y = 0; y < height; y++) {
       for (let x = 0; x < width; x++) {
         const tile = tiles[y][x];
-        const feetY = spriteFeetY(tile);
-
-        if (tile.monster) {
-          const kind = tile.monster;
-          const v2 = this.v2Px.has(kind);
-          const folder = v2 ? V2_FOLDER : V1_FOLDER;
-          const lodSets: NonNullable<SpriteInfo['lodSets']> = {};
-          const lodSize: NonNullable<SpriteInfo['lodSize']> = {};
-          const worldHeight = this.wallHeightOf(kind);
-          const lods = v2 ? LOD_NAMES : (['near', 'mid', 'far'] as const);
-          for (const lod of lods) {
-            const idle = await this.loadSet(loadTex, folder, kind, 'idle', 4, lod);
-            if (!idle.length) continue;
-            const attack = await this.loadSet(loadTex, folder, kind, 'attack', 3, lod);
-            const hurt = await this.loadSet(loadTex, folder, kind, 'hurt', 1, lod);
-            const death = await this.loadSet(loadTex, folder, kind, 'death', 4, lod);
-            lodSets[lod] = { idle, attack, hurt, death, windup: attack.length ? [attack[0]] : idle };
-            lodSize[lod] = this.quadForLod(kind, lod, worldHeight, idle[0]);
-          }
-          const startLod: LodName = lodSets.near ? 'near' : ((Object.keys(lodSets)[0] as LodName | undefined) ?? 'near');
-          const startSets = lodSets[startLod] ?? {};
-          const frames = startSets.idle ?? [];
-          if (!frames.length) continue;
-          const size = lodSize[startLod] ?? quadForWorldHeight(worldHeight, CELL_SIZE, 80, 60);
-          const feet = this.feetFor(`${kind}_idle_1_${startLod}.png`, size.h, feetY);
-          const mat = makeSpriteMaterial(frames[0], true);
-          const sprite = makeBillboard(mat, x * CELL_SIZE, feet, y * CELL_SIZE, size.w, size.h);
-          sprite.renderOrder = SPRITE_RENDER_ORDER;
-          scene.add(sprite);
-
-          this.sprites.push({
-            object: sprite,
-            material: mat,
-            x,
-            y,
-            kind: 'monster',
-            monsterKind: kind,
-            spawnX: x,
-            spawnY: y,
-            v2,
-            worldHeight,
-            baseW: size.w,
-            baseH: size.h,
-            floorY: feet,
-            tileFloorY: feetY,
-            imageH: this.anchors.get(`${kind}_idle_1_${startLod}.png`)?.imageH ?? texSize(frames[0]).h,
-            gapBelow: this.anchors.get(`${kind}_idle_1_${startLod}.png`)?.gapBelow ?? 0,
-            frames,
-            sets: startSets,
-            lodSets,
-            lodSize,
-            currentLod: startLod,
-            currentFrame: 0,
-            animSpeed: 200,
-            lastFrameTime: 0,
-            anim: 'idle',
-            animOnce: false
-          });
-        }
-
         const itemName = tile.item || (tile.chest ? 'chest' : undefined);
-        if (itemName) {
-          const def = ITEM_SPRITE[itemName] ?? {
-            file: `item_${itemName}_near.png`,
-            h: ITEM_HEIGHT[itemName] ?? 0.3
-          };
-          const folder = def.base ?? 'art/dungeon';
-          const prefix = def.prefix ?? itemName;
-          const nearPath = `${folder}/${prefix}_near.png`;
-          const tex = await loadTex(nearPath);
-          const lod = await Promise.all([
-            tex,
-            loadTex(`${folder}/${prefix}_mid.png`).catch(() => tex),
-            loadTex(`${folder}/${prefix}_far.png`).catch(() => tex)
-          ]);
-          const size = billboardSize(def.h);
-          const mat = makeSpriteMaterial(tex);
-          const sprite = makeBillboard(mat, x * CELL_SIZE, feetY, y * CELL_SIZE, size.w, size.h);
-          sprite.renderOrder = ITEM_RENDER_ORDER;
-          sprite.userData.item = itemName === 'oil_flask' ? 'oil' : itemName;
-          scene.add(sprite);
-
-          this.sprites.push({
-            object: sprite,
-            material: mat,
-            x,
-            y,
-            kind: 'item',
-            itemId: itemName,
-            baseW: size.w,
-            baseH: size.h,
-            floorY: feetY,
-            tileFloorY: feetY,
-            imageH: 60,
-            gapBelow: 0,
-            lod,
-            currentFrame: 0,
-            animSpeed: 0,
-            lastFrameTime: 0,
-            anim: 'idle',
-            animOnce: false
-          });
-          if (tile.secret && !tile.secretOpen) {
-            sprite.visible = false;
-            this.sprites[this.sprites.length - 1].hidden = true;
-          }
-        }
+        if (!itemName) continue;
+        jobs.push({ x, y, tile, itemName, feetY: spriteFeetY(tile) });
       }
     }
+    const created = await mapPool(jobs, SPRITE_LOAD_CONCURRENCY, async (job) => {
+      const { x, y, tile, itemName, feetY } = job;
+      const def = ITEM_SPRITE[itemName] ?? {
+        file: `item_${itemName}_near.png`,
+        h: ITEM_HEIGHT[itemName] ?? 0.3
+      };
+      const folder = def.base ?? 'art/dungeon';
+      const prefix = def.prefix ?? itemName;
+      const tex = await this.loadTex(`${folder}/${prefix}_near.png`);
+      const lod = await Promise.all([
+        tex,
+        this.loadTex(`${folder}/${prefix}_mid.png`).catch(() => tex),
+        this.loadTex(`${folder}/${prefix}_far.png`).catch(() => tex)
+      ]);
+      const size = billboardSize(def.h);
+      const mat = makeSpriteMaterial(tex);
+      const sprite = makeBillboard(mat, x * CELL_SIZE, feetY, y * CELL_SIZE, size.w, size.h);
+      sprite.renderOrder = ITEM_RENDER_ORDER;
+      sprite.userData.item = itemName === 'oil_flask' ? 'oil' : itemName;
+      scene.add(sprite);
+      const info: SpriteInfo = {
+        object: sprite,
+        material: mat,
+        x,
+        y,
+        kind: 'item',
+        itemId: itemName,
+        baseW: size.w,
+        baseH: size.h,
+        floorY: feetY,
+        tileFloorY: feetY,
+        imageH: 60,
+        gapBelow: 0,
+        lod,
+        currentFrame: 0,
+        animSpeed: 0,
+        lastFrameTime: 0,
+        anim: 'idle',
+        animOnce: false
+      };
+      if (tile.secret && !tile.secretOpen) {
+        sprite.visible = false;
+        info.hidden = true;
+      }
+      return info;
+    });
+    this.sprites.push(...created);
+  }
+
+  private async loadMonsters(scene: THREE.Scene, floorData: FloorData) {
+    const jobs: Array<{ x: number; y: number; tile: Tile; kind: string; feetY: number }> = [];
+    const { tiles, width, height } = floorData;
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const tile = tiles[y][x];
+        if (!tile.monster) continue;
+        jobs.push({ x, y, tile, kind: tile.monster, feetY: spriteFeetY(tile) });
+      }
+    }
+    const created = await mapPool(jobs, SPRITE_LOAD_CONCURRENCY, async (job) => {
+      const { x, y, kind, feetY } = job;
+      const v2 = this.v2Px.has(kind);
+      const folder = v2 ? V2_FOLDER : V1_FOLDER;
+      const lodSets: NonNullable<SpriteInfo['lodSets']> = {};
+      const lodSize: NonNullable<SpriteInfo['lodSize']> = {};
+      const worldHeight = this.wallHeightOf(kind);
+      const lods = v2 ? LOD_NAMES : (['near', 'mid', 'far'] as const);
+      await Promise.all(
+        lods.map(async (lod) => {
+          const [idle, attack, hurt, death] = await Promise.all([
+            this.loadSet(folder, kind, 'idle', 4, lod),
+            this.loadSet(folder, kind, 'attack', 3, lod),
+            this.loadSet(folder, kind, 'hurt', 1, lod),
+            this.loadSet(folder, kind, 'death', 4, lod)
+          ]);
+          if (!idle.length) return;
+          lodSets[lod] = { idle, attack, hurt, death, windup: attack.length ? [attack[0]] : idle };
+          lodSize[lod] = this.quadForLod(kind, lod, worldHeight, idle[0]);
+        })
+      );
+      const startLod: LodName = lodSets.near ? 'near' : ((Object.keys(lodSets)[0] as LodName | undefined) ?? 'near');
+      const startSets = lodSets[startLod] ?? {};
+      const frames = startSets.idle ?? [];
+      if (!frames.length) return null;
+      const size = lodSize[startLod] ?? quadForWorldHeight(worldHeight, CELL_SIZE, 80, 60);
+      const feet = this.feetFor(`${kind}_idle_1_${startLod}.png`, size.h, feetY);
+      const mat = makeSpriteMaterial(frames[0], true);
+      const sprite = makeBillboard(mat, x * CELL_SIZE, feet, y * CELL_SIZE, size.w, size.h);
+      sprite.renderOrder = SPRITE_RENDER_ORDER;
+      scene.add(sprite);
+      const info: SpriteInfo = {
+        object: sprite,
+        material: mat,
+        x,
+        y,
+        kind: 'monster',
+        monsterKind: kind,
+        spawnX: x,
+        spawnY: y,
+        v2,
+        worldHeight,
+        baseW: size.w,
+        baseH: size.h,
+        floorY: feet,
+        tileFloorY: feetY,
+        imageH: this.anchors.get(`${kind}_idle_1_${startLod}.png`)?.imageH ?? texSize(frames[0]).h,
+        gapBelow: this.anchors.get(`${kind}_idle_1_${startLod}.png`)?.gapBelow ?? 0,
+        frames,
+        sets: startSets,
+        lodSets,
+        lodSize,
+        currentLod: startLod,
+        currentFrame: 0,
+        animSpeed: 200,
+        lastFrameTime: 0,
+        anim: 'idle',
+        animOnce: false
+      };
+      return info;
+    });
+    for (const info of created) {
+      if (info) this.sprites.push(info);
+    }
+    this.monstersReady = true;
   }
 
   setAdjacentScale(_n: number) {
@@ -823,22 +868,38 @@ export class SpriteManager {
     return floorY - a.gapBelow * (quadH / a.imageH);
   }
 
-  private async loadSet(
-    loadTex: (path: string) => Promise<THREE.Texture>,
+  private loadSet(
     folder: string,
     kind: string,
     anim: string,
     count: number,
     lod: LodName
   ): Promise<THREE.Texture[]> {
+    const key = `${folder}|${kind}|${anim}|${lod}|${count}`;
+    const cached = this.animCache.get(key);
+    if (cached) return cached;
+    const pending = this.loadSetUncached(folder, kind, anim, count, lod);
+    this.animCache.set(key, pending);
+    return pending;
+  }
+
+  private async loadSetUncached(
+    folder: string,
+    kind: string,
+    anim: string,
+    count: number,
+    lod: LodName
+  ): Promise<THREE.Texture[]> {
+    const frames = await Promise.all(
+      Array.from({ length: count }, (_, i) => {
+        const name = `${kind}_${anim}_${i + 1}_${lod}.png`;
+        return this.loadTex(`${folder}/${name}`).catch(() => null);
+      })
+    );
     const out: THREE.Texture[] = [];
-    for (let i = 1; i <= count; i++) {
-      const name = `${kind}_${anim}_${i}_${lod}.png`;
-      try {
-        out.push(await loadTex(`${folder}/${name}`));
-      } catch {
-        break;
-      }
+    for (const tex of frames) {
+      if (!tex) break;
+      out.push(tex);
     }
     return out;
   }
@@ -1013,10 +1074,7 @@ export class SpriteManager {
     if (host.material instanceof THREE.SpriteMaterial) setFrostAmount(host.material, amount);
   }
 
-  private async loadHitFx(
-    loadTex: (path: string) => Promise<THREE.Texture>,
-    baseUrl: string
-  ) {
+  private async loadHitFx(baseUrl: string) {
     try {
       const res = await fetch(`${baseUrl}art/fx/hits/hits.json`);
       if (!res.ok) return;
@@ -1044,13 +1102,15 @@ export class SpriteManager {
         const fx = json.effects?.[effectName];
         if (!fx) return;
         const n = fx.frames ?? 4;
+        const loaded = await Promise.all(
+          Array.from({ length: n }, (_, i) =>
+            this.loadTex(`art/fx/hits/${effectName}_${i + 1}_near.png`).catch(() => null)
+          )
+        );
         const frames: THREE.Texture[] = [];
-        for (let i = 1; i <= n; i++) {
-          try {
-            frames.push(await loadTex(`art/fx/hits/${effectName}_${i}_near.png`));
-          } catch {
-            break;
-          }
+        for (const tex of loaded) {
+          if (!tex) break;
+          frames.push(tex);
         }
         const size = fx.sizes?.near ?? [40, 30];
         this.hitFx.set(key, {
