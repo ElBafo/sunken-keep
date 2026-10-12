@@ -512,6 +512,58 @@ describe('src/core combat rules', () => {
     expect(Math.abs(rat.x) + Math.abs(rat.y)).toBeLessThan(ratStart);
   });
 
+  it('chase keeps monster_move and fires alert plus fight_start once', () => {
+    const e = engine();
+    e.setChaseEnabled(true);
+    e.setOccupancy(openGrid(() => false, 8, 8));
+    e.setPartyPos(0, 0, 1);
+    const rat = e.spawnMonster('keep_rat', 3, 0);
+    const all: CombatEvent[] = [];
+    for (let t = 0; t <= 3; t += 0.45) all.push(...e.tick(t));
+
+    const alerts = all.filter((ev) => ev.type === 'sfx' && ev.name === 'keep_rat_alert');
+    const starts = all.filter((ev) => ev.type === 'fight_start');
+    const moves = all.filter((ev) => ev.type === 'monster_move');
+    expect(moves.length, 'chase steps are not discarded by startFight').toBeGreaterThan(0);
+    expect(alerts, 'alert once per chase, from the square they reached').toHaveLength(1);
+    expect(starts, 'fight music duck once per chase').toHaveLength(1);
+    expect(alerts[0]).toMatchObject({ type: 'sfx', x: rat.x, y: rat.y });
+    expect(Math.abs(rat.x - e.partyX) + Math.abs(rat.y - e.partyY)).toBe(1);
+    expect(e.fight?.monsterId).toBe(rat.id);
+
+    const after = e.tick(3.5);
+    expect(after.filter((ev) => ev.type === 'sfx' && ev.name === 'keep_rat_alert')).toHaveLength(0);
+    expect(after.filter((ev) => ev.type === 'fight_start')).toHaveLength(0);
+  });
+
+  it('adjacent notice and bump do not double alert or fight_start', () => {
+    const noticed = engine();
+    noticed.setChaseEnabled(true);
+    noticed.setOccupancy(openGrid(() => false, 8, 8));
+    noticed.setPartyPos(0, 0, 1);
+    const rat = noticed.spawnMonster('keep_rat', 1, 0);
+    const first = noticed.tick(0);
+    expect(first.filter((ev) => ev.type === 'sfx' && ev.name === 'keep_rat_alert')).toHaveLength(1);
+    expect(first.filter((ev) => ev.type === 'fight_start')).toHaveLength(1);
+    expect(first.filter((ev) => ev.type === 'log' && ev.key === 'monster_near')).toHaveLength(1);
+    expect(first.some((ev) => ev.type === 'monster_move')).toBe(false);
+    expect(noticed.fight?.monsterId).toBe(rat.id);
+    const again = noticed.tick(0.2);
+    expect(again.filter((ev) => ev.type === 'sfx' && ev.name === 'keep_rat_alert')).toHaveLength(0);
+    expect(again.filter((ev) => ev.type === 'fight_start')).toHaveLength(0);
+
+    const bump = engine();
+    bump.setPartyPos(0, 0, 1);
+    const crab = bump.spawnMonster('rust_crab', 1, 0);
+    const ev = bump.bump(1, 0, 0);
+    expect(ev.filter((x) => x.type === 'sfx' && x.name === 'rust_crab_alert')).toHaveLength(1);
+    expect(ev.filter((x) => x.type === 'fight_start')).toHaveLength(1);
+    const extra = bump.tick(0.1);
+    expect(extra.filter((x) => x.type === 'sfx' && x.name === 'rust_crab_alert')).toHaveLength(0);
+    expect(extra.filter((x) => x.type === 'fight_start')).toHaveLength(0);
+    expect(bump.fight?.monsterId).toBe(crab.id);
+  });
+
   it('logs collapse and plays down sfx once, then retargets a standing hero', () => {
     const e = new CombatEngine(rules, {
       d20: () => 20,

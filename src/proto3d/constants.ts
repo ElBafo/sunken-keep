@@ -88,8 +88,8 @@ export const STEP_VOLUME = 0.4;
 /** Lit torch pool — warm, smooth falloff. */
 export const SCONCE_RADIUS_TILES = 2.5;
 export const TORCH_INTENSITY = 1.45;
-/** Wren's lantern with oil — full on the party square, near-ambient by 1.5. */
-export const LANTERN_RADIUS_TILES = 1.5;
+/** Wren's lantern with oil — full on the party square, readable on the next. */
+export const LANTERN_RADIUS_TILES = 2.0;
 export const LANTERN_INTENSITY = 0.64;
 /** Ember-only lantern — dies just past the next square's near edge. */
 export const EMBER_RADIUS_TILES = 1.1;

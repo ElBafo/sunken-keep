@@ -74,10 +74,10 @@ function smoothFalloff(distTiles: number, radius: number): number {
 
 /**
  * Lantern / ember: full on the party's own square, then a steep quartic drop
- * so the middle of the next square is already near-ambient (oil ~1.5 tiles,
+ * so the middle of the next square is already near-ambient (oil ~2 tiles,
  * ember ~1.1). Walls and ceiling use 3D distance and fall off with height.
  */
-function partyFalloff(distTiles: number, radius: number, coreTiles = LANTERN_CORE_TILES): number {
+export function partyFalloff(distTiles: number, radius: number, coreTiles = LANTERN_CORE_TILES): number {
   if (radius <= 0 || distTiles >= radius) return 0;
   const core = Math.min(coreTiles, radius * 0.45);
   if (distTiles <= core) return 1;
@@ -85,14 +85,15 @@ function partyFalloff(distTiles: number, radius: number, coreTiles = LANTERN_COR
   return t * t * t * t;
 }
 
-function partyDistTiles(wx: number, wy: number, wz: number, partyX: number, partyY: number): number {
+export function partyDistTiles(wx: number, wy: number, wz: number, partyX: number, partyY: number): number {
   const dx = wx / CELL_SIZE - partyX;
   const dz = wz / CELL_SIZE - partyY;
   const horiz = Math.sqrt(dx * dx + dz * dz);
-  // Floor disk: 2D reach. Walls and ceiling pay extra so they die past the puddle.
+  // Floor disk: 2D reach. Walls and ceiling use 3D distance only — no extra
+  // prop penalty, so desk / beam vertices in the puddle stay lit.
   if (wy < 0.28) return horiz;
   const dy = (wy - LANTERN_HEIGHT) / CELL_SIZE;
-  return Math.sqrt(horiz * horiz + dy * dy) + 0.55;
+  return Math.sqrt(horiz * horiz + dy * dy);
 }
 
 function parseBright(value: number): number {
@@ -318,6 +319,19 @@ export class VertexLightingManager {
     const wz = tileY * CELL_SIZE;
     const [r, g, b] = this.shadeVertex(wx, 0.08, wz, tileX, tileY, isDark, 1);
     return (r + g + b) / 3;
+  }
+
+  /** Shade a world-space point (desk tops, lamp stems) for tests and debug. */
+  sampleVertex(
+    wx: number,
+    wy: number,
+    wz: number,
+    tileX: number,
+    tileY: number,
+    isDark = false
+  ): { rgb: [number, number, number]; luma: number } {
+    const rgb = this.shadeVertex(wx, wy, wz, tileX, tileY, isDark, 1);
+    return { rgb, luma: (rgb[0] + rgb[1] + rgb[2]) / 3 };
   }
 
   /** Table fill only (no torch, lantern, or sunbeam) after ?bright=. */
