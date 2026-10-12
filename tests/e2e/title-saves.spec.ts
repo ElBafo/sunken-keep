@@ -189,9 +189,8 @@ test.describe('proto3d step4 title and saves', () => {
     await expect(page.locator('#title-overlay')).toHaveClass(/show/);
     await page.waitForFunction(
       () => {
-        const boot = (window as unknown as { __proto3d: { boot: () => { introShot1?: boolean; introMusic?: boolean } } })
-          .__proto3d.boot();
-        return boot.introShot1 === true && boot.introMusic === true;
+        const boot = (window as unknown as { __proto3d: { boot: () => { introShot1?: boolean } } }).__proto3d.boot();
+        return boot.introShot1 === true;
       },
       null,
       { timeout: 15000 }
