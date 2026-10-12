@@ -173,7 +173,10 @@ test.describe('proto3d step4 title and saves', () => {
     expect(beforeTap.transform).toMatch(/scale\(/);
     expect(beforeTap.tap).toMatch(/Tap to start/i);
     expect(beforeTap.boot.tapPromptReady).toBe(true);
-    await page.locator('#title-canvas').dispatchEvent('pointerdown', { isPrimary: true });
+    await page.evaluate(() => {
+      const canvas = document.getElementById('title-canvas');
+      canvas?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, isPrimary: true }));
+    });
     await expect(page.locator('#tap-to-start')).toBeHidden();
     await expect(page.locator('#title-overlay')).toHaveClass(/show/);
     await page.waitForFunction(

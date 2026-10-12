@@ -2593,7 +2593,7 @@ class Game {
     tapToStart.classList.remove('hidden');
     const overlayActive = () => !tapToStart.classList.contains('hidden');
     const onTap = (e: Event) => {
-      if (e instanceof PointerEvent && 'isPrimary' in e && !e.isPrimary) return;
+      if (e instanceof PointerEvent && e.isPrimary === false) return;
       this.audioManager.unlock();
       if (!overlayActive()) return;
       const now = performance.now();
@@ -2621,6 +2621,8 @@ class Game {
       this.consumeTitleTap();
     };
     tapToStart.addEventListener('pointerdown', onTap);
+    tapToStart.addEventListener('pointerup', onTap);
+    tapToStart.addEventListener('click', onTap);
     const onStageTap = (e: Event) => {
       if (!overlayActive()) return;
       onTap(e);
