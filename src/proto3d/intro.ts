@@ -34,19 +34,24 @@ interface EyePos {
   openTime: number;
 }
 
-export const INTRO_IMAGE_FILES = [
+export const INTRO_SHOT_FILES = [
   'shot1_keep.png',
   'shot2_sinking.png',
   'shot3_forge.png',
   'shot4_drowned.png',
   'shot5_swamp.png',
-  'shot6_gate.png',
-  'eyes.png',
-  'boat.png',
-  'title.png'
+  'shot6_gate.png'
 ] as const;
 
-export const INTRO_SHOT_FILES = INTRO_IMAGE_FILES.slice(0, 6);
+/** Shared intro art plus only the title file for the active language. */
+export function INTRO_IMAGE_FILES(locale: string): string[] {
+  return [
+    ...INTRO_SHOT_FILES,
+    'eyes.png',
+    'boat.png',
+    locale === 'el' ? 'title_el.png' : 'title.png'
+  ];
+}
 
 export const INTRO_DURATION_SEC = 35;
 
@@ -123,7 +128,7 @@ export class IntroPlayer {
   /** Kick off every intro image, captions, and the 5×7 font. Safe to call more than once. */
   preload() {
     this.preloadShot1();
-    for (const name of INTRO_IMAGE_FILES) void this.loadImage(name);
+    for (const name of INTRO_IMAGE_FILES(this.story.locale)) void this.loadImage(name);
   }
 
   /** Drive caption/shot time from intro music `currentTime`. Null falls back to elapsed. */
@@ -133,12 +138,13 @@ export class IntroPlayer {
 
   applyLocale() {
     this.applyCaptionRows();
+    void this.loadImage(this.story.locale === 'el' ? 'title_el.png' : 'title.png');
   }
 
   async load() {
     this.preload();
     await Promise.all([
-      ...INTRO_IMAGE_FILES.map((name) => this.loadImage(name)),
+      ...INTRO_IMAGE_FILES(this.story.locale).map((name) => this.loadImage(name)),
       this.loadCaptions(),
       this.loadFont()
     ]);
@@ -488,7 +494,8 @@ export class IntroPlayer {
   }
 
   private renderTitle(fadeTime: number) {
-    const title = this.images.get('title.png');
+    const preferred = this.story.locale === 'el' ? 'title_el.png' : 'title.png';
+    const title = this.images.get(preferred) ?? this.images.get('title.png');
     if (!title) return;
     this.ctx.globalAlpha = Math.min(fadeTime / 1.5, 1);
     this.ctx.drawImage(title, (this.width - title.width) / 2, 60);
