@@ -5,7 +5,8 @@
 # no dither -> 1px dark silhouette outline + lit top edges. Brightness ~0.92 of wall_front.
 # Closed and open share one scale and one base box: centred body, base on the bottom row, closed
 # chest about as tall as the old one. Ramp also has 4 warm shades (forge orange #e08a3c darkened)
-# for wood/rust. Far uses the same pipeline with near-strength warm shades, ~1.0 of wall.
+# for wood/rust. Far = finished mid frames area-downscaled to 30x24 (base on the bottom row), snapped to the far
+# ramp (wall + 8 warm shades), outline restored, isolated pixels merged; 0.95-1.05 of wall.
 # python3 scripts/build_chest_from_source.py
 import os
 os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)),'..'))
@@ -49,7 +50,7 @@ def ramp(dist,warm_scale=None):
     warm=[np.round(FORGE*k*c).astype(int) for c in scs for k in WARM_K]
     R=np.vstack([P]+[e[None] for e in ext]+[w[None] for w in warm]); R=R[np.argsort(R.sum(1),kind='stable')]
     return wall,R,max(1,len(P)//8)
-for dist,((fw,fh),H) in FOOT.items():
+for dist,((fw,fh),H) in [(k,v) for k,v in FOOT.items() if k!='far']:
     wall,RAMP,step=ramp(dist,1.0 if dist=='far' else None)   # far: near-strength warm shades so it doesn't sink to black
     TGT=1.0 if dist=='far' else TARGET
     for n in ('closed','open'):
@@ -108,3 +109,37 @@ for dist,((fw,fh),H) in FOOT.items():
         bbx=Image.fromarray(out).getbbox()
         print(f'{name}: {fw}x{fh} bbox {bbx} chest mean {o[op].mean():.1f} wall {wall.mean():.1f} ratio {o[op].mean()/wall.mean():.2f}')
 
+
+def far_from_mid(n):
+    wall,RAMP,step=ramp('far',1.0); (fw,fh),_=FOOT['far']
+    WARM=[i for i in range(len(RAMP)) if RAMP[i][0]-RAMP[i][2]>8 and RAMP[i][0]>RAMP[i][1]+2]
+    GREY=[i for i in range(len(RAMP)) if i not in WARM]
+    mid=Image.open(D+('item_chest_mid.png' if n=='closed' else 'item_chest_open_mid.png')).convert('RGBA')
+    m=np.array(mid).astype(float); pm=m[...,:3]*m[...,3:]/255
+    w,h=30,24
+    a=np.array(Image.fromarray(m[...,3].astype(np.uint8)).resize((w,h),Image.BOX)).astype(float)/255
+    rgb=np.array(Image.fromarray(pm.astype(np.uint8)).resize((w,h),Image.BOX)).astype(float)/np.maximum(a[...,None],0.01)
+    op=a>=0.5
+    d2=((rgb.reshape(-1,1,3)-RAMP[None])**2).sum(2)
+    Wa=np.array(WARM); I_all=d2.argmin(1); I_w=Wa[d2[:,Wa].argmin(1)]
+    warmish=(rgb[...,0]>rgb[...,1]).reshape(-1)          # warm source pixels snap to the warm shades only
+    I=np.where(warmish,I_w,I_all).reshape(h,w)
+    pad=np.pad(op,1); edge=op&~(pad[:-2,1:-1]&pad[2:,1:-1]&pad[1:-1,:-2]&pad[1:-1,2:])
+    o=RAMP[I]; o[edge]=RAMP[GREY[min(step,len(GREY)-1)]]
+    o=despeckle(o,op)
+    fam={}
+    for F in (WARM,GREY):                  # one shade darker = next darker colour in the same family
+        Fs=sorted(F,key=lambda i:RAMP[i].sum())
+        for k,i in enumerate(Fs): fam[tuple(RAMP[i])]=RAMP[Fs[max(0,k-1)]]
+    # over 1.05: darken by one shade, body tones first (highlights/lock/lid top kept), only as many
+    # as needed (a full uniform step overshoots to ~0.91, below the 0.95 floor)
+    ys,xs=np.nonzero(op&~edge); hi=np.percentile(o[op].sum(1),80)
+    idx=sorted([p for p in zip(ys,xs) if o[p].sum()<hi],key=lambda p:-o[p].sum()); k=0
+    while o[op].mean()/wall.mean()>1.05 and k<len(idx):
+        y,x=idx[k]; o[y,x]=fam.get(tuple(o[y,x]),o[y,x]); k+=1
+    print(n,'darkened',k,'body pixels by one shade')
+    out=np.zeros((fh,fw,4),np.uint8); out[fh-h:,:,:3][op]=o[op]; out[fh-h:,:,3][op]=255
+    name='item_chest_far' if n=='closed' else 'item_chest_open_far'
+    Image.fromarray(out,'RGBA').save(D+name+'.png')
+    print(f'{name}: 30x25 bbox {Image.fromarray(out).getbbox()} ratio {o[op].mean()/wall.mean():.3f}')
+for n in ('closed','open'): far_from_mid(n)
