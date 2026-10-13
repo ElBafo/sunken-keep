@@ -2215,6 +2215,26 @@
    "footRow": 20,
    "gapBelow": 0,
    "topRow": 5
+  },
+  "slime_small_idle_1_close_frost.png": {
+   "footRow": 56,
+   "gapBelow": 0,
+   "topRow": 6
+  },
+  "slime_small_idle_1_near_frost.png": {
+   "footRow": 30,
+   "gapBelow": 0,
+   "topRow": 3
+  },
+  "slime_small_idle_1_mid_frost.png": {
+   "footRow": 21,
+   "gapBelow": 0,
+   "topRow": 2
+  },
+  "slime_small_idle_1_far_frost.png": {
+   "footRow": 16,
+   "gapBelow": 0,
+   "topRow": 2
   }
  },
  "distanceFrames": {
@@ -3979,6 +3999,34 @@
     "footRow": 38,
     "gapBelow": 0,
     "topRow": 5
+   },
+   "slime_small_idle_1_close_frost.png": {
+    "imageW": 82,
+    "imageH": 57,
+    "footRow": 56,
+    "gapBelow": 0,
+    "topRow": 6
+   },
+   "slime_small_idle_1_near_frost.png": {
+    "imageW": 45,
+    "imageH": 31,
+    "footRow": 30,
+    "gapBelow": 0,
+    "topRow": 3
+   },
+   "slime_small_idle_1_mid_frost.png": {
+    "imageW": 32,
+    "imageH": 22,
+    "footRow": 21,
+    "gapBelow": 0,
+    "topRow": 2
+   },
+   "slime_small_idle_1_far_frost.png": {
+    "imageW": 25,
+    "imageH": 17,
+    "footRow": 16,
+    "gapBelow": 0,
+    "topRow": 2
    }
   },
   "idleBodyHeightPx": {

@@ -68,7 +68,13 @@ describe('slime frost data and bark flag', () => {
     expect(sprites).not.toMatch(/scale.*_frost|frost.*scaled/);
     expect(sprites).not.toMatch(/slimeFrostTex\.get\('slime:/);
     const atlas = readFileSync(resolve(__dirname, '../public/art/atlas/monsters.json'), 'utf8');
-    expect(atlas).not.toMatch(/slime_small\S*_frost/);
+    for (const lod of ['close', 'near', 'mid', 'far']) {
+      expect(atlas).toContain(`slime_small_idle_1_${lod}_frost.png`);
+      expect(atlas).toContain(`slime_idle_1_${lod}_frost.png`);
+    }
+    const anchors = readFileSync(resolve(__dirname, '../public/art/dungeon/monster_anchor.json'), 'utf8');
+    expect(anchors).toContain('slime_small_idle_1_close_frost.png');
+    expect(anchors).toContain('"imageW": 82');
   });
 
   it('stores slime_frost_resist_seen in save flags so it survives reload', () => {

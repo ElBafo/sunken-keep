@@ -1166,7 +1166,7 @@ export class SpriteManager {
             const tex = await this.loadTex(slimeFrostFramePath(kind, lod));
             this.slimeFrostTex.set(`${kind}:${lod}`, tex);
           } catch {
-            // slime_small frost art ships later; lookup still uses these names
+            // missing LOD still tints; each kind uses its own <idle>_frost name
           }
         })
       );
