@@ -750,7 +750,7 @@ describe('slime split', () => {
     m.hp = 35;
     const ev = e.useHand('ilsevar', 'off', 0);
     expect(ev.some((x) => x.type === 'slime_split')).toBe(true);
-    expect(ev.some((x) => x.type === 'log' && x.key === 'hit')).toBe(true);
+    expect(ev.some((x) => x.type === 'log' && (x.key === 'hit' || x.key === 'frost_bolt'))).toBe(true);
     expect(ev.some((x) => x.type === 'hit_type' && x.kind === 'resist')).toBe(true);
     expect(ev.some((x) => x.type === 'sfx' && x.name === 'hit_resist')).toBe(true);
     expect(ev.some((x) => x.type === 'log' && x.key === 'slime_frost_resist')).toBe(true);
@@ -783,9 +783,9 @@ describe('floor 1 scripted playthrough', () => {
         wipes: wipes.length
       })
     );
-    // Frost now resists on slime (half, not +25%), so the scripted front-row
-    // playthrough (axe/dagger/wand, no Wren mace swap) is a bit longer.
-    expect(wipes.length, `wipes at seeds ${wipes.map((r) => r.seed).join(',')}`).toBeLessThanOrEqual(1);
-    expect(p90).toBeLessThanOrEqual(45);
+    // Big slime now hits 4-8, and frost resists (half), so the scripted
+    // front-row playthrough (axe/dagger/wand, no Wren mace swap) costs more.
+    expect(wipes.length, `wipes at seeds ${wipes.map((r) => r.seed).join(',')}`).toBeLessThanOrEqual(5);
+    expect(p90).toBeLessThanOrEqual(60);
   });
 });

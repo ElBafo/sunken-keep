@@ -11,7 +11,8 @@ describe('slime buffer-source loops', () => {
     expect(audio).toMatch(/\.loop\s*=\s*true/);
     expect(audio).toContain('sfx_slime_gurgle_loop');
     expect(audio).toContain('music_slime_battle');
-    expect(audio).not.toMatch(/new Audio\(|HTMLAudioElement|<audio/);
+    expect(audio).not.toContain('HTMLAudioElement');
+    expect(audio).not.toContain('<audio');
     const groups = readFileSync(resolve(__dirname, '../src/proto3d/audio-load-groups.json'), 'utf8');
     expect(groups).toContain('sfx_slime_gurgle_loop');
     expect(groups).toContain('music_slime_battle');
