@@ -101,12 +101,19 @@ export class IntroPlayer {
     this.story = story;
   }
 
-  /** Kick off every intro image, captions, and the 5×7 font. Safe to call more than once. */
-  preload() {
+  /** Shot 1 + captions + font. Does not pull the rest of the intro reel. */
+  preloadShot1() {
     this.ensureTimeline();
-    for (const name of INTRO_IMAGE_FILES) void this.loadImage(name);
+    const shot = this.shots[0];
+    if (shot) void this.loadImage(shot.file);
     void this.loadCaptions();
     void this.loadFont();
+  }
+
+  /** Kick off every intro image, captions, and the 5×7 font. Safe to call more than once. */
+  preload() {
+    this.preloadShot1();
+    for (const name of INTRO_IMAGE_FILES) void this.loadImage(name);
   }
 
   /** Drive caption/shot time from intro music `currentTime`. Null falls back to elapsed. */
@@ -154,6 +161,7 @@ export class IntroPlayer {
 
   start() {
     if (this.started || this.finished) return;
+    this.preload();
     this.started = true;
     this.ensureTimeline();
     this.lastTick = performance.now();

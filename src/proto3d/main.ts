@@ -360,9 +360,39 @@ class Game {
     this.atmosphere = new Atmosphere(this.quality);
     this.atmosphere.applyFog(this.renderer.scene, this.renderer.renderer);
 
+    this.hud = new PartyHud(this.story, () => this.oil, layout, {
+      onUse: (hero, hand) => this.handleHandTap(hero, hand),
+      onLog: () => this.audioManager?.playUi('ui_log_line'),
+      playUi: (name) => this.audioManager?.playUi(name),
+      onCancel: () => {
+        this.cancelSwap();
+        this.hideTorchChoice();
+      },
+      onPortrait: (hero) => this.handlePortraitTap(hero),
+      onBag: () => this.toggleBag(),
+      onSave: () => this.requestManualSave(),
+      onPotion: (kind) => this.quickPotion(kind),
+      potionCounts: () => ({
+        health: this.bag.countOf('potion_red'),
+        mana: this.bag.countOf('potion_blue')
+      })
+    });
+    this.inventory = new InventoryUi(this.story, this.bag, layout.inventoryScreen, {
+      equipment: () => this.equipmentState(),
+      onUse: (index) => this.useBagSlot(index),
+      onEquip: (index, hero, slot) => this.equipBagSlot(index, hero, slot),
+      onDrink: (index, hero) => this.drinkBagSlot(index, hero),
+      onClose: () => this.closeBag(),
+      playUi: (name) => this.audioManager?.playUi(name)
+    });
+    const hudReady = this.hud.load();
+    void this.inventory.load();
+    if (this.bubble) void this.bubble.load();
+
     this.sceneBuilder = new SceneBuilder();
     await this.sceneBuilder.loadTextures();
     this.sceneBuilder.buildScene(this.renderer.scene, floor1);
+    void this.audioManager.loadBeforePlaySounds();
 
     this.dressing = new Dressing();
     this.water = new WaterSystem();
@@ -400,38 +430,12 @@ class Game {
     this.spriteManager = new SpriteManager(this.renderer.camera);
     await this.spriteManager.loadSprites(this.renderer.scene, floor1, { monsters: false });
     this.darkFx = new DarkFx();
-    await this.darkFx.load(this.renderer.scene, floor1, this.spriteManager);
-    this.hud = new PartyHud(this.story, () => this.oil, layout, {
-      onUse: (hero, hand) => this.handleHandTap(hero, hand),
-      onLog: () => this.audioManager?.playUi('ui_log_line'),
-      playUi: (name) => this.audioManager?.playUi(name),
-      onCancel: () => {
-        this.cancelSwap();
-        this.hideTorchChoice();
-      },
-      onPortrait: (hero) => this.handlePortraitTap(hero),
-      onBag: () => this.toggleBag(),
-      onSave: () => this.requestManualSave(),
-      onPotion: (kind) => this.quickPotion(kind),
-      potionCounts: () => ({
-        health: this.bag.countOf('potion_red'),
-        mana: this.bag.countOf('potion_blue')
-      })
-    });
+    void this.darkFx.load(this.renderer.scene, floor1, this.spriteManager);
     await this.initCombat(params);
     this.loadLampNote();
     this.updateOilHud();
-    await this.hud.load();
+    await hudReady;
     this.syncPartyHud();
-    this.inventory = new InventoryUi(this.story, this.bag, layout.inventoryScreen, {
-      equipment: () => this.equipmentState(),
-      onUse: (index) => this.useBagSlot(index),
-      onEquip: (index, hero, slot) => this.equipBagSlot(index, hero, slot),
-      onDrink: (index, hero) => this.drinkBagSlot(index, hero),
-      onClose: () => this.closeBag(),
-      playUi: (name) => this.audioManager?.playUi(name)
-    });
-    await this.inventory.load();
     this.snapshotLoot();
     this.snapshotTiles();
     this.wireTorchChoice();
@@ -457,7 +461,7 @@ class Game {
 
     void this.title?.loadRest();
     void this.audioManager.loadBeforePlaySounds(this.renderer.scene, floor1Sconces);
-    if (this.bubble) await this.bubble.load();
+    if (this.bubble) void this.bubble.load();
     this.updateDoorButton();
   }
 
@@ -469,18 +473,19 @@ class Game {
   }
 
   private beginTitleBackgroundLoads() {
-    this.intro?.preload();
-    void this.audioManager.loadIntroMusic();
+    this.intro?.preloadShot1();
     void this.title?.loadRest();
     this.beginFloor1BackgroundLoads();
   }
 
-  /** After intro preload is in flight: warm floor 1 art/audio without blocking title or intro. */
+  /** After intro shot 1 is in flight: do not steal the radio from world textures. */
   private beginFloor1BackgroundLoads() {
     if (this.floor1PrefetchStarted) return;
     this.floor1PrefetchStarted = true;
-    void prefetchRelPaths(beforePlayRelPaths(), 8);
-    void this.audioManager.loadBeforePlaySounds();
+    void this.worldBoot.then(() => {
+      void prefetchRelPaths(beforePlayRelPaths(), 8);
+      void this.audioManager.loadBeforePlaySounds();
+    });
   }
 
   private async ensureIntroStartReady() {
@@ -748,7 +753,9 @@ class Game {
 
   openBag() {
     if (this.inventory?.open) return;
-    this.inventory.show();
+    void this.inventory.load().then(() => {
+      if (this.phase === 'play') this.inventory.show();
+    });
   }
 
   closeBag() {
@@ -1824,7 +1831,7 @@ class Game {
     const name = this.story.speakerName(speaker);
     this.lastMessage = `${name}: ${picked.text}`;
     this.hud?.pushLog(`${name}: ${picked.text}`);
-    this.bubble?.show(picked.text, speaker, name);
+    void this.bubble?.load().then(() => this.bubble?.show(picked.text, speaker, name));
     this.lastBarkFace = {
       speaker: picked.speaker,
       face: picked.face,
