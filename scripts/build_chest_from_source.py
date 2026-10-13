@@ -5,7 +5,7 @@
 # no dither -> 1px dark silhouette outline + lit top edges. Brightness ~0.92 of wall_front.
 # Closed and open share one scale and one base box: centred body, base on the bottom row, closed
 # chest about as tall as the old one. Ramp also has 4 warm shades (forge orange #e08a3c darkened)
-# for wood/rust. Far size gets a hand-drawn pass (bands, lock, recess, lit rim).
+# for wood/rust. Far = area-downscale of the finished mid frames + clean hand pass (far_from_mid).
 # python3 scripts/build_chest_from_source.py
 import os
 os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)),'..'))
@@ -30,48 +30,81 @@ def cut(n):
     xs=[p[0]*2 for p in POLY[n]]; ys=[p[1]*2 for p in POLY[n]]
     bb=(min(xs),min(ys),max(xs),max(ys))
     return src.crop(bb),m.crop(bb),bb
-def simplify_far(n,o,op,RAMP,step,target):
-    # hand pass for the 25x16 chest: blur from the BOX average turns bands/lock into a lump,
-    # so redraw them as clear 1px marks over the quantized paint; plank pattern picked to hit target
-    op=op.copy(); h,w=op.shape; ys,xs=np.nonzero(op); Y1=ys.max()
-    for y in (Y1,Y1-1):                                   # bottom notch: give the base rows the row above's span
-        xa=np.nonzero(op[y-1])[0]; op[y,xa.min():xa.max()+1]=True
-    ys,xs=np.nonzero(op); X0,X1,Y0,Y1=xs.min(),xs.max(),ys.min(),ys.max()
-    S=RAMP.sum(1); warm=[i for i in range(len(RAMP)) if RAMP[i][0]-RAMP[i][2]>8 and RAMP[i][0]>RAMP[i][1]+2]
-    grey=[i for i in range(len(RAMP)) if i not in warm]
-    dark=RAMP[grey[min(step,len(grey)-1)]]; lit=RAMP[warm[-1]]; lit2=RAMP[warm[-2]]
-    iron=RAMP[min(grey,key=lambda i:abs(S[i]/3-1.6*target))]
-    bw=X1-X0; body_top=Y0 if n=='closed' else Y0+int((Y1-Y0)*0.38)
+def despeckle(o,op):
+    # merge isolated single pixels (colour unlike all 8 opaque neighbours) into their median neighbour
+    o=o.copy(); h,w=op.shape; src=o.copy()
+    for y in range(1,h-1):
+        for x in range(1,w-1):
+            if not op[y,x]: continue
+            nb=[tuple(src[y+dy,x+dx]) for dy in (-1,0,1) for dx in (-1,0,1) if (dy or dx) and op[y+dy,x+dx]]
+            if len(nb)==8 and tuple(src[y,x]) not in nb:
+                L=sorted(nb,key=sum); o[y,x]=L[len(L)//2]
+    return o
+def far_from_mid(n):
+    # far = area-downscale of the finished mid frame (same shape + palette), then a clean hand pass
+    (fw,fh),H=FOOT['far']; wall,RAMP,step=ramp('far',1.0)   # near-strength warm shades: far needs the contrast
+    WARM=[i for i in range(len(RAMP)) if RAMP[i][0]-RAMP[i][2]>8 and RAMP[i][0]>RAMP[i][1]+2]
+    GREY=[i for i in range(len(RAMP)) if i not in WARM]
+    mid=Image.open(D+('item_chest_mid.png' if n=='closed' else 'item_chest_open_mid.png')).convert('RGBA')
+    cm=Image.open(D+'item_chest_mid.png').getbbox(); s=H/(cm[3]-cm[1])
+    bb=mid.getbbox(); m=np.array(mid.crop(bb)).astype(float)
+    w=round(m.shape[1]*s); h=round(m.shape[0]*s)
+    pm=m[...,:3]*m[...,3:]/255
+    a=np.array(Image.fromarray(m[...,3].astype(np.uint8)).resize((w,h),Image.BOX)).astype(float)/255
+    rgb=np.array(Image.fromarray(pm.astype(np.uint8)).resize((w,h),Image.BOX)).astype(float)/np.maximum(a[...,None],0.01)
+    op=a>=0.5; L=rgb.sum(2)
     pad=np.pad(op,1); edge=op&~(pad[:-2,1:-1]&pad[2:,1:-1]&pad[1:-1,:-2]&pad[1:-1,2:])
-    best=None
-    for wi,di in ((2,0),(3,0),(2,1),(3,1),(1,0),(2,2),(3,2)):
-        for per in (2,3,4):
-            wood,woodd=RAMP[warm[wi]],RAMP[warm[di]]; o2=np.zeros_like(o)
-            for y in range(h):
-                for x in range(w):
-                    if not op[y,x]: continue
-                    if n=='open' and y<body_top and not (x in (X0,X0+1,X1,X1-1) or y<=Y0+1): o2[y,x]=RAMP[grey[0]]  # recess
-                    else: o2[y,x]=wood if (y-Y0)%per==1 else woodd                                                    # planks
-            for fx in (0.13,0.33,0.67,0.87):                                                  # iron bands
-                bx=X0+round(bw*fx); o2[body_top+1:Y1,bx][op[body_top+1:Y1,bx]]=iron
-            lx=X0+bw//2; ly=body_top+max(2,(Y1-body_top)//3)                                  # lock plate + keyhole
-            o2[ly:ly+3,lx-1:lx+2]=iron; o2[ly+1,lx]=dark
-            for x in range(X0+1,X1):
-                if op[body_top+1,x]: o2[body_top+1,x]=lit                                    # lit rim
-                if n=='open' and op[Y0+1,x]: o2[Y0+1,x]=lit2                                  # lid top lit warm
-            o2[edge]=dark
-            m=o2[op].mean(); 
-            if best is None or abs(m-target)<abs(best[0]-target): best=(m,o2)
-    return best[1],op
-def ramp(dist):
+    ys,xs=np.nonzero(op); X0,X1,Y0,Y1=xs.min(),xs.max(),ys.min(),ys.max()
+    dark=RAMP[GREY[min(step,len(GREY)-1)]]; recess_c=RAMP[GREY[1]]
+    W0,W1,W2,W3=(RAMP[i] for i in WARM[:4]); band=RAMP[GREY[step]]   # bands: dark wall grey (iron)
+    inner=op&~edge
+    if n=='open':   # recess = dark interior below the lid back, above the front body
+        rows=[y for y in range(Y0,Y1+1) if inner[y].any()]
+        dk=inner&(L<np.percentile(L[inner],35))
+        rec_rows=[y for y in rows if dk[y].sum()>=0.5*inner[y].sum() and Y0+2<y<Y0+(Y1-Y0)*0.75]
+        r0,r1=(min(rec_rows),max(rec_rows)) if rec_rows else (Y0+4,Y0+7)
+        body_top=r1+1
+    else: body_top=Y0+1
+    def make(thr):
+        o=np.zeros((h,w,3),int)
+        o[inner]=np.where((L[inner]>=thr)[:,None],W1,W0)            # wood: warm shades 2-3 (darkest two warm shades at near strength)
+        if n=='open':
+            for y in range(r0,r1+1):
+                xi=np.nonzero(inner[y])[0]
+                if len(xi)>2: o[y,xi[1]:xi[-1]]=recess_c              # dark recess, 1px warm sides
+                if len(xi): o[y,xi[0]]=W3; o[y,xi[-1]]=W3
+            for x in range(X0,X1+1):
+                if inner[r1+1,x]: o[r1+1,x]=W3                        # lit front rim
+                if inner[r0-1,x]: o[r0-1,x]=W2                        # lid back lower edge
+        for x in range(X0,X1+1):                                      # lit top rim
+            col=np.nonzero(inner[:,x])[0]
+            if len(col): o[col[0],x]=W3 if x%3 else W2
+        for fx in (0.25,0.75):                                        # darker band columns
+            bx=X0+round((X1-X0)*fx)
+            for y in range(body_top+1,Y1):
+                if inner[y,bx]: o[y,bx]=band
+        lx=X0+(X1-X0)//2; ly=body_top+max(1,(Y1-body_top)//3)          # 2x2 lighter lock
+        o[ly:ly+2,lx:lx+2]=W3
+        o[edge]=dark; return o
+    tgt=wall.mean()*TARGET; best=None
+    for q in range(5,96,3):
+        o=make(np.percentile(L[inner],q)); mm=o[op].mean()
+        if best is None or abs(mm-tgt)<abs(best[0]-tgt): best=(mm,o)
+    o=best[1].astype(np.uint8); out=np.zeros((fh,fw,4),np.uint8)
+    ox=(fw-w)//2; oy=fh-h
+    out[oy:oy+h,ox:ox+w,:3][op]=o[op]; out[oy:oy+h,ox:ox+w,3][op]=255
+    name='item_chest_far' if n=='closed' else 'item_chest_open_far'
+    Image.fromarray(out,'RGBA').save(D+name+'.png')
+    print(f'{name}: {fw}x{fh} bbox {Image.fromarray(out).getbbox()} ratio {o[op].mean()/wall.mean():.2f}')
+def ramp(dist,warm_scale=None):
     wall=np.array(Image.open(W+f'wall_front_{dist}.png').convert('RGB')).astype(int)
     P=np.unique(wall.reshape(-1,3),axis=0); P=P[np.argsort(P.sum(1))]
     top=P[-1].astype(float); ext=[np.clip(np.round(top*(1+0.12*k)),0,255).astype(int) for k in (1,2)]
-    sc=wall.mean()/26.2   # warm shades follow the distance's darkening like the wall does
+    sc=wall.mean()/26.2 if warm_scale is None else warm_scale   # warm shades follow the distance's darkening like the wall does
     warm=[np.round(FORGE*k*sc).astype(int) for k in WARM_K]
     R=np.vstack([P]+[e[None] for e in ext]+[w[None] for w in warm]); R=R[np.argsort(R.sum(1),kind='stable')]
     return wall,R,max(1,len(P)//8)
-for dist,((fw,fh),H) in FOOT.items():
+for dist,((fw,fh),H) in [(k,v) for k,v in FOOT.items() if k!='far']:
     wall,RAMP,step=ramp(dist)
     for n in ('closed','open'):
         crop,mask,bb=cut(n)
@@ -116,7 +149,7 @@ for dist,((fw,fh),H) in FOOT.items():
             if o[op].mean()<wall.mean()*TARGET: lo=g
             else: hi=g
         o=build((lo+hi)/2)
-        if dist=='far': o,op=simplify_far(n,o,op,RAMP,step,wall.mean()*TARGET)
+        if dist=='near': o=despeckle(o,op)
         o=o.astype(np.uint8)
         out=np.zeros((fh,fw,4),np.uint8)
         # paste with clipping
@@ -128,3 +161,5 @@ for dist,((fw,fh),H) in FOOT.items():
         Image.fromarray(out,'RGBA').save(D+name+'.png')
         bbx=Image.fromarray(out).getbbox()
         print(f'{name}: {fw}x{fh} bbox {bbx} chest mean {o[op].mean():.1f} wall {wall.mean():.1f} ratio {o[op].mean()/wall.mean():.2f}')
+
+for n in ('closed','open'): far_from_mid(n)
