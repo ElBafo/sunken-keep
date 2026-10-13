@@ -135,7 +135,8 @@ def build(dist,seed,fk=1.0,save=True):
     a=np.dstack([out,np.full((H,W),255)]).astype(np.uint8)
     Image.fromarray(a,'RGBA').save(D+f'rubble_front_{dist}.png'); return m1
 KN={'near':2,'mid':1,'far':0}
-for dist,seed in (('near',11),('mid',12),('far',13)):
+# rubble now comes from scripts/build_rubble_from_source.py; set BUILD_RUBBLE=1 to rebuild the procedural version
+for dist,seed in ((('near',11),('mid',12),('far',13)) if os.environ.get('BUILD_RUBBLE') else ()):
     m=build(dist,seed); w=np.array(Image.open(D+f'wall_front_{dist}.png').convert('RGB')).mean()
     print(f'{dist}: rubble mean {m:.1f}, wall mean {w:.1f}')
 # dust burst, 160x140: stringy smeared wisps drifting down/out, dust.png colours + 17-step alpha
