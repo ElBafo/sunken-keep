@@ -22,6 +22,7 @@ MARGIN=2
 FORGE=np.array([0xe0,0x8a,0x3c]); WARM_K=(0.10,0.17,0.26,0.38)
 BODY_X={'closed':(145,513),'open':(142,513)}   # body left/right in view coords -> same width in both
 TARGET=0.92
+IRON_SAT,IRON_L=0.55,110
 def cut(n):
     src=Image.open(f'art/src/chest_{n}_src.jpg').convert('RGB'); S=4
     m=Image.new('L',(1280*S,720*S),0); ImageDraw.Draw(m).polygon([(x*2*S,y*2*S) for x,y in POLY[n]],fill=255)
@@ -29,33 +30,39 @@ def cut(n):
     xs=[p[0]*2 for p in POLY[n]]; ys=[p[1]*2 for p in POLY[n]]
     bb=(min(xs),min(ys),max(xs),max(ys))
     return src.crop(bb),m.crop(bb),bb
-def simplify_far(n,o,op,RAMP,step):
+def simplify_far(n,o,op,RAMP,step,target):
     # hand pass for the 25x16 chest: blur from the BOX average turns bands/lock into a lump,
-    # so redraw them as clear 1px marks over the quantized paint
-    h,w=op.shape; ys,xs=np.nonzero(op); X0,X1,Y0,Y1=xs.min(),xs.max(),ys.min(),ys.max()
-    S=RAMP.sum(1); warm=[i for i in range(len(RAMP)) if RAMP[i][0]-RAMP[i][2]>8]
-    wood=RAMP[warm[1]]; woodd=RAMP[warm[0]]; dark=RAMP[step]; lit=RAMP[warm[-1]]
-    grey=[i for i in range(len(RAMP)) if i not in warm]; iron=RAMP[min(grey,key=lambda i:abs(S[i]/3-2.0*o[op].mean()))]
-    o=o.copy(); bw=X1-X0
-    body_top=Y0 if n=='closed' else Y0+int((Y1-Y0)*0.38)
-    for y in range(h):
-        for x in range(w):
-            if not op[y,x]: continue
-            if n=='open' and y<body_top and not (x in (X0,X0+1,X1,X1-1) or y<=Y0+1): o[y,x]=dark   # recess
-            elif y>body_top and 0<x-X0<bw: o[y,x]=wood if (y-body_top)%3==1 else woodd               # planks
-    for fx in (0.13,0.33,0.67,0.87):                                                              # iron bands
-        bx=X0+round(bw*fx)
-        for y in range(body_top+1,Y1): o[y,bx]=iron if op[y,bx] else o[y,bx]
-    lx=X0+bw//2; ly=body_top+max(2,(Y1-body_top)//3)                                             # lock plate + keyhole
-    for dy in range(3):
-        for dx in (-1,0,1): o[ly+dy,lx+dx]=iron
-    o[ly+1,lx]=dark
-    for x in range(X0+1,X1):                                                                      # lit rim
-        if op[body_top+1,x]: o[body_top+1,x]=lit
-    # outline back on top
+    # so redraw them as clear 1px marks over the quantized paint; plank pattern picked to hit target
+    op=op.copy(); h,w=op.shape; ys,xs=np.nonzero(op); Y1=ys.max()
+    for y in (Y1,Y1-1):                                   # bottom notch: give the base rows the row above's span
+        xa=np.nonzero(op[y-1])[0]; op[y,xa.min():xa.max()+1]=True
+    ys,xs=np.nonzero(op); X0,X1,Y0,Y1=xs.min(),xs.max(),ys.min(),ys.max()
+    S=RAMP.sum(1); warm=[i for i in range(len(RAMP)) if RAMP[i][0]-RAMP[i][2]>8 and RAMP[i][0]>RAMP[i][1]+2]
+    grey=[i for i in range(len(RAMP)) if i not in warm]
+    dark=RAMP[grey[min(step,len(grey)-1)]]; lit=RAMP[warm[-1]]; lit2=RAMP[warm[-2]]
+    iron=RAMP[min(grey,key=lambda i:abs(S[i]/3-1.6*target))]
+    bw=X1-X0; body_top=Y0 if n=='closed' else Y0+int((Y1-Y0)*0.38)
     pad=np.pad(op,1); edge=op&~(pad[:-2,1:-1]&pad[2:,1:-1]&pad[1:-1,:-2]&pad[1:-1,2:])
-    o[edge]=dark
-    return o
+    best=None
+    for wi,di in ((2,0),(3,0),(2,1),(3,1),(1,0),(2,2),(3,2)):
+        for per in (2,3,4):
+            wood,woodd=RAMP[warm[wi]],RAMP[warm[di]]; o2=np.zeros_like(o)
+            for y in range(h):
+                for x in range(w):
+                    if not op[y,x]: continue
+                    if n=='open' and y<body_top and not (x in (X0,X0+1,X1,X1-1) or y<=Y0+1): o2[y,x]=RAMP[grey[0]]  # recess
+                    else: o2[y,x]=wood if (y-Y0)%per==1 else woodd                                                    # planks
+            for fx in (0.13,0.33,0.67,0.87):                                                  # iron bands
+                bx=X0+round(bw*fx); o2[body_top+1:Y1,bx][op[body_top+1:Y1,bx]]=iron
+            lx=X0+bw//2; ly=body_top+max(2,(Y1-body_top)//3)                                  # lock plate + keyhole
+            o2[ly:ly+3,lx-1:lx+2]=iron; o2[ly+1,lx]=dark
+            for x in range(X0+1,X1):
+                if op[body_top+1,x]: o2[body_top+1,x]=lit                                    # lit rim
+                if n=='open' and op[Y0+1,x]: o2[Y0+1,x]=lit2                                  # lid top lit warm
+            o2[edge]=dark
+            m=o2[op].mean(); 
+            if best is None or abs(m-target)<abs(best[0]-target): best=(m,o2)
+    return best[1],op
 def ramp(dist):
     wall=np.array(Image.open(W+f'wall_front_{dist}.png').convert('RGB')).astype(int)
     P=np.unique(wall.reshape(-1,3),axis=0); P=P[np.argsort(P.sum(1))]
@@ -78,8 +85,18 @@ for dist,((fw,fh),H) in FOOT.items():
         col=np.where(a[...,None]>0.01,sm/np.maximum(a[...,None],0.01),0)
         op=a>=0.5
         ox=round((fw-(bx1-bx0)*s)/2-bx0*s); oy=fh-h
+        WARM=[i for i in range(len(RAMP)) if RAMP[i][0]-RAMP[i][2]>8 and RAMP[i][0]>RAMP[i][1]+2]; GREY=[i for i in range(len(RAMP)) if i not in WARM]
+        WL=RAMP[WARM].sum(1)
+        # wood vs iron from the source: rusty iron is the saturated orange-brown, wood the greyer brown
+        sat=(col[...,0]-col[...,2])/np.maximum(col[...,0],1); iron=op&(sat>IRON_SAT)&(col.sum(2)>IRON_L)
         def q(img):
-            f=img.reshape(-1,1,3); i=((f-RAMP[None])**2).sum(2).argmin(1); return i.reshape(h,w)
+            Lp=img.sum(2); I=np.zeros((h,w),int)
+            f=img.reshape(-1,1,3); G=np.array(GREY); I_g=G[((f-RAMP[G][None])**2).sum(2).argmin(1)].reshape(h,w)
+            I_w=np.array(WARM)[np.abs(Lp[...,None]-WL[None,None]).argmin(2)]   # wood: warm shade by brightness, not hue
+            I=np.where(iron,I_g,I_w)
+            if iron.any():                                                       # warm rust highlights on the iron
+                t=np.percentile(Lp[iron],85); I=np.where(iron&(Lp>=t),WARM[2],I)
+            return I
         def build(g):
             I=q(np.clip(col*g,0,255)); R=I.copy()
             pad=np.pad(op,1)
@@ -88,10 +105,10 @@ for dist,((fw,fh),H) in FOOT.items():
             for y in range(h):
                 for x in range(w):
                     if not op[y,x]: continue
-                    if edge[y,x]: R[y,x]=min(I[y,x],step); continue        # 1px dark silhouette outline
-                    top=y>0 and edge[y-1,x] and (y<2 or not op[y-2,x])   # first row under the top outline
+                    if edge[y,x]: R[y,x]=GREY[min(step,len(GREY)-1)]; continue   # 1px dark silhouette outline
+                    top=y>0 and edge[y-1,x] and (y<2 or not op[y-2,x])
                     if top or (y>0 and L[y,x]-L[y-1,x]>max(30,L[op].mean())):
-                        R[y,x]=min(len(RAMP)-1,I[y,x]+2*step)            # lit top edge
+                        R[y,x]=WARM[-1] if L[y,x]>=L[op].mean() else WARM[-2]     # lit rim: two brightest warm shades
             return RAMP[R]
         lo,hi=0.2,6.0
         for _ in range(16):
@@ -99,7 +116,7 @@ for dist,((fw,fh),H) in FOOT.items():
             if o[op].mean()<wall.mean()*TARGET: lo=g
             else: hi=g
         o=build((lo+hi)/2)
-        if dist=='far': o=simplify_far(n,o,op,RAMP,step)
+        if dist=='far': o,op=simplify_far(n,o,op,RAMP,step,wall.mean()*TARGET)
         o=o.astype(np.uint8)
         out=np.zeros((fh,fw,4),np.uint8)
         # paste with clipping
