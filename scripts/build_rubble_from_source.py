@@ -7,16 +7,17 @@ import os,sys
 os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)),'..'))
 from PIL import Image
 import numpy as np
-SRC='/workspace/sunken-keep/art/src/rubble_src.jpg'
+SRC='/workspace/sunken-keep/art/src/rubble_src_v2.jpg'   # v2: same scene, no smoke
 D='public/art/dungeon_v2/'
 SIZES={'near':(160,140),'mid':(120,100),'far':(80,70)}
 src=Image.open(SRC).convert('RGB')
 if len(sys.argv)==5: CROP=tuple(map(int,sys.argv[1:]))
-else: CROP=(300,50,900,575)   # 1280x720 source: lantern (x~155-205) and painted side walls cropped out, heap fills, dark corridor above right
+else: CROP=(288,51,1000,675)   # 1024-view (230,41,800,540) x1.25: between the painted side walls, heap base on the bottom row   # 1280x720 source: lantern (x~155-205) and painted side walls cropped out, heap fills, dark corridor above right
 # 1) baked-in haze at the top right -> dark corridor (polygon above the heap's right flank, source coords)
 from PIL import ImageDraw
 HAZE=[(630,50),(1280,50),(1280,370),(880,320),(800,300),(740,275),(690,200),(645,120)]
-ImageDraw.Draw(src).polygon(HAZE,fill=(0,0,0))
+HAZE_FILL=False   # v2 source has no smoke
+if HAZE_FILL: ImageDraw.Draw(src).polygon(HAZE,fill=(0,0,0))
 # 2) crop: y1=575 / x1=900 trims the painted wet floor so the heap base sits on the bottom row
 crop=src.crop(CROP)
 for dist,(w,h) in SIZES.items():
@@ -33,14 +34,15 @@ for dist,(w,h) in SIZES.items():
     DARKT=RAMP[min(len(RAMP)-1,step)].sum()   # 'darkness' = the lowest eighth of the ramp
     def q(img):
         f=img.reshape(-1,1,3); i=((f-RAMP[None])**2).sum(2).argmin(1); o=RAMP[i].reshape(img.shape)
-        # 3) sharpen: 1px darker outline where stone meets darkness, lit top edges -> brighter shade
-        L=o.sum(2); dark=L<=DARKT; res=o.copy()
+        # 3) sharpen by local contrast: darker outline where a neighbour is much darker,
+        #    brighter lit edge where the pixel above is much darker
+        L=o.sum(2); res=o.copy(); T=max(30,1.0*L.mean())   # high enough that only block edges, not surface texture, trigger
         for yy in range(h):
             for xx in range(w):
-                if dark[yy,xx]: continue
-                nb=[(yy+dy,xx+dx) for dy,dx in ((-1,0),(1,0),(0,-1),(0,1)) if 0<=yy+dy<h and 0<=xx+dx<w]
-                if yy>0 and dark[yy-1,xx]: res[yy,xx]=RAMP[min(len(RAMP)-1,RI[tuple(o[yy,xx])]+2*step)]
-                elif any(dark[a,b] for a,b in nb): res[yy,xx]=RAMP[max(0,RI[tuple(o[yy,xx])]-step)]
+                i=RI[tuple(o[yy,xx])]
+                if yy>0 and L[yy,xx]-L[yy-1,xx]>T: res[yy,xx]=RAMP[min(len(RAMP)-1,i+2*step)]; continue
+                nb=[L[yy+dy,xx+dx] for dy,dx in ((1,0),(0,-1),(0,1)) if 0<=yy+dy<h and 0<=xx+dx<w]
+                if nb and L[yy,xx]-min(nb)>T: res[yy,xx]=RAMP[max(0,i-step)]
         return res
     lo,hi=0.2,4.0
     for _ in range(14):
