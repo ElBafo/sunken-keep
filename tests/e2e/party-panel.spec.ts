@@ -124,7 +124,7 @@ test('proto3d party panel: portraits, hands, take/snuff, dunk, 44pt targets', as
   }
 
   const layout = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.layout());
-  expect(layout.oilBar, 'oil row from layout585.json').toEqual([70, 442, 65, 4]);
+  expect(layout.oilBar, 'oil row from layout585.json').toEqual([70, 440, 65, 6]);
   expect(layout.log, '3-line log from layout585.json').toEqual([4, 479, 262, 28]);
   expect(layout.view, '3D view from layout585.json').toEqual([0, 0, 270, 380]);
   expect(layout.panelTop).toBe(380);

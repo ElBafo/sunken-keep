@@ -101,6 +101,7 @@ export class PartyHud {
   private frostHintArmed = false;
   private swapArmed = false;
   lastHitType: string | null = null;
+  private oilFlashUntil = 0;
 
   constructor(
     story: StoryText,
@@ -801,11 +802,22 @@ export class PartyHud {
     ctx.fillRect(x, y, Math.max(0, w * Math.min(1, Math.max(0, pct))), h);
   }
 
+  flashOil(now = performance.now()) {
+    this.oilFlashUntil = now + 180;
+  }
+
   private drawOilGauge() {
     const oil = Math.max(0, Math.min(OIL_MAX, this.oilFn()));
     const img = this.images.get(`oil${oil}`);
     const [x, y, w, h] = this.oilBar;
     if (img) drawSprite(this.ctx, img, x, y, w, h);
+    if (img && performance.now() < this.oilFlashUntil) {
+      this.ctx.save();
+      this.ctx.globalAlpha = 0.7;
+      this.ctx.globalCompositeOperation = 'lighter';
+      drawSprite(this.ctx, img, x, y, w, h);
+      this.ctx.restore();
+    }
   }
 
   private drawHandIcon(ctx: CanvasRenderingContext2D, hero: HeroHud, hand: HandSlot, rect: Rect, now: number) {

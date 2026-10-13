@@ -91,6 +91,25 @@
       "worldHeight": 0.39
     }
   },
+  "slime_small": {
+    "floor": 1,
+    "hp": 20,
+    "damage": [
+      3,
+      6
+    ],
+    "ac": 11,
+    "interval": 2.5,
+    "_role": "half-HP split of the v2 slime; inherits the big slime's resistances",
+    "behavior": {
+      "habit": "resist_blades",
+      "detail": "axe and dagger deal half damage; mace and frost deal full, frost +25%",
+      "stationary": true
+    },
+    "size": {
+      "worldHeight": 0.312
+    }
+  },
   "drowned_dwarf": {
     "floor": 3,
     "hp": 35,

@@ -1032,6 +1032,42 @@ export class AudioManager {
     if (this.musicSound) this.musicSound.setVolume(on ? 0.12 : this.musicVolume);
   }
 
+  playOilFlask(opts?: { fadeAt?: number | null; fadeSec?: number }) {
+    this.playUi('oil_flask');
+    const sound = [...this.uiPool].reverse().find((a) => a.isPlaying) ?? this.uiPool[this.uiPool.length - 1];
+    if (!sound || opts?.fadeAt == null) return;
+    const startFade = opts.fadeAt * 1000;
+    const fadeMs = (opts.fadeSec ?? 0.05) * 1000;
+    const t0 = performance.now();
+    const tick = () => {
+      if (!sound.isPlaying) return;
+      const elapsed = performance.now() - t0;
+      if (elapsed < startFade) {
+        requestAnimationFrame(tick);
+        return;
+      }
+      this.fadeOut(sound, fadeMs);
+    };
+    requestAnimationFrame(tick);
+  }
+
+  playCaveIn() {
+    this.playUi('far_rumble');
+  }
+
+  fadeCaveIn(ms = 300) {
+    const sound = [...this.uiPool].reverse().find((a) => a.isPlaying);
+    this.fadeOut(sound ?? null, ms);
+  }
+
+  introAudioState(): string | null {
+    try {
+      return this.listener.context?.state ?? null;
+    } catch {
+      return null;
+    }
+  }
+
   playUi(name: string, volume = 1, rate = 1) {
     this.lastUiNames.push(name);
     if (this.lastUiNames.length > 24) this.lastUiNames.splice(0, this.lastUiNames.length - 24);

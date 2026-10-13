@@ -84,7 +84,10 @@ export const ONCE_TRIGGERS: TriggerDef[] = [
   { id: 'tam_left', type: 'bark', once: true },
   { id: 'frogcatcher_drowned', type: 'bark', once: true },
   { id: 'water_rising', type: 'log', once: true },
-  { id: 'act1_end', type: 'log', once: true }
+  { id: 'act1_end', type: 'log', once: true },
+  { id: 'opening_cavein', type: 'bark', once: true },
+  { id: 'opening_cavein_2', type: 'bark', once: true },
+  { id: 'cave_in_done', type: 'log', once: true }
 ];
 
 export const ONCE_TRIGGER_IDS = ONCE_TRIGGERS.map((t) => t.id);

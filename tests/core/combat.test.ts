@@ -644,6 +644,31 @@ describe('hit types and small combat bugs', () => {
   });
 });
 
+describe('slime split', () => {
+  it('splits a flagged 70 HP slime at half into two slime_small', () => {
+    const e = new CombatEngine(rules, {
+      d20: () => 20,
+      int: (a: number, b: number) => a,
+      next: () => 0,
+      pick: <T>(xs: T[]) => xs[0],
+      chance: () => false
+    } as unknown as Rng);
+    const m = e.spawnMonster('slime', 2, 0, 70, { split: true });
+    e.setPartyPos(1, 0, 1);
+    e.beginFight(m, 0);
+    m.hp = 35;
+    const ev = e.useHand('brannoc', 'main', 0);
+    const split = ev.find((x) => x.type === 'slime_split');
+    expect(split).toBeTruthy();
+    if (split && split.type === 'slime_split') {
+      expect(split.kids).toHaveLength(2);
+      expect(split.kids.every((k) => k.kind === 'slime_small')).toBe(true);
+    }
+    expect(m.alive).toBe(false);
+    expect(e.livingMonsters().map((x) => x.kind).sort()).toEqual(['slime_small', 'slime_small']);
+  });
+});
+
 describe('floor 1 scripted playthrough', () => {
   it('reports HP lost for a fixed seed (target ~24)', () => {
     const result = simulateFloor1(actions, monsters, 21);

@@ -38,6 +38,8 @@ export class Player {
   moveToX = 0;
   moveToY = 0;
   moveToDir = 0;
+  moveDuration = MOVE_DURATION;
+  moveEase: 'inOut' | 'out' = 'inOut';
 
   constructor(camera: THREE.Camera, floorData: FloorData) {
     this.camera = camera;
@@ -68,8 +70,8 @@ export class Player {
   update(_deltaTime: number) {
     if (this.isMoving) {
       const elapsed = performance.now() - this.moveStartTime;
-      const t = Math.min(elapsed / MOVE_DURATION, 1);
-      const eased = this.easeInOutQuad(t);
+      const t = Math.min(elapsed / this.moveDuration, 1);
+      const eased = this.moveEase === 'out' ? this.easeOutQuad(t) : this.easeInOutQuad(t);
 
       const interpX = this.moveFromX + (this.moveToX - this.moveFromX) * eased;
       const interpY = this.moveFromY + (this.moveToY - this.moveFromY) * eased;
@@ -98,6 +100,10 @@ export class Player {
 
   easeInOutQuad(t: number): number {
     return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+  }
+
+  easeOutQuad(t: number): number {
+    return 1 - (1 - t) * (1 - t);
   }
 
   poseCamera(gridX: number, gridY: number, rotY: number, bob = 0) {
@@ -204,9 +210,11 @@ export class Player {
     return 'ok';
   }
 
-  startMove(toX: number, toY: number, toDir: number) {
+  startMove(toX: number, toY: number, toDir: number, duration = MOVE_DURATION, ease: 'inOut' | 'out' = 'inOut') {
     this.isMoving = true;
     this.moveStartTime = performance.now();
+    this.moveDuration = duration;
+    this.moveEase = ease;
     this.moveFromX = this.x;
     this.moveFromY = this.y;
     this.moveFromDir = this.dir;

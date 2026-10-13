@@ -8,7 +8,6 @@ import {
   CELL_SIZE,
   DOOR_UNLOCK_LEAD_MS,
   HERO_VOICES,
-  OIL_FLASK,
   OIL_MAX,
   OIL_START,
   OIL_TORCH_COST,
@@ -19,7 +18,20 @@ import {
 } from './constants';
 import { CombatEngine, HERO_IDS, openGrid, parseRules, Rng, type CombatEvent } from '../core';
 import { Dressing } from './dressing';
-import { floor1, floor1Sconces } from './floor-data';
+import {
+  CaveInDirector,
+  caveInCrashed,
+  caveInFinished,
+  dustBurstFrame,
+  CAVE_IN_CRASH_AT,
+  CAVE_IN_DUST_AT,
+  CAVE_IN_DUST_SKIP_FRAME,
+  CAVE_IN_SKIP_FADE_SEC,
+  CAVE_IN_STATE,
+  CAVE_IN_TURN_SEC
+} from './cave-in';
+import { floor1, floor1CaveIn, floor1Sconces } from './floor-data';
+import { oilFlaskPlan, OIL_FLASK_FADE_SEC } from './oil-flask';
 import { InputManager } from './input';
 import { MoveResult, Player } from './player';
 import { loadProgress, persistEnabled, saveProgress } from './progress';
@@ -152,6 +164,13 @@ class Game {
   private playReady = false;
   private pendingTap = false;
   private skipIntroRequested = false;
+  private caveIn = new CaveInDirector();
+  private caveInBusy = false;
+  private caveInStartedAt = 0;
+  private caveInCrashed = false;
+  private wantOpeningCaveIn = false;
+  private oilDisplay = OIL_START;
+  private oilGlugTimers: ReturnType<typeof setTimeout>[] = [];
   private worldBoot: Promise<void> = Promise.resolve();
   private stageFitWired = false;
   private newGameStarted = false;
@@ -202,6 +221,7 @@ class Game {
     if (this.skipTitle) {
       this.storyProgress.startNewGame();
       this.pendingStartSnapshot = true;
+      this.wantOpeningCaveIn = true;
     }
 
     this.worldBoot = this.bootWorld(canvas, params);
@@ -284,6 +304,7 @@ class Game {
     if (introCanvas) {
       this.intro = new IntroPlayer(introCanvas, this.story);
       this.intro.setTimeSource(() => this.audioManager.introCurrentTime());
+      this.intro.setAudioState(() => this.audioManager.introAudioState());
       this.intro.setOnFinished(() => this.skipIntro());
       const overlay = document.getElementById('intro-overlay');
       if (overlay) {
@@ -318,10 +339,12 @@ class Game {
       return;
     }
     if (action.type === 'new_game') {
+      this.leaveGameScreen();
       this.startNewGame();
       return;
     }
     if (action.type === 'continue' || action.type === 'load') {
+      this.leaveGameScreen();
       this.title.hide();
       this.audioManager.markPlayStarted();
       void this.runContinue(action.payload);
@@ -363,7 +386,7 @@ class Game {
     this.atmosphere = new Atmosphere(this.quality);
     this.atmosphere.applyFog(this.renderer.scene, this.renderer.renderer);
 
-    this.hud = new PartyHud(this.story, () => this.oil, layout, {
+    this.hud = new PartyHud(this.story, () => this.oilDisplay, layout, {
       onUse: (hero, hand) => this.handleHandTap(hero, hand),
       onLog: () => this.audioManager?.playUi('ui_log_line'),
       playUi: (name) => this.audioManager?.playUi(name),
@@ -528,6 +551,10 @@ class Game {
 
   handleMove(result: MoveResult) {
     if (this.phase !== 'play') return;
+    if (this.caveInBusy) {
+      this.skipCaveIn();
+      return;
+    }
     this.cancelSwap();
     if (this.combat?.gameOver) return;
     if (result === 'ok') {
@@ -870,16 +897,34 @@ class Game {
   }
 
   private useOilFlask(index: number) {
-    if (this.oil >= OIL_MAX) {
+    const plan = oilFlaskPlan(this.oil);
+    if (plan.kind === 'full') {
       this.showPrompt(this.storyLog('oil_full'));
       this.audioManager.playUi('item_use_fail');
       return;
     }
     if (!this.bag.takeAt(index, 1)) return;
-    this.setOil(this.oil + OIL_FLASK);
-    this.audioManager.playUi('lantern_refill');
-    this.showMessage(this.storyLog('oil_use', { n: this.oil, max: OIL_MAX }));
+    this.clearOilGlugs();
+    this.setOil(plan.to, true);
+    this.oilDisplay = plan.from;
+    this.audioManager.playOilFlask({ fadeAt: plan.fadeAt, fadeSec: OIL_FLASK_FADE_SEC });
+    for (const at of plan.glugs) {
+      const t = window.setTimeout(() => {
+        this.oilDisplay = Math.min(plan.to, this.oilDisplay + 1);
+        this.hud?.flashOil();
+        this.hud?.draw(performance.now());
+        this.updateOilHud();
+      }, at * 1000);
+      this.oilGlugTimers.push(t);
+    }
+    this.showMessage(this.storyLog('oil_use', { n: plan.to, max: OIL_MAX }));
     this.inventory.redraw();
+  }
+
+  private clearOilGlugs() {
+    for (const t of this.oilGlugTimers) clearTimeout(t);
+    this.oilGlugTimers = [];
+    this.oilDisplay = this.oil;
   }
 
   private drinkPendingPotion(hero: HeroId) {
@@ -981,17 +1026,7 @@ class Game {
     const testMode = params.get('test') === '1';
     const combatOn = params.get('combat') === '1';
     this.combat.setChaseEnabled(!testMode || combatOn);
-    this.combat.setOccupancy(
-      openGrid(
-        (x, y) => tileBlocksPath(floor1.tiles[y]?.[x]),
-        floor1.width,
-        floor1.height,
-        (x, y) => {
-          const tile = floor1.tiles[y]?.[x];
-          return !!(tile?.deepWater || tile?.shallowWater);
-        }
-      )
-    );
+    this.refreshOccupancy();
     this.player.isOccupiedByMonster = (x, y) => !!this.combat.monsterAt(x, y);
     this.combat.setPartyPos(this.player.x, this.player.y, this.player.dir);
     this.syncEquipmentToCombat();
@@ -1003,7 +1038,7 @@ class Game {
       for (let x = 0; x < floor1.width; x++) {
         const tile = floor1.tiles[y][x];
         if (!tile.monster) continue;
-        const m = this.combat.spawnMonster(tile.monster, x, y, tile.monsterHp);
+        const m = this.combat.spawnMonster(tile.monster, x, y, tile.monsterHp, { split: !!tile.split });
         this.spriteManager.bindMonster(x, y, m.id);
       }
     }
@@ -1075,6 +1110,12 @@ class Game {
           this.spriteManager.playAnimId(e.id, 'death', nowMs);
           this.darkFx.hideEye(e.x, e.y, this.audioManager);
           this.audioManager?.stopWindup(e.id);
+          break;
+        case 'slime_split':
+          this.spriteManager.hideDeadMonsterId(e.from);
+          for (const kid of e.kids) {
+            void this.spriteManager.addLiveMonster(this.renderer.scene, kid.kind, kid.x, kid.y, kid.id);
+          }
           break;
         case 'hero':
         case 'hero_revive':
@@ -1172,6 +1213,7 @@ class Game {
       this.torches?.syncFromSconce(s);
     }
     this.oil = OIL_START;
+    this.oilDisplay = this.oil;
   }
 
   loadAutosave() {
@@ -1221,6 +1263,11 @@ class Game {
     this.flags.clear();
     this.hud.resetFrostHint();
     this.closeBag();
+    this.oilDisplay = this.oil;
+    this.resetRubble();
+    this.refreshOccupancy();
+    this.caveInBusy = false;
+    this.caveInCrashed = false;
     this.audioManager?.fadeGameOver(300);
     this.audioManager?.updateListener(this.player.x, this.player.y, this.player.dir);
   }
@@ -1283,10 +1330,11 @@ class Game {
     return true;
   }
 
-  setOil(value: number) {
+  setOil(value: number, keepDisplay = false) {
     const next = Math.min(OIL_MAX, Math.max(0, Math.floor(value)));
     const prev = this.oil;
     this.oil = next;
+    if (!keepDisplay) this.oilDisplay = this.oil;
     if (prev > 0 && next <= 0) {
       this.audioManager.playUi('oil_empty');
       this.audioManager.startLanternLoop(false);
@@ -1355,6 +1403,10 @@ class Game {
 
   interact(clientX?: number, clientY?: number) {
     if (this.phase !== 'play') return;
+    if (this.caveInBusy) {
+      this.skipCaveIn();
+      return;
+    }
     this.interactCount += 1;
     if (this.inventory?.open) {
       if (this.inventory.selected >= 0) {
@@ -1675,6 +1727,8 @@ class Game {
     this.playStartedAt = performance.now();
     this.escapeRunActive = !!save.escapeRunActive;
     this.oil = save.oil;
+    this.oilDisplay = this.oil;
+    this.clearOilGlugs();
     this.bag.load(save.bag ?? []);
     this.player.hasKey = this.bag.has('key') || this.bag.has('captain_key');
     this.floorStates = { ...(save.floors ?? {}) };
@@ -1745,6 +1799,150 @@ class Game {
     this.closeBag();
     this.rebuildAudioFromState();
     this.audioManager?.updateListener(this.player.x, this.player.y, this.player.dir);
+    this.syncCaveInWorld();
+  }
+
+  private refreshOccupancy() {
+    if (!this.combat) return;
+    this.combat.setOccupancy(
+      openGrid(
+        (x, y) => tileBlocksPath(floor1.tiles[y]?.[x]),
+        floor1.width,
+        floor1.height,
+        (x, y) => {
+          const tile = floor1.tiles[y]?.[x];
+          return !!(tile?.deepWater || tile?.shallowWater);
+        }
+      )
+    );
+  }
+
+  private caveInDone() {
+    return this.flags.has(CAVE_IN_STATE) || this.storyProgress.fired.has(CAVE_IN_STATE);
+  }
+
+  private leaveGameScreen() {
+    this.caveIn.clearLeaveScreen();
+    this.clearOilGlugs();
+    if (this.caveInBusy) {
+      this.caveInBusy = false;
+      this.audioManager?.fadeCaveIn(CAVE_IN_SKIP_FADE_SEC * 1000);
+    }
+  }
+
+  private resetRubble() {
+    const { x, y } = floor1CaveIn.rubble;
+    const tile = floor1.tiles[y]?.[x];
+    if (tile) tile.wall = false;
+    this.sceneBuilder?.clearRubble();
+    if (this.sceneBuilder && this.renderer) {
+      this.sceneBuilder.setDustBurst(this.renderer.scene, x, y, null);
+    }
+  }
+
+  private applyRubble() {
+    const { x, y } = floor1CaveIn.rubble;
+    this.sceneBuilder.applyRubbleWall(this.renderer.scene, floor1, x, y);
+    this.refreshOccupancy();
+    this.vertexLighting.relight();
+    this.vertexLighting.updateAllMeshes(this.renderer.scene);
+  }
+
+  private syncCaveInWorld() {
+    if (this.caveInDone()) this.applyRubble();
+    else {
+      this.resetRubble();
+      this.refreshOccupancy();
+    }
+  }
+
+  private maybeStartCaveIn(instant = false) {
+    if (this.caveInDone()) {
+      this.applyRubble();
+      return;
+    }
+    const spec = floor1CaveIn;
+    this.player.setPosition(spec.at.x, spec.at.y, floor1.startDir);
+    if (instant) {
+      this.completeCaveIn(true);
+      return;
+    }
+    this.caveIn.beginOpening(false);
+    this.caveInBusy = true;
+    this.caveInStartedAt = performance.now();
+    this.caveInCrashed = false;
+    this.audioManager.playCaveIn();
+    this.player.startMove(spec.stepTo.x, spec.stepTo.y, this.player.dir);
+  }
+
+  private skipCaveIn() {
+    if (!this.caveInBusy) return;
+    this.completeCaveIn(false);
+  }
+
+  private completeCaveIn(silent: boolean) {
+    const spec = floor1CaveIn;
+    const skipAt = CAVE_IN_CRASH_AT + CAVE_IN_DUST_AT[CAVE_IN_DUST_SKIP_FRAME - 1];
+    this.caveInStartedAt = performance.now() - skipAt * 1000;
+    this.player.setPosition(spec.stepTo.x, spec.stepTo.y, spec.endDir);
+    this.applyRubble();
+    this.sceneBuilder.setDustBurst(
+      this.renderer.scene,
+      spec.rubble.x,
+      spec.rubble.y,
+      CAVE_IN_DUST_SKIP_FRAME
+    );
+    this.audioManager.fadeCaveIn(CAVE_IN_SKIP_FADE_SEC * 1000);
+    this.caveInBusy = false;
+    this.caveInCrashed = true;
+    this.flags.add(CAVE_IN_STATE);
+    this.storyProgress.fire(CAVE_IN_STATE);
+    if (silent) {
+      this.caveIn.clearLeaveScreen();
+      return;
+    }
+    this.speakBark(spec.bark);
+    this.caveIn.scheduleBark2(() => {
+      this.speakBark('opening_cavein_2');
+    });
+  }
+
+  private updateCaveIn(now: number) {
+    const spec = floor1CaveIn;
+    if (!this.caveInBusy) {
+      if (this.caveInCrashed) {
+        const t = (now - this.caveInStartedAt) / 1000 - CAVE_IN_CRASH_AT;
+        this.sceneBuilder.setDustBurst(this.renderer.scene, spec.rubble.x, spec.rubble.y, dustBurstFrame(t));
+      }
+      return;
+    }
+    const elapsed = (now - this.caveInStartedAt) / 1000;
+    if (!this.caveInCrashed && caveInCrashed(elapsed)) {
+      this.caveInCrashed = true;
+      if (this.player.x !== spec.stepTo.x || this.player.y !== spec.stepTo.y || this.player.isMoving) {
+        this.player.setPosition(spec.stepTo.x, spec.stepTo.y, this.player.dir);
+      }
+      this.applyRubble();
+      this.player.startMove(spec.stepTo.x, spec.stepTo.y, spec.endDir, CAVE_IN_TURN_SEC * 1000, 'out');
+    }
+    if (this.caveInCrashed) {
+      this.sceneBuilder.setDustBurst(
+        this.renderer.scene,
+        spec.rubble.x,
+        spec.rubble.y,
+        dustBurstFrame(elapsed - CAVE_IN_CRASH_AT)
+      );
+    }
+    if (caveInFinished(elapsed)) this.finishCaveInControl();
+  }
+
+  private finishCaveInControl() {
+    if (!this.caveInBusy) return;
+    this.caveInBusy = false;
+    this.flags.add(CAVE_IN_STATE);
+    this.storyProgress.fire(CAVE_IN_STATE);
+    this.speakBark(floor1CaveIn.bark);
+    this.caveIn.scheduleBark2(() => this.speakBark('opening_cavein_2'));
   }
 
   private rebuildAudioFromState() {
@@ -1759,6 +1957,7 @@ class Game {
 
   canAutosave(): boolean {
     if (this.phase !== 'play') return false;
+    if (this.caveInBusy) return false;
     if (this.escapeRunActive) return false;
     if (this.combat?.gameOver) return false;
     if (this.combat?.fight) return false;
@@ -1872,17 +2071,7 @@ class Game {
     this.flags.add('secret_found');
     this.sceneBuilder.setSecretOpen(this.renderer.scene, x, y, true);
     this.spriteManager.resetItems(floor1);
-    this.combat.setOccupancy(
-      openGrid(
-        (ox, oy) => tileBlocksPath(floor1.tiles[oy]?.[ox]),
-        floor1.width,
-        floor1.height,
-        (ox, oy) => {
-          const t = floor1.tiles[oy]?.[ox];
-          return !!(t?.deepWater || t?.shallowWater);
-        }
-      )
-    );
+    this.refreshOccupancy();
     this.vertexLighting.relight();
     if (this.storyProgress.fire('secret_found')) this.showMessage(this.storyLog('secret_found'));
     this.speakBark('secret_wall');
@@ -1923,6 +2112,7 @@ class Game {
   private startNewGame() {
     if (this.newGameStarted) return;
     this.newGameStarted = true;
+    this.wantOpeningCaveIn = true;
     this.enteringPlay = false;
     this.title.hide();
     this.audioManager.markPlayStarted();
@@ -2012,6 +2202,12 @@ class Game {
       this.pendingStartSnapshot = false;
     }
     this.audioManager.crossfadeToAct1();
+    if (this.wantOpeningCaveIn) {
+      this.wantOpeningCaveIn = false;
+      this.maybeStartCaveIn(this.skipTitle);
+    } else {
+      this.syncCaveInWorld();
+    }
     this.startLoop();
   }
 
@@ -2606,7 +2802,14 @@ class Game {
       startNewGame: () => this.startNewGame(),
       skipIntro: () => this.skipIntro(),
       setLocale: (locale: Locale) => this.setLocale(locale),
-      showTitle: () => this.title.show('title'),
+      showTitle: () => {
+        this.leaveGameScreen();
+        this.title.show('title');
+      },
+      caveInBusy: () => this.caveInBusy,
+      caveInDone: () => this.caveInDone(),
+      skipCaveIn: () => this.skipCaveIn(),
+      startCaveIn: () => this.maybeStartCaveIn(false),
       currentSlot: () => this.currentSlot,
       blockReason: (x: number, y: number) => this.player.blockReason(x, y),
       interactFacingProp: () => this.handleFacingProp(),
@@ -2678,11 +2881,19 @@ class Game {
         return { result, before, after: dest };
       },
       tryTurnLeft: () => {
+        if (this.caveInBusy) {
+          this.skipCaveIn();
+          return 'ok' as const;
+        }
         this.cancelSwap();
         this.hideTorchChoice();
         return this.player.turnLeft();
       },
       tryTurnRight: () => {
+        if (this.caveInBusy) {
+          this.skipCaveIn();
+          return 'ok' as const;
+        }
         this.cancelSwap();
         this.hideTorchChoice();
         return this.player.turnRight();
@@ -2814,6 +3025,7 @@ class Game {
     this.darkFx.update(now, this.vertexLighting, this.spriteManager, this.audioManager, this.player.x, this.player.y);
     this.vertexLighting.setFlickerTime(now);
     this.hud?.draw(now);
+    this.updateCaveIn(now);
 
     if (this.messageTimer && now >= this.messageTimer) {
       this.messageTimer = 0;

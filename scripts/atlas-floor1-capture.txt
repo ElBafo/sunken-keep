@@ -193,6 +193,12 @@ proto3d/fx/dark/glint_4.png
 proto3d/fx/dark/glint_5.png
 proto3d/fx/dark/glint_6.png
 proto3d/fx/dark/stairs_glow.png
+proto3d/fx/dust_burst_1.png
+proto3d/fx/dust_burst_2.png
+proto3d/fx/dust_burst_3.png
+proto3d/fx/dust_burst_4.png
+proto3d/fx/dust_burst_5.png
+proto3d/fx/dust_burst_6.png
 proto3d/tex3d/ceiling.png
 proto3d/tex3d/door_open.png
 proto3d/tex3d/door_panel.png

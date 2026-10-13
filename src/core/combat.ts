@@ -146,7 +146,7 @@ export class CombatEngine {
     void now;
   }
 
-  spawnMonster(kind: string, x: number, y: number, hp?: number): MonsterState {
+  spawnMonster(kind: string, x: number, y: number, hp?: number, extra?: { split?: boolean }): MonsterState {
     const def = this.data.monsters[kind];
     const max = hp ?? def?.hp ?? 1;
     const m: MonsterState = {
@@ -162,10 +162,46 @@ export class CombatEngine {
       windup: null,
       missNext: false,
       alive: true,
-      deadAt: 0
+      deadAt: 0,
+      split: extra?.split,
+      splitDone: false
     };
     this.monsters.push(m);
     return m;
+  }
+
+  private splitNeighbor(x: number, y: number): { x: number; y: number } {
+    for (const [dx, dy] of DIRS) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (this.monsterAt(nx, ny)) continue;
+      if (this.openMap && !this.openMap.walkable(nx, ny)) continue;
+      return { x: nx, y: ny };
+    }
+    return { x, y: y - 1 };
+  }
+
+  maybeSplit(m: MonsterState, now: number): boolean {
+    if (!m.split || m.splitDone || !m.alive || m.hp <= 0) return false;
+    if (m.hp > m.maxHp / 2) return false;
+    m.splitDone = true;
+    const hpEach = Math.max(1, Math.ceil(m.hp / 2));
+    m.hp = 0;
+    m.alive = false;
+    m.deadAt = now;
+    const neighbor = this.splitNeighbor(m.x, m.y);
+    const a = this.spawnMonster('slime_small', m.x, m.y, hpEach);
+    const b = this.spawnMonster('slime_small', neighbor.x, neighbor.y, hpEach);
+    this.emit({ type: 'monster_dead', id: m.id, x: m.x, y: m.y, kind: m.kind });
+    this.emit({
+      type: 'slime_split',
+      from: m.id,
+      kids: [
+        { id: a.id, x: a.x, y: a.y, kind: a.kind },
+        { id: b.id, x: b.x, y: b.y, kind: b.kind }
+      ]
+    });
+    return true;
   }
 
   clearMonsters() {
@@ -660,6 +696,7 @@ export class CombatEngine {
     const mul = this.resistMul(target.kind, item);
     dmg = Math.max(1, Math.floor(dmg * mul));
     target.hp -= dmg;
+    if (this.maybeSplit(target, now)) return this.flush();
     const kind = this.hitKind(crit, mul);
     if (kind !== 'resist') this.emit({ type: 'monster_anim', id: target.id, anim: 'hurt' });
     this.emit({ type: 'sfx', name: `${target.kind}_hurt`, x: target.x, y: target.y, combat: true });
@@ -1028,7 +1065,17 @@ export class CombatEngine {
   }
 
   restoreMonsters(
-    list: Array<{ id: string; kind: string; x: number; y: number; hp: number; maxHp: number; alive: boolean }>
+    list: Array<{
+      id: string;
+      kind: string;
+      x: number;
+      y: number;
+      hp: number;
+      maxHp: number;
+      alive: boolean;
+      split?: boolean;
+      splitDone?: boolean;
+    }>
   ) {
     this.monsters = [];
     this.fight = null;
@@ -1050,7 +1097,9 @@ export class CombatEngine {
         windup: null,
         missNext: false,
         alive: s.alive,
-        deadAt: s.alive ? 0 : 1
+        deadAt: s.alive ? 0 : 1,
+        split: s.split,
+        splitDone: !!s.splitDone
       });
     }
     this.nextId = maxId + 1;

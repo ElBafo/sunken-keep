@@ -22,7 +22,8 @@ const DEFAULT_WORLD_HEIGHT: Record<string, number> = {
   keep_rat: 0.25,
   rust_crab: 0.35,
   cellar_spider: 0.3,
-  slime: 0.55,
+  slime: 0.39,
+  slime_small: 0.312,
   drowned_dwarf: 0.6,
   captain_dural: 0.68,
   tide_spawn: 0.85
@@ -972,6 +973,69 @@ export class SpriteManager {
     if (!s) return;
     s.hidden = true;
     s.object.visible = false;
+  }
+
+  async addLiveMonster(scene: THREE.Scene, kind: string, x: number, y: number, id: string, feetY = 0) {
+    const v2 = this.v2Px.has(kind);
+    const folder = v2 ? V2_FOLDER : V1_FOLDER;
+    const lodSets: NonNullable<SpriteInfo['lodSets']> = {};
+    const lodSize: NonNullable<SpriteInfo['lodSize']> = {};
+    const worldHeight = this.wallHeightOf(kind);
+    const lods = v2 ? LOD_NAMES : (['near', 'mid', 'far'] as const);
+    await Promise.all(
+      lods.map(async (lod) => {
+        const [idle, attack, hurt, death] = await Promise.all([
+          this.loadSet(folder, kind, 'idle', 4, lod),
+          this.loadSet(folder, kind, 'attack', 3, lod),
+          this.loadSet(folder, kind, 'hurt', 1, lod),
+          this.loadSet(folder, kind, 'death', 4, lod)
+        ]);
+        if (!idle.length) return;
+        lodSets[lod] = { idle, attack, hurt, death, windup: attack.length ? [attack[0]] : idle };
+        lodSize[lod] = this.quadForLod(kind, lod, worldHeight, idle[0]);
+      })
+    );
+    const startLod: LodName = lodSets.near ? 'near' : ((Object.keys(lodSets)[0] as LodName | undefined) ?? 'near');
+    const startSets = lodSets[startLod] ?? {};
+    const frames = startSets.idle ?? [];
+    if (!frames.length) return null;
+    const size = lodSize[startLod] ?? quadForWorldHeight(worldHeight, CELL_SIZE, 80, 60);
+    const feet = this.feetFor(`${kind}_idle_1_${startLod}.png`, size.h, feetY);
+    const mat = makeSpriteMaterial(frames[0], true);
+    const sprite = makeBillboard(mat, x * CELL_SIZE, feet, y * CELL_SIZE, size.w, size.h);
+    sprite.renderOrder = SPRITE_RENDER_ORDER;
+    scene.add(sprite);
+    const info: SpriteInfo = {
+      object: sprite,
+      material: mat,
+      x,
+      y,
+      kind: 'monster',
+      monsterKind: kind,
+      monsterId: id,
+      spawnX: x,
+      spawnY: y,
+      v2,
+      worldHeight,
+      baseW: size.w,
+      baseH: size.h,
+      floorY: feet,
+      tileFloorY: feetY,
+      imageH: this.anchors.get(`${kind}_idle_1_${startLod}.png`)?.imageH ?? texSize(frames[0]).h,
+      gapBelow: this.anchors.get(`${kind}_idle_1_${startLod}.png`)?.gapBelow ?? 0,
+      frames,
+      sets: startSets,
+      lodSets,
+      lodSize,
+      currentLod: startLod,
+      currentFrame: 0,
+      animSpeed: 200,
+      lastFrameTime: 0,
+      anim: 'idle',
+      animOnce: false
+    };
+    this.sprites.push(info);
+    return info;
   }
 
   resetMonsters(floor: FloorData) {

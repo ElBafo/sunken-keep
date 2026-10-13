@@ -158,6 +158,26 @@ describe('intro finish → skipIntro', () => {
     expect(h.finishedAt()).toBe(35_000);
   });
 
+  it('does not treat a stall as ended while AudioContext is suspended', () => {
+    let music = 0;
+    let state = 'running';
+    const h = harness({ music: () => music });
+    h.intro.setAudioState(() => state);
+    h.intro.start();
+    h.setNow(5_000);
+    music = 5;
+    h.tick();
+    expect(h.intro.isFinished()).toBe(false);
+    state = 'suspended';
+    h.setNow(5_000 + INTRO_STALL_MS);
+    h.tick();
+    expect(h.intro.isFinished()).toBe(false);
+    state = 'running';
+    h.setNow(5_000 + INTRO_STALL_MS + 50);
+    h.tick();
+    expect(h.intro.isFinished()).toBe(true);
+  });
+
   it('blocked music (missing/failed bed) still ends on the 35s wall clock', () => {
     const h = harness();
     h.intro.setTimeSource(() => {

@@ -133,6 +133,7 @@
   "water_lap_loop": "sfx_water_lap_loop",
   "oil_pickup": "sfx_oil_pickup",
   "lantern_refill": "sfx_lantern_refill",
+  "oil_flask": "sfx_oil_flask",
   "lantern_ember_loop": "sfx_lantern_ember_loop",
   "oil_empty": "sfx_oil_empty",
   "dark_presence_loop": "sfx_dark_presence_loop",

@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
 import { MONSTER_OFFSET_TOWARD_PARTY } from '../src/proto3d/constants';
 import { monsterLodName, monsterVisualOffset, quadForWorldHeight } from '../src/proto3d/sprites';
@@ -13,9 +15,9 @@ describe('monster billboard sizing', () => {
   });
 
   it('sizes the quad as worldHeight × wall, using that set’s pixel ratio', () => {
-    const slimeClose = quadForWorldHeight(0.55, 2, 118, 82);
-    expect(slimeClose.h).toBeCloseTo(1.1, 5);
-    expect(slimeClose.w).toBeCloseTo(1.1 * (118 / 82), 5);
+    const slimeClose = quadForWorldHeight(0.39, 2, 71, 39);
+    expect(slimeClose.h).toBeCloseTo(0.78, 5);
+    expect(slimeClose.w).toBeCloseTo(0.78 * (71 / 39), 5);
 
     const ratClose = quadForWorldHeight(0.25, 2, 42, 37);
     expect(ratClose.h).toBeCloseTo(0.5, 5);
@@ -28,6 +30,12 @@ describe('monster billboard sizing', () => {
     const leechClose = quadForWorldHeight(0.15, 2, 37, 22);
     expect(leechClose.h).toBeCloseTo(0.3, 5);
     expect(leechClose.w).toBeCloseTo(0.3 * (37 / 22), 5);
+  });
+
+  it('falls back to 0.39 walls for slime when monsters.json omits size', () => {
+    const src = readFileSync(resolve(__dirname, '../src/proto3d/sprites.ts'), 'utf8');
+    expect(src).toMatch(/slime:\s*0\.39/);
+    expect(src).toMatch(/slime_small:\s*0\.312/);
   });
 
   it('offsets a quarter square toward the party at every distance', () => {

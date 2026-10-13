@@ -1,104 +1,16 @@
+import {
+  floor1 as rawFloor1,
+  floor1CaveIn as rawCaveIn,
+  floor1Sconces as rawSconces
+} from '../../public/levels/floor1';
 import { FloorData, Sconce } from './types';
 
-const m = (monster: string, hp: number) => ({
-  monster,
-  monsterState: 'idle' as const,
-  monsterAnimTime: 0,
-  monsterHp: hp,
-  monsterMaxHp: hp
-});
-
-// Floor 1: Upper Halls 15×12 (from public/levels/floor1.ts)
-//   ###############
-//   #~=~#S..#.....#
-//   #~=~D.......F.#
-//   #~=~#...#.F...#
-//   #~~~#####...F>#
-//   #.......#######
-//   #...#.......###
-//   #...#...###.###
-//   #########.....#
-//   #########...P.#
-//   #########.....#
-//   ###############
-export const floor1: FloorData = {
-  width: 15,
-  height: 12,
-  startX: 1,
-  startY: 7,
-  startDir: 0,
-  tiles: [
-    [
-      { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true },
-      { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true },
-      { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }
-    ],
-    [
-      { wall: true }, { shallowWater: true }, { deepWater: true }, { shallowWater: true }, { wall: true },
-      { secret: true, carving: 'carving_secret', item: 'journal_page', journalPage: 1 }, {}, {}, { wall: true }, {},
-      m('keep_rat', 14), {}, {}, {}, { wall: true }
-    ],
-    [
-      { wall: true }, { shallowWater: true }, { deepWater: true }, { shallowWater: true, ...m('bog_leeches', 12) },
-      { door: true, doorLocked: true, carving: 'carving_door' }, {}, {}, m('slime', 40), {},
-      { bark: 'guard_hall_enter' }, {}, { daylight: true },
-      { prop: 'beams_fallen', propPlacement: 'floor' }, {}, { wall: true }
-    ],
-    [
-      { wall: true }, { shallowWater: true }, { deepWater: true }, { shallowWater: true }, { wall: true },
-      { ...m('rust_crab', 24), item: 'potion_red' }, { item: 'potion_red' }, {}, { wall: true }, {},
-      { prop: 'beams_fallen', mirror: true, propPlacement: 'floor' }, {}, {}, {}, { wall: true }
-    ],
-    [
-      { wall: true }, { shallowWater: true }, { shallowWater: true }, { shallowWater: true }, { wall: true },
-      { wall: true }, { wall: true }, { wall: true }, { wall: true }, {},
-      {}, {}, { prop: 'beams_fallen', propPlacement: 'floor' }, { stairs: 'down' }, { wall: true }
-    ],
-    [
-      { wall: true }, {}, { item: 'key' }, {}, { bark: 'pantry' },
-      { item: 'potion_blue' }, {}, m('keep_rat', 14), { wall: true }, { wall: true },
-      { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }
-    ],
-    [
-      { wall: true }, { carving: 'carving_start' }, {}, {}, { wall: true },
-      {}, { item: 'oil_flask' }, {}, { bark: 'lampkeeper_hooks_heard' }, {},
-      {}, {}, { wall: true }, { wall: true }, { wall: true }
-    ],
-    [
-      { wall: true }, { bark: 'f1_start' }, {}, {}, { wall: true },
-      { chest: true, chestItems: ['potion_red'] }, {}, { item: 'potion_green' }, { wall: true }, { wall: true },
-      { wall: true }, {}, { wall: true }, { wall: true }, { wall: true }
-    ],
-    [
-      { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true },
-      { wall: true }, { wall: true }, { wall: true }, { wall: true }, {},
-      {}, { bark: 'lampkeeper_enter' }, { item: 'oil_flask' }, {}, { wall: true }
-    ],
-    [
-      { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true },
-      { wall: true }, { wall: true }, { wall: true }, { wall: true }, {},
-      {}, {},
-      { prop: 'desk', readNote: 'note_lampkeeper', bark: 'lampkeeper_note_read', propPlacement: 'floor' },
-      { prop: 'lamp_capped', bark: 'lampkeeper_capped_lamp', propPlacement: 'wall', propWall: 'E' },
-      { wall: true }
-    ],
-    [
-      { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true },
-      { wall: true }, { wall: true }, { wall: true }, { wall: true }, { prop: 'jar_rack' },
-      {}, {}, {}, {}, { wall: true }
-    ],
-    [
-      { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true },
-      { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true },
-      { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }
-    ]
-  ]
-};
+export const floor1: FloorData = rawFloor1 as unknown as FloorData;
+export const floor1Sconces: Sconce[] = rawSconces as Sconce[];
+export const floor1CaveIn = rawCaveIn;
 
 /**
  * Proto3d only — do not copy this into shared floor1.
- * Until combat is ported, keep a potion under the rust crab at (5,3) so the
- * guarded-item sprite tests still have a live monster on loot.
  * The locked door at (4,2) must have a free square in front at (3,2);
  * move the leeches onto (3,3) in the water hall (same shallow-water floor height).
  */
@@ -119,15 +31,3 @@ function relocateLeechesOffDoor(floor: FloorData) {
 }
 
 relocateLeechesOffDoor(floor1);
-
-export const floor1Sconces: Sconce[] = [
-  { x: 0, y: 6, face: 'E', lit: true, capped: false },
-  { x: 4, y: 1, face: 'W', lit: true, capped: false },
-  { x: 6, y: 4, face: 'S', lit: true, capped: false },
-  { x: 4, y: 6, face: 'W', lit: false, capped: false },
-  { x: 8, y: 1, face: 'W', lit: false, capped: false },
-  { x: 8, y: 5, face: 'S', lit: false, capped: false },
-  { x: 14, y: 3, face: 'W', lit: false, capped: false },
-  { x: 0, y: 3, face: 'E', lit: false, capped: true },
-  { x: 9, y: 0, face: 'S', lit: false, capped: true }
-];

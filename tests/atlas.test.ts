@@ -117,7 +117,9 @@ describe('floor 1 sprite atlases', () => {
       'proto3d/fx/dark/eyes_green_1.png',
       'proto3d/fx/dark/eyes_pale_1.png',
       'proto3d/fx/dark/glint_1.png',
-      'proto3d/fx/dark/stairs_glow.png'
+      'proto3d/fx/dark/stairs_glow.png',
+      'proto3d/fx/dust_burst_1.png',
+      'proto3d/fx/dust_burst_6.png'
     ];
     for (const path of skipPacked) {
       expect(lookupFrame(path), path).toBeTruthy();

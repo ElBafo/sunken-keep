@@ -136,7 +136,7 @@ export const BRIGHT_MIN = 0.6;
 export const BRIGHT_MAX = 1.6;
 export const OIL_START = 2;
 export const OIL_MAX = 4;
-export const OIL_FLASK = 1;
+export const OIL_FLASK = 2;
 export const OIL_TORCH_COST = 1;
 /** Held wall-torch pool: small, follows the party square. */
 export const CARRIED_TORCH_RADIUS_TILES = 1.35;

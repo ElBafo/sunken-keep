@@ -8,6 +8,7 @@ import {
 } from './constants';
 import { DoorSystem } from './doors';
 import { makeWallGeometry, wallMidY } from './geometry';
+import { loadSpriteTexture } from './atlas';
 import { loadTextureCached } from './asset-cache';
 import { mapPool, SPRITE_LOAD_CONCURRENCY } from './load-pool';
 import {
@@ -22,6 +23,7 @@ import {
   VariantSurface
 } from './texture-variants';
 import { FloorData, Tile } from './types';
+import { hasWallMips, loadNearestMipTexture } from './wall-mips';
 
 type TexOpts = {
   wrapS: THREE.Wrapping;
@@ -43,6 +45,10 @@ export class SceneBuilder {
   private secretOpen: THREE.Texture | null = null;
   private submergedShallow: THREE.Texture[] = [];
   private submergedDeep: THREE.Texture[] = [];
+  private rubbleTex: THREE.Texture | null = null;
+  private dustFrames: THREE.Texture[] = [];
+  private rubbleMeshes: THREE.Mesh[] = [];
+  private dustSprite: THREE.Sprite | null = null;
   doors = new DoorSystem();
 
   async loadTextures(): Promise<void> {
@@ -50,6 +56,14 @@ export class SceneBuilder {
     const files = listedTex3dFiles();
 
     const loadTex = async (path: string, opts: TexOpts): Promise<THREE.Texture> => {
+      const filename = path.replace(/^proto3d\/tex3d\//, '');
+      if (hasWallMips(filename)) {
+        const tex = await loadNearestMipTexture(baseUrl, filename);
+        tex.wrapS = opts.wrapS;
+        tex.wrapT = opts.wrapT;
+        tex.needsUpdate = true;
+        return tex;
+      }
       const tex = await loadTextureCached(`${baseUrl}${path}`);
       tex.colorSpace = THREE.SRGBColorSpace;
       (tex as any).encoding = 3001;
@@ -65,7 +79,7 @@ export class SceneBuilder {
     const wall: TexOpts = {
       wrapS: THREE.RepeatWrapping,
       wrapT: THREE.ClampToEdgeWrapping,
-      mipmaps: false
+      mipmaps: true
     };
     const floor: TexOpts = {
       wrapS: THREE.RepeatWrapping,
@@ -154,6 +168,29 @@ export class SceneBuilder {
     this.secretOpen = cutoutTex.secretOpen ?? null;
     this.submergedShallow = shallow;
     this.submergedDeep = deep;
+    try {
+      const rubble = await loadTextureCached(`${baseUrl}art/dungeon_v2/rubble_front_near.png`);
+      rubble.colorSpace = THREE.SRGBColorSpace;
+      rubble.magFilter = THREE.NearestFilter;
+      rubble.minFilter = THREE.NearestFilter;
+      rubble.generateMipmaps = false;
+      rubble.needsUpdate = true;
+      this.rubbleTex = rubble;
+    } catch {
+      this.rubbleTex = this.variants.get('wall_plain')?.[0] ?? null;
+    }
+    this.dustFrames = [];
+    for (let i = 1; i <= 6; i++) {
+      try {
+        const dust = await loadSpriteTexture(`proto3d/fx/dust_burst_${i}.png`);
+        dust.magFilter = THREE.NearestFilter;
+        dust.minFilter = THREE.NearestFilter;
+        dust.generateMipmaps = false;
+        this.dustFrames.push(dust);
+      } catch {
+        break;
+      }
+    }
 
     console.log('All textures loaded successfully');
   }
@@ -333,6 +370,96 @@ export class SceneBuilder {
     wall.userData.cellX = x;
     wall.userData.cellY = y;
     group.add(wall);
+  }
+
+  applyRubbleWall(scene: THREE.Scene, floorData: FloorData, x: number, y: number) {
+    const tile = floorData.tiles[y]?.[x];
+    if (!tile) return;
+    tile.wall = true;
+    this.clearRubble();
+    const group = new THREE.Group();
+    group.name = 'cave-in-rubble';
+    const tex = this.rubbleTex ?? this.pick('wall_plain', x, y, 'W');
+    const wx = x * CELL_SIZE;
+    const wz = y * CELL_SIZE;
+    const faces: Array<{ dx: number; dz: number; face: 'N' | 'E' | 'S' | 'W' }> = [
+      { dx: 0, dz: -1, face: 'N' },
+      { dx: 1, dz: 0, face: 'E' },
+      { dx: 0, dz: 1, face: 'S' },
+      { dx: -1, dz: 0, face: 'W' }
+    ];
+    for (const { dx, dz, face } of faces) {
+      const nx = x + dx;
+      const nz = y + dz;
+      const neighbor = floorData.tiles[nz]?.[nx];
+      if (!neighbor || occludesWallFace(neighbor)) continue;
+      const geo = makeWallGeometry();
+      const mat = new THREE.MeshBasicMaterial({
+        map: tex,
+        vertexColors: true,
+        side: THREE.DoubleSide
+      });
+      const wall = new THREE.Mesh(geo, mat);
+      const midY = wallMidY();
+      if (face === 'N') {
+        wall.position.set(wx, midY, wz - CELL_SIZE / 2);
+        wall.rotation.y = 0;
+      } else if (face === 'E') {
+        wall.position.set(wx + CELL_SIZE / 2, midY, wz);
+        wall.rotation.y = Math.PI / 2;
+      } else if (face === 'S') {
+        wall.position.set(wx, midY, wz + CELL_SIZE / 2);
+        wall.rotation.y = Math.PI;
+      } else {
+        wall.position.set(wx - CELL_SIZE / 2, midY, wz);
+        wall.rotation.y = -Math.PI / 2;
+      }
+      wall.userData.lightX = nx;
+      wall.userData.lightY = nz;
+      wall.userData.face = face;
+      wall.userData.kind = 'wall';
+      wall.userData.rubble = true;
+      wall.userData.cellX = x;
+      wall.userData.cellY = y;
+      group.add(wall);
+      this.rubbleMeshes.push(wall);
+    }
+    scene.add(group);
+  }
+
+  setDustBurst(scene: THREE.Scene, x: number, y: number, frame: number | null) {
+    if (frame == null || !this.dustFrames.length) {
+      if (this.dustSprite) this.dustSprite.visible = false;
+      return;
+    }
+    const tex = this.dustFrames[Math.max(0, Math.min(this.dustFrames.length, frame) - 1)];
+    if (!this.dustSprite) {
+      const mat = new THREE.SpriteMaterial({
+        map: tex,
+        transparent: true,
+        depthWrite: false,
+        toneMapped: false
+      });
+      this.dustSprite = new THREE.Sprite(mat);
+      this.dustSprite.scale.set(CELL_SIZE, CELL_SIZE, 1);
+      this.dustSprite.userData.kind = 'dust_burst';
+      scene.add(this.dustSprite);
+    }
+    const mat = this.dustSprite.material as THREE.SpriteMaterial;
+    mat.map = tex;
+    mat.needsUpdate = true;
+    this.dustSprite.position.set(x * CELL_SIZE, CELL_SIZE * 0.5, y * CELL_SIZE);
+    this.dustSprite.visible = true;
+    this.dustSprite.userData.lightX = x;
+    this.dustSprite.userData.lightY = y;
+  }
+
+  clearRubble() {
+    for (const mesh of this.rubbleMeshes) {
+      mesh.parent?.remove(mesh);
+    }
+    this.rubbleMeshes = [];
+    if (this.dustSprite) this.dustSprite.visible = false;
   }
 
   setSecretOpen(scene: THREE.Scene, x: number, y: number, open: boolean) {

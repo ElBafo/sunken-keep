@@ -32,6 +32,8 @@ export interface SavedMonster {
   hp: number;
   maxHp: number;
   alive: boolean;
+  split?: boolean;
+  splitDone?: boolean;
 }
 
 export interface SavedSconce {
@@ -272,6 +274,8 @@ export function snapshotMonster(m: MonsterState): SavedMonster {
     y: m.y,
     hp: m.hp,
     maxHp: m.maxHp,
-    alive: m.alive
+    alive: m.alive,
+    split: m.split,
+    splitDone: m.splitDone
   };
 }
