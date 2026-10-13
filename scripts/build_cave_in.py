@@ -15,12 +15,13 @@ BLOCKS={'cap':[(0,0,32,24),(128,0,160,24)],
  'panel':[(34,26,80,71),(80,26,126,71),(34,71,80,116),(80,71,126,116)],
  'brick':[(32+12*i,114,44+12*i,126) for i in range(8)],
  'base':[(0,125,40,140),(40,125,80,140),(80,125,120,140),(120,125,160,140)]}
+DK=1.0
 def build(dist,seed,fk=1.0,save=True):
     src=np.array(Image.open(D+f'wall_front_{dist}.png').convert('RGB')).astype(int)
     H,W=src.shape[:2]; s=W/160; r=random.Random(seed)
     P=np.unique(src.reshape(-1,3),axis=0); Pl=P.sum(1)
     order=np.argsort(Pl); dark=P[order[0]]; dark2=P[order[min(3,len(P)-1)]]
-    WALLMEAN=src.mean(); RAMP=P[order]; RIDX={tuple(c):i for i,c in enumerate(RAMP)}
+    WALLMEAN=src.mean(); DARK2=DK; RAMP=P[order]; RIDX={tuple(c):i for i,c in enumerate(RAMP)}
     STEP=max(1,len(RAMP)//8)   # one ramp step = 1/8 of the wall's luminance ramp
     def bump(c,n): return RAMP[min(len(RAMP)-1,RIDX[tuple(c)]+n*STEP)]
     def quant(img):  # snap to nearest wall colour
@@ -67,14 +68,14 @@ def build(dist,seed,fk=1.0,save=True):
     knot=[cut(b) for b in BLOCKS['panel'][:1]+BLOCKS['pillar'][1:2]]
     small=[cut(b) for k in ('brick','stud','base','cap') for b in BLOCKS[k]]
     plainall=plainbig+small
-    def top(x): return H*(0.04+0.8*abs(x/W-0.5))   # pile surface: high centre, spreads wide at the base
+    def top(x): return H*1.3*abs(x/W-0.5)   # triangular cap: full height centre, 35% at edges
     # 1) back mass: dim chunks packed edge to edge over the whole square (stone deeper in the corridor)
     y=-2
     while y<H:
         x=-r.randint(0,8); rowh=0
         while x<W:
             b,m=chunk(r.choice(plainall),.5); h,w=m.shape
-            if y+h>top(x+w/2)-3*s: place(b,m,x,y+r.randint(-1,1),r.uniform(.83,.87))
+            if y>=max(top(x),top(x+w))-2*s: place(b,m,x,y+r.randint(-1,1),r.uniform(.83,.87))
             x+=w-r.randint(0,2); rowh=max(rowh,h)
         y+=max(3,int(rowh*.7))
     # 2) front pile, stacked with a skyline: each chunk drops until it rests on what is below it.
@@ -84,8 +85,9 @@ def build(dist,seed,fk=1.0,save=True):
         if not cols: return False
         low={c:np.nonzero(m[:,c])[0].max() for c in cols}; hi_={c:np.nonzero(m[:,c])[0].min() for c in cols}
         y=min(surf[x+c]-low[c]-1 for c in cols)+int(s)   # sink 1px: chunks bite into each other
-        if y+min(hi_.values())<min(top(x+c) for c in cols)-2*s: return False   # above pile outline
-        if b[m].mean()<WALLMEAN: b=np.array([[bump(c,1) for c in row] for row in b])  # whole-block +1 step for dark blocks
+        if any(y+hi_[c]<top(x+c)-s for c in cols): return False   # strict per-column cap   # above pile outline
+        bm=b[m].mean()
+        if bm<WALLMEAN: b=np.array([[bump(c,2 if bm<DARK2*WALLMEAN else 1) for c in row] for row in b])  # +1 step, +2 on the darkest  # whole-block +1 step for dark blocks
         place(b,m,x,y,1.0)   # original shading kept inside the block
         # light catches the top face and the edge facing down the slope: +1/+2 ramp steps
         t=max(2,int(round(s*3))); right=(x+w/2)>W/2
@@ -177,7 +179,7 @@ def frame(f):
             warp=1+.25*np.sin(3*ang+cx)+.18*np.sin(5*ang+cy)+.12*np.sin(yy*.35+cx)
             cl=np.maximum(cl,wt*np.clip(1-rad/warp,0,1)**.8)
         n=rs.random((140,160)); n=(n+np.roll(n,1,1)+np.roll(n,-1,1)+np.roll(n,2,1))/4   # horizontal smear grain
-        k=[.53,.53,.42,.40,.40][f]
+        k=[.53,.53,.53,.53,.53][f]
         acc=np.maximum(acc*.35,cl*k*(.75+.5*n)); hi[:]=False
         hi|=(cl>.75)&(n>.55)
     a=(np.clip(acc,0,221/255)*255/17).astype(int)*17
