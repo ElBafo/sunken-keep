@@ -38,6 +38,7 @@ art/intro/shot4_drowned.png
 art/intro/shot5_swamp.png
 art/intro/shot6_gate.png
 art/intro/title.png
+art/intro/title_el.png
 art/portraits/brannoc_healthy.png
 art/portraits/brannoc_near_death.png
 art/portraits/brannoc_wounded.png
