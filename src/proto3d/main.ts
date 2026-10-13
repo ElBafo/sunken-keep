@@ -41,7 +41,7 @@ import {
   type SavedFloor
 } from './saves';
 import { TitleScreen, type TitleAction } from './title';
-import { audioGroupRelPaths } from './audio-groups';
+import { beforePlayRelPaths, firstFightRelPaths } from './audio-groups';
 import { floor1MonsterArtPaths, prefetchRelPaths } from './floor1-prefetch';
 import { IntroPlayer } from './intro';
 import { mountIntroSkip, type IntroSkipHandle } from './intro-skip';
@@ -457,7 +457,7 @@ class Game {
     });
 
     void this.title?.loadRest();
-    void this.audioManager.loadPlayableSounds(this.renderer.scene, floor1Sconces);
+    void this.audioManager.loadBeforePlaySounds(this.renderer.scene, floor1Sconces);
     if (this.bubble) await this.bubble.load();
     this.updateDoorButton();
   }
@@ -480,9 +480,9 @@ class Game {
   private beginFloor1BackgroundLoads() {
     if (this.floor1PrefetchStarted) return;
     this.floor1PrefetchStarted = true;
-    const extra = [...floor1MonsterArtPaths(), ...audioGroupRelPaths('floor1')];
-    void prefetchRelPaths(extra, 4);
-    void this.audioManager.loadFloor1PlaySounds();
+    void prefetchRelPaths([...floor1MonsterArtPaths(), ...beforePlayRelPaths()], 8);
+    void this.audioManager.loadBeforePlaySounds();
+    void prefetchRelPaths(firstFightRelPaths(), 4);
   }
 
   private async ensureIntroStartReady() {
@@ -491,7 +491,7 @@ class Game {
 
   private async ensurePlayReady() {
     await this.worldBoot;
-    await this.audioManager.loadPlayableSounds(this.renderer.scene, floor1Sconces);
+    await this.audioManager.loadBeforePlaySounds(this.renderer.scene, floor1Sconces);
     await this.spriteManager.ensureMonsters(this.renderer.scene, floor1);
     if (this.combat.monsters.length === 0) this.spawnFloorMonsters();
     else this.rebindMonsters();
@@ -2017,7 +2017,7 @@ class Game {
       this.audioManager.attachDressing(this.renderer.scene, this.dressing.marks);
       this.audioManager.startNamedLoop('lamp_hooks', 11 * CELL_SIZE, 0.55, 9 * CELL_SIZE, 0.38, 'named');
       this.rebuildAudioFromState();
-      void this.audioManager.loadLaterSounds();
+      void this.audioManager.startPlayStreaming();
     } catch (err) {
       console.warn('Audio init failed', err);
       this.audioManager.startLanternLoop(this.oil > 0);
@@ -2065,7 +2065,9 @@ class Game {
         introStarted: this.intro?.hasStarted() ?? false,
         skipToPlayableMs: this.skipToPlayableMs,
         floor1Prefetch: this.floor1PrefetchStarted,
-        pendingFloor1Sounds: this.audioManager.pendingFloor1Stems()
+        pendingBeforePlaySounds: this.audioManager.pendingBeforePlayStems(),
+        pendingFirstFightSounds: this.audioManager.pendingFirstFightStems(),
+        playAgeMs: this.playStartedAt ? Math.round(performance.now() - this.playStartedAt) : null
       }),
       setPosition: (x: number, y: number, dir: number) => {
         this.cancelSwap();

@@ -1,4 +1,5 @@
 import loadGroups from './audio-load-groups.json';
+import { BEFORE_PLAY_STEMS, FIRST_FIGHT_STEMS } from './floor1-sounds';
 
 export type AudioLoadGroup = 'title' | 'floor1' | 'later';
 
@@ -63,4 +64,30 @@ export function audioGroupFiles(group: AudioLoadGroup): ReadonlyArray<readonly [
 /** Title bed + button voices. Intro music stays on its own preload. */
 export function titleMenuStems(): string[] {
   return audioGroupStems('title').filter((stem) => stem !== 'music_intro');
+}
+
+export function beforePlayStems(): readonly string[] {
+  return BEFORE_PLAY_STEMS;
+}
+
+export function firstFightStems(): readonly string[] {
+  return FIRST_FIGHT_STEMS;
+}
+
+const BEFORE_PLAY_SET = new Set<string>(BEFORE_PLAY_STEMS);
+const FIRST_FIGHT_SET = new Set<string>(FIRST_FIGHT_STEMS);
+
+/** Floor 1 beds that stream after the first-fight burst (includes flooded-halls ambience). */
+export function floor1StreamStems(): string[] {
+  return audioGroupStems('floor1').filter(
+    (stem) => !BEFORE_PLAY_SET.has(stem) && !FIRST_FIGHT_SET.has(stem)
+  );
+}
+
+export function beforePlayRelPaths(): string[] {
+  return beforePlayStems().map(audioStemPath);
+}
+
+export function firstFightRelPaths(): string[] {
+  return firstFightStems().map(audioStemPath);
 }

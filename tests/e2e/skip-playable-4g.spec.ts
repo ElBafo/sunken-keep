@@ -3,14 +3,24 @@ import { test, expect, devices } from '@playwright/test';
 const BASE_URL = 'http://127.0.0.1:4173/sunken-keep';
 const RUNS = 3;
 const BUDGET_MS = 5000;
+const FIRST_FIGHT_MS = 6000;
 const DOWNLOAD_MBPS = 9;
 const LATENCY_MS = 150;
 
 test.use({ ...devices['iPhone 15'], hasTouch: true, isMobile: true });
 
+type Boot = {
+  skipToPlayableMs?: number | null;
+  pendingBeforePlaySounds?: string[];
+  pendingFirstFightSounds?: string[];
+  playAgeMs?: number | null;
+};
+
 async function skipToPlayable(page: import('@playwright/test').Page): Promise<{
   skipToPlayableMs: number;
-  pendingFloor1Sounds: string[];
+  pendingBeforePlaySounds: string[];
+  firstFightMs: number | null;
+  pendingFirstFightSounds: string[];
 }> {
   await page.goto(`${BASE_URL}/proto3d.html`);
   await page.waitForFunction(
@@ -42,26 +52,40 @@ async function skipToPlayable(page: import('@playwright/test').Page): Promise<{
   await skip.click({ force: true });
   await page.waitForFunction(
     () => {
-      const boot = (window as unknown as { __proto3d?: { boot?: () => { skipToPlayableMs?: number | null } } }).__proto3d
-        ?.boot?.();
+      const boot = (window as unknown as { __proto3d?: { boot?: () => Boot } }).__proto3d?.boot?.();
       return boot?.skipToPlayableMs != null;
     },
     null,
     { timeout: 45000 }
   );
-  return page.evaluate(() => {
-    const boot = (
-      window as unknown as {
-        __proto3d: {
-          boot: () => { skipToPlayableMs?: number | null; pendingFloor1Sounds?: string[] };
-        };
-      }
-    ).__proto3d.boot();
+  const atPlay = await page.evaluate(() => {
+    const boot = (window as unknown as { __proto3d: { boot: () => Boot } }).__proto3d.boot();
     return {
       skipToPlayableMs: boot.skipToPlayableMs ?? -1,
-      pendingFloor1Sounds: boot.pendingFloor1Sounds ?? ['missing-debug']
+      pendingBeforePlaySounds: boot.pendingBeforePlaySounds ?? ['missing-debug']
     };
   });
+  await page.waitForFunction(
+    () => {
+      const boot = (window as unknown as { __proto3d?: { boot?: () => Boot } }).__proto3d?.boot?.();
+      return (boot?.pendingFirstFightSounds?.length ?? 1) === 0;
+    },
+    null,
+    { timeout: FIRST_FIGHT_MS + 1500 }
+  );
+  const afterFight = await page.evaluate(() => {
+    const boot = (window as unknown as { __proto3d: { boot: () => Boot } }).__proto3d.boot();
+    return {
+      playAgeMs: boot.playAgeMs ?? null,
+      pendingFirstFightSounds: boot.pendingFirstFightSounds ?? ['missing-debug']
+    };
+  });
+  return {
+    skipToPlayableMs: atPlay.skipToPlayableMs,
+    pendingBeforePlaySounds: atPlay.pendingBeforePlaySounds,
+    firstFightMs: afterFight.playAgeMs,
+    pendingFirstFightSounds: afterFight.pendingFirstFightSounds
+  };
 }
 
 function median(values: number[]): number {
@@ -90,8 +114,13 @@ test.describe('skip-to-playable on iPhone Fast 4G', () => {
         latency: LATENCY_MS
       });
       const result = await skipToPlayable(page);
-      console.log(`iPhone 9Mbps/150ms run ${i + 1}: ${result.skipToPlayableMs}ms pending=${JSON.stringify(result.pendingFloor1Sounds)}`);
-      expect(result.pendingFloor1Sounds, 'no floor 1 sound still pending at play start').toEqual([]);
+      console.log(
+        `iPhone 9Mbps/150ms run ${i + 1}: skip=${result.skipToPlayableMs}ms firstFight=${result.firstFightMs}ms beforePlay=${JSON.stringify(result.pendingBeforePlaySounds)} firstFightPending=${JSON.stringify(result.pendingFirstFightSounds)}`
+      );
+      expect(result.pendingBeforePlaySounds, 'before-play set loaded at play start').toEqual([]);
+      expect(result.pendingFirstFightSounds, 'first-fight set loaded').toEqual([]);
+      expect(result.firstFightMs, 'first-fight set ready within 6s of play').not.toBeNull();
+      expect(result.firstFightMs ?? 99999).toBeLessThanOrEqual(FIRST_FIGHT_MS);
       times.push(result.skipToPlayableMs);
       await context.close();
     }

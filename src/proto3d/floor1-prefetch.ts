@@ -1,4 +1,4 @@
-import { audioGroupFiles, audioGroupRelPaths } from './audio-groups';
+import { audioGroupFiles, beforePlayRelPaths } from './audio-groups';
 import { prefetchUrl } from './asset-cache';
 import { floor1 } from './floor-data';
 import { mapPool, SPRITE_LOAD_CONCURRENCY } from './load-pool';
@@ -25,7 +25,7 @@ const WATER_BEDS = [
 
 const CUTOUT_TEX = ['door_open.png', 'door_panel.png', 'secret_closed.png', 'secret_open.png'];
 
-/** Title+floor1 audio that must decode before play. Later beds wait until the dungeon is up. */
+/** Tiny before-play audio set. Combat and ambience stream after play starts. */
 export const FLOOR1_PLAY_AUDIO = audioGroupFiles('floor1');
 
 export function floor1MonsterKinds(): string[] {
@@ -63,9 +63,10 @@ export function floor1MonsterArtPaths(): string[] {
   return paths;
 }
 
-/** Walls, floor 1 monster frames, ambience, steps, torch, floor 1 combat. */
+/** Walls, floor 1 monster frames, and the tiny before-play audio set. */
 export function floor1PlayableRelPaths(): string[] {
-  return [...floor1TexturePaths(), ...floor1MonsterArtPaths(), ...audioGroupRelPaths('floor1')];
+  const audio = beforePlayRelPaths().filter((p) => p !== 'audio/sfx_ui_button.mp3');
+  return [...floor1TexturePaths(), ...floor1MonsterArtPaths(), ...audio];
 }
 
 /** Fetch into the HTTP cache. Never throws; limited in-flight requests. */

@@ -5,10 +5,13 @@ import {
   audioGroupRelPaths,
   audioGroupStems,
   audioStemKeys,
+  beforePlayRelPaths,
+  firstFightStems,
+  floor1StreamStems,
   titleMenuStems
 } from '../src/proto3d/audio-groups';
 import { titleBootRelPaths } from '../src/proto3d/boot-assets';
-import { FLOOR1_PLAY_STEMS } from '../src/proto3d/floor1-sounds';
+import { BEFORE_PLAY_STEMS, FIRST_FIGHT_STEMS } from '../src/proto3d/floor1-sounds';
 import { floor1PlayableRelPaths } from '../src/proto3d/floor1-prefetch';
 
 describe('audio load groups', () => {
@@ -28,27 +31,32 @@ describe('audio load groups', () => {
     expect(titleBootRelPaths('en')).not.toContain('audio/music_intro.mp3');
   });
 
-  it('puts floor1 beds in the playable list and later beds out of it', () => {
+  it('puts the before-play set in the playable list and keeps ambience off the critical path', () => {
     const playable = new Set(floor1PlayableRelPaths());
     const later = audioGroupRelPaths('later');
-    expect(playable.has('audio/amb_flooded_halls_loop.mp3')).toBe(true);
-    expect(playable.has('audio/sfx_oil_pickup.mp3')).toBe(true);
-    expect(playable.has('audio/sfx_lantern_refill.mp3')).toBe(true);
+    expect(playable.has('audio/sfx_step_1.mp3')).toBe(true);
+    expect(playable.has('audio/sfx_lantern_loop.mp3')).toBe(true);
+    expect(playable.has('audio/sfx_bump.mp3')).toBe(true);
+    expect(playable.has('audio/amb_flooded_halls_loop.mp3')).toBe(false);
+    expect(playable.has('audio/sfx_keep_rat_alert.mp3')).toBe(false);
     expect(later).toContain('audio/music_act1_loop.mp3');
     expect(later).toContain('audio/amb_swamp_loop.mp3');
     expect(playable.has('audio/music_act1_loop.mp3')).toBe(false);
-    expect(playable.has('audio/amb_swamp_loop.mp3')).toBe(false);
   });
 
-  it('keeps every floor 1 playable stem out of the later group', () => {
-    const ready = new Set([...audioGroupStems('title'), ...audioGroupStems('floor1')]);
+  it('keeps before-play and first-fight stems out of later, and streams flooded halls after play', () => {
     const later = new Set(audioGroupStems('later'));
-    for (const stem of FLOOR1_PLAY_STEMS) {
+    const stream = new Set(floor1StreamStems());
+    for (const stem of BEFORE_PLAY_STEMS) {
       expect(later.has(stem), `${stem} must not stay in later`).toBe(false);
-      expect(ready.has(stem), `${stem} must be in title or floor1`).toBe(true);
     }
-    expect(later.has('amb_flooded_halls_loop')).toBe(false);
-    expect(ready.has('amb_flood_rush_1_loop')).toBe(false);
+    for (const stem of FIRST_FIGHT_STEMS) {
+      expect(later.has(stem), `${stem} must not stay in later`).toBe(false);
+      expect(firstFightStems()).toContain(stem);
+    }
+    expect(stream.has('amb_flooded_halls_loop')).toBe(true);
+    expect(beforePlayRelPaths()).not.toContain('audio/amb_flooded_halls_loop.mp3');
+    expect(later.has('amb_flood_rush_1_loop')).toBe(true);
   });
 
   it('ships every grouped mp3', () => {
