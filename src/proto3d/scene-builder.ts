@@ -8,6 +8,7 @@ import {
 } from './constants';
 import { DoorSystem } from './doors';
 import { makeWallGeometry, wallMidY } from './geometry';
+import { mapPool, SPRITE_LOAD_CONCURRENCY } from './load-pool';
 import {
   flipUVsX,
   floorFlipX,
@@ -90,45 +91,79 @@ export class SceneBuilder {
     const optsFor = (surface: VariantSurface): TexOpts =>
       surface.startsWith('wall') ? wall : floor;
 
-    await Promise.all(
-      VARIANT_SURFACES.map(async (surface) => {
-        const names = variantFilenames(surface, files);
-        const loaded = await Promise.all(
-          names.map((n) => loadTex(`proto3d/tex3d/${n}`, optsFor(surface)))
-        );
-        this.variants.set(surface, loaded);
-      })
-    );
-
-    const [doorOpen, doorPanel, secretClosed, secretOpen] = await Promise.all([
-      loadTex('proto3d/tex3d/door_open.png', cutout),
-      loadTex('proto3d/tex3d/door_panel.png', cutout),
-      loadTex('proto3d/tex3d/secret_closed.png', wall),
-      loadTex('proto3d/tex3d/secret_open.png', cutout)
-    ]);
-    this.doorOpen = doorOpen;
-    this.doorPanel = doorPanel;
-    this.secretClosed = secretClosed;
-    this.secretOpen = secretOpen;
-
+    const jobs: Array<{ path: string; opts: TexOpts; assign: (tex: THREE.Texture) => void }> = [];
+    for (const surface of VARIANT_SURFACES) {
+      const names = variantFilenames(surface, files);
+      const loaded: THREE.Texture[] = new Array(names.length);
+      this.variants.set(surface, loaded);
+      names.forEach((n, i) => {
+        jobs.push({
+          path: `proto3d/tex3d/${n}`,
+          opts: optsFor(surface),
+          assign: (tex) => {
+            loaded[i] = tex;
+          }
+        });
+      });
+    }
+    const cutouts: Array<{ path: string; opts: TexOpts; key: 'doorOpen' | 'doorPanel' | 'secretClosed' | 'secretOpen' }> = [
+      { path: 'proto3d/tex3d/door_open.png', opts: cutout, key: 'doorOpen' },
+      { path: 'proto3d/tex3d/door_panel.png', opts: cutout, key: 'doorPanel' },
+      { path: 'proto3d/tex3d/secret_closed.png', opts: wall, key: 'secretClosed' },
+      { path: 'proto3d/tex3d/secret_open.png', opts: cutout, key: 'secretOpen' }
+    ];
+    const cutoutTex: Partial<Record<(typeof cutouts)[number]['key'], THREE.Texture>> = {};
+    for (const job of cutouts) {
+      jobs.push({
+        path: job.path,
+        opts: job.opts,
+        assign: (tex) => {
+          cutoutTex[job.key] = tex;
+        }
+      });
+    }
     const waterFloor: TexOpts = {
       wrapS: THREE.RepeatWrapping,
       wrapT: THREE.RepeatWrapping,
       mipmaps: true
     };
-    this.submergedShallow = await Promise.all(
-      ['floor_submerged.png', 'floor_submerged_2.png', 'floor_submerged_3.png', 'floor_submerged_4.png'].map((n) =>
-        loadTex(`proto3d/tex3d/water/${n}`, waterFloor)
-      )
-    );
-    this.submergedDeep = await Promise.all(
-      [
-        'floor_submerged_deep.png',
-        'floor_submerged_deep_2.png',
-        'floor_submerged_deep_3.png',
-        'floor_submerged_deep_4.png'
-      ].map((n) => loadTex(`proto3d/tex3d/water/${n}`, waterFloor))
-    );
+    const shallowNames = ['floor_submerged.png', 'floor_submerged_2.png', 'floor_submerged_3.png', 'floor_submerged_4.png'];
+    const deepNames = [
+      'floor_submerged_deep.png',
+      'floor_submerged_deep_2.png',
+      'floor_submerged_deep_3.png',
+      'floor_submerged_deep_4.png'
+    ];
+    const shallow: THREE.Texture[] = new Array(shallowNames.length);
+    const deep: THREE.Texture[] = new Array(deepNames.length);
+    shallowNames.forEach((n, i) => {
+      jobs.push({
+        path: `proto3d/tex3d/water/${n}`,
+        opts: waterFloor,
+        assign: (tex) => {
+          shallow[i] = tex;
+        }
+      });
+    });
+    deepNames.forEach((n, i) => {
+      jobs.push({
+        path: `proto3d/tex3d/water/${n}`,
+        opts: waterFloor,
+        assign: (tex) => {
+          deep[i] = tex;
+        }
+      });
+    });
+    await mapPool(jobs, SPRITE_LOAD_CONCURRENCY, async (job) => {
+      const tex = await loadTex(job.path, job.opts);
+      job.assign(tex);
+    });
+    this.doorOpen = cutoutTex.doorOpen ?? null;
+    this.doorPanel = cutoutTex.doorPanel ?? null;
+    this.secretClosed = cutoutTex.secretClosed ?? null;
+    this.secretOpen = cutoutTex.secretOpen ?? null;
+    this.submergedShallow = shallow;
+    this.submergedDeep = deep;
 
     console.log('All textures loaded successfully');
   }

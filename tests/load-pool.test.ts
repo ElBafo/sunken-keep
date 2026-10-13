@@ -2,6 +2,7 @@ import { readFileSync, statSync } from 'fs';
 import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
 import { titleBootRelPaths } from '../src/proto3d/boot-assets';
+import { floor1PlayableRelPaths } from '../src/proto3d/floor1-prefetch';
 import { INTRO_SHOT_FILES } from '../src/proto3d/intro';
 import { createLimiter, mapPool, SPRITE_LOAD_CONCURRENCY } from '../src/proto3d/load-pool';
 
@@ -104,5 +105,12 @@ describe('title boot asset list', () => {
     expect(music).toBeGreaterThan(400_000);
     expect(music).toBeLessThan(500_000);
     expect(titleBootRelPaths('en')).not.toContain('audio/music_intro.mp3');
+  });
+
+  it('keeps floor 1 playable assets out of the title-blocking batch', () => {
+    const title = new Set(titleBootRelPaths('en'));
+    const playable = floor1PlayableRelPaths();
+    expect(playable.some((p) => title.has(p))).toBe(false);
+    expect(playable.length).toBeGreaterThan(50);
   });
 });

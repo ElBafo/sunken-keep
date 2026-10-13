@@ -76,6 +76,21 @@ export function wrapFontLine(text: string, maxChars: number): string[] {
   return lines.length ? lines : [text];
 }
 
+/** Intro captions: 5×7 at 6px advance, word wrap, two lines max. */
+export const CAPTION_CHAR_PX = 6;
+export const CAPTION_MAX_CHARS = 42;
+export const CAPTION_MAX_LINES = 2;
+
+export function wrapCaption(
+  text: string,
+  maxChars = CAPTION_MAX_CHARS,
+  maxLines = CAPTION_MAX_LINES
+): string[] {
+  const lines = wrapFontLine(text, maxChars).map((line) => line.replace(/\s+$/, ''));
+  if (lines.length <= maxLines) return lines.length ? lines : [text];
+  return lines.slice(0, maxLines);
+}
+
 /** Draw one line with the 5×7 atlas, including the Greek block in `glyphs`. */
 export function drawFont5x7(
   ctx: CanvasRenderingContext2D,
