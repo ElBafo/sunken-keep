@@ -1038,7 +1038,7 @@ export class AudioManager {
     if (this.musicSound) this.musicSound.setVolume(on ? 0.12 : this.musicVolume);
   }
 
-  /** Web Audio buffer-source loops (loop=true), never an HTMLAudioElement. */
+  /** Web Audio buffer-source loops with loop=true. */
   private startBufferLoop(
     src: AudioBufferSourceNode | null,
     gain: GainNode | null,
