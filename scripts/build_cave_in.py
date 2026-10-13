@@ -15,7 +15,7 @@ BLOCKS={'cap':[(0,0,32,24),(128,0,160,24)],
  'panel':[(34,26,80,71),(80,26,126,71),(34,71,80,116),(80,71,126,116)],
  'brick':[(32+12*i,114,44+12*i,126) for i in range(8)],
  'base':[(0,125,40,140),(40,125,80,140),(80,125,120,140),(120,125,160,140)]}
-def build(dist,seed):
+def build(dist,seed,fk=1.0,save=True):
     src=np.array(Image.open(D+f'wall_front_{dist}.png').convert('RGB')).astype(int)
     H,W=src.shape[:2]; s=W/160; r=random.Random(seed)
     P=np.unique(src.reshape(-1,3),axis=0); Pl=P.sum(1)
@@ -45,7 +45,7 @@ def build(dist,seed):
             elif side==1: m[h-v:,i]=False
             elif side==2: m[i,:v]=False
             else: m[i,w-v:]=False
-        k=r.randrange(4); b=np.rot90(b,k); m=np.rot90(m,k)
+        k=r.choice((0,2)) if max(w,h)>1.6*min(w,h) else r.randrange(4); b=np.rot90(b,k); m=np.rot90(m,k)  # long slabs lie flat
         if r.random()<.5: b=b[:,::-1]; m=m[:,::-1]
         return b,m
     out=np.zeros_like(src); out[:]=dark
@@ -59,16 +59,20 @@ def build(dist,seed):
         ys,xs=np.nonzero(m); c=b[ys,xs]; ys=ys+y; xs=xs+x
         ok=(ys>=0)&(ys<H)&(xs>=0)&(xs<W); out[ys[ok],xs[ok]]=c[ok]
     allb=[cut(b) for v in BLOCKS.values() for b in v]
-    big=[cut(b) for k in ('panel','pillar','frieze','cap') for b in BLOCKS[k]]
-    small=[cut(b) for k in ('brick','stud','base','cap','frieze') for b in BLOCKS[k]]
-    def top(x): return H*(0.30+0.75*abs(x/W-0.5)**1.5)   # pile surface: high centre, spreads wide at the base
+    # plain stone only (bricks, base, caps, studs); knotwork limited to KNOT pieces
+    plainbig=[cut(b) for k in ('base','cap','stud') for b in BLOCKS[k]]+[cut((32,114,80,126)),cut((80,114,128,126))]
+    knot=[cut(b) for b in BLOCKS['panel'][:1]+BLOCKS['pillar'][1:2]]
+    small=[cut(b) for k in ('brick','stud','base','cap') for b in BLOCKS[k]]
+    plainall=plainbig+small
+    def top(x): return H*(0.22+1.25*abs(x/W-0.5)**1.3)   # pile surface: high centre, spreads wide at the base
     # 1) back mass: dim chunks packed edge to edge over the whole square (stone deeper in the corridor)
     y=-2
     while y<H:
         x=-r.randint(0,8); rowh=0
         while x<W:
-            b,m=chunk(r.choice(allb),.5); h,w=m.shape
-            place(b,m,x,y+r.randint(-1,1),r.uniform(.48,.6)); x+=w-r.randint(0,2); rowh=max(rowh,h)
+            b,m=chunk(r.choice(plainall),.5); h,w=m.shape
+            if y+h>top(x+w/2)-3*s: place(b,m,x,y+r.randint(-1,1),r.uniform(.3,.4))
+            x+=w-r.randint(0,2); rowh=max(rowh,h)
         y+=max(3,int(rowh*.7))
     # 2) front pile, stacked with a skyline: each chunk drops until it rests on what is below it.
     surf=np.full(W,H+int(2*s))
@@ -82,21 +86,22 @@ def build(dist,seed):
         for c in cols: surf[x+c]=min(surf[x+c],y+hi_[c])
         return True
     pieces=[]
-    for _ in range(14): pieces.append((0,chunk(r.choice(big),.55)))
-    for _ in range(40): pieces.append((1,chunk(r.choice(big),.3)))
-    for _ in range(90): pieces.append((2,chunk(r.choice(small),.35)))
+    for kb in knot[:KN[dist]]: pieces.append((0,chunk(kb,.6)))
+    for _ in range(30): pieces.append((0,chunk(r.choice(plainbig),.6)))
+    for _ in range(80): pieces.append((1,chunk(r.choice(plainbig),.35)))
+    for _ in range(160): pieces.append((2,chunk(r.choice(small),.35)))
     pieces.sort(key=lambda p:(p[0],-p[1][1].sum()))
     for tier,(b,m) in pieces:
         w=m.shape[1]
-        for _try in range(6):
+        for _try in range(12):
             x=int(r.uniform(-.15,1.0)*W-w*.3)
-            if drop(b,m,x,[1.15,1.08,1.12][tier]*r.uniform(.93,1.05)): break
+            if drop(b,m,x,fk*[1.0,.95,.98][tier]*r.uniform(.93,1.05)): break
     # 3) grit: 1-3px crumbs of wall pixels lying on the pile surface and spilled on the floor
     for _ in range(int(160*s)):
         x=r.randrange(W); g=max(1,int(r.uniform(1,2.6)*s+.4))
         y=int(min(H-1,surf[x]+r.uniform(-1,1)*s)) if r.random()<.6 else int(H-r.uniform(1,8)*s)
         sx=r.randrange(W-g); sy=r.randrange(H-g); gg=src[sy:sy+g,sx:sx+g]
-        place(gg,np.ones((g,g),bool),x,y-g+1,1.0,outline=True)
+        place(gg,np.ones((g,g),bool),x,y-g+1,fk,outline=True)
     # 6) a few irregular dark cracks between blocks (no light through)
     for _ in range(int(5+3*s)):
         x=r.uniform(.1,.9)*W; y=r.uniform(.15,.85)*H; L=int(r.uniform(5,14)*s)
@@ -110,18 +115,27 @@ def build(dist,seed):
             if r.random()<.15: dx=-dx
     # match overall brightness to the wall
     m0=src.mean(); m1=out.mean()
-    print(dist,'wall mean',round(m0,1),'rubble mean',round(m1,1))
-    # no global rescale (it flattens the depth); report the difference instead
+    if not save: return m1
     a=np.dstack([out,np.full((H,W),255)]).astype(np.uint8)
-    Image.fromarray(a,'RGBA').save(D+f'rubble_front_{dist}.png')
-for dist,seed in (('near',11),('mid',12),('far',13)): build(dist,seed)
+    Image.fromarray(a,'RGBA').save(D+f'rubble_front_{dist}.png'); return m1
+KN={'near':2,'mid':1,'far':0}
+TARGET={'near':24,'mid':18,'far':13}
+for dist,seed in (('near',11),('mid',12),('far',13)):
+    # pick the front-block brightness so the piece hits its target mean; colours are
+    # snapped to existing (brighter) wall colours, the back layer stays dim
+    lo,hi=1.0,4.0
+    for _ in range(12):
+        fk=(lo+hi)/2
+        if build(dist,seed,fk,False)<TARGET[dist]: lo=fk
+        else: hi=fk
+    m=build(dist,seed,(lo+hi)/2); print(f'{dist}: mean {m:.1f} (target {TARGET[dist]}), front gain {(lo+hi)/2:.2f}')
 # dust burst, 160x140: stringy smeared wisps drifting down/out, dust.png colours + 17-step alpha
 DUST=[(145,141,125),(188,184,168)]
 os.makedirs('public/proto3d/fx',exist_ok=True)
 r=random.Random(5)
 # each wisp is a random-walk polyline from the collapse line, pushed out sideways and down
 wisps=[]
-for _ in range(64):
+for _ in range(40):
     x=r.uniform(20,140); y=r.uniform(40,95); side=1 if x>80 else -1
     wisps.append(dict(x=x,y=y,vx=side*r.uniform(.4,1.6),vy=r.uniform(.2,1.0),
         ang=r.uniform(-.6,.6)+(0 if side>0 else math.pi),L=r.uniform(14,40),hi=r.random()<.3,seed=r.random()))
@@ -137,13 +151,13 @@ def frame(f):
         for i in range(n):
             ang+=rr.uniform(-.35,.35); x+=math.cos(ang); y+=math.sin(ang)*.5+.25+t*.3
             fade=(1-i/n)**.7
-            th=1+int(rr.random()<.35)   # thin strings, occasional 2px smear
+            th=2+int(t*3)   # thin strings, occasional 2px smear
             for k in range(th):
-                for j in range(-1-int(t*2),2+int(t*2)):   # horizontal smear widens over time
+                for j in range(-2-int(t*5),3+int(t*5)):   # horizontal smear widens over time
                     xi=int(x+j); yi=int(y+k)
-                    if 0<=xi<160 and 0<=yi<140 and rr.random()<.75-abs(j)*.12:
-                        a=fade*life*(1-abs(j)*.25)*(0.85 if w['hi'] else 0.6)
-                        acc[yi,xi]=max(acc[yi,xi],a)
+                    if 0<=xi<160 and 0<=yi<140 and rr.random()<.85-abs(j)*.07:
+                        a=fade*life*max(0,1-abs(j)*.12)*(0.5 if w['hi'] else 0.36)
+                        acc[yi,xi]=min(1,acc[yi,xi]+a*.5)
                         if w['hi'] and abs(j)<1 and fade>.5: hi[yi,xi]=True
     a=(np.clip(acc,0,221/255)*255/17).astype(int)*17
     im=np.zeros((140,160,4),np.uint8)
