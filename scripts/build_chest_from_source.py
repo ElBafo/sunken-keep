@@ -98,62 +98,63 @@ def far_from_mid(n):
     print(f'{name}: {fw}x{fh} bbox {Image.fromarray(out).getbbox()} ratio {o[op].mean()/wall.mean():.2f}')
 def far_hand(n):
     # far (30x25) drawn by hand in the far palette, proportions from the mid frames (bbox 43x27 -> 25x16):
-    # 3/4 view from slightly above: curved lit lid top, darker right side face, dark lid seam,
-    # front with 2 iron bands + 2x2 lock, dark bottom row + 1-row floor shadow. Open: tilted lid back panel,
-    # dark recess, warm rim. Wood shade mix picked to land ~0.93 of wall brightness.
+    # 3/4 view from slightly above: curved lid top in the brightest warm, front wood, a right side face
+    # 2 steps darker than the front (not black), dark lid seam, 2 iron bands + 2x2 lock, dark bottom row
+    # + 1-row floor shadow. Open: 5-row brighter lid back rising above the body, dark hinge line,
+    # black recess (no glint), warm rim. Brightness 1.00-1.05 of wall, hard cap 1.05.
     wall,RAMP,step=ramp('far',1.0)
     WARM=[i for i in range(len(RAMP)) if RAMP[i][0]-RAMP[i][2]>8 and RAMP[i][0]>RAMP[i][1]+2]
     GREY=[i for i in range(len(RAMP)) if i not in WARM]
-    W=[RAMP[i] for i in WARM[:4]]; K=RAMP[GREY[0]]; DK=RAMP[GREY[step]]; G2=RAMP[GREY[2*step]]
-    x0,xf,x1=2,22,26          # front face x0..xf, right side face xf+1..x1
+    W=[np.round(FORGE*k).astype(int) for k in (0.10,0.17,0.26,0.38)]   # forge warm shades (explicit; the wall ramp has olive-browns too)
+    K=RAMP[GREY[0]]; DK=RAMP[GREY[step]]; G2=RAMP[GREY[2*step]]
+    SIDE=np.round(FORGE*0.06).astype(int)   # 2 steps (0.10->0.08->0.06) below the front wood, not black
+    x0,xf,x1=2,22,26
     best=None
-    for fa,fb,per in [(a_,b_,p_) for a_ in (0,1,2) for b_ in (0,1) for p_ in (3,4,99)]:
+    for per,lid_v,pan_v in [(p_,l_,q_) for p_ in (2,3,4,99) for l_ in (0,1,2,3) for q_ in (0,1,2,3)]:
         o=np.zeros((25,30,3),int); a=np.zeros((25,30),bool)
         def px(x,y,c): o[y,x]=c; a[y,x]=True
-        top=9 if n=='closed' else 6
         if n=='closed':
-            lid=[(top,4,x1-2),(top+1,3,x1-1),(top+2,x0,x1),(top+3,x0,x1)]   # curved lid top, 4 rows
-            shades=[[W[2],W[3],W[3],W[2]],[W[2],W[3],W[2],W[1]],[W[1],W[3],W[2],W[1]]][fa]
+            top=9
+            lid=[(top,4,x1-2),(top+1,3,x1-1),(top+2,x0,x1),(top+3,x0,x1)]
+            shades=[[W[3],W[3],W[2],W[1]],[W[3],W[2],W[1],W[1]],[W[3],W[2],W[1],W[0]],[W[3],W[1],W[1],W[0]]][lid_v]
             for (y,a0,a1),c in zip(lid,shades):
                 for x in range(a0,a1+1): px(x,y,c if x<=xf else W[1])
-            seam=top+4; body0=seam+1
+            for x in range(x0,x1+1): px(x,top+4,DK)                               # lid seam
+            body0=top+5
         else:
-            panel=[(top,4,x1-2),(top+1,3,x1-1),(top+2,3,x1-1),(top+3,x0,x1)]    # lid back tilted: narrower at top
-            shades=[[W[3],W[2],W[1],W[1]],[W[3],W[3],W[2],W[2]]][fb]
+            top=4
+            panel=[(top,5,x1-3),(top+1,4,x1-2),(top+2,3,x1-1),(top+3,3,x1-1),(top+4,x0+1,x1)]   # 5 rows, tilted back
+            shades=[[W[3],W[3],W[2],W[2],W[1]],[W[3],W[2],W[2],W[1],W[1]],[W[3],W[2],W[1],W[1],W[0]],[W[3],W[1],W[1],W[0],W[0]]][pan_v]
             for (y,a0,a1),c in zip(panel,shades):
-                for x in range(a0,a1+1): px(x,y,c if x<=xf-1 else W[0])
-            for y in (top+4,top+5,top+6):                                       # dark recess with warm sides
+                for x in range(a0,a1+1): px(x,y,c if x<=xf-1 else W[1])
+            for x in range(x0+1,x1+1): px(x,top+5,DK)                             # hinge line
+            for y in (top+6,top+7,top+8):                                         # black recess, warm sides, no glint
                 for x in range(x0,x1+1): px(x,y,K)
                 px(x0+1,y,W[1]); px(xf,y,W[1])
-            y=top+7
-            for x in range(x0,x1+1): px(x,y,W[3] if x<=xf else W[2])             # lit front rim
-            seam=None; body0=y+1
-        if seam is not None:
-            for x in range(x0,x1+1): px(x,seam,DK)                               # lid seam
+            for x in range(x0,x1+1): px(x,top+9,W[3] if x<=xf else W[2])          # lit front rim
+            body0=top+10
         for y in range(body0,23):
             for x in range(x0,x1+1):
-                if x<=xf: c=W[1] if (y-body0)%per==per-1 else W[0]                   # front wood, faint lighter plank lines
-                else: c=DK if x>=x1-1 else W[0]                                    # side face, darker (solid, no dither)
+                c=(np.round(FORGE*0.08).astype(int) if (y-body0)%per==per-1 else W[0]) if x<=xf else SIDE      # front W1 (one step brighter) with darker plank seams; side face
                 px(x,y,c)
-        for bx in (6,18):                                                        # iron bands
-            for y in range(body0,23): px(bx,y,G2 if y==body0 else DK)
+        for bx in (6,18):
+            for y in range(body0,23): px(bx,y,G2 if y==body0 else DK)            # iron bands
         ly=body0+2; px(12,ly,W[3]); px(13,ly,W[3]); px(12,ly+1,W[3]); px(13,ly+1,W[2])   # 2x2 lock
         for x in range(x0,x1+1): px(x,23,DK)                                     # front-bottom shadow row
         for x in range(x0+1,x1+2): px(x,24,K)                                    # floor shadow
-        for x in range(x0,x1+1): px(x,top-0,o[top,x]) if a[top,x] else None
-        # outline: silhouette edge (except floor shadow) dark
         pad=np.pad(a,1); edge=a&~(pad[:-2,1:-1]&pad[2:,1:-1]&pad[1:-1,:-2]&pad[1:-1,2:]); edge[24]=False
         lit_top=np.zeros_like(a)
         for x in range(30):
             ys=np.nonzero(a[:,x])[0]
             if len(ys): lit_top[ys[0],x]=True
-        o[edge&~lit_top]=K; o[lit_top]=np.where((np.arange(30)<=xf)[:,None],W[2],W[1])[np.nonzero(lit_top)[1]]
-        m=o[a].mean(); tgt=wall.mean()*0.935
-        if best is None or abs(m-tgt)<abs(best[0]-tgt): best=(m,o.copy(),a.copy())
+        o[edge&~lit_top]=K; o[lit_top]=np.where((np.arange(30)<=xf)[:,None],W[3],W[2])[np.nonzero(lit_top)[1]]
+        m=o[a].mean(); r=m/wall.mean()
+        if r>1.05: continue                                                       # hard cap
+        if best is None or abs(r-1.025)<abs(best[0]/wall.mean()-1.025): best=(m,o.copy(),a.copy())
     m,o,a=best; out=np.zeros((25,30,4),np.uint8); out[a,:3]=o[a]; out[a,3]=255
     name='item_chest_far' if n=='closed' else 'item_chest_open_far'
     Image.fromarray(out,'RGBA').save(D+name+'.png')
-    print(f'{name}: 30x25 bbox {Image.fromarray(out).getbbox()} ratio {m/wall.mean():.2f}')
+    print(f'{name}: 30x25 bbox {Image.fromarray(out).getbbox()} ratio {m/wall.mean():.3f}')
 def ramp(dist,warm_scale=None):
     wall=np.array(Image.open(W+f'wall_front_{dist}.png').convert('RGB')).astype(int)
     P=np.unique(wall.reshape(-1,3),axis=0); P=P[np.argsort(P.sum(1))]
