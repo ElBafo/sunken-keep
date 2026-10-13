@@ -1,11 +1,11 @@
-"""Floor 1 v2 small slime (0.44 wall height, x0.8 of big slime) + slime_split_1..3."""
+"""Floor 1 v2 small slime (0.8 x big slime world height) + slime_split_1..3."""
 import os,json,glob,colorsys
 os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)),'..'))
 from PIL import Image
 import sys; sys.path.insert(0,'scripts'); from slime_clean import clean, helmet_sprite
 D='public/art/dungeon/monsters_v2/'; DISTS=['close','near','mid','far']
 SZ=json.load(open(D+'sizes.json')); WALL=SZ['wallPx']; SQ={'close':'1','near':'2','mid':'3','far':'4'}
-BIG=SZ['monsters']['slime']; H_SMALL=0.44
+BIG=SZ["monsters"]["slime"]; H_SMALL=round(BIG["worldHeight"]*0.8,4)   # small = 0.8 x big slime
 files=sorted(os.path.basename(f) for f in glob.glob(D+'slime_*.png') if not os.path.basename(f).startswith(('slime_small','slime_split')))
 pal=set()
 for f in files:
