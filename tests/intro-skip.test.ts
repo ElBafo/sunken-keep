@@ -16,6 +16,12 @@ describe('intro skip copy and tap size', () => {
     expect(INTRO_SKIP_MIN_TAP_PX).toBeGreaterThanOrEqual(44);
   });
 
+  it('Skip and a finished reel both enter play through skipIntro()', () => {
+    const src = readFileSync(resolve(__dirname, '../src/proto3d/main.ts'), 'utf8');
+    expect(src).toContain('onSkip: () => this.skipIntro()');
+    expect(src).toContain('setOnFinished(() => this.skipIntro())');
+  });
+
   it('places the Skip button in the top-right corner with a 44px tap target', () => {
     const css = readFileSync(resolve(__dirname, '../proto3d.html'), 'utf8');
     const block = css.slice(css.indexOf('.intro-skip'), css.indexOf('.intro-skip[hidden]'));

@@ -284,6 +284,7 @@ class Game {
     if (introCanvas) {
       this.intro = new IntroPlayer(introCanvas, this.story);
       this.intro.setTimeSource(() => this.audioManager.introCurrentTime());
+      this.intro.setOnFinished(() => this.skipIntro());
       const overlay = document.getElementById('intro-overlay');
       if (overlay) {
         this.introSkip = mountIntroSkip({
@@ -1981,6 +1982,7 @@ class Game {
     this.intro?.skip();
     this.introSkip?.hide();
     document.getElementById('intro-overlay')?.classList.remove('show');
+    if (this.phase === 'play' || this.enteringPlay) return;
     this.beginPlay();
   }
 

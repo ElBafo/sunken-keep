@@ -50,6 +50,9 @@ export const INTRO_SHOT_FILES = INTRO_IMAGE_FILES.slice(0, 6);
 
 export const INTRO_DURATION_SEC = 35;
 
+/** If music_intro stops advancing for this long, treat it as ended/stalled. */
+export const INTRO_STALL_MS = 1000;
+
 /** Keep the last shot when time is past the timeline instead of wrapping to shot 1. */
 export function introShotIndex(durations: readonly number[], time: number): number {
   if (durations.length === 0) return 0;
@@ -87,7 +90,14 @@ export class IntroPlayer {
   private skipped = false;
   private waitingForShot = false;
   private needShot: ((waiting: boolean) => void) | null = null;
+  private onFinished: (() => void) | null = null;
+  private finishNotified = false;
   private timeSource: (() => number | null) | null = null;
+  private wallStartMs = 0;
+  private wallClockOn = false;
+  private lastMusicTime: number | null = null;
+  private lastMusicChangeMs = 0;
+  private sawMusicAdvance = false;
   private font: HTMLImageElement | null = null;
   private fontGlyphs: FontGlyphs = {};
   private eyePositions: EyePos[] = [];
@@ -155,6 +165,11 @@ export class IntroPlayer {
     this.needShot = handler;
   }
 
+  /** Called once when the reel ends — Game wires this to skipIntro(). */
+  setOnFinished(handler: (() => void) | null) {
+    this.onFinished = handler;
+  }
+
   hasStarted(): boolean {
     return this.started;
   }
@@ -164,15 +179,23 @@ export class IntroPlayer {
     this.preload();
     this.started = true;
     this.ensureTimeline();
-    this.lastTick = performance.now();
+    const now = performance.now();
+    this.lastTick = now;
+    this.wallStartMs = now;
+    this.wallClockOn = true;
     this.elapsedMs = 0;
     this.currentTime = 0;
     this.finished = false;
     this.skipped = false;
+    this.finishNotified = false;
     this.waitingForShot = false;
+    this.lastMusicTime = null;
+    this.lastMusicChangeMs = now;
+    this.sawMusicAdvance = false;
     const tick = () => {
       if (this.finished) return;
       this.update();
+      if (this.finished) return;
       this.render();
       this.raf = requestAnimationFrame(tick);
     };
@@ -181,10 +204,8 @@ export class IntroPlayer {
 
   skip() {
     this.skipped = true;
-    this.finished = true;
     this.started = true;
-    this.setWaiting(false);
-    if (this.raf) cancelAnimationFrame(this.raf);
+    this.markFinished(false);
   }
 
   isFinished(): boolean {
@@ -289,22 +310,55 @@ export class IntroPlayer {
     this.needShot?.(waiting);
   }
 
+  private markFinished(notify: boolean) {
+    this.finished = true;
+    this.setWaiting(false);
+    if (this.raf) {
+      cancelAnimationFrame(this.raf);
+      this.raf = 0;
+    }
+    if (!notify || this.finishNotified) return;
+    this.finishNotified = true;
+    this.onFinished?.();
+  }
+
+  private musicSample(): number | null {
+    try {
+      const musicTime = this.timeSource?.();
+      if (musicTime == null || !Number.isFinite(musicTime) || musicTime < 0) return null;
+      return musicTime;
+    } catch {
+      return null;
+    }
+  }
+
   private update() {
     const now = performance.now();
-    const musicTime = this.timeSource?.();
-    if (musicTime != null && Number.isFinite(musicTime) && musicTime >= 0) {
-      this.currentTime = musicTime;
-    } else if (!this.waitingForShot) {
+    const wallSec = this.wallClockOn ? (now - this.wallStartMs) / 1000 : 0;
+    const musicTime = this.musicSample();
+    if (musicTime != null) {
+      if (this.lastMusicTime == null || musicTime > this.lastMusicTime + 0.02) {
+        this.lastMusicTime = musicTime;
+        this.lastMusicChangeMs = now;
+        this.sawMusicAdvance = true;
+      }
+      this.currentTime = Math.max(musicTime, wallSec);
+    } else {
       this.elapsedMs += now - this.lastTick;
-      this.currentTime = this.elapsedMs / 1000;
+      this.currentTime = Math.max(this.elapsedMs / 1000, wallSec);
     }
     this.lastTick = now;
-    if (this.currentTime >= INTRO_DURATION_SEC || this.skipped) {
-      this.finished = true;
-      this.setWaiting(false);
-      cancelAnimationFrame(this.raf);
+
+    const wallDone = wallSec >= INTRO_DURATION_SEC || this.currentTime >= INTRO_DURATION_SEC;
+    const musicDone = musicTime != null && musicTime >= INTRO_DURATION_SEC;
+    const musicStopped = this.sawMusicAdvance && musicTime == null;
+    const musicStalled =
+      this.sawMusicAdvance && musicTime != null && now - this.lastMusicChangeMs >= INTRO_STALL_MS;
+    if (this.skipped || wallDone || musicDone || musicStopped || musicStalled) {
+      this.markFinished(true);
       return;
     }
+
     const idx = this.shotIndexAt(this.currentTime);
     if (!this.hasShot(idx)) {
       this.setWaiting(true);
