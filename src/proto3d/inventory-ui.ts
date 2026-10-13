@@ -1,4 +1,5 @@
 import type { HeroId } from '../core/types';
+import { drawSprite, loadSpriteImage, type SpriteImage } from './atlas';
 import { fetchJsonCached, loadHtmlImage } from './asset-cache';
 import { StoryText } from './i18n';
 import { drawFont5x7, type FontGlyphs } from './font5x7';
@@ -69,7 +70,7 @@ export class InventoryUi {
   private story: StoryText;
   private bag: PartyBag;
   private layout: InventoryScreenLayout;
-  private images = new Map<string, HTMLImageElement>();
+  private images = new Map<string, SpriteImage>();
   private itemIcons = new Map<string, string>();
   private handIcons = new Map<string, string>();
   private fontImg: HTMLImageElement | null = null;
@@ -119,10 +120,9 @@ export class InventoryUi {
 
   async load() {
     const base = import.meta.env.BASE_URL;
-    const loadImg = (rel: string) => loadHtmlImage(`${base}${rel}`);
     const cache = async (key: string, rel: string) => {
       try {
-        this.images.set(key, await loadImg(rel));
+        this.images.set(key, await loadSpriteImage(rel));
       } catch {
         /* optional plate / icon */
       }
@@ -133,7 +133,20 @@ export class InventoryUi {
     for (const [id, file] of Object.entries(hands.icons ?? {})) this.handIcons.set(id, file);
 
     const jobs: Array<Promise<void>> = [
-      cache('font', 'art/font/font_5x7.png'),
+      loadHtmlImage(`${base}art/font/font_5x7.png`)
+        .then((img) => {
+          this.fontImg = img;
+          this.images.set('font', {
+            image: img,
+            sx: 0,
+            sy: 0,
+            sw: img.width,
+            sh: img.height,
+            path: 'art/font/font_5x7.png',
+            fromAtlas: false
+          });
+        })
+        .catch(() => undefined),
       fetchJsonCached<{ cellWidth?: number; glyphs?: FontGlyphs }>(`${base}art/font/font_5x7.json`)
         .then((meta) => {
           if (Number.isFinite(meta.cellWidth)) this.fontCellW = meta.cellWidth!;
@@ -155,7 +168,7 @@ export class InventoryUi {
       jobs.push(cache(file, file.startsWith('art/') ? file : `art/ui/hands/${file}`));
     }
     await Promise.all(jobs);
-    this.fontImg = this.images.get('font') ?? null;
+    this.fontImg = this.fontImg ?? this.images.get('font')?.image ?? null;
     this.mount();
     this.draw();
   }
@@ -341,8 +354,8 @@ export class InventoryUi {
     ctx.clearRect(0, 0, CANVAS_W, CANVAS_H);
     const stone = this.images.get('stone');
     if (stone) {
-      for (let y = 0; y < CANVAS_H; y += stone.height || 32) {
-        ctx.drawImage(stone, 0, y);
+      for (let y = 0; y < CANVAS_H; y += stone.sh || 32) {
+        drawSprite(ctx, stone, 0, y);
       }
     } else {
       ctx.fillStyle = '#2a2a2a';
@@ -360,15 +373,15 @@ export class InventoryUi {
     const [ix, iy] = this.layout.closeIcon.pos;
     if (this.closePressed) {
       const plate = this.images.get('pressed28');
-      if (plate) this.ctx.drawImage(plate, x - 1, y - 1);
+      if (plate) drawSprite(this.ctx, plate, x - 1, y - 1);
       else {
         this.ctx.fillStyle = '#1a1210';
         this.ctx.fillRect(x, y, w, h);
       }
-      if (icon) this.ctx.drawImage(icon, ix, iy + 1);
+      if (icon) drawSprite(this.ctx, icon, ix, iy + 1);
       return;
     }
-    if (icon) this.ctx.drawImage(icon, ix, iy);
+    if (icon) drawSprite(this.ctx, icon, ix, iy);
   }
 
   private drawSlots() {
@@ -376,7 +389,7 @@ export class InventoryUi {
     this.layout.slots.forEach((raw, i) => {
       const [x, y, w, h] = aabbToRect(raw);
       const frame = this.images.get(i === this.selected ? 'slotSel' : 'slot');
-      if (frame) ctx.drawImage(frame, x, y);
+      if (frame) drawSprite(ctx, frame, x, y);
       else {
         ctx.fillStyle = '#0c0a08';
         ctx.fillRect(x, y, w, h);
@@ -386,7 +399,7 @@ export class InventoryUi {
       const slot = this.bag.slots[i];
       if (!slot) return;
       const img = this.itemImage(slot.item);
-      if (img) ctx.drawImage(img, x + 8, y + 8, ICON, ICON);
+      if (img) drawSprite(ctx, img, x + 8, y + 8, ICON, ICON);
       const shown = Math.min(STACK_MAX, slot.count);
       if (shown >= 2) {
         const pos = this.layout.stackCount[i];
@@ -406,7 +419,7 @@ export class InventoryUi {
       const portrait = face ? this.images.get(hero) : null;
       if (face && portrait) {
         ctx.imageSmoothingEnabled = false;
-        ctx.drawImage(portrait, face[0], face[1], face[2], face[3]);
+        drawSprite(ctx, portrait, face[0], face[1], face[2], face[3]);
       }
       for (const entry of this.layout.paperdoll[hero] ?? []) {
         const slot = Object.keys(entry)[0] as DollSlot;
@@ -420,7 +433,7 @@ export class InventoryUi {
         const item = slot === 'armour' || slot === 'trinket' ? eq[hero]?.armour : eq[hero]?.[slot];
         if (!item || item === 'empty_hand' || item === 'fist') continue;
         const img = slot === 'armour' || slot === 'trinket' ? this.itemImage(item) : this.handImage(hero, item);
-        if (img) ctx.drawImage(img, x + 3, y + 3, ICON, ICON);
+        if (img) drawSprite(ctx, img, x + 3, y + 3, ICON, ICON);
       }
     }
   }
@@ -472,12 +485,12 @@ export class InventoryUi {
     }
   }
 
-  private itemImage(id: string): HTMLImageElement | undefined {
+  private itemImage(id: string): SpriteImage | undefined {
     const file = this.itemIcons.get(id);
     return (file && this.images.get(file)) || this.images.get(id);
   }
 
-  private handImage(hero: HeroId, item: string): HTMLImageElement | undefined {
+  private handImage(hero: HeroId, item: string): SpriteImage | undefined {
     const key = item === 'empty_hand' || item === 'fist' ? `fist_${hero}` : item;
     const file = this.handIcons.get(key) ?? (item === 'iron_shield' ? this.handIcons.get('shield') : undefined);
     if (file) return this.images.get(`art/ui/hands/${file}`) ?? this.images.get(file);

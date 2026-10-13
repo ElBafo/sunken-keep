@@ -7,6 +7,7 @@ import {
 } from '../constants';
 import { ITEM_ACT_SFX } from '../core/types';
 import { HAND_COOLDOWN_MS, OIL_MAX } from './constants';
+import { drawSprite, drawSpriteSrc, loadSpriteImage, type SpriteImage } from './atlas';
 import { fetchJsonCached, loadHtmlImage } from './asset-cache';
 import { StoryText } from './i18n';
 import { drawFont5x7, wrapFontLine, type FontGlyphs } from './font5x7';
@@ -73,7 +74,7 @@ export class PartyHud {
   private iconSize = 24;
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
-  private images = new Map<string, HTMLImageElement>();
+  private images = new Map<string, SpriteImage>();
   private icons = new Map<string, string>();
   private fontReady = false;
   private fontImg: HTMLImageElement | null = null;
@@ -182,9 +183,8 @@ export class PartyHud {
 
   async load() {
     const base = import.meta.env.BASE_URL;
-    const loadImg = (rel: string) => loadHtmlImage(`${base}${rel}`);
     const cache = async (key: string, rel: string) => {
-      const img = await loadImg(rel);
+      const img = await loadSpriteImage(rel);
       this.images.set(key, img);
       return img;
     };
@@ -225,7 +225,18 @@ export class PartyHud {
 
     await Promise.all([
       cache('panel', 'art/ui/layout585/panel_585.png'),
-      cache('font', 'art/font/font_5x7.png'),
+      loadHtmlImage(`${base}art/font/font_5x7.png`).then((img) => {
+        this.fontImg = img;
+        this.images.set('font', {
+          image: img,
+          sx: 0,
+          sy: 0,
+          sw: img.width,
+          sh: img.height,
+          path: 'art/font/font_5x7.png',
+          fromAtlas: false
+        });
+      }),
       cache('downed', 'art/ui/panel/portrait_downed.png'),
       cache('levelup1', 'art/ui/panel/portrait_levelup_1.png'),
       cache('levelup2', 'art/ui/panel/portrait_levelup_2.png'),
@@ -248,7 +259,7 @@ export class PartyHud {
       ...this.panelArtJobs(cache)
     ]);
 
-    this.fontImg = this.images.get('font') ?? null;
+    this.fontImg = this.fontImg ?? this.images.get('font')?.image ?? null;
     this.fontReady = !!this.fontImg;
     this.mountHandButtons();
     this.mountChromeButtons();
@@ -285,7 +296,7 @@ export class PartyHud {
     }
   }
 
-  private panelArtJobs(cache: (key: string, rel: string) => Promise<HTMLImageElement>) {
+  private panelArtJobs(cache: (key: string, rel: string) => Promise<SpriteImage>) {
     const paths = new Set<string>();
     for (const spec of Object.values(this.layout.panelIcons)) {
       if (spec.icon) paths.add(panelArtPath(spec.icon));
@@ -300,7 +311,7 @@ export class PartyHud {
     paths.add('art/ui/panel/well_pressed_28.png');
     paths.add('art/ui/panel/well_60x28.png');
     paths.add('art/ui/panel/well_pressed_60x28.png');
-    return [...paths].map((rel) => cache(rel, rel).catch(() => undefined as unknown as HTMLImageElement));
+    return [...paths].map((rel) => cache(rel, rel).catch(() => undefined as unknown as SpriteImage));
   }
 
   private mountChromeButtons() {
@@ -691,10 +702,21 @@ export class PartyHud {
     ctx.clearRect(0, 0, this.designWidth, this.designHeight);
     const panel = this.images.get('panel');
     if (panel) {
-      if (panel.height >= this.panelTop + this.designHeight) {
-        ctx.drawImage(panel, 0, this.panelTop, this.designWidth, this.designHeight, 0, 0, this.designWidth, this.designHeight);
+      if (panel.sh >= this.panelTop + this.designHeight) {
+        drawSpriteSrc(
+          ctx,
+          panel,
+          0,
+          this.panelTop,
+          this.designWidth,
+          this.designHeight,
+          0,
+          0,
+          this.designWidth,
+          this.designHeight
+        );
       } else {
-        ctx.drawImage(panel, 0, 0);
+        drawSprite(ctx, panel, 0, 0);
       }
     } else {
       ctx.fillStyle = '#1a1612';
@@ -735,7 +757,7 @@ export class PartyHud {
   private drawPortrait(ctx: CanvasRenderingContext2D, hero: HeroHud, rect: Rect, now: number) {
     const [x, y, w, h] = rect;
     const img = this.images.get(this.portraitKey(hero));
-    if (img) ctx.drawImage(img, x, y, w, h);
+    if (img) drawSprite(ctx, img, x, y, w, h);
     else {
       ctx.fillStyle = '#333';
       ctx.fillRect(x, y, w, h);
@@ -745,9 +767,9 @@ export class PartyHud {
       if (downed) {
         ctx.save();
         ctx.filter = 'grayscale(1) brightness(0.6)';
-        if (img) ctx.drawImage(img, x, y, w, h);
+        if (img) drawSprite(ctx, img, x, y, w, h);
         ctx.filter = 'none';
-        ctx.drawImage(downed, x, y, w, h);
+        drawSprite(ctx, downed, x, y, w, h);
         ctx.restore();
       }
     }
@@ -755,7 +777,7 @@ export class PartyHud {
       const t = (performance.now() - this.levelFlash.started) / 180;
       const frame = Math.min(2, Math.floor(t));
       const flash = this.images.get(`levelup${frame + 1}`);
-      if (flash) ctx.drawImage(flash, x, y, w, h);
+      if (flash) drawSprite(ctx, flash, x, y, w, h);
       if (t >= 3) this.levelFlash = null;
     }
     ctx.lineWidth = hero.formation === 'front' ? 2 : 1;
@@ -768,7 +790,7 @@ export class PartyHud {
     const frame = (Math.floor((now / 1000) * 2) % 4) + 1;
     const img = this.images.get(`perk${frame}`);
     if (!img) return;
-    ctx.drawImage(img, portraitX + 36, portraitY - 3);
+    drawSprite(ctx, img, portraitX + 36, portraitY - 3);
   }
 
   private drawBar(ctx: CanvasRenderingContext2D, rect: Rect, pct: number, fill: string, back: string) {
@@ -783,7 +805,7 @@ export class PartyHud {
     const oil = Math.max(0, Math.min(OIL_MAX, this.oilFn()));
     const img = this.images.get(`oil${oil}`);
     const [x, y, w, h] = this.oilBar;
-    if (img) this.ctx.drawImage(img, x, y, w, h);
+    if (img) drawSprite(this.ctx, img, x, y, w, h);
   }
 
   private drawHandIcon(ctx: CanvasRenderingContext2D, hero: HeroHud, hand: HandSlot, rect: Rect, now: number) {
@@ -804,7 +826,7 @@ export class PartyHud {
       const ix = x + (w - size) / 2;
       const iy = y + (h - size) / 2;
       if (recovering || outOfReach || hero.downed) ctx.globalAlpha = 0.35;
-      ctx.drawImage(img, ix, iy, size, size);
+      drawSprite(ctx, img, ix, iy, size, size);
       ctx.globalAlpha = 1;
     }
     if (recovering) {
@@ -851,7 +873,7 @@ export class PartyHud {
     const img = this.images.get(`hint${frame}`);
     if (!img) return;
     const [x, y, w, h] = rect;
-    ctx.drawImage(img, x, y, w, h);
+    drawSprite(ctx, img, x, y, w, h);
   }
 
   private drawLog() {
@@ -900,12 +922,12 @@ export class PartyHud {
       if (!local) continue;
       const [x, y, w, h] = local;
       const plate = this.images.get('art/ui/panel/well_pressed_28.png');
-      if (plate) this.ctx.drawImage(plate, x, y, w, h);
+      if (plate) drawSprite(this.ctx, plate, x, y, w, h);
       const icon = this.images.get(`art/ui/panel/icon_${key}.png`);
       if (!icon) continue;
-      const ix = x + Math.floor((w - icon.width) / 2);
-      const iy = y + Math.floor((h - icon.height) / 2) + 1;
-      this.ctx.drawImage(icon, ix, iy);
+      const ix = x + Math.floor((w - icon.sw) / 2);
+      const iy = y + Math.floor((h - icon.sh) / 2) + 1;
+      drawSprite(this.ctx, icon, ix, iy);
     }
   }
 
@@ -917,19 +939,20 @@ export class PartyHud {
     const pressed = this.pressed.has(key);
     const platePath = panelArtPath((pressed ? spec.pressed : spec.normal) ?? '');
     const plate = platePath ? this.images.get(platePath) : undefined;
-    if (plate) this.ctx.drawImage(plate, x, y, w, h);
+    if (plate) drawSprite(this.ctx, plate, x, y, w, h);
     const empty = count === 0;
     const iconRel = empty && spec.iconEmpty ? spec.iconEmpty : spec.icon;
     const icon = iconRel ? this.images.get(panelArtPath(iconRel)) : undefined;
     const pressNudge = pressed ? 1 : 0;
     if (icon) {
       if (spec.iconPos) {
-        this.ctx.drawImage(icon, spec.iconPos[0], spec.iconPos[1] - this.panelTop + pressNudge);
+        drawSprite(this.ctx, icon, spec.iconPos[0], spec.iconPos[1] - this.panelTop + pressNudge);
       } else {
-        this.ctx.drawImage(
+        drawSprite(
+          this.ctx,
           icon,
-          x + Math.floor((w - icon.width) / 2),
-          y + Math.floor((h - icon.height) / 2) + pressNudge
+          x + Math.floor((w - icon.sw) / 2),
+          y + Math.floor((h - icon.sh) / 2) + pressNudge
         );
       }
     }

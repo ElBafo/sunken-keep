@@ -1,4 +1,4 @@
-import { fetchArrayBuffer } from './asset-cache';
+import { cropSpriteBlobUrl, loadSpriteImage } from './atlas';
 
 export const GAME_STAGE_W = 270;
 export const GAME_STAGE_H = 585;
@@ -49,11 +49,9 @@ export function fitGameStage(): { scale: number; left: number; top: number; widt
 export async function applyLetterboxStone(): Promise<void> {
   const host = document.getElementById('game-letterbox');
   if (!host || host.dataset.stone) return;
-  const base = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.BASE_URL : '/';
-  const url = `${base}art/ui/layout585/stone_strip_tile.png`;
   try {
-    const buf = await fetchArrayBuffer(url);
-    const obj = URL.createObjectURL(new Blob([buf]));
+    const src = await loadSpriteImage('art/ui/layout585/stone_strip_tile.png');
+    const obj = await cropSpriteBlobUrl(src);
     host.style.backgroundImage = `url("${obj}")`;
     host.style.backgroundRepeat = 'repeat';
     host.dataset.stone = '1';

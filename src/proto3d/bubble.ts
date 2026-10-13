@@ -1,4 +1,5 @@
 import type { HeroId } from '../constants';
+import { drawSprite, drawSpriteSrc, loadSpriteImage, type SpriteImage } from './atlas';
 import { fetchJsonCached, loadHtmlImage } from './asset-cache';
 import { drawFont5x7, type FontGlyphs } from './font5x7';
 
@@ -25,8 +26,8 @@ const HERO_TAIL_X: Record<string, number> = {
 export class SpeechBubble {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
-  private slice: HTMLImageElement | null = null;
-  private tail: HTMLImageElement | null = null;
+  private slice: SpriteImage | null = null;
+  private tail: SpriteImage | null = null;
   private font: HTMLImageElement | null = null;
   private glyphs: FontGlyphs = {};
   private text = '';
@@ -45,19 +46,15 @@ export class SpeechBubble {
   async load() {
     const base = import.meta.env.BASE_URL;
     const [slice, tail, font, meta] = await Promise.all([
-      this.loadImg(`${base}art/ui/bubble_9slice.png`),
-      this.loadImg(`${base}art/ui/bubble_tail.png`),
-      this.loadImg(`${base}art/font/font_5x7.png`),
+      loadSpriteImage('art/ui/bubble_9slice.png').catch(() => null),
+      loadSpriteImage('art/ui/bubble_tail.png').catch(() => null),
+      loadHtmlImage(`${base}art/font/font_5x7.png`).catch(() => null),
       fetchJsonCached<{ glyphs?: FontGlyphs }>(`${base}art/font/font_5x7.json`)
     ]);
     this.slice = slice;
     this.tail = tail;
     this.font = font;
     this.glyphs = meta.glyphs ?? {};
-  }
-
-  private loadImg(src: string) {
-    return loadHtmlImage(src).catch(() => new Image());
   }
 
   show(text: string, speaker: HeroId, speakerName = '', now = performance.now()) {
@@ -103,20 +100,20 @@ export class SpeechBubble {
     return [first, words.slice(i).join(' ').slice(0, CHARS)];
   }
 
-  private drawNine(img: HTMLImageElement, x: number, y: number, w: number, h: number) {
+  private drawNine(img: SpriteImage, x: number, y: number, w: number, h: number) {
     const m = 4;
-    const iw = img.width;
-    const ih = img.height;
+    const iw = img.sw;
+    const ih = img.sh;
     const ctx = this.ctx;
-    ctx.drawImage(img, 0, 0, m, m, x, y, m, m);
-    ctx.drawImage(img, iw - m, 0, m, m, x + w - m, y, m, m);
-    ctx.drawImage(img, 0, ih - m, m, m, x, y + h - m, m, m);
-    ctx.drawImage(img, iw - m, ih - m, m, m, x + w - m, y + h - m, m, m);
-    ctx.drawImage(img, m, 0, iw - 2 * m, m, x + m, y, w - 2 * m, m);
-    ctx.drawImage(img, m, ih - m, iw - 2 * m, m, x + m, y + h - m, w - 2 * m, m);
-    ctx.drawImage(img, 0, m, m, ih - 2 * m, x, y + m, m, h - 2 * m);
-    ctx.drawImage(img, iw - m, m, m, ih - 2 * m, x + w - m, y + m, m, h - 2 * m);
-    ctx.drawImage(img, m, m, iw - 2 * m, ih - 2 * m, x + m, y + m, w - 2 * m, h - 2 * m);
+    drawSpriteSrc(ctx, img, 0, 0, m, m, x, y, m, m);
+    drawSpriteSrc(ctx, img, iw - m, 0, m, m, x + w - m, y, m, m);
+    drawSpriteSrc(ctx, img, 0, ih - m, m, m, x, y + h - m, m, m);
+    drawSpriteSrc(ctx, img, iw - m, ih - m, m, m, x + w - m, y + h - m, m, m);
+    drawSpriteSrc(ctx, img, m, 0, iw - 2 * m, m, x + m, y, w - 2 * m, m);
+    drawSpriteSrc(ctx, img, m, ih - m, iw - 2 * m, m, x + m, y + h - m, w - 2 * m, m);
+    drawSpriteSrc(ctx, img, 0, m, m, ih - 2 * m, x, y + m, m, h - 2 * m);
+    drawSpriteSrc(ctx, img, iw - m, m, m, ih - 2 * m, x + w - m, y + m, m, h - 2 * m);
+    drawSpriteSrc(ctx, img, m, m, iw - 2 * m, ih - 2 * m, x + m, y + m, w - 2 * m, h - 2 * m);
   }
 
   private draw(alpha = 1) {
@@ -149,8 +146,8 @@ export class SpeechBubble {
     }
     if (this.tail) {
       const centre = HERO_TAIL_X[this.speaker] ?? VIEW_W / 2;
-      const tx = Math.max(4, Math.min(VIEW_W - this.tail.width - 4, centre - this.tail.width / 2));
-      ctx.drawImage(this.tail, tx, BUBBLE_H - 2);
+      const tx = Math.max(4, Math.min(VIEW_W - this.tail.sw - 4, centre - this.tail.sw / 2));
+      drawSprite(ctx, this.tail, tx, BUBBLE_H - 2);
     }
     ctx.globalAlpha = 1;
   }

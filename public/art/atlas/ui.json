@@ -1,0 +1,407 @@
+{
+ "image": "art/atlas/ui.png",
+ "size": {
+  "w": 274,
+  "h": 563
+ },
+ "padding": 2,
+ "extrude": 1,
+ "frames": {
+  "art/ui/bubble_9slice.png": {
+   "x": 178,
+   "y": 506,
+   "w": 12,
+   "h": 12
+  },
+  "art/ui/bubble_tail.png": {
+   "x": 127,
+   "y": 534,
+   "w": 9,
+   "h": 6
+  },
+  "art/ui/hands/hand_axe.png": {
+   "x": 98,
+   "y": 418,
+   "w": 24,
+   "h": 24
+  },
+  "art/ui/hands/hand_dagger.png": {
+   "x": 126,
+   "y": 418,
+   "w": 24,
+   "h": 24
+  },
+  "art/ui/hands/hand_fist_brannoc.png": {
+   "x": 154,
+   "y": 418,
+   "w": 24,
+   "h": 24
+  },
+  "art/ui/hands/hand_fist_ilsevar.png": {
+   "x": 182,
+   "y": 418,
+   "w": 24,
+   "h": 24
+  },
+  "art/ui/hands/hand_fist_mags.png": {
+   "x": 210,
+   "y": 418,
+   "w": 24,
+   "h": 24
+  },
+  "art/ui/hands/hand_fist_wren.png": {
+   "x": 2,
+   "y": 450,
+   "w": 24,
+   "h": 24
+  },
+  "art/ui/hands/hand_glow_hint_1.png": {
+   "x": 2,
+   "y": 383,
+   "w": 31,
+   "h": 31
+  },
+  "art/ui/hands/hand_glow_hint_2.png": {
+   "x": 37,
+   "y": 383,
+   "w": 31,
+   "h": 31
+  },
+  "art/ui/hands/hand_glow_hint_3.png": {
+   "x": 72,
+   "y": 383,
+   "w": 31,
+   "h": 31
+  },
+  "art/ui/hands/hand_glow_hint_4.png": {
+   "x": 107,
+   "y": 383,
+   "w": 31,
+   "h": 31
+  },
+  "art/ui/hands/hand_mace.png": {
+   "x": 30,
+   "y": 450,
+   "w": 24,
+   "h": 24
+  },
+  "art/ui/hands/hand_prayer_lantern.png": {
+   "x": 58,
+   "y": 450,
+   "w": 24,
+   "h": 24
+  },
+  "art/ui/hands/hand_prayer_lantern_ember.png": {
+   "x": 86,
+   "y": 450,
+   "w": 24,
+   "h": 24
+  },
+  "art/ui/hands/hand_scroll.png": {
+   "x": 114,
+   "y": 450,
+   "w": 24,
+   "h": 24
+  },
+  "art/ui/hands/hand_shield.png": {
+   "x": 142,
+   "y": 450,
+   "w": 24,
+   "h": 24
+  },
+  "art/ui/hands/hand_torch_burnt.png": {
+   "x": 170,
+   "y": 450,
+   "w": 24,
+   "h": 24
+  },
+  "art/ui/hands/hand_torch_lit.png": {
+   "x": 198,
+   "y": 450,
+   "w": 24,
+   "h": 24
+  },
+  "art/ui/hands/hand_tricks_pouch.png": {
+   "x": 226,
+   "y": 450,
+   "w": 24,
+   "h": 24
+  },
+  "art/ui/hands/hand_wand.png": {
+   "x": 2,
+   "y": 478,
+   "w": 24,
+   "h": 24
+  },
+  "art/ui/items/icon_ashmantle_hammer.png": {
+   "x": 30,
+   "y": 478,
+   "w": 24,
+   "h": 24
+  },
+  "art/ui/items/icon_captain_key.png": {
+   "x": 58,
+   "y": 478,
+   "w": 24,
+   "h": 24
+  },
+  "art/ui/items/icon_chain_mail.png": {
+   "x": 86,
+   "y": 478,
+   "w": 24,
+   "h": 24
+  },
+  "art/ui/items/icon_iron_shield.png": {
+   "x": 114,
+   "y": 478,
+   "w": 24,
+   "h": 24
+  },
+  "art/ui/items/icon_journal_page.png": {
+   "x": 142,
+   "y": 478,
+   "w": 24,
+   "h": 24
+  },
+  "art/ui/items/icon_key.png": {
+   "x": 170,
+   "y": 478,
+   "w": 24,
+   "h": 24
+  },
+  "art/ui/items/icon_oil.png": {
+   "x": 198,
+   "y": 478,
+   "w": 24,
+   "h": 24
+  },
+  "art/ui/items/icon_potion_blue.png": {
+   "x": 226,
+   "y": 478,
+   "w": 24,
+   "h": 24
+  },
+  "art/ui/items/icon_potion_green.png": {
+   "x": 2,
+   "y": 506,
+   "w": 24,
+   "h": 24
+  },
+  "art/ui/items/icon_potion_red.png": {
+   "x": 30,
+   "y": 506,
+   "w": 24,
+   "h": 24
+  },
+  "art/ui/items/slot_40.png": {
+   "x": 70,
+   "y": 279,
+   "w": 40,
+   "h": 40
+  },
+  "art/ui/items/slot_40_selected.png": {
+   "x": 114,
+   "y": 279,
+   "w": 40,
+   "h": 40
+  },
+  "art/ui/layout585/panel_585.png": {
+   "x": 2,
+   "y": 2,
+   "w": 270,
+   "h": 205
+  },
+  "art/ui/layout585/stone_strip_tile.png": {
+   "x": 2,
+   "y": 347,
+   "w": 270,
+   "h": 32
+  },
+  "art/ui/oil/oil_gauge_0.png": {
+   "x": 140,
+   "y": 534,
+   "w": 65,
+   "h": 4
+  },
+  "art/ui/oil/oil_gauge_1.png": {
+   "x": 2,
+   "y": 549,
+   "w": 65,
+   "h": 4
+  },
+  "art/ui/oil/oil_gauge_2.png": {
+   "x": 71,
+   "y": 549,
+   "w": 65,
+   "h": 4
+  },
+  "art/ui/oil/oil_gauge_3.png": {
+   "x": 140,
+   "y": 549,
+   "w": 65,
+   "h": 4
+  },
+  "art/ui/oil/oil_gauge_4.png": {
+   "x": 2,
+   "y": 557,
+   "w": 65,
+   "h": 4
+  },
+  "art/ui/panel/icon_back.png": {
+   "x": 32,
+   "y": 534,
+   "w": 9,
+   "h": 10
+  },
+  "art/ui/panel/icon_bag.png": {
+   "x": 58,
+   "y": 506,
+   "w": 20,
+   "h": 20
+  },
+  "art/ui/panel/icon_close.png": {
+   "x": 194,
+   "y": 506,
+   "w": 12,
+   "h": 12
+  },
+  "art/ui/panel/icon_forward.png": {
+   "x": 45,
+   "y": 534,
+   "w": 9,
+   "h": 10
+  },
+  "art/ui/panel/icon_menu.png": {
+   "x": 114,
+   "y": 534,
+   "w": 9,
+   "h": 7
+  },
+  "art/ui/panel/icon_potion_blue_btn.png": {
+   "x": 82,
+   "y": 506,
+   "w": 20,
+   "h": 20
+  },
+  "art/ui/panel/icon_potion_blue_btn_empty.png": {
+   "x": 106,
+   "y": 506,
+   "w": 20,
+   "h": 20
+  },
+  "art/ui/panel/icon_potion_red_btn.png": {
+   "x": 130,
+   "y": 506,
+   "w": 20,
+   "h": 20
+  },
+  "art/ui/panel/icon_potion_red_btn_empty.png": {
+   "x": 154,
+   "y": 506,
+   "w": 20,
+   "h": 20
+  },
+  "art/ui/panel/icon_save.png": {
+   "x": 210,
+   "y": 506,
+   "w": 12,
+   "h": 11
+  },
+  "art/ui/panel/icon_strafe_left.png": {
+   "x": 86,
+   "y": 534,
+   "w": 10,
+   "h": 9
+  },
+  "art/ui/panel/icon_strafe_right.png": {
+   "x": 100,
+   "y": 534,
+   "w": 10,
+   "h": 9
+  },
+  "art/ui/panel/icon_turn_left.png": {
+   "x": 58,
+   "y": 534,
+   "w": 10,
+   "h": 10
+  },
+  "art/ui/panel/icon_turn_right.png": {
+   "x": 72,
+   "y": 534,
+   "w": 10,
+   "h": 10
+  },
+  "art/ui/panel/portrait_downed.png": {
+   "x": 2,
+   "y": 211,
+   "w": 64,
+   "h": 64
+  },
+  "art/ui/panel/portrait_levelup_1.png": {
+   "x": 70,
+   "y": 211,
+   "w": 64,
+   "h": 64
+  },
+  "art/ui/panel/portrait_levelup_2.png": {
+   "x": 138,
+   "y": 211,
+   "w": 64,
+   "h": 64
+  },
+  "art/ui/panel/portrait_levelup_3.png": {
+   "x": 2,
+   "y": 279,
+   "w": 64,
+   "h": 64
+  },
+  "art/ui/panel/well_28.png": {
+   "x": 142,
+   "y": 383,
+   "w": 28,
+   "h": 28
+  },
+  "art/ui/panel/well_60x28.png": {
+   "x": 174,
+   "y": 383,
+   "w": 60,
+   "h": 28
+  },
+  "art/ui/panel/well_pressed_28.png": {
+   "x": 2,
+   "y": 418,
+   "w": 28,
+   "h": 28
+  },
+  "art/ui/panel/well_pressed_60x28.png": {
+   "x": 34,
+   "y": 418,
+   "w": 60,
+   "h": 28
+  },
+  "art/ui/perks/perk_pending_1.png": {
+   "x": 226,
+   "y": 506,
+   "w": 11,
+   "h": 11
+  },
+  "art/ui/perks/perk_pending_2.png": {
+   "x": 241,
+   "y": 506,
+   "w": 11,
+   "h": 11
+  },
+  "art/ui/perks/perk_pending_3.png": {
+   "x": 2,
+   "y": 534,
+   "w": 11,
+   "h": 11
+  },
+  "art/ui/perks/perk_pending_4.png": {
+   "x": 17,
+   "y": 534,
+   "w": 11,
+   "h": 11
+  }
+ }
+}

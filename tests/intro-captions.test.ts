@@ -120,7 +120,9 @@ describe('floor 1 playable prefetch list', () => {
     const paths = floor1PlayableRelPaths();
     expect(floor1MonsterKinds().sort()).toEqual(['bog_leeches', 'keep_rat', 'rust_crab', 'slime']);
     expect(paths.some((p) => p.includes('proto3d/tex3d/wall_plain'))).toBe(true);
-    expect(paths.some((p) => p.includes('monsters_v2/keep_rat_idle_1_near.png'))).toBe(true);
+    expect(paths).toContain('art/atlas/monsters.png');
+    expect(paths).toContain('art/atlas/monsters.json');
+    expect(paths.some((p) => p.includes('monsters_v2/keep_rat_idle_1_near.png'))).toBe(false);
     expect(paths).toContain('audio/sfx_step_1.mp3');
     expect(paths).toContain('audio/sfx_lantern_loop.mp3');
     expect(paths).toContain('audio/sfx_bump.mp3');

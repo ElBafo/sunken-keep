@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { loadSpriteTexture, textureFrameSize } from './atlas';
 import { loadTextureCached } from './asset-cache';
 import { CELL_SIZE } from './constants';
 import { FloorData, Tile } from './types';
@@ -37,8 +38,13 @@ export class PropBuilder {
   async load(): Promise<void> {
     const baseUrl = import.meta.env.BASE_URL;
     const load = async (path: string, repeat: boolean): Promise<THREE.Texture> => {
-      const tex = await loadTextureCached(`${baseUrl}${path}`);
-      configureTex(tex, repeat);
+      if (repeat) {
+        const tex = await loadTextureCached(`${baseUrl}${path}`);
+        configureTex(tex, true);
+        return tex;
+      }
+      const tex = await loadSpriteTexture(path);
+      configureTex(tex, false);
       return tex;
     };
 
@@ -259,8 +265,8 @@ export class PropBuilder {
     sprite.userData.baseH = LAMP_H;
     this.group.add(sprite);
 
-    const img = this.lampTex.image as { width?: number; height?: number } | undefined;
-    const pose = wallPropPlanePose(x, y, face, img?.width ?? 32, img?.height ?? 48);
+    const size = textureFrameSize(this.lampTex);
+    const pose = wallPropPlanePose(x, y, face, size.w || 32, size.h || 48);
     const wallMat = new THREE.MeshLambertMaterial({
       map: this.lampTex,
       emissive: new THREE.Color(0xffffff),

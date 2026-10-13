@@ -10,7 +10,7 @@ import {
   isWaterTile,
   tileBedY
 } from './constants';
-import { loadTextureCached } from './asset-cache';
+import { loadSpriteTexture } from './atlas';
 import { FloorData, Tile } from './types';
 import { SpriteManager } from './sprites';
 import { VertexLightingManager } from './vertex-lighting';
@@ -96,9 +96,8 @@ export class DarkFx {
   private glowMap: THREE.Texture | null = null;
 
   async load(scene: THREE.Scene, floorData: FloorData, sprites: SpriteManager) {
-    const baseUrl = import.meta.env.BASE_URL;
     const loadTex = async (path: string) => {
-      const tex = await loadTextureCached(`${baseUrl}${path}`);
+      const tex = await loadSpriteTexture(path);
       configureFxTexture(tex);
       return tex;
     };

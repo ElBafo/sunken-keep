@@ -1,3 +1,4 @@
+import { atlasRelPaths } from './atlas';
 import { audioGroupFiles, beforePlayRelPaths } from './audio-groups';
 import { prefetchUrl } from './asset-cache';
 import { floor1 } from './floor-data';
@@ -63,10 +64,10 @@ export function floor1MonsterArtPaths(): string[] {
   return paths;
 }
 
-/** Walls, floor 1 monster frames, and the tiny before-play audio set. */
+/** Walls, floor 1 atlas sheets (monsters in the early group), and the tiny before-play audio set. */
 export function floor1PlayableRelPaths(): string[] {
   const audio = beforePlayRelPaths().filter((p) => p !== 'audio/sfx_ui_button.mp3');
-  return [...floor1TexturePaths(), ...floor1MonsterArtPaths(), ...audio];
+  return [...floor1TexturePaths(), ...atlasRelPaths(), ...audio];
 }
 
 /** Fetch into the HTTP cache. Never throws; limited in-flight requests. */

@@ -1,0 +1,377 @@
+{
+ "image": "art/atlas/fx.png",
+ "size": {
+  "w": 500,
+  "h": 932
+ },
+ "padding": 2,
+ "extrude": 1,
+ "frames": {
+  "proto3d/atmo/ash_bowl.png": {
+   "x": 138,
+   "y": 2,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/banner_torn.png": {
+   "x": 270,
+   "y": 2,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/bones.png": {
+   "x": 2,
+   "y": 262,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/ceiling_crack.png": {
+   "x": 134,
+   "y": 262,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/chains.png": {
+   "x": 266,
+   "y": 262,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/cobweb_corner_l.png": {
+   "x": 2,
+   "y": 394,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/cobweb_corner_r.png": {
+   "x": 134,
+   "y": 394,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/crack_large.png": {
+   "x": 266,
+   "y": 394,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/desk_note.png": {
+   "x": 2,
+   "y": 526,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/drip_drop.png": {
+   "x": 242,
+   "y": 790,
+   "w": 4,
+   "h": 8
+  },
+  "proto3d/atmo/drip_stain.png": {
+   "x": 134,
+   "y": 526,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/dust.png": {
+   "x": 250,
+   "y": 790,
+   "w": 8,
+   "h": 8
+  },
+  "proto3d/atmo/jar_rack.png": {
+   "x": 266,
+   "y": 526,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/lamp_capped.png": {
+   "x": 170,
+   "y": 790,
+   "w": 32,
+   "h": 48
+  },
+  "proto3d/atmo/lamp_hooks.png": {
+   "x": 2,
+   "y": 658,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/moss_patch.png": {
+   "x": 134,
+   "y": 658,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/rust_stain.png": {
+   "x": 266,
+   "y": 658,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/sconce_capped.png": {
+   "x": 134,
+   "y": 790,
+   "w": 32,
+   "h": 64
+  },
+  "proto3d/atmo/shaft_1.png": {
+   "x": 2,
+   "y": 2,
+   "w": 64,
+   "h": 256
+  },
+  "proto3d/atmo/shaft_2.png": {
+   "x": 70,
+   "y": 2,
+   "w": 64,
+   "h": 256
+  },
+  "proto3d/atmo/splash_1.png": {
+   "x": 262,
+   "y": 790,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/atmo/splash_2.png": {
+   "x": 282,
+   "y": 790,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/atmo/splash_3.png": {
+   "x": 302,
+   "y": 790,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/atmo/tally_marks.png": {
+   "x": 2,
+   "y": 790,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/fx/dark/eyes_amber_1.png": {
+   "x": 322,
+   "y": 790,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_amber_10.png": {
+   "x": 342,
+   "y": 790,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_amber_2.png": {
+   "x": 362,
+   "y": 790,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_amber_3.png": {
+   "x": 382,
+   "y": 790,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_amber_4.png": {
+   "x": 402,
+   "y": 790,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_amber_5.png": {
+   "x": 422,
+   "y": 790,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_amber_6.png": {
+   "x": 442,
+   "y": 790,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_amber_7.png": {
+   "x": 462,
+   "y": 790,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_amber_8.png": {
+   "x": 482,
+   "y": 790,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_amber_9.png": {
+   "x": 2,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_green_1.png": {
+   "x": 22,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_green_10.png": {
+   "x": 42,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_green_2.png": {
+   "x": 62,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_green_3.png": {
+   "x": 82,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_green_4.png": {
+   "x": 102,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_green_5.png": {
+   "x": 122,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_green_6.png": {
+   "x": 142,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_green_7.png": {
+   "x": 162,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_green_8.png": {
+   "x": 182,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_green_9.png": {
+   "x": 202,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_pale_1.png": {
+   "x": 222,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_pale_10.png": {
+   "x": 242,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_pale_2.png": {
+   "x": 262,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_pale_3.png": {
+   "x": 282,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_pale_4.png": {
+   "x": 302,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_pale_5.png": {
+   "x": 322,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_pale_6.png": {
+   "x": 342,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_pale_7.png": {
+   "x": 362,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_pale_8.png": {
+   "x": 382,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_pale_9.png": {
+   "x": 402,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/glint_1.png": {
+   "x": 422,
+   "y": 922,
+   "w": 7,
+   "h": 7
+  },
+  "proto3d/fx/dark/glint_2.png": {
+   "x": 433,
+   "y": 922,
+   "w": 7,
+   "h": 7
+  },
+  "proto3d/fx/dark/glint_3.png": {
+   "x": 444,
+   "y": 922,
+   "w": 7,
+   "h": 7
+  },
+  "proto3d/fx/dark/glint_4.png": {
+   "x": 455,
+   "y": 922,
+   "w": 7,
+   "h": 7
+  },
+  "proto3d/fx/dark/glint_5.png": {
+   "x": 466,
+   "y": 922,
+   "w": 7,
+   "h": 7
+  },
+  "proto3d/fx/dark/glint_6.png": {
+   "x": 477,
+   "y": 922,
+   "w": 7,
+   "h": 7
+  },
+  "proto3d/fx/dark/stairs_glow.png": {
+   "x": 206,
+   "y": 790,
+   "w": 32,
+   "h": 16
+  }
+ }
+}
