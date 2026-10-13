@@ -107,26 +107,24 @@ export class TorchSystem {
     };
 
     const states: TorchVisualState[] = ['lit', 'dead', 'capped'];
-    const loaded = await Promise.all(
-      states.flatMap((state) => [
-        loadTex(`proto3d/tex3d/torch/bracket_${state}_side.png`),
-        loadTex(`proto3d/tex3d/torch/bracket_${state}_front.png`)
-      ])
-    );
+    const [bracketTex, flame, flare, snuff] = await Promise.all([
+      Promise.all(
+        states.flatMap((state) => [
+          loadTex(`proto3d/tex3d/torch/bracket_${state}_side.png`),
+          loadTex(`proto3d/tex3d/torch/bracket_${state}_front.png`)
+        ])
+      ),
+      Promise.all([1, 2, 3, 4].map((n) => loadTex(`proto3d/tex3d/torch/flame_calm_${n}.png`))),
+      Promise.all([1, 2, 3, 4, 5, 6].map((n) => loadTex(`proto3d/tex3d/torch/flare_${n}.png`))),
+      Promise.all([1, 2, 3, 4, 5].map((n) => loadTex(`proto3d/tex3d/torch/snuff_${n}.png`)))
+    ]);
     states.forEach((state, i) => {
-      this.brackets[state].side = loaded[i * 2];
-      this.brackets[state].front = loaded[i * 2 + 1];
+      this.brackets[state].side = bracketTex[i * 2];
+      this.brackets[state].front = bracketTex[i * 2 + 1];
     });
-
-    this.flameFrames = await Promise.all(
-      [1, 2, 3, 4].map((n) => loadTex(`proto3d/tex3d/torch/flame_calm_${n}.png`))
-    );
-    this.flareFrames = await Promise.all(
-      [1, 2, 3, 4, 5, 6].map((n) => loadTex(`proto3d/tex3d/torch/flare_${n}.png`))
-    );
-    this.snuffFrames = await Promise.all(
-      [1, 2, 3, 4, 5].map((n) => loadTex(`proto3d/tex3d/torch/snuff_${n}.png`))
-    );
+    this.flameFrames = flame;
+    this.flareFrames = flare;
+    this.snuffFrames = snuff;
 
     const w = SCONCE_WIDTH_TILES * CELL_SIZE;
     const h = SCONCE_HEIGHT_TILES * CELL_SIZE;

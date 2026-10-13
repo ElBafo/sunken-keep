@@ -201,6 +201,7 @@ class Game {
       this.pendingStartSnapshot = true;
     }
 
+    this.worldBoot = this.bootWorld(canvas, params);
     await this.bootTitleChrome();
     this.titleReady = true;
     if (!this.skipTitle) {
@@ -213,8 +214,6 @@ class Game {
       if (this.pendingTap) this.consumeTitleTap();
     }
     this.applyStoryLabels();
-
-    this.worldBoot = this.bootWorld(canvas, params);
     if (this.skipTitle) {
       await this.ensurePlayReady();
       this.setTapStatus('tap_to_start');
