@@ -261,6 +261,66 @@
     "feetShifted": {},
     "rimLight": false
    }
+  },
+  "slime_small": {
+   "worldHeight": 0.44,
+   "worldHeightSource": "floor1 v2 split (0.8 x slime)",
+   "close": {
+    "squares": 1,
+    "px": [
+     115,
+     80
+    ],
+    "exactPx": 79.71,
+    "quadWorld": [
+     1.2672,
+     0.88
+    ],
+    "feetShifted": {},
+    "rimLight": false
+   },
+   "near": {
+    "squares": 2,
+    "px": [
+     63,
+     44
+    ],
+    "exactPx": 44.28,
+    "quadWorld": [
+     1.264,
+     0.88
+    ],
+    "feetShifted": {},
+    "rimLight": false
+   },
+   "mid": {
+    "squares": 3,
+    "px": [
+     44,
+     31
+    ],
+    "exactPx": 30.65,
+    "quadWorld": [
+     1.2737,
+     0.88
+    ],
+    "feetShifted": {},
+    "rimLight": false
+   },
+   "far": {
+    "squares": 4,
+    "px": [
+     34,
+     23
+    ],
+    "exactPx": 23.44,
+    "quadWorld": [
+     1.3048,
+     0.88
+    ],
+    "feetShifted": {},
+    "rimLight": false
+   }
   }
  }
 }

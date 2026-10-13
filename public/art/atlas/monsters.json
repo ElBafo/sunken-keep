@@ -1,945 +1,945 @@
 {
  "image": "art/atlas/monsters.png",
  "size": {
-  "w": 503,
-  "h": 1230
+  "w": 511,
+  "h": 1916
  },
  "padding": 2,
  "extrude": 1,
  "frames": {
   "art/dungeon/monsters_v2/bog_leeches_attack_1_close.png": {
-   "x": 96,
-   "y": 1038,
+   "x": 76,
+   "y": 1697,
    "w": 47,
    "h": 27
   },
   "art/dungeon/monsters_v2/bog_leeches_attack_1_far.png": {
    "x": 485,
-   "y": 1203,
+   "y": 1889,
    "w": 13,
    "h": 8
   },
   "art/dungeon/monsters_v2/bog_leeches_attack_1_mid.png": {
    "x": 212,
-   "y": 1203,
+   "y": 1889,
    "w": 17,
    "h": 10
   },
   "art/dungeon/monsters_v2/bog_leeches_attack_1_near.png": {
    "x": 54,
-   "y": 1182,
+   "y": 1868,
    "w": 25,
    "h": 15
   },
   "art/dungeon/monsters_v2/bog_leeches_attack_2_close.png": {
-   "x": 147,
-   "y": 1038,
+   "x": 127,
+   "y": 1697,
    "w": 47,
    "h": 27
   },
   "art/dungeon/monsters_v2/bog_leeches_attack_2_far.png": {
    "x": 2,
-   "y": 1220,
+   "y": 1906,
    "w": 13,
    "h": 8
   },
   "art/dungeon/monsters_v2/bog_leeches_attack_2_mid.png": {
    "x": 233,
-   "y": 1203,
+   "y": 1889,
    "w": 17,
    "h": 10
   },
   "art/dungeon/monsters_v2/bog_leeches_attack_2_near.png": {
    "x": 83,
-   "y": 1182,
+   "y": 1868,
    "w": 25,
    "h": 15
   },
   "art/dungeon/monsters_v2/bog_leeches_attack_3_close.png": {
-   "x": 198,
-   "y": 1038,
+   "x": 178,
+   "y": 1697,
    "w": 47,
    "h": 27
   },
   "art/dungeon/monsters_v2/bog_leeches_attack_3_far.png": {
    "x": 19,
-   "y": 1220,
+   "y": 1906,
    "w": 13,
    "h": 8
   },
   "art/dungeon/monsters_v2/bog_leeches_attack_3_mid.png": {
    "x": 254,
-   "y": 1203,
+   "y": 1889,
    "w": 17,
    "h": 10
   },
   "art/dungeon/monsters_v2/bog_leeches_attack_3_near.png": {
    "x": 112,
-   "y": 1182,
+   "y": 1868,
    "w": 25,
    "h": 15
   },
   "art/dungeon/monsters_v2/bog_leeches_close.png": {
-   "x": 249,
-   "y": 1038,
+   "x": 229,
+   "y": 1697,
    "w": 47,
    "h": 27
   },
   "art/dungeon/monsters_v2/bog_leeches_death_1_close.png": {
-   "x": 300,
-   "y": 1038,
+   "x": 280,
+   "y": 1697,
    "w": 47,
    "h": 27
   },
   "art/dungeon/monsters_v2/bog_leeches_death_1_far.png": {
    "x": 36,
-   "y": 1220,
+   "y": 1906,
    "w": 13,
    "h": 8
   },
   "art/dungeon/monsters_v2/bog_leeches_death_1_mid.png": {
    "x": 275,
-   "y": 1203,
+   "y": 1889,
    "w": 17,
    "h": 10
   },
   "art/dungeon/monsters_v2/bog_leeches_death_1_near.png": {
    "x": 141,
-   "y": 1182,
+   "y": 1868,
    "w": 25,
    "h": 15
   },
   "art/dungeon/monsters_v2/bog_leeches_death_2_close.png": {
-   "x": 351,
-   "y": 1038,
+   "x": 331,
+   "y": 1697,
    "w": 47,
    "h": 27
   },
   "art/dungeon/monsters_v2/bog_leeches_death_2_far.png": {
    "x": 53,
-   "y": 1220,
+   "y": 1906,
    "w": 13,
    "h": 8
   },
   "art/dungeon/monsters_v2/bog_leeches_death_2_mid.png": {
    "x": 296,
-   "y": 1203,
+   "y": 1889,
    "w": 17,
    "h": 10
   },
   "art/dungeon/monsters_v2/bog_leeches_death_2_near.png": {
    "x": 170,
-   "y": 1182,
+   "y": 1868,
    "w": 25,
    "h": 15
   },
   "art/dungeon/monsters_v2/bog_leeches_death_3_close.png": {
-   "x": 402,
-   "y": 1038,
+   "x": 382,
+   "y": 1697,
    "w": 47,
    "h": 27
   },
   "art/dungeon/monsters_v2/bog_leeches_death_3_far.png": {
    "x": 70,
-   "y": 1220,
+   "y": 1906,
    "w": 13,
    "h": 8
   },
   "art/dungeon/monsters_v2/bog_leeches_death_3_mid.png": {
    "x": 317,
-   "y": 1203,
+   "y": 1889,
    "w": 17,
    "h": 10
   },
   "art/dungeon/monsters_v2/bog_leeches_death_3_near.png": {
    "x": 199,
-   "y": 1182,
+   "y": 1868,
    "w": 25,
    "h": 15
   },
   "art/dungeon/monsters_v2/bog_leeches_death_4_close.png": {
-   "x": 453,
-   "y": 1038,
+   "x": 433,
+   "y": 1697,
    "w": 47,
    "h": 27
   },
   "art/dungeon/monsters_v2/bog_leeches_death_4_far.png": {
    "x": 87,
-   "y": 1220,
+   "y": 1906,
    "w": 13,
    "h": 8
   },
   "art/dungeon/monsters_v2/bog_leeches_death_4_mid.png": {
    "x": 338,
-   "y": 1203,
+   "y": 1889,
    "w": 17,
    "h": 10
   },
   "art/dungeon/monsters_v2/bog_leeches_death_4_near.png": {
    "x": 228,
-   "y": 1182,
+   "y": 1868,
    "w": 25,
    "h": 15
   },
   "art/dungeon/monsters_v2/bog_leeches_far.png": {
    "x": 104,
-   "y": 1220,
+   "y": 1906,
    "w": 13,
    "h": 8
   },
   "art/dungeon/monsters_v2/bog_leeches_hurt_1_close.png": {
    "x": 2,
-   "y": 1071,
+   "y": 1730,
    "w": 47,
    "h": 27
   },
   "art/dungeon/monsters_v2/bog_leeches_hurt_1_far.png": {
    "x": 121,
-   "y": 1220,
+   "y": 1906,
    "w": 13,
    "h": 8
   },
   "art/dungeon/monsters_v2/bog_leeches_hurt_1_mid.png": {
    "x": 359,
-   "y": 1203,
+   "y": 1889,
    "w": 17,
    "h": 10
   },
   "art/dungeon/monsters_v2/bog_leeches_hurt_1_near.png": {
    "x": 257,
-   "y": 1182,
+   "y": 1868,
    "w": 25,
    "h": 15
   },
   "art/dungeon/monsters_v2/bog_leeches_idle_1_close.png": {
    "x": 53,
-   "y": 1071,
+   "y": 1730,
    "w": 47,
    "h": 27
   },
   "art/dungeon/monsters_v2/bog_leeches_idle_1_far.png": {
    "x": 138,
-   "y": 1220,
+   "y": 1906,
    "w": 13,
    "h": 8
   },
   "art/dungeon/monsters_v2/bog_leeches_idle_1_mid.png": {
    "x": 380,
-   "y": 1203,
+   "y": 1889,
    "w": 17,
    "h": 10
   },
   "art/dungeon/monsters_v2/bog_leeches_idle_1_near.png": {
    "x": 286,
-   "y": 1182,
+   "y": 1868,
    "w": 25,
    "h": 15
   },
   "art/dungeon/monsters_v2/bog_leeches_idle_2_close.png": {
    "x": 104,
-   "y": 1071,
+   "y": 1730,
    "w": 47,
    "h": 27
   },
   "art/dungeon/monsters_v2/bog_leeches_idle_2_far.png": {
    "x": 155,
-   "y": 1220,
+   "y": 1906,
    "w": 13,
    "h": 8
   },
   "art/dungeon/monsters_v2/bog_leeches_idle_2_mid.png": {
    "x": 401,
-   "y": 1203,
+   "y": 1889,
    "w": 17,
    "h": 10
   },
   "art/dungeon/monsters_v2/bog_leeches_idle_2_near.png": {
    "x": 315,
-   "y": 1182,
+   "y": 1868,
    "w": 25,
    "h": 15
   },
   "art/dungeon/monsters_v2/bog_leeches_idle_3_close.png": {
    "x": 155,
-   "y": 1071,
+   "y": 1730,
    "w": 47,
    "h": 27
   },
   "art/dungeon/monsters_v2/bog_leeches_idle_3_far.png": {
    "x": 172,
-   "y": 1220,
+   "y": 1906,
    "w": 13,
    "h": 8
   },
   "art/dungeon/monsters_v2/bog_leeches_idle_3_mid.png": {
    "x": 422,
-   "y": 1203,
+   "y": 1889,
    "w": 17,
    "h": 10
   },
   "art/dungeon/monsters_v2/bog_leeches_idle_3_near.png": {
    "x": 344,
-   "y": 1182,
+   "y": 1868,
    "w": 25,
    "h": 15
   },
   "art/dungeon/monsters_v2/bog_leeches_idle_4_close.png": {
    "x": 206,
-   "y": 1071,
+   "y": 1730,
    "w": 47,
    "h": 27
   },
   "art/dungeon/monsters_v2/bog_leeches_idle_4_far.png": {
    "x": 189,
-   "y": 1220,
+   "y": 1906,
    "w": 13,
    "h": 8
   },
   "art/dungeon/monsters_v2/bog_leeches_idle_4_mid.png": {
    "x": 443,
-   "y": 1203,
+   "y": 1889,
    "w": 17,
    "h": 10
   },
   "art/dungeon/monsters_v2/bog_leeches_idle_4_near.png": {
    "x": 373,
-   "y": 1182,
+   "y": 1868,
    "w": 25,
    "h": 15
   },
   "art/dungeon/monsters_v2/bog_leeches_mid.png": {
    "x": 464,
-   "y": 1203,
+   "y": 1889,
    "w": 17,
    "h": 10
   },
   "art/dungeon/monsters_v2/bog_leeches_near.png": {
    "x": 402,
-   "y": 1182,
+   "y": 1868,
    "w": 25,
    "h": 15
   },
   "art/dungeon/monsters_v2/keep_rat_attack_1_close.png": {
-   "x": 85,
-   "y": 774,
+   "x": 2,
+   "y": 1273,
    "w": 53,
    "h": 45
   },
   "art/dungeon/monsters_v2/keep_rat_attack_1_far.png": {
    "x": 431,
-   "y": 1182,
+   "y": 1868,
    "w": 17,
    "h": 13
   },
   "art/dungeon/monsters_v2/keep_rat_attack_1_mid.png": {
    "x": 212,
-   "y": 1159,
+   "y": 1845,
    "w": 22,
    "h": 17
   },
   "art/dungeon/monsters_v2/keep_rat_attack_1_near.png": {
    "x": 257,
-   "y": 1071,
+   "y": 1730,
    "w": 29,
    "h": 25
   },
   "art/dungeon/monsters_v2/keep_rat_attack_2_close.png": {
-   "x": 142,
-   "y": 774,
+   "x": 59,
+   "y": 1273,
    "w": 53,
    "h": 45
   },
   "art/dungeon/monsters_v2/keep_rat_attack_2_far.png": {
    "x": 452,
-   "y": 1182,
+   "y": 1868,
    "w": 17,
    "h": 13
   },
   "art/dungeon/monsters_v2/keep_rat_attack_2_mid.png": {
    "x": 238,
-   "y": 1159,
+   "y": 1845,
    "w": 22,
    "h": 17
   },
   "art/dungeon/monsters_v2/keep_rat_attack_2_near.png": {
    "x": 290,
-   "y": 1071,
+   "y": 1730,
    "w": 29,
    "h": 25
   },
   "art/dungeon/monsters_v2/keep_rat_attack_3_close.png": {
-   "x": 199,
-   "y": 774,
+   "x": 116,
+   "y": 1273,
    "w": 53,
    "h": 45
   },
   "art/dungeon/monsters_v2/keep_rat_attack_3_far.png": {
    "x": 473,
-   "y": 1182,
+   "y": 1868,
    "w": 17,
    "h": 13
   },
   "art/dungeon/monsters_v2/keep_rat_attack_3_mid.png": {
    "x": 264,
-   "y": 1159,
+   "y": 1845,
    "w": 22,
    "h": 17
   },
   "art/dungeon/monsters_v2/keep_rat_attack_3_near.png": {
    "x": 323,
-   "y": 1071,
+   "y": 1730,
    "w": 29,
    "h": 25
   },
   "art/dungeon/monsters_v2/keep_rat_close.png": {
-   "x": 256,
-   "y": 774,
+   "x": 173,
+   "y": 1273,
    "w": 53,
    "h": 45
   },
   "art/dungeon/monsters_v2/keep_rat_death_1_close.png": {
-   "x": 313,
-   "y": 774,
+   "x": 230,
+   "y": 1273,
    "w": 53,
    "h": 45
   },
   "art/dungeon/monsters_v2/keep_rat_death_1_far.png": {
    "x": 2,
-   "y": 1203,
+   "y": 1889,
    "w": 17,
    "h": 13
   },
   "art/dungeon/monsters_v2/keep_rat_death_1_mid.png": {
    "x": 290,
-   "y": 1159,
+   "y": 1845,
    "w": 22,
    "h": 17
   },
   "art/dungeon/monsters_v2/keep_rat_death_1_near.png": {
    "x": 356,
-   "y": 1071,
+   "y": 1730,
    "w": 29,
    "h": 25
   },
   "art/dungeon/monsters_v2/keep_rat_death_2_close.png": {
-   "x": 370,
-   "y": 774,
+   "x": 287,
+   "y": 1273,
    "w": 53,
    "h": 45
   },
   "art/dungeon/monsters_v2/keep_rat_death_2_far.png": {
    "x": 23,
-   "y": 1203,
+   "y": 1889,
    "w": 17,
    "h": 13
   },
   "art/dungeon/monsters_v2/keep_rat_death_2_mid.png": {
    "x": 316,
-   "y": 1159,
+   "y": 1845,
    "w": 22,
    "h": 17
   },
   "art/dungeon/monsters_v2/keep_rat_death_2_near.png": {
    "x": 389,
-   "y": 1071,
+   "y": 1730,
    "w": 29,
    "h": 25
   },
   "art/dungeon/monsters_v2/keep_rat_death_3_close.png": {
-   "x": 427,
-   "y": 774,
+   "x": 344,
+   "y": 1273,
    "w": 53,
    "h": 45
   },
   "art/dungeon/monsters_v2/keep_rat_death_3_far.png": {
    "x": 44,
-   "y": 1203,
+   "y": 1889,
    "w": 17,
    "h": 13
   },
   "art/dungeon/monsters_v2/keep_rat_death_3_mid.png": {
    "x": 342,
-   "y": 1159,
+   "y": 1845,
    "w": 22,
    "h": 17
   },
   "art/dungeon/monsters_v2/keep_rat_death_3_near.png": {
    "x": 422,
-   "y": 1071,
+   "y": 1730,
    "w": 29,
    "h": 25
   },
   "art/dungeon/monsters_v2/keep_rat_death_4_close.png": {
-   "x": 2,
-   "y": 833,
+   "x": 401,
+   "y": 1273,
    "w": 53,
    "h": 45
   },
   "art/dungeon/monsters_v2/keep_rat_death_4_far.png": {
    "x": 65,
-   "y": 1203,
+   "y": 1889,
    "w": 17,
    "h": 13
   },
   "art/dungeon/monsters_v2/keep_rat_death_4_mid.png": {
    "x": 368,
-   "y": 1159,
+   "y": 1845,
    "w": 22,
    "h": 17
   },
   "art/dungeon/monsters_v2/keep_rat_death_4_near.png": {
    "x": 455,
-   "y": 1071,
+   "y": 1730,
    "w": 29,
    "h": 25
   },
   "art/dungeon/monsters_v2/keep_rat_far.png": {
    "x": 86,
-   "y": 1203,
+   "y": 1889,
    "w": 17,
    "h": 13
   },
   "art/dungeon/monsters_v2/keep_rat_hurt_1_close.png": {
-   "x": 59,
-   "y": 833,
+   "x": 2,
+   "y": 1322,
    "w": 53,
    "h": 45
   },
   "art/dungeon/monsters_v2/keep_rat_hurt_1_far.png": {
    "x": 107,
-   "y": 1203,
+   "y": 1889,
    "w": 17,
    "h": 13
   },
   "art/dungeon/monsters_v2/keep_rat_hurt_1_mid.png": {
    "x": 394,
-   "y": 1159,
+   "y": 1845,
    "w": 22,
    "h": 17
   },
   "art/dungeon/monsters_v2/keep_rat_hurt_1_near.png": {
    "x": 2,
-   "y": 1102,
+   "y": 1761,
    "w": 29,
    "h": 25
   },
   "art/dungeon/monsters_v2/keep_rat_idle_1_close.png": {
-   "x": 116,
-   "y": 833,
+   "x": 59,
+   "y": 1322,
    "w": 53,
    "h": 45
   },
   "art/dungeon/monsters_v2/keep_rat_idle_1_far.png": {
    "x": 128,
-   "y": 1203,
+   "y": 1889,
    "w": 17,
    "h": 13
   },
   "art/dungeon/monsters_v2/keep_rat_idle_1_mid.png": {
    "x": 420,
-   "y": 1159,
+   "y": 1845,
    "w": 22,
    "h": 17
   },
   "art/dungeon/monsters_v2/keep_rat_idle_1_near.png": {
    "x": 35,
-   "y": 1102,
+   "y": 1761,
    "w": 29,
    "h": 25
   },
   "art/dungeon/monsters_v2/keep_rat_idle_2_close.png": {
-   "x": 173,
-   "y": 833,
+   "x": 116,
+   "y": 1322,
    "w": 53,
    "h": 45
   },
   "art/dungeon/monsters_v2/keep_rat_idle_2_far.png": {
    "x": 149,
-   "y": 1203,
+   "y": 1889,
    "w": 17,
    "h": 13
   },
   "art/dungeon/monsters_v2/keep_rat_idle_2_mid.png": {
    "x": 446,
-   "y": 1159,
+   "y": 1845,
    "w": 22,
    "h": 17
   },
   "art/dungeon/monsters_v2/keep_rat_idle_2_near.png": {
    "x": 68,
-   "y": 1102,
+   "y": 1761,
    "w": 29,
    "h": 25
   },
   "art/dungeon/monsters_v2/keep_rat_idle_3_close.png": {
-   "x": 230,
-   "y": 833,
+   "x": 173,
+   "y": 1322,
    "w": 53,
    "h": 45
   },
   "art/dungeon/monsters_v2/keep_rat_idle_3_far.png": {
    "x": 170,
-   "y": 1203,
+   "y": 1889,
    "w": 17,
    "h": 13
   },
   "art/dungeon/monsters_v2/keep_rat_idle_3_mid.png": {
    "x": 472,
-   "y": 1159,
+   "y": 1845,
    "w": 22,
    "h": 17
   },
   "art/dungeon/monsters_v2/keep_rat_idle_3_near.png": {
    "x": 101,
-   "y": 1102,
+   "y": 1761,
    "w": 29,
    "h": 25
   },
   "art/dungeon/monsters_v2/keep_rat_idle_4_close.png": {
-   "x": 287,
-   "y": 833,
+   "x": 230,
+   "y": 1322,
    "w": 53,
    "h": 45
   },
   "art/dungeon/monsters_v2/keep_rat_idle_4_far.png": {
    "x": 191,
-   "y": 1203,
+   "y": 1889,
    "w": 17,
    "h": 13
   },
   "art/dungeon/monsters_v2/keep_rat_idle_4_mid.png": {
    "x": 2,
-   "y": 1182,
+   "y": 1868,
    "w": 22,
    "h": 17
   },
   "art/dungeon/monsters_v2/keep_rat_idle_4_near.png": {
    "x": 134,
-   "y": 1102,
+   "y": 1761,
    "w": 29,
    "h": 25
   },
   "art/dungeon/monsters_v2/keep_rat_mid.png": {
    "x": 28,
-   "y": 1182,
+   "y": 1868,
    "w": 22,
    "h": 17
   },
   "art/dungeon/monsters_v2/keep_rat_near.png": {
    "x": 167,
-   "y": 1102,
+   "y": 1761,
    "w": 29,
    "h": 25
   },
   "art/dungeon/monsters_v2/rust_crab_attack_1_close.png": {
-   "x": 150,
-   "y": 418,
+   "x": 121,
+   "y": 878,
    "w": 95,
    "h": 63
   },
   "art/dungeon/monsters_v2/rust_crab_attack_1_far.png": {
-   "x": 254,
-   "y": 1131,
+   "x": 268,
+   "y": 1818,
    "w": 31,
    "h": 19
   },
   "art/dungeon/monsters_v2/rust_crab_attack_1_mid.png": {
    "x": 200,
-   "y": 1102,
+   "y": 1761,
    "w": 38,
    "h": 24
   },
   "art/dungeon/monsters_v2/rust_crab_attack_1_near.png": {
-   "x": 179,
-   "y": 924,
+   "x": 284,
+   "y": 1509,
    "w": 53,
    "h": 35
   },
   "art/dungeon/monsters_v2/rust_crab_attack_2_close.png": {
-   "x": 249,
-   "y": 418,
+   "x": 220,
+   "y": 878,
    "w": 95,
    "h": 63
   },
   "art/dungeon/monsters_v2/rust_crab_attack_2_far.png": {
-   "x": 289,
-   "y": 1131,
+   "x": 303,
+   "y": 1818,
    "w": 31,
    "h": 19
   },
   "art/dungeon/monsters_v2/rust_crab_attack_2_mid.png": {
    "x": 242,
-   "y": 1102,
+   "y": 1761,
    "w": 38,
    "h": 24
   },
   "art/dungeon/monsters_v2/rust_crab_attack_2_near.png": {
-   "x": 236,
-   "y": 924,
+   "x": 341,
+   "y": 1509,
    "w": 53,
    "h": 35
   },
   "art/dungeon/monsters_v2/rust_crab_attack_3_close.png": {
-   "x": 348,
-   "y": 418,
+   "x": 319,
+   "y": 878,
    "w": 95,
    "h": 63
   },
   "art/dungeon/monsters_v2/rust_crab_attack_3_far.png": {
-   "x": 324,
-   "y": 1131,
+   "x": 338,
+   "y": 1818,
    "w": 31,
    "h": 19
   },
   "art/dungeon/monsters_v2/rust_crab_attack_3_mid.png": {
    "x": 284,
-   "y": 1102,
+   "y": 1761,
    "w": 38,
    "h": 24
   },
   "art/dungeon/monsters_v2/rust_crab_attack_3_near.png": {
-   "x": 293,
-   "y": 924,
+   "x": 398,
+   "y": 1509,
    "w": 53,
    "h": 35
   },
   "art/dungeon/monsters_v2/rust_crab_close.png": {
    "x": 2,
-   "y": 522,
+   "y": 962,
    "w": 95,
    "h": 63
   },
   "art/dungeon/monsters_v2/rust_crab_death_1_close.png": {
    "x": 101,
-   "y": 522,
+   "y": 962,
    "w": 95,
    "h": 63
   },
   "art/dungeon/monsters_v2/rust_crab_death_1_far.png": {
-   "x": 359,
-   "y": 1131,
+   "x": 373,
+   "y": 1818,
    "w": 31,
    "h": 19
   },
   "art/dungeon/monsters_v2/rust_crab_death_1_mid.png": {
    "x": 326,
-   "y": 1102,
+   "y": 1761,
    "w": 38,
    "h": 24
   },
   "art/dungeon/monsters_v2/rust_crab_death_1_near.png": {
-   "x": 350,
-   "y": 924,
+   "x": 455,
+   "y": 1509,
    "w": 53,
    "h": 35
   },
   "art/dungeon/monsters_v2/rust_crab_death_2_close.png": {
    "x": 200,
-   "y": 522,
+   "y": 962,
    "w": 95,
    "h": 63
   },
   "art/dungeon/monsters_v2/rust_crab_death_2_far.png": {
-   "x": 394,
-   "y": 1131,
+   "x": 408,
+   "y": 1818,
    "w": 31,
    "h": 19
   },
   "art/dungeon/monsters_v2/rust_crab_death_2_mid.png": {
    "x": 368,
-   "y": 1102,
+   "y": 1761,
    "w": 38,
    "h": 24
   },
   "art/dungeon/monsters_v2/rust_crab_death_2_near.png": {
-   "x": 407,
-   "y": 924,
+   "x": 2,
+   "y": 1551,
    "w": 53,
    "h": 35
   },
   "art/dungeon/monsters_v2/rust_crab_death_3_close.png": {
    "x": 299,
-   "y": 522,
+   "y": 962,
    "w": 95,
    "h": 63
   },
   "art/dungeon/monsters_v2/rust_crab_death_3_far.png": {
-   "x": 429,
-   "y": 1131,
+   "x": 443,
+   "y": 1818,
    "w": 31,
    "h": 19
   },
   "art/dungeon/monsters_v2/rust_crab_death_3_mid.png": {
    "x": 410,
-   "y": 1102,
+   "y": 1761,
    "w": 38,
    "h": 24
   },
   "art/dungeon/monsters_v2/rust_crab_death_3_near.png": {
-   "x": 2,
-   "y": 966,
+   "x": 59,
+   "y": 1551,
    "w": 53,
    "h": 35
   },
   "art/dungeon/monsters_v2/rust_crab_death_4_close.png": {
    "x": 398,
-   "y": 522,
+   "y": 962,
    "w": 95,
    "h": 63
   },
   "art/dungeon/monsters_v2/rust_crab_death_4_far.png": {
-   "x": 464,
-   "y": 1131,
+   "x": 478,
+   "y": 1818,
    "w": 31,
    "h": 19
   },
   "art/dungeon/monsters_v2/rust_crab_death_4_mid.png": {
    "x": 452,
-   "y": 1102,
+   "y": 1761,
    "w": 38,
    "h": 24
   },
   "art/dungeon/monsters_v2/rust_crab_death_4_near.png": {
-   "x": 59,
-   "y": 966,
+   "x": 116,
+   "y": 1551,
    "w": 53,
    "h": 35
   },
   "art/dungeon/monsters_v2/rust_crab_far.png": {
    "x": 2,
-   "y": 1159,
+   "y": 1845,
    "w": 31,
    "h": 19
   },
   "art/dungeon/monsters_v2/rust_crab_hurt_1_close.png": {
    "x": 2,
-   "y": 589,
+   "y": 1029,
    "w": 95,
    "h": 63
   },
   "art/dungeon/monsters_v2/rust_crab_hurt_1_far.png": {
    "x": 37,
-   "y": 1159,
+   "y": 1845,
    "w": 31,
    "h": 19
   },
   "art/dungeon/monsters_v2/rust_crab_hurt_1_mid.png": {
    "x": 2,
-   "y": 1131,
+   "y": 1790,
    "w": 38,
    "h": 24
   },
   "art/dungeon/monsters_v2/rust_crab_hurt_1_near.png": {
-   "x": 116,
-   "y": 966,
+   "x": 173,
+   "y": 1551,
    "w": 53,
    "h": 35
   },
   "art/dungeon/monsters_v2/rust_crab_idle_1_close.png": {
    "x": 101,
-   "y": 589,
+   "y": 1029,
    "w": 95,
    "h": 63
   },
   "art/dungeon/monsters_v2/rust_crab_idle_1_far.png": {
    "x": 72,
-   "y": 1159,
+   "y": 1845,
    "w": 31,
    "h": 19
   },
   "art/dungeon/monsters_v2/rust_crab_idle_1_mid.png": {
    "x": 44,
-   "y": 1131,
+   "y": 1790,
    "w": 38,
    "h": 24
   },
   "art/dungeon/monsters_v2/rust_crab_idle_1_near.png": {
-   "x": 173,
-   "y": 966,
+   "x": 230,
+   "y": 1551,
    "w": 53,
    "h": 35
   },
   "art/dungeon/monsters_v2/rust_crab_idle_2_close.png": {
    "x": 200,
-   "y": 589,
+   "y": 1029,
    "w": 95,
    "h": 63
   },
   "art/dungeon/monsters_v2/rust_crab_idle_2_far.png": {
    "x": 107,
-   "y": 1159,
+   "y": 1845,
    "w": 31,
    "h": 19
   },
   "art/dungeon/monsters_v2/rust_crab_idle_2_mid.png": {
    "x": 86,
-   "y": 1131,
+   "y": 1790,
    "w": 38,
    "h": 24
   },
   "art/dungeon/monsters_v2/rust_crab_idle_2_near.png": {
-   "x": 230,
-   "y": 966,
+   "x": 287,
+   "y": 1551,
    "w": 53,
    "h": 35
   },
   "art/dungeon/monsters_v2/rust_crab_idle_3_close.png": {
    "x": 299,
-   "y": 589,
+   "y": 1029,
    "w": 95,
    "h": 63
   },
   "art/dungeon/monsters_v2/rust_crab_idle_3_far.png": {
    "x": 142,
-   "y": 1159,
+   "y": 1845,
    "w": 31,
    "h": 19
   },
   "art/dungeon/monsters_v2/rust_crab_idle_3_mid.png": {
    "x": 128,
-   "y": 1131,
+   "y": 1790,
    "w": 38,
    "h": 24
   },
   "art/dungeon/monsters_v2/rust_crab_idle_3_near.png": {
-   "x": 287,
-   "y": 966,
+   "x": 344,
+   "y": 1551,
    "w": 53,
    "h": 35
   },
   "art/dungeon/monsters_v2/rust_crab_idle_4_close.png": {
    "x": 398,
-   "y": 589,
+   "y": 1029,
    "w": 95,
    "h": 63
   },
   "art/dungeon/monsters_v2/rust_crab_idle_4_far.png": {
    "x": 177,
-   "y": 1159,
+   "y": 1845,
    "w": 31,
    "h": 19
   },
   "art/dungeon/monsters_v2/rust_crab_idle_4_mid.png": {
    "x": 170,
-   "y": 1131,
+   "y": 1790,
    "w": 38,
    "h": 24
   },
   "art/dungeon/monsters_v2/rust_crab_idle_4_near.png": {
-   "x": 344,
-   "y": 966,
+   "x": 401,
+   "y": 1551,
    "w": 53,
    "h": 35
   },
   "art/dungeon/monsters_v2/rust_crab_mid.png": {
    "x": 212,
-   "y": 1131,
+   "y": 1790,
    "w": 38,
    "h": 24
   },
   "art/dungeon/monsters_v2/rust_crab_near.png": {
-   "x": 401,
-   "y": 966,
+   "x": 2,
+   "y": 1590,
    "w": 53,
    "h": 35
   },
@@ -950,20 +950,20 @@
    "h": 100
   },
   "art/dungeon/monsters_v2/slime_attack_1_far.png": {
-   "x": 458,
-   "y": 966,
+   "x": 194,
+   "y": 1629,
    "w": 43,
    "h": 29
   },
   "art/dungeon/monsters_v2/slime_attack_1_mid.png": {
-   "x": 344,
-   "y": 833,
+   "x": 203,
+   "y": 1419,
    "w": 55,
    "h": 38
   },
   "art/dungeon/monsters_v2/slime_attack_1_near.png": {
    "x": 2,
-   "y": 656,
+   "y": 1096,
    "w": 79,
    "h": 55
   },
@@ -974,20 +974,20 @@
    "h": 100
   },
   "art/dungeon/monsters_v2/slime_attack_2_far.png": {
-   "x": 2,
-   "y": 1005,
+   "x": 241,
+   "y": 1629,
    "w": 43,
    "h": 29
   },
   "art/dungeon/monsters_v2/slime_attack_2_mid.png": {
-   "x": 403,
-   "y": 833,
+   "x": 262,
+   "y": 1419,
    "w": 55,
    "h": 38
   },
   "art/dungeon/monsters_v2/slime_attack_2_near.png": {
    "x": 85,
-   "y": 656,
+   "y": 1096,
    "w": 79,
    "h": 55
   },
@@ -998,20 +998,20 @@
    "h": 100
   },
   "art/dungeon/monsters_v2/slime_attack_3_far.png": {
-   "x": 49,
-   "y": 1005,
+   "x": 288,
+   "y": 1629,
    "w": 43,
    "h": 29
   },
   "art/dungeon/monsters_v2/slime_attack_3_mid.png": {
-   "x": 2,
-   "y": 882,
+   "x": 321,
+   "y": 1419,
    "w": 55,
    "h": 38
   },
   "art/dungeon/monsters_v2/slime_attack_3_near.png": {
    "x": 168,
-   "y": 656,
+   "y": 1096,
    "w": 79,
    "h": 55
   },
@@ -1028,20 +1028,20 @@
    "h": 100
   },
   "art/dungeon/monsters_v2/slime_death_1_far.png": {
-   "x": 96,
-   "y": 1005,
+   "x": 335,
+   "y": 1629,
    "w": 43,
    "h": 29
   },
   "art/dungeon/monsters_v2/slime_death_1_mid.png": {
-   "x": 61,
-   "y": 882,
+   "x": 380,
+   "y": 1419,
    "w": 55,
    "h": 38
   },
   "art/dungeon/monsters_v2/slime_death_1_near.png": {
    "x": 251,
-   "y": 656,
+   "y": 1096,
    "w": 79,
    "h": 55
   },
@@ -1052,20 +1052,20 @@
    "h": 100
   },
   "art/dungeon/monsters_v2/slime_death_2_far.png": {
-   "x": 143,
-   "y": 1005,
+   "x": 382,
+   "y": 1629,
    "w": 43,
    "h": 29
   },
   "art/dungeon/monsters_v2/slime_death_2_mid.png": {
-   "x": 120,
-   "y": 882,
+   "x": 439,
+   "y": 1419,
    "w": 55,
    "h": 38
   },
   "art/dungeon/monsters_v2/slime_death_2_near.png": {
    "x": 334,
-   "y": 656,
+   "y": 1096,
    "w": 79,
    "h": 55
   },
@@ -1076,20 +1076,20 @@
    "h": 100
   },
   "art/dungeon/monsters_v2/slime_death_3_far.png": {
-   "x": 190,
-   "y": 1005,
+   "x": 429,
+   "y": 1629,
    "w": 43,
    "h": 29
   },
   "art/dungeon/monsters_v2/slime_death_3_mid.png": {
-   "x": 179,
-   "y": 882,
+   "x": 2,
+   "y": 1467,
    "w": 55,
    "h": 38
   },
   "art/dungeon/monsters_v2/slime_death_3_near.png": {
    "x": 417,
-   "y": 656,
+   "y": 1096,
    "w": 79,
    "h": 55
   },
@@ -1100,26 +1100,26 @@
    "h": 100
   },
   "art/dungeon/monsters_v2/slime_death_4_far.png": {
-   "x": 237,
-   "y": 1005,
+   "x": 2,
+   "y": 1664,
    "w": 43,
    "h": 29
   },
   "art/dungeon/monsters_v2/slime_death_4_mid.png": {
-   "x": 238,
-   "y": 882,
+   "x": 61,
+   "y": 1467,
    "w": 55,
    "h": 38
   },
   "art/dungeon/monsters_v2/slime_death_4_near.png": {
    "x": 2,
-   "y": 715,
+   "y": 1155,
    "w": 79,
    "h": 55
   },
   "art/dungeon/monsters_v2/slime_far.png": {
-   "x": 284,
-   "y": 1005,
+   "x": 49,
+   "y": 1664,
    "w": 43,
    "h": 29
   },
@@ -1130,20 +1130,20 @@
    "h": 100
   },
   "art/dungeon/monsters_v2/slime_hurt_1_far.png": {
-   "x": 331,
-   "y": 1005,
+   "x": 96,
+   "y": 1664,
    "w": 43,
    "h": 29
   },
   "art/dungeon/monsters_v2/slime_hurt_1_mid.png": {
-   "x": 297,
-   "y": 882,
+   "x": 120,
+   "y": 1467,
    "w": 55,
    "h": 38
   },
   "art/dungeon/monsters_v2/slime_hurt_1_near.png": {
    "x": 85,
-   "y": 715,
+   "y": 1155,
    "w": 79,
    "h": 55
   },
@@ -1154,20 +1154,20 @@
    "h": 100
   },
   "art/dungeon/monsters_v2/slime_idle_1_far.png": {
-   "x": 378,
-   "y": 1005,
+   "x": 143,
+   "y": 1664,
    "w": 43,
    "h": 29
   },
   "art/dungeon/monsters_v2/slime_idle_1_mid.png": {
-   "x": 356,
-   "y": 882,
+   "x": 179,
+   "y": 1467,
    "w": 55,
    "h": 38
   },
   "art/dungeon/monsters_v2/slime_idle_1_near.png": {
    "x": 168,
-   "y": 715,
+   "y": 1155,
    "w": 79,
    "h": 55
   },
@@ -1178,20 +1178,20 @@
    "h": 100
   },
   "art/dungeon/monsters_v2/slime_idle_2_far.png": {
-   "x": 425,
-   "y": 1005,
+   "x": 190,
+   "y": 1664,
    "w": 43,
    "h": 29
   },
   "art/dungeon/monsters_v2/slime_idle_2_mid.png": {
-   "x": 415,
-   "y": 882,
+   "x": 238,
+   "y": 1467,
    "w": 55,
    "h": 38
   },
   "art/dungeon/monsters_v2/slime_idle_2_near.png": {
    "x": 251,
-   "y": 715,
+   "y": 1155,
    "w": 79,
    "h": 55
   },
@@ -1202,20 +1202,20 @@
    "h": 100
   },
   "art/dungeon/monsters_v2/slime_idle_3_far.png": {
-   "x": 2,
-   "y": 1038,
+   "x": 237,
+   "y": 1664,
    "w": 43,
    "h": 29
   },
   "art/dungeon/monsters_v2/slime_idle_3_mid.png": {
-   "x": 2,
-   "y": 924,
+   "x": 297,
+   "y": 1467,
    "w": 55,
    "h": 38
   },
   "art/dungeon/monsters_v2/slime_idle_3_near.png": {
    "x": 334,
-   "y": 715,
+   "y": 1155,
    "w": 79,
    "h": 55
   },
@@ -1226,33 +1226,417 @@
    "h": 100
   },
   "art/dungeon/monsters_v2/slime_idle_4_far.png": {
-   "x": 49,
-   "y": 1038,
+   "x": 284,
+   "y": 1664,
    "w": 43,
    "h": 29
   },
   "art/dungeon/monsters_v2/slime_idle_4_mid.png": {
-   "x": 61,
-   "y": 924,
+   "x": 356,
+   "y": 1467,
    "w": 55,
    "h": 38
   },
   "art/dungeon/monsters_v2/slime_idle_4_near.png": {
    "x": 417,
-   "y": 715,
+   "y": 1155,
    "w": 79,
    "h": 55
   },
   "art/dungeon/monsters_v2/slime_mid.png": {
-   "x": 120,
-   "y": 924,
+   "x": 415,
+   "y": 1467,
    "w": 55,
    "h": 38
   },
   "art/dungeon/monsters_v2/slime_near.png": {
    "x": 2,
-   "y": 774,
+   "y": 1214,
    "w": 79,
+   "h": 55
+  },
+  "art/dungeon/monsters_v2/slime_small_attack_1_close.png": {
+   "x": 2,
+   "y": 626,
+   "w": 115,
+   "h": 80
+  },
+  "art/dungeon/monsters_v2/slime_small_attack_1_far.png": {
+   "x": 254,
+   "y": 1790,
+   "w": 34,
+   "h": 23
+  },
+  "art/dungeon/monsters_v2/slime_small_attack_1_mid.png": {
+   "x": 59,
+   "y": 1590,
+   "w": 44,
+   "h": 31
+  },
+  "art/dungeon/monsters_v2/slime_small_attack_1_near.png": {
+   "x": 287,
+   "y": 1322,
+   "w": 63,
+   "h": 44
+  },
+  "art/dungeon/monsters_v2/slime_small_attack_2_close.png": {
+   "x": 121,
+   "y": 626,
+   "w": 115,
+   "h": 80
+  },
+  "art/dungeon/monsters_v2/slime_small_attack_2_far.png": {
+   "x": 292,
+   "y": 1790,
+   "w": 34,
+   "h": 23
+  },
+  "art/dungeon/monsters_v2/slime_small_attack_2_mid.png": {
+   "x": 107,
+   "y": 1590,
+   "w": 44,
+   "h": 31
+  },
+  "art/dungeon/monsters_v2/slime_small_attack_2_near.png": {
+   "x": 354,
+   "y": 1322,
+   "w": 63,
+   "h": 44
+  },
+  "art/dungeon/monsters_v2/slime_small_attack_3_close.png": {
+   "x": 240,
+   "y": 626,
+   "w": 115,
+   "h": 80
+  },
+  "art/dungeon/monsters_v2/slime_small_attack_3_far.png": {
+   "x": 330,
+   "y": 1790,
+   "w": 34,
+   "h": 23
+  },
+  "art/dungeon/monsters_v2/slime_small_attack_3_mid.png": {
+   "x": 155,
+   "y": 1590,
+   "w": 44,
+   "h": 31
+  },
+  "art/dungeon/monsters_v2/slime_small_attack_3_near.png": {
+   "x": 421,
+   "y": 1322,
+   "w": 63,
+   "h": 44
+  },
+  "art/dungeon/monsters_v2/slime_small_close.png": {
+   "x": 359,
+   "y": 626,
+   "w": 115,
+   "h": 80
+  },
+  "art/dungeon/monsters_v2/slime_small_death_1_close.png": {
+   "x": 2,
+   "y": 710,
+   "w": 115,
+   "h": 80
+  },
+  "art/dungeon/monsters_v2/slime_small_death_1_far.png": {
+   "x": 368,
+   "y": 1790,
+   "w": 34,
+   "h": 23
+  },
+  "art/dungeon/monsters_v2/slime_small_death_1_mid.png": {
+   "x": 203,
+   "y": 1590,
+   "w": 44,
+   "h": 31
+  },
+  "art/dungeon/monsters_v2/slime_small_death_1_near.png": {
+   "x": 2,
+   "y": 1371,
+   "w": 63,
+   "h": 44
+  },
+  "art/dungeon/monsters_v2/slime_small_death_2_close.png": {
+   "x": 121,
+   "y": 710,
+   "w": 115,
+   "h": 80
+  },
+  "art/dungeon/monsters_v2/slime_small_death_2_far.png": {
+   "x": 406,
+   "y": 1790,
+   "w": 34,
+   "h": 23
+  },
+  "art/dungeon/monsters_v2/slime_small_death_2_mid.png": {
+   "x": 251,
+   "y": 1590,
+   "w": 44,
+   "h": 31
+  },
+  "art/dungeon/monsters_v2/slime_small_death_2_near.png": {
+   "x": 69,
+   "y": 1371,
+   "w": 63,
+   "h": 44
+  },
+  "art/dungeon/monsters_v2/slime_small_death_3_close.png": {
+   "x": 240,
+   "y": 710,
+   "w": 115,
+   "h": 80
+  },
+  "art/dungeon/monsters_v2/slime_small_death_3_far.png": {
+   "x": 444,
+   "y": 1790,
+   "w": 34,
+   "h": 23
+  },
+  "art/dungeon/monsters_v2/slime_small_death_3_mid.png": {
+   "x": 299,
+   "y": 1590,
+   "w": 44,
+   "h": 31
+  },
+  "art/dungeon/monsters_v2/slime_small_death_3_near.png": {
+   "x": 136,
+   "y": 1371,
+   "w": 63,
+   "h": 44
+  },
+  "art/dungeon/monsters_v2/slime_small_death_4_close.png": {
+   "x": 359,
+   "y": 710,
+   "w": 115,
+   "h": 80
+  },
+  "art/dungeon/monsters_v2/slime_small_death_4_far.png": {
+   "x": 2,
+   "y": 1818,
+   "w": 34,
+   "h": 23
+  },
+  "art/dungeon/monsters_v2/slime_small_death_4_mid.png": {
+   "x": 347,
+   "y": 1590,
+   "w": 44,
+   "h": 31
+  },
+  "art/dungeon/monsters_v2/slime_small_death_4_near.png": {
+   "x": 203,
+   "y": 1371,
+   "w": 63,
+   "h": 44
+  },
+  "art/dungeon/monsters_v2/slime_small_far.png": {
+   "x": 40,
+   "y": 1818,
+   "w": 34,
+   "h": 23
+  },
+  "art/dungeon/monsters_v2/slime_small_hurt_1_close.png": {
+   "x": 2,
+   "y": 794,
+   "w": 115,
+   "h": 80
+  },
+  "art/dungeon/monsters_v2/slime_small_hurt_1_far.png": {
+   "x": 78,
+   "y": 1818,
+   "w": 34,
+   "h": 23
+  },
+  "art/dungeon/monsters_v2/slime_small_hurt_1_mid.png": {
+   "x": 395,
+   "y": 1590,
+   "w": 44,
+   "h": 31
+  },
+  "art/dungeon/monsters_v2/slime_small_hurt_1_near.png": {
+   "x": 270,
+   "y": 1371,
+   "w": 63,
+   "h": 44
+  },
+  "art/dungeon/monsters_v2/slime_small_idle_1_close.png": {
+   "x": 121,
+   "y": 794,
+   "w": 115,
+   "h": 80
+  },
+  "art/dungeon/monsters_v2/slime_small_idle_1_far.png": {
+   "x": 116,
+   "y": 1818,
+   "w": 34,
+   "h": 23
+  },
+  "art/dungeon/monsters_v2/slime_small_idle_1_mid.png": {
+   "x": 443,
+   "y": 1590,
+   "w": 44,
+   "h": 31
+  },
+  "art/dungeon/monsters_v2/slime_small_idle_1_near.png": {
+   "x": 337,
+   "y": 1371,
+   "w": 63,
+   "h": 44
+  },
+  "art/dungeon/monsters_v2/slime_small_idle_2_close.png": {
+   "x": 240,
+   "y": 794,
+   "w": 115,
+   "h": 80
+  },
+  "art/dungeon/monsters_v2/slime_small_idle_2_far.png": {
+   "x": 154,
+   "y": 1818,
+   "w": 34,
+   "h": 23
+  },
+  "art/dungeon/monsters_v2/slime_small_idle_2_mid.png": {
+   "x": 2,
+   "y": 1629,
+   "w": 44,
+   "h": 31
+  },
+  "art/dungeon/monsters_v2/slime_small_idle_2_near.png": {
+   "x": 404,
+   "y": 1371,
+   "w": 63,
+   "h": 44
+  },
+  "art/dungeon/monsters_v2/slime_small_idle_3_close.png": {
+   "x": 359,
+   "y": 794,
+   "w": 115,
+   "h": 80
+  },
+  "art/dungeon/monsters_v2/slime_small_idle_3_far.png": {
+   "x": 192,
+   "y": 1818,
+   "w": 34,
+   "h": 23
+  },
+  "art/dungeon/monsters_v2/slime_small_idle_3_mid.png": {
+   "x": 50,
+   "y": 1629,
+   "w": 44,
+   "h": 31
+  },
+  "art/dungeon/monsters_v2/slime_small_idle_3_near.png": {
+   "x": 2,
+   "y": 1419,
+   "w": 63,
+   "h": 44
+  },
+  "art/dungeon/monsters_v2/slime_small_idle_4_close.png": {
+   "x": 2,
+   "y": 878,
+   "w": 115,
+   "h": 80
+  },
+  "art/dungeon/monsters_v2/slime_small_idle_4_far.png": {
+   "x": 230,
+   "y": 1818,
+   "w": 34,
+   "h": 23
+  },
+  "art/dungeon/monsters_v2/slime_small_idle_4_mid.png": {
+   "x": 98,
+   "y": 1629,
+   "w": 44,
+   "h": 31
+  },
+  "art/dungeon/monsters_v2/slime_small_idle_4_near.png": {
+   "x": 69,
+   "y": 1419,
+   "w": 63,
+   "h": 44
+  },
+  "art/dungeon/monsters_v2/slime_small_mid.png": {
+   "x": 146,
+   "y": 1629,
+   "w": 44,
+   "h": 31
+  },
+  "art/dungeon/monsters_v2/slime_small_near.png": {
+   "x": 136,
+   "y": 1419,
+   "w": 63,
+   "h": 44
+  },
+  "art/dungeon/monsters_v2/slime_split_1_close.png": {
+   "x": 150,
+   "y": 418,
+   "w": 232,
+   "h": 100
+  },
+  "art/dungeon/monsters_v2/slime_split_1_far.png": {
+   "x": 331,
+   "y": 1664,
+   "w": 70,
+   "h": 29
+  },
+  "art/dungeon/monsters_v2/slime_split_1_mid.png": {
+   "x": 2,
+   "y": 1509,
+   "w": 90,
+   "h": 38
+  },
+  "art/dungeon/monsters_v2/slime_split_1_near.png": {
+   "x": 85,
+   "y": 1214,
+   "w": 128,
+   "h": 55
+  },
+  "art/dungeon/monsters_v2/slime_split_2_close.png": {
+   "x": 2,
+   "y": 522,
+   "w": 232,
+   "h": 100
+  },
+  "art/dungeon/monsters_v2/slime_split_2_far.png": {
+   "x": 405,
+   "y": 1664,
+   "w": 70,
+   "h": 29
+  },
+  "art/dungeon/monsters_v2/slime_split_2_mid.png": {
+   "x": 96,
+   "y": 1509,
+   "w": 90,
+   "h": 38
+  },
+  "art/dungeon/monsters_v2/slime_split_2_near.png": {
+   "x": 217,
+   "y": 1214,
+   "w": 128,
+   "h": 55
+  },
+  "art/dungeon/monsters_v2/slime_split_3_close.png": {
+   "x": 238,
+   "y": 522,
+   "w": 232,
+   "h": 100
+  },
+  "art/dungeon/monsters_v2/slime_split_3_far.png": {
+   "x": 2,
+   "y": 1697,
+   "w": 70,
+   "h": 29
+  },
+  "art/dungeon/monsters_v2/slime_split_3_mid.png": {
+   "x": 190,
+   "y": 1509,
+   "w": 90,
+   "h": 38
+  },
+  "art/dungeon/monsters_v2/slime_split_3_near.png": {
+   "x": 349,
+   "y": 1214,
+   "w": 128,
    "h": 55
   }
  }
