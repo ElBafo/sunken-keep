@@ -110,7 +110,7 @@ def far_hand(n):
     SIDE=np.round(FORGE*0.06).astype(int)   # 2 steps (0.10->0.08->0.06) below the front wood, not black
     x0,xf,x1=2,22,26
     best=None
-    for per,lid_v,pan_v in [(p_,l_,q_) for p_ in (2,3,4,99) for l_ in (0,1,2,3) for q_ in (0,1,2,3)]:
+    for per,lid_v,pan_v in [(p_,l_,q_) for p_ in (2,3,4,99) for l_ in (0,1,2,3) for q_ in (2,)]:   # open: brightest lid-back panel that fits the 1.05 cap (0 and 1 exceed it)
         o=np.zeros((25,30,3),int); a=np.zeros((25,30),bool)
         def px(x,y,c): o[y,x]=c; a[y,x]=True
         if n=='closed':
