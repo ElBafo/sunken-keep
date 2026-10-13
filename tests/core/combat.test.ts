@@ -71,6 +71,7 @@ describe('src/core combat rules', () => {
     expect(rules.monsters.rust_crab.behavior.habit).toBe('wind_up');
     expect(rules.monsters.rust_crab.behavior.every).toBe(3);
     expect(rules.monsters.rust_crab.behavior.specialDamage).toEqual([5, 8]);
+    expect(rules.monsters.slime.hp).toBe(70);
     expect(rules.monsters.slime.interval).toBe(2.5);
     expect(rules.monsters.rust_crab.behavior.block).toBe('halve');
     expect(rules.monsters.slime.behavior.habit).toBe('resist_blades');
@@ -174,7 +175,7 @@ describe('src/core combat rules', () => {
     const frost = slime.useHand('ilsevar', 'off', 0);
     expect(frost.some((x) => x.type === 'out_of_reach')).toBe(false);
     expect(logs(frost, 'frost_bolt').length).toBe(1);
-    expect(s.hp).toBeLessThan(40);
+    expect(s.hp).toBeLessThan(rules.monsters.slime.hp);
   });
 
   it('slime resists blades/piercing and takes full blunt; frost is half and resist', () => {
@@ -190,18 +191,19 @@ describe('src/core combat rules', () => {
     const axeE = mk();
     const slimeA = fight(axeE, 'slime');
     axeE.useHand('brannoc', 'main', 0);
-    const axeDmg = 40 - slimeA.hp;
+    const slimeHp = rules.monsters.slime.hp;
+    const axeDmg = slimeHp - slimeA.hp;
 
     const maceE = mk();
     maceE.heroes.wren.formation = 'front';
     const slimeM = fight(maceE, 'slime');
     maceE.useHand('wren', 'main', 0);
-    const maceDmg = 40 - slimeM.hp;
+    const maceDmg = slimeHp - slimeM.hp;
 
     const dagE = mk();
     const slimeD = fight(dagE, 'slime');
     dagE.useHand('mags', 'main', 0);
-    const dagDmg = 40 - slimeD.hp;
+    const dagDmg = slimeHp - slimeD.hp;
 
     expect(axeDmg).toBe(Math.floor(4 * 0.5));
     expect(maceDmg).toBe(3);
@@ -210,7 +212,7 @@ describe('src/core combat rules', () => {
     const frostE = mk();
     const slimeF = fight(frostE, 'slime');
     const frostEv = frostE.useHand('ilsevar', 'off', 0);
-    const frostDmg = 40 - slimeF.hp;
+    const frostDmg = slimeHp - slimeF.hp;
     expect(frostDmg).toBe(Math.floor(8 * 0.5));
     expect(frostEv.some((x) => x.type === 'hit_type' && x.kind === 'resist')).toBe(true);
     expect(frostEv.some((x) => x.type === 'sfx' && x.name === 'hit_resist')).toBe(true);
@@ -221,7 +223,7 @@ describe('src/core combat rules', () => {
     const wandEv = wandE.useHand('ilsevar', 'main', 0);
     expect(wandEv.some((x) => x.type === 'hit_type' && x.kind === 'resist')).toBe(true);
     expect(wandEv.some((x) => x.type === 'hit_type' && x.kind === 'weak')).toBe(false);
-    expect(40 - slimeW.hp).toBe(Math.floor(3 * 0.5));
+    expect(slimeHp - slimeW.hp).toBe(Math.floor(3 * 0.5));
   });
 
   it('crab wind-up on every 3rd attack is halved by a raised shield', () => {
@@ -613,7 +615,7 @@ describe('hit types and small combat bugs', () => {
     expect(resist.some((x) => x.type === 'hit_type' && x.kind === 'resist')).toBe(true);
     expect(resist.some((x) => x.type === 'sfx' && x.name === 'hit_resist')).toBe(true);
     expect(resist.some((x) => x.type === 'monster_anim' && x.anim === 'hurt')).toBe(false);
-    expect(slimeR.hp).toBeLessThan(40);
+    expect(slimeR.hp).toBeLessThan(rules.monsters.slime.hp);
 
     const critE = new CombatEngine(rules, {
       d20: () => 20,
@@ -687,7 +689,9 @@ describe('slime split', () => {
       pick: <T>(xs: T[]) => xs[0],
       chance: () => false
     } as unknown as Rng);
-    const m = e.spawnMonster('slime', 2, 0, 70, { split: true });
+    const m = e.spawnMonster('slime', 2, 0, undefined, { split: true });
+    expect(m.maxHp).toBe(rules.monsters.slime.hp);
+    expect(m.maxHp).toBe(70);
     e.setPartyPos(1, 0, 1);
     e.beginFight(m, 0);
     m.hp = 35;
@@ -710,7 +714,7 @@ describe('slime split', () => {
       pick: <T>(xs: T[]) => xs[0],
       chance: () => false
     } as unknown as Rng);
-    const m = e.spawnMonster('slime', 2, 0, 70, { split: true });
+    const m = e.spawnMonster('slime', 2, 0, undefined, { split: true });
     e.setPartyPos(1, 0, 1);
     e.beginFight(m, 0);
     m.hp = 35;
@@ -734,7 +738,7 @@ describe('slime split', () => {
       pick: <T>(xs: T[]) => xs[0],
       chance: () => false
     } as unknown as Rng);
-    const m = e.spawnMonster('slime', 2, 0, 70, { split: true });
+    const m = e.spawnMonster('slime', 2, 0, undefined, { split: true });
     e.setPartyPos(1, 0, 1);
     e.beginFight(m, 0);
     m.hp = 35;
@@ -760,7 +764,7 @@ describe('slime split', () => {
       pick: <T>(xs: T[]) => xs[0],
       chance: () => false
     } as unknown as Rng);
-    const m = e.spawnMonster('slime', 2, 0, 70, { split: true });
+    const m = e.spawnMonster('slime', 2, 0, undefined, { split: true });
     e.setPartyPos(1, 0, 1);
     e.beginFight(m, 0);
     m.hp = 35;
@@ -779,7 +783,7 @@ describe('slime split', () => {
       pick: <T>(xs: T[]) => xs[0],
       chance: () => false
     } as unknown as Rng);
-    const m = e.spawnMonster('slime', 2, 0, 70, { split: true });
+    const m = e.spawnMonster('slime', 2, 0, undefined, { split: true });
     e.setPartyPos(1, 0, 1);
     e.beginFight(m, 0);
     m.hp = 35;

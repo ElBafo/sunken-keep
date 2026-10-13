@@ -135,6 +135,30 @@ describe('bark picker', () => {
     expect(director.queuedCount()).toBe(0);
   });
 
+  it('never lets a combat flavour bark land between two cave-in story lines', () => {
+    const director = new BarkDirector({
+      flavour_gap_s: 0,
+      flavour_min_interval_s: 0,
+      min_gap_s: 0
+    });
+    const lines: BarkLine[] = [
+      { trigger: 'opening_cavein', speaker: 'brannoc', text: 'Closed.', tier: 'story' },
+      { trigger: 'opening_cavein_2', speaker: 'mags', text: 'Brilliant.', tier: 'story' },
+      { trigger: 'new_monster', speaker: 'mags', text: 'A rat!', tier: 'flavour' }
+    ];
+    const ctx = (nowMs: number) => ({ nowMs, party, flags: new Set<string>(), skipRateLimits: true });
+    const first = director.pick('opening_cavein', lines, ctx(0));
+    expect(first?.trigger).toBe('opening_cavein');
+    expect(director.pick('opening_cavein_2', lines, ctx(200))).toBeNull();
+    expect(director.queuedCount()).toBe(1);
+    expect(director.pick('new_monster', lines, ctx(400))).toBeNull();
+    const readyAt = barkDurationMs(first!);
+    expect(director.pick('new_monster', lines, ctx(readyAt))).toBeNull();
+    const second = director.flush(readyAt);
+    expect(second?.trigger).toBe('opening_cavein_2');
+    expect(director.queuedCount()).toBe(0);
+  });
+
   it('clears queued story barks when leaving the game screen', () => {
     const director = new BarkDirector({
       flavour_gap_s: 120,

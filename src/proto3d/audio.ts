@@ -128,6 +128,7 @@ export class AudioManager {
   private slimeBattleGain: GainNode | null = null;
   private slimelingPan = new Map<string, number>();
   private lastSlimelingSfxAt = Number.NEGATIVE_INFINITY;
+  private preStingSilence = false;
 
   constructor(quality: QualityLevel) {
     this.listener = new THREE.AudioListener();
@@ -431,6 +432,7 @@ export class AudioManager {
   }
 
   private ensureAct1Music() {
+    if (this.preStingSilence) return;
     const music = this.buffers.get('music_act1');
     if (music && !this.musicSound) {
       this.musicSound = new THREE.Audio(this.listener);
@@ -450,6 +452,7 @@ export class AudioManager {
   }
 
   private startAmbienceIfReady() {
+    if (this.preStingSilence) return;
     this.ensureAmbientSound();
     if (!this.playStarted || !this.ambientSound || this.ambientSound.isPlaying) return;
     this.ambientSound.setVolume(0);
@@ -1150,7 +1153,7 @@ export class AudioManager {
     const started = this.startBufferLoop(
       this.slimeBattleSrc,
       this.slimeBattleGain,
-      ['music_slime_battle', 'slime_battle'],
+      ['music.music_slime_battle', 'music_slime_battle', 'slime_battle'],
       0.28
     );
     this.slimeBattleSrc = started.src;
@@ -1203,6 +1206,25 @@ export class AudioManager {
 
   playCaveIn() {
     this.playUi('cave_in');
+  }
+
+  /** Fade act-1 music (and halls ambience) to silence before sting_slime_lair. */
+  fadeToPreStingSilence(ms = 1000, onSilent?: () => void) {
+    this.preStingSilence = true;
+    const fading = !!(this.musicSound?.isPlaying || this.ambientSound?.isPlaying);
+    this.fadeOut(this.musicSound, ms);
+    this.fadeOut(this.ambientSound, ms);
+    if (!onSilent) return;
+    if (!fading) onSilent();
+    else window.setTimeout(onSilent, ms);
+  }
+
+  clearPreStingSilence() {
+    this.preStingSilence = false;
+  }
+
+  playSting(name: string) {
+    this.playUi(name);
   }
 
   fadeCaveIn(ms = 300) {

@@ -565,6 +565,7 @@ class Game {
       this.playFootstep(this.player.moveToX, this.player.moveToY);
       this.maybeDunkTorch(this.player.moveToX, this.player.moveToY);
       this.fireTileBark(this.player.moveToX, this.player.moveToY);
+      this.fireTileTrigger(this.player.moveToX, this.player.moveToY);
       return;
     }
     if (result === 'secret') {
@@ -1042,7 +1043,7 @@ class Game {
       for (let x = 0; x < floor1.width; x++) {
         const tile = floor1.tiles[y][x];
         if (!tile.monster) continue;
-        const m = this.combat.spawnMonster(tile.monster, x, y, tile.monsterHp, { split: !!tile.split });
+        const m = this.combat.spawnMonster(tile.monster, x, y, undefined, { split: !!tile.split });
         this.spriteManager.bindMonster(x, y, m.id);
       }
     }
@@ -1096,6 +1097,7 @@ class Game {
         case 'sfx':
           if (e.name === 'hero_down') break;
           this.audioManager?.playCombat(e.name, e.volume ?? 1, e.x, e.y, e.id);
+          if (e.id && e.name.endsWith('_death')) this.audioManager?.clearSlimelingPan(e.id);
           break;
         case 'sfx_stop':
           this.audioManager?.stopWindup(e.id);
@@ -1120,7 +1122,6 @@ class Game {
           {
             const survivor = this.spriteManager.beginPairSlide(e.id, nowMs);
             if (survivor) this.audioManager?.setSlimelingPan(survivor, 0);
-            this.audioManager?.clearSlimelingPan(e.id);
           }
           this.syncSlimeAudio();
           break;
@@ -1737,6 +1738,9 @@ class Game {
 
   applySave(save: SavePayload) {
     this.audioManager?.fadeGameOver(300);
+    this.barkDirector.clearQueue();
+    this.bubble?.hide();
+    this.audioManager?.clearPreStingSilence();
     document.getElementById('gameover')?.classList.remove('show');
     this.hud?.clearLog();
     this.lastMessage = '';
@@ -1845,8 +1849,12 @@ class Game {
   private leaveGameScreen() {
     this.caveIn.clearLeaveScreen();
     this.barkDirector.clearQueue();
+    this.bubble?.hide();
+    this.newGameStarted = false;
+    this.enteringPlay = false;
     this.audioManager?.stopSlimeLoops();
     this.audioManager?.clearSlimelingPan();
+    this.audioManager?.clearPreStingSilence();
     this.clearOilGlugs();
     if (this.caveInBusy) {
       this.caveInBusy = false;
@@ -1862,6 +1870,8 @@ class Game {
     this.sceneBuilder?.clearRubble();
     if (this.sceneBuilder && this.renderer) {
       this.sceneBuilder.setDustBurst(this.renderer.scene, x, y, null);
+      this.vertexLighting?.registerScene(this.renderer.scene);
+      this.vertexLighting?.relight();
     }
   }
 
@@ -1869,6 +1879,7 @@ class Game {
     const { x, y } = floor1CaveIn.rubble;
     this.sceneBuilder.applyRubbleWall(this.renderer.scene, floor1, x, y);
     this.refreshOccupancy();
+    this.vertexLighting.registerScene(this.renderer.scene);
     this.vertexLighting.relight();
     this.vertexLighting.updateAllMeshes(this.renderer.scene);
   }
@@ -2117,6 +2128,19 @@ class Game {
     const key = `bark:${tile.bark}`;
     if (this.flags.has(key) || !this.storyProgress.fire(tile.bark)) return;
     if (this.speakBark(tile.bark)) this.flags.add(key);
+  }
+
+  private fireTileTrigger(x: number, y: number) {
+    const tile = this.player.tileAt(x, y);
+    if (!tile?.trigger) return;
+    const key = `trigger:${tile.trigger}`;
+    if (tile.once && this.flags.has(key)) return;
+    const fade = !!(tile.ambienceOut || tile.sting);
+    const sting = !!tile.sting;
+    if (fade || sting) {
+      if (tile.once) this.flags.add(key);
+      this.audioManager?.fadeToPreStingSilence(1000, sting ? () => this.audioManager?.playSting('sting_slime_lair') : undefined);
+    }
   }
 
   openSecretAt(x: number, y: number): boolean {

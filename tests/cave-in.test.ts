@@ -35,6 +35,10 @@ describe('floor 1 cave-in', () => {
       bark: 'opening_cavein'
     });
     expect(floor1.tiles[14][3].trigger).toBe('cave_in');
+    expect(floor1.tiles[3][19].trigger).toBe('slime_trail_helmet');
+    expect(floor1.tiles[3][19].ambienceOut).toBe(true);
+    expect(floor1.tiles[5][19].trigger).toBe('slime_lair_door');
+    expect(floor1.tiles[5][19].sting).toBe(true);
   });
 
   it('crashes at 1.2s then eases the turn out over 0.45s', () => {
@@ -93,6 +97,14 @@ describe('floor 1 cave-in', () => {
     expect(src).toContain('flushBarks');
     expect(src).toContain('barkDirector.flush');
     expect(src).toContain('barkDirector.clearQueue');
+    expect(src).toContain('newGameStarted = false');
+    expect(src).toMatch(/leaveGameScreen\(\)[\s\S]*bubble\?\.hide\(\)/);
+    expect(src).toMatch(/applySave\([\s\S]*bubble\?\.hide\(\)/);
+    expect(src).toContain('fireTileTrigger');
+    expect(src).toContain('fadeToPreStingSilence');
+    expect(src).toContain("playSting('sting_slime_lair')");
+    expect(src).toContain('registerScene(this.renderer.scene)');
+    expect(src).toContain('spawnMonster(tile.monster, x, y, undefined');
     expect(src).toMatch(/!this\.player\.isMoving[\s\S]*playCaveIn\(\)/);
     expect(src).toMatch(/caveInCrashed\(elapsed\)[\s\S]*applyRubble\(\)[\s\S]*dustBurstFrame\(0\)/);
   });

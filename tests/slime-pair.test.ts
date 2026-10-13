@@ -42,5 +42,10 @@ describe('slimeling pair layout and voices', () => {
     const main = readFileSync(resolve(__dirname, '../src/proto3d/main.ts'), 'utf8');
     expect(main).toContain('SLIME_SMALL_PAN');
     expect(main).toContain('beginPairSlide');
+    const deadCase = main.slice(main.indexOf("case 'monster_dead'"), main.indexOf("case 'slime_split'"));
+    expect(deadCase).toContain('beginPairSlide');
+    expect(deadCase).not.toContain('clearSlimelingPan(e.id)');
+    expect(main).toContain("e.name.endsWith('_death')");
+    expect(main).toContain('clearSlimelingPan(e.id)');
   });
 });

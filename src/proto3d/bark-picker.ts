@@ -116,6 +116,7 @@ export class BarkDirector {
   private lastBarkEndMs = Number.NEGATIVE_INFINITY;
   private lastAnyBarkMs = Number.NEGATIVE_INFINITY;
   private lastFlavourMs = Number.NEGATIVE_INFINITY;
+  private lastWasStory = false;
   private usedFlavour = new Set<string>();
   private playedOnce = new Set<string>();
   private storyQueue: BarkLine[] = [];
@@ -134,6 +135,7 @@ export class BarkDirector {
     this.lastBarkEndMs = Number.NEGATIVE_INFINITY;
     this.lastAnyBarkMs = Number.NEGATIVE_INFINITY;
     this.lastFlavourMs = Number.NEGATIVE_INFINITY;
+    this.lastWasStory = false;
     this.usedFlavour.clear();
     this.playedOnce.clear();
     this.clearQueue();
@@ -173,6 +175,9 @@ export class BarkDirector {
     const minGapMs = this.rules.min_gap_s * 1000;
     const inGap = now < this.lastBarkEndMs + minGapMs;
     const speaking = now < this.lastBarkEndMs;
+    const storyHeld = this.storyQueue.length > 0 || (this.lastWasStory && speaking);
+
+    if (tier === 'flavour' && storyHeld) return null;
 
     if (!ctx.skipRateLimits && tier === 'flavour') {
       if (inGap) return null;
@@ -196,7 +201,7 @@ export class BarkDirector {
     const pickFrom = notLast.length ? notLast : candidates;
     const chosen = pickRandom(pickFrom, this.rng);
 
-    if (!ctx.skipRateLimits && tier !== 'flavour' && speaking) {
+    if (tier !== 'flavour' && (speaking || this.storyQueue.length > 0)) {
       this.enqueueStory(chosen);
       return null;
     }
@@ -218,6 +223,7 @@ export class BarkDirector {
     this.lastLineId = id;
     this.lastAnyBarkMs = now;
     this.lastBarkEndMs = now + barkDurationMs(chosen);
+    this.lastWasStory = tier !== 'flavour';
     if (tier === 'flavour') {
       this.lastFlavourMs = now;
       this.usedFlavour.add(id);

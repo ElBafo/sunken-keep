@@ -11,7 +11,7 @@ import { loadSlot, parseSave, SAVE_VERSION, writeSlot } from '../src/proto3d/sav
 
 function readMonsters(rel: string) {
   return JSON.parse(readFileSync(resolve(__dirname, rel), 'utf8')) as {
-    slime: { behavior: { frostMul?: number; detail?: string; counter?: string } };
+    slime: { hp?: number; behavior: { frostMul?: number; detail?: string; counter?: string } };
     slime_small: {
       damage: [number, number];
       interval: number;
@@ -53,6 +53,16 @@ describe('slime frost data and bark flag', () => {
     expect(m.slime_small.behavior.detail).toBe(m.slime.behavior.detail);
     expect(m.slime_small.damage).toEqual([2, 5]);
     expect(m.slime_small.interval).toBe(2.5);
+    expect(m.slime.hp).toBe(70);
+  });
+
+  it('lists slime_small under distanceFrames.monsters so v2 frames load', () => {
+    const anchors = JSON.parse(
+      readFileSync(resolve(__dirname, '../public/art/dungeon/monster_anchor.json'), 'utf8')
+    ) as {
+      distanceFrames: { monsters: Record<string, { close?: { px?: number[] } }> };
+    };
+    expect(anchors.distanceFrames.monsters.slime_small.close?.px).toEqual([82, 57]);
   });
 
   it('looks up each kind’s own <idle frame>_frost name, without scaling the big slime', () => {

@@ -2513,6 +2513,66 @@
      "feetShifted": {},
      "rimLight": true
     }
+   },
+   "slime_small": {
+    "worldHeight": 0.312,
+    "worldHeightSource": "levels/monsters.json",
+    "close": {
+     "squares": 1,
+     "px": [
+      82,
+      57
+     ],
+     "exactPx": 56.52,
+     "quadWorld": [
+      0.8965,
+      0.624
+     ],
+     "feetShifted": {},
+     "rimLight": false
+    },
+    "near": {
+     "squares": 2,
+     "px": [
+      45,
+      31
+     ],
+     "exactPx": 31.4,
+     "quadWorld": [
+      0.896,
+      0.624
+     ],
+     "feetShifted": {},
+     "rimLight": false
+    },
+    "mid": {
+     "squares": 3,
+     "px": [
+      32,
+      22
+     ],
+     "exactPx": 21.74,
+     "quadWorld": [
+      0.9245,
+      0.624
+     ],
+     "feetShifted": {},
+     "rimLight": false
+    },
+    "far": {
+     "squares": 4,
+     "px": [
+      25,
+      17
+     ],
+     "exactPx": 16.62,
+     "quadWorld": [
+      0.9211,
+      0.624
+     ],
+     "feetShifted": {},
+     "rimLight": false
+    }
    }
   },
   "files": {
