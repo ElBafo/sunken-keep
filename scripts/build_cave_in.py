@@ -20,7 +20,7 @@ def build(dist,seed,fk=1.0,save=True):
     H,W=src.shape[:2]; s=W/160; r=random.Random(seed)
     P=np.unique(src.reshape(-1,3),axis=0); Pl=P.sum(1)
     order=np.argsort(Pl); dark=P[order[0]]; dark2=P[order[min(3,len(P)-1)]]
-    RAMP=P[order]; RIDX={tuple(c):i for i,c in enumerate(RAMP)}
+    WALLMEAN=src.mean(); RAMP=P[order]; RIDX={tuple(c):i for i,c in enumerate(RAMP)}
     STEP=max(1,len(RAMP)//8)   # one ramp step = 1/8 of the wall's luminance ramp
     def bump(c,n): return RAMP[min(len(RAMP)-1,RIDX[tuple(c)]+n*STEP)]
     def quant(img):  # snap to nearest wall colour
@@ -56,7 +56,7 @@ def build(dist,seed,fk=1.0,save=True):
     def place(b,m,x,y,k=1.0,outline=True):
         h,w=m.shape; b=shade(b,k) if k!=1 else b
         if outline:  # dark crack ring under the chunk, offset down-right (shadow)
-            for dx,dy in ((1,1),(1,0),(0,1)):
+            for dx,dy in ((1,1),):
                 ys,xs=np.nonzero(m); ys=ys+y+dy; xs=xs+x+dx
                 ok=(ys>=0)&(ys<H)&(xs>=0)&(xs<W); out[ys[ok],xs[ok]]=dark
         ys,xs=np.nonzero(m); c=b[ys,xs]; ys=ys+y; xs=xs+x
@@ -67,14 +67,14 @@ def build(dist,seed,fk=1.0,save=True):
     knot=[cut(b) for b in BLOCKS['panel'][:1]+BLOCKS['pillar'][1:2]]
     small=[cut(b) for k in ('brick','stud','base','cap') for b in BLOCKS[k]]
     plainall=plainbig+small
-    def top(x): return H*(0.22+1.25*abs(x/W-0.5)**1.3)   # pile surface: high centre, spreads wide at the base
+    def top(x): return H*(0.04+0.8*abs(x/W-0.5))   # pile surface: high centre, spreads wide at the base
     # 1) back mass: dim chunks packed edge to edge over the whole square (stone deeper in the corridor)
     y=-2
     while y<H:
         x=-r.randint(0,8); rowh=0
         while x<W:
             b,m=chunk(r.choice(plainall),.5); h,w=m.shape
-            if y+h>top(x+w/2)-3*s: place(b,m,x,y+r.randint(-1,1),r.uniform(.65,.75))
+            if y+h>top(x+w/2)-3*s: place(b,m,x,y+r.randint(-1,1),r.uniform(.83,.87))
             x+=w-r.randint(0,2); rowh=max(rowh,h)
         y+=max(3,int(rowh*.7))
     # 2) front pile, stacked with a skyline: each chunk drops until it rests on what is below it.
@@ -85,6 +85,7 @@ def build(dist,seed,fk=1.0,save=True):
         low={c:np.nonzero(m[:,c])[0].max() for c in cols}; hi_={c:np.nonzero(m[:,c])[0].min() for c in cols}
         y=min(surf[x+c]-low[c]-1 for c in cols)+int(s)   # sink 1px: chunks bite into each other
         if y+min(hi_.values())<min(top(x+c) for c in cols)-2*s: return False   # above pile outline
+        if b[m].mean()<WALLMEAN: b=np.array([[bump(c,1) for c in row] for row in b])  # whole-block +1 step for dark blocks
         place(b,m,x,y,1.0)   # original shading kept inside the block
         # light catches the top face and the edge facing down the slope: +1/+2 ramp steps
         t=max(2,int(round(s*3))); right=(x+w/2)>W/2
@@ -166,17 +167,17 @@ def frame(f):
                         acc[yi,xi]=min(1,acc[yi,xi]+a*.5)
                         if w['hi'] and abs(j)<1 and fade>.5: hi[yi,xi]=True
     if f==5: acc*=.45   # last frame: faint leftover wisps, no bright streak pop after the soft cloud
-    if f in (2,3,4):   # merge into 2-3 large soft drifting shapes
+    if f in (0,1,2,3,4):   # soft shapes: small dense burst (1-2) -> merged cloud (3-5) into 2-3 large soft drifting shapes
         rs=np.random.default_rng(7)
         cl=np.zeros((140,160)); yy,xx=np.mgrid[0:140,0:160]
-        for (cx,cy,rx,ry,wt) in ((40,92,46,20,1.0),(118,88,44,22,.9),(80,112,52,16,.7))[:3 if f<4 else 2]:
-            cx+=(-1 if cx<80 else 1)*(f-2)*8; cy+=(f-2)*6; rx*=1+.15*(f-2)
+        for (cx,cy,rx,ry,wt) in ((40,92,46,20,1.0),(118,88,44,22,.9),(80,112,52,16,.7))[:3 if f<4 else 3]:
+            cx+=(-1 if cx<80 else 1)*(f-2)*8; cy+=(f-2)*6; g=[.45,.7,1,1.15,1.3][f]; rx*=g; ry*=g
             # warped, ragged edge: radius modulated by low-freq noise per angle and row
             ang=np.arctan2((yy-cy)/ry,(xx-cx)/rx); rad=np.hypot((xx-cx)/rx,(yy-cy)/ry)
             warp=1+.25*np.sin(3*ang+cx)+.18*np.sin(5*ang+cy)+.12*np.sin(yy*.35+cx)
             cl=np.maximum(cl,wt*np.clip(1-rad/warp,0,1)**.8)
         n=rs.random((140,160)); n=(n+np.roll(n,1,1)+np.roll(n,-1,1)+np.roll(n,2,1))/4   # horizontal smear grain
-        k=[0,0,.42,.38,.24][f]
+        k=[.53,.53,.42,.40,.40][f]
         acc=np.maximum(acc*.35,cl*k*(.75+.5*n)); hi[:]=False
         hi|=(cl>.75)&(n>.55)
     a=(np.clip(acc,0,221/255)*255/17).astype(int)*17
