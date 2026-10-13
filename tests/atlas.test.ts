@@ -58,6 +58,8 @@ describe('floor 1 sprite atlases', () => {
     expect(lookupFrame('proto3d/fx/dark/glint_1.png')?.sheet).toBe('fx');
     expect(lookupFrame('proto3d/fx/dark/stairs_glow.png')?.sheet).toBe('fx');
     expect(lookupFrame('art/intro/shot1_keep.png')).toBeNull();
+    expect(lookupFrame('art/intro/title.png')).toBeNull();
+    expect(lookupFrame('art/intro/title_el.png')).toBeNull();
     const darkFrames = Object.keys(readMap('fx').frames).filter((p) => p.startsWith('proto3d/fx/dark/'));
     expect(darkFrames).toHaveLength(37);
   });
@@ -84,7 +86,9 @@ describe('floor 1 sprite atlases', () => {
         '/sunken-keep/art/portraits/wren_healthy.png',
         '/sunken-keep/art/atlas/ui.png',
         '/sunken-keep/art/font/font_5x7.png',
-        '/sunken-keep/proto3d/atmo/water_edge.png'
+        '/sunken-keep/proto3d/atmo/water_edge.png',
+        '/sunken-keep/art/intro/title.png',
+        '/sunken-keep/art/intro/title_el.png'
       ])
     ).toEqual(['art/portraits/wren_healthy.png']);
     expect(atlasFallbackPaths()).toEqual([]);

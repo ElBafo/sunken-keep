@@ -17,6 +17,8 @@ describe('wall vs floor props', () => {
   const lamp = floor1.tiles[9][13];
   const desk = floor1.tiles[9][12];
   const beam = floor1.tiles[2][12];
+  const rack = floor1.tiles[10][9];
+  const mirrored = floor1.tiles[3][10];
 
   it('marks the capped lamp as a non-blocking wall prop on E', () => {
     expect(lamp.prop).toBe('lamp_capped');
@@ -25,10 +27,14 @@ describe('wall vs floor props', () => {
     expect(lamp.propWall).toBe('E');
   });
 
-  it('keeps desk and guard-hall beams as blocking floor props', () => {
+  it('keeps desk, jar rack, and guard-hall beams as blocking floor props', () => {
     expect(isBlockingProp(desk)).toBe(true);
     expect(isWallProp(desk)).toBe(false);
     expect(isBlockingProp(beam)).toBe(true);
+    expect(rack.prop).toBe('jar_rack');
+    expect(isBlockingProp(rack)).toBe(true);
+    expect(mirrored.prop).toBe('beams_fallen');
+    expect(mirrored.mirror).toBe(true);
   });
 
   it('lets the party walk onto the lamp square but not the beams', () => {
@@ -38,6 +44,7 @@ describe('wall vs floor props', () => {
     expect(player.blockReason(10, 3)).toBe('wall');
     expect(player.blockReason(12, 4)).toBe('wall');
     expect(player.blockReason(12, 9)).toBe('wall');
+    expect(player.blockReason(9, 10)).toBe('wall');
   });
 
   it('interacts from the adjacent square facing it and from its own square facing E only', () => {

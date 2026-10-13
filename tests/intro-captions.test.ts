@@ -7,7 +7,8 @@ import {
   captionTextAt,
   IntroPlayer,
   introShotIndex,
-  INTRO_DURATION_SEC
+  INTRO_DURATION_SEC,
+  INTRO_IMAGE_FILES
 } from '../src/proto3d/intro';
 import type { StoryText } from '../src/proto3d/i18n';
 
@@ -69,6 +70,30 @@ describe('wrapCaption', () => {
   it('keeps short English captions on one line', () => {
     const lines = wrapCaption('Its forges went cold.');
     expect(lines).toEqual(['Its forges went cold.']);
+  });
+});
+
+describe('intro title locale', () => {
+  it('copies the Greek logo into intro art', () => {
+    expect(existsSync(resolve(__dirname, '../public/art/intro/title_el.png'))).toBe(true);
+  });
+
+  it('loads only title.png for English and only title_el.png for Greek', () => {
+    const en = INTRO_IMAGE_FILES('en');
+    const el = INTRO_IMAGE_FILES('el');
+    expect(en).toContain('title.png');
+    expect(en).not.toContain('title_el.png');
+    expect(el).toContain('title_el.png');
+    expect(el).not.toContain('title.png');
+  });
+
+  it('renderTitle uses title_el.png for el and falls back to title.png', () => {
+    const src = readFileSync(resolve(__dirname, '../src/proto3d/intro.ts'), 'utf8');
+    const start = src.indexOf('private renderTitle');
+    const end = src.indexOf('private renderCaption');
+    const fn = src.slice(start, end);
+    expect(fn).toContain("this.story.locale === 'el' ? 'title_el.png' : 'title.png'");
+    expect(fn).toContain("this.images.get(preferred) ?? this.images.get('title.png')");
   });
 });
 

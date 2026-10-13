@@ -72,9 +72,10 @@ export class PropBuilder {
       for (let x = 0; x < width; x++) {
         const tile = tiles[y][x];
         if (tile.prop === 'beams_fallen') this.addBeams(x, y, !!tile.mirror);
-        else if (tile.prop === 'desk') this.addDesk(x, y);
-        else if (tile.prop === 'jar_rack') this.addRack(x, y);
+        else if (tile.prop === 'desk' || tile.prop === 'table') this.addDesk(x, y);
+        else if (tile.prop === 'jar_rack' || tile.prop === 'weapon_rack') this.addRack(x, y);
         else if (tile.prop === 'lamp_capped') this.addLamp(x, y, tile, isWallFace(tile.propWall) ? tile.propWall : 'E');
+        else if (tile.prop) this.addGeneric(x, y, String(tile.prop));
       }
     }
   }
@@ -227,8 +228,25 @@ export class PropBuilder {
     this.tag(face, x, y, 'rack');
   }
 
+  private addGeneric(x: number, y: number, kind: string) {
+    const wx = x * CELL_SIZE;
+    const wz = y * CELL_SIZE;
+    const h = kind === 'bunk' ? 0.28 : kind === 'altar' || kind === 'offering_bowl' ? 0.42 : 0.7;
+    const w = kind === 'bunk' ? 1.15 : 0.55;
+    const d = kind === 'bunk' ? 0.55 : 0.55;
+    const mesh = this.box(w, h, d, this.woodPlain, x, y, kind);
+    mesh.position.set(wx, h / 2, wz);
+  }
+
   private addLamp(x: number, y: number, _tile: Tile, face: PropWall) {
-    if (!this.lampTex) return;
+    if (!this.lampTex) {
+      const stub = this.box(LAMP_W, LAMP_H, 0.08, this.woodPlain, x, y, 'lamp_capped');
+      stub.position.set(x * CELL_SIZE - 0.55, LAMP_H / 2, y * CELL_SIZE + 0.15);
+      stub.userData.gridX = x;
+      stub.userData.gridY = y;
+      stub.userData.propWall = face;
+      return;
+    }
     const mat = new THREE.SpriteMaterial({
       map: this.lampTex,
       color: 0xffffff,

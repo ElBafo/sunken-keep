@@ -47,7 +47,7 @@ export const floor1: FloorData = {
     [
       { wall: true }, { shallowWater: true }, { deepWater: true }, { shallowWater: true }, { wall: true },
       { ...m('rust_crab', 24), item: 'potion_red' }, { item: 'potion_red' }, {}, { wall: true }, {},
-      { prop: 'beams_fallen', propPlacement: 'floor' }, {}, {}, {}, { wall: true }
+      { prop: 'beams_fallen', mirror: true, propPlacement: 'floor' }, {}, {}, {}, { wall: true }
     ],
     [
       { wall: true }, { shallowWater: true }, { shallowWater: true }, { shallowWater: true }, { wall: true },
@@ -84,7 +84,7 @@ export const floor1: FloorData = {
     ],
     [
       { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true },
-      { wall: true }, { wall: true }, { wall: true }, { wall: true }, {},
+      { wall: true }, { wall: true }, { wall: true }, { wall: true }, { prop: 'jar_rack' },
       {}, {}, {}, {}, { wall: true }
     ],
     [
