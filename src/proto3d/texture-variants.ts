@@ -47,7 +47,8 @@ export function variantFilenames(surface: VariantSurface, files: readonly string
       const m = f.match(new RegExp(`^${surface}_(\\d+)\\.png$`));
       return m ? { file: f, n: Number(m[1]) } : null;
     })
-    .filter((x): x is { file: string; n: number } => x !== null && x.n >= 2)
+    // `_64` / `_32` are mip levels (see wall_mips.json), not variants
+    .filter((x): x is { file: string; n: number } => x !== null && x.n >= 2 && x.n !== 32 && x.n !== 64)
     .sort((a, b) => a.n - b.n)
     .map((x) => x.file);
   return files.includes(base) ? [base, ...extras] : extras;
