@@ -22,6 +22,7 @@ import {
   floor1StreamStems,
   titleMenuStems
 } from './audio-groups';
+import { HERO_IDS } from '../core/types';
 import { loadAudioCached } from './asset-cache';
 import { mapPool, SPRITE_LOAD_CONCURRENCY } from './load-pool';
 import { FloorData, Sconce } from './types';
@@ -952,12 +953,15 @@ export class AudioManager {
     return pick;
   }
 
-  /** Wordless bark sting. Prefer vox_<hero>_talk when that buffer exists. */
-  playBarkVoice(hero: string) {
-    const talk = `vox_${hero}_talk`;
-    if (this.buffers.has(talk)) {
+  /**
+   * Once per bark / dialogue bubble. Party heroes use vox_<hero>_talk;
+   * everyone else gets the quiet generic bark.
+   */
+  playBarkVoice(speaker: string, volume = 0.8) {
+    if ((HERO_IDS as readonly string[]).includes(speaker)) {
+      const talk = `vox_${speaker}_talk`;
       this.lastHeroVoice = talk;
-      this.playUi(talk, 0.7);
+      this.playUi(talk, volume);
       return;
     }
     this.lastHeroVoice = 'bark';

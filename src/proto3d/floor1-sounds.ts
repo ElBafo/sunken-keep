@@ -61,12 +61,16 @@ export const FIRST_FIGHT_STEMS = [
   'sfx_act_wand',
   'vox_brannoc_hurt_1',
   'vox_brannoc_hurt_2',
+  'vox_brannoc_talk',
   'vox_ilsevar_hurt_1',
   'vox_ilsevar_hurt_2',
+  'vox_ilsevar_talk',
   'vox_mags_hurt_1',
   'vox_mags_hurt_2',
+  'vox_mags_talk',
   'vox_wren_hurt_1',
-  'vox_wren_hurt_2'
+  'vox_wren_hurt_2',
+  'vox_wren_talk'
 ] as const;
 
 /** @deprecated Use BEFORE_PLAY_STEMS / FIRST_FIGHT_STEMS. Kept for older tests. */

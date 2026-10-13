@@ -1829,7 +1829,7 @@ class Game {
     });
     if (!picked) return false;
     const speaker = asHeroId(picked.speaker);
-    const name = this.story.speakerName(speaker);
+    const name = this.story.speakerName(picked.speaker);
     this.lastMessage = `${name}: ${picked.text}`;
     this.hud?.pushLog(`${name}: ${picked.text}`);
     void this.bubble?.load().then(() => this.bubble?.show(picked.text, speaker, name));
@@ -1839,7 +1839,7 @@ class Game {
       listener: picked.listener,
       listenerFace: picked.listenerFace
     };
-    this.audioManager.playBarkVoice(speaker);
+    this.audioManager.playBarkVoice(picked.speaker);
     return true;
   }
 

@@ -24,6 +24,7 @@ describe('audio load groups', () => {
     expect(audioStemKeys('music_menu_loop')).toContain('menu');
     expect(audioStemKeys('music_act1_loop')).toContain('music_act1');
     expect(audioStemKeys('sfx_bark')).toContain('bark');
+    expect(audioStemKeys('vox_brannoc_talk')).toContain('vox_brannoc_talk');
   });
 
   it('keeps intro music out of the title-blocking menu stems', () => {
@@ -59,6 +60,12 @@ describe('audio load groups', () => {
     expect(stream.has('amb_flooded_halls_loop')).toBe(true);
     expect(beforePlayRelPaths()).not.toContain('audio/amb_flooded_halls_loop.mp3');
     expect(later.has('amb_flood_rush_1_loop')).toBe(true);
+    for (const hero of ['brannoc', 'wren', 'ilsevar', 'mags']) {
+      const stem = `vox_${hero}_talk`;
+      expect(firstFightStems()).toContain(stem);
+      expect(audioGroupStems('floor1')).toContain(stem);
+      expect(later.has(stem)).toBe(false);
+    }
   });
 
   it('ships every grouped mp3', () => {
