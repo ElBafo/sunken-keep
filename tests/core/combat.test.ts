@@ -290,7 +290,7 @@ describe('src/core combat rules', () => {
     expect(ev.some((x) => x.type === 'monster_dead')).toBe(true);
     expect(logs(ev, 'xp_gain').length).toBe(1);
     for (const id of ['brannoc', 'wren', 'ilsevar', 'mags'] as HeroId[]) {
-      expect(forced.heroes[id].xp).toBe(40);
+      expect(forced.heroes[id].xp).toBe(rules.monsters.slime.hp);
     }
     const ev2 = forced.debugAddXp(60);
     expect(ev2.some((x) => x.type === 'level_up')).toBe(true);
@@ -803,7 +803,7 @@ describe('floor 1 scripted playthrough', () => {
     expect(result.wipe).toBe(false);
     expect(result.kills.length).toBe(5);
     expect(result.hpLost).toBeGreaterThan(8);
-    expect(result.hpLost).toBeLessThan(50);
+    expect(result.hpLost).toBeLessThan(70);
   });
 
   it('keeps 500 seeds under 45 p90 HP loss with at most one wipe', () => {
@@ -822,9 +822,9 @@ describe('floor 1 scripted playthrough', () => {
         wipes: wipes.length
       })
     );
-    // Big slime now hits 4-8, and frost resists (half), so the scripted
-    // front-row playthrough (axe/dagger/wand, no Wren mace swap) costs more.
+    // 70 HP slime + 4-8 hits, frost half. Scripted front-row (axe/dagger/wand,
+    // no Wren mace) fights to the split then the last rat.
     expect(wipes.length, `wipes at seeds ${wipes.map((r) => r.seed).join(',')}`).toBeLessThanOrEqual(5);
-    expect(p90).toBeLessThanOrEqual(60);
+    expect(p90).toBeLessThanOrEqual(80);
   });
 });
