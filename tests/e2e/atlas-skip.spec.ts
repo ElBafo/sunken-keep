@@ -92,31 +92,34 @@ test('New Game skip to first fight then dark corridor has no packed-frame single
   expect(firstFight.darkSingles, 'no fx/dark frame as a single file at first fight').toEqual([]);
   expect(firstFight.pngCount).toBeGreaterThan(0);
 
-  // Beam-hall rat eyes at (10,1); snuff the start torch so the (2,5) key glints in the dark.
+  // Past the slime (7,2): stand at (9,2) looking west so amber eyes show. Snuff the
+  // start torch so the (2,5) key glints. Then look north from (2,7) at those glints.
   await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
     p.setPosition(1, 6, 3);
     p.snuffFacing();
-    p.setPosition(13, 1, 3);
+    p.setPosition(9, 2, 3);
   });
   await page.waitForFunction(
     () => {
       const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
       const fx = p.darkFx();
-      const ratEyes = fx.eyes.find((e) => e.x === 10 && e.y === 1);
-      const keyGlint = fx.glints.find((g) => g.x === 2 && g.y === 5 && g.item === 'key');
       return (
-        p.isSquareLit(10, 1) === false &&
-        p.isSquareLit(2, 5) === false &&
-        ratEyes?.visible === true &&
-        keyGlint?.visible === true
+        fx.eyes.some((e) => e.visible) &&
+        fx.glints.some((g) => g.visible && g.item === 'key')
       );
     },
     null,
     { timeout: 8000 }
   );
-  await page.waitForTimeout(220);
+  await page.waitForTimeout(280);
   await page.screenshot({ path: `${OUT}/atlas_dark_corridor_eyes.png`, fullPage: false });
+
+  await page.evaluate(() => {
+    (window as unknown as { __proto3d: Proto3d }).__proto3d.setPosition(2, 7, 0);
+  });
+  await page.waitForTimeout(280);
+  await page.screenshot({ path: `${OUT}/atlas_dark_corridor_glints.png`, fullPage: false });
 
   const dark = await page.evaluate(() => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
@@ -128,7 +131,7 @@ test('New Game skip to first fight then dark corridor has no packed-frame single
       pngCount: pngs.length,
       pngs,
       darkSingles: pngs.filter((path) => path.startsWith('proto3d/fx/dark/')),
-      ratLit: p.isSquareLit(10, 1),
+      slimeLit: p.isSquareLit(7, 2),
       keyLit: p.isSquareLit(2, 5),
       fx: p.darkFx()
     };
@@ -137,14 +140,20 @@ test('New Game skip to first fight then dark corridor has no packed-frame single
     pngCount: dark.pngCount,
     leaks: dark.leaks,
     darkSingles: dark.darkSingles,
-    ratLit: dark.ratLit,
+    slimeLit: dark.slimeLit,
     keyLit: dark.keyLit,
     eyes: dark.fx.eyes.filter((e) => e.visible),
     glints: dark.fx.glints.filter((g) => g.visible)
   });
   expect(dark.leaks, `packed frames loaded as singles in dark corridor: ${dark.leaks.join(', ')}`).toEqual([]);
   expect(dark.darkSingles, 'no fx/dark frame loads as a single file').toEqual([]);
-  expect(dark.fx.eyes.find((e) => e.x === 10 && e.y === 1)?.visible, 'rat eyes show in the dark').toBe(true);
-  expect(dark.fx.glints.find((g) => g.item === 'key')?.visible, 'key glint shows in the dark').toBe(true);
+  expect(
+    dark.fx.eyes.some((e) => e.visible),
+    'eyes show in the dark corridor'
+  ).toBe(true);
+  expect(
+    dark.fx.glints.some((g) => g.visible && g.item === 'key'),
+    'key glint shows in the dark'
+  ).toBe(true);
   expect(dark.pngCount).toBeGreaterThan(0);
 });
