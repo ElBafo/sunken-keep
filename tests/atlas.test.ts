@@ -54,8 +54,12 @@ describe('floor 1 sprite atlases', () => {
     expect(lookupFrame('proto3d/atmo/water_edge.png')).toBeNull();
     expect(lookupFrame('proto3d/atmo/water_line.png')).toBeNull();
     expect(lookupFrame('proto3d/tex3d/wall_plain.png')).toBeNull();
-    expect(lookupFrame('proto3d/fx/dark/eyes_green_1.png')).toBeNull();
+    expect(lookupFrame('proto3d/fx/dark/eyes_green_1.png')?.sheet).toBe('fx');
+    expect(lookupFrame('proto3d/fx/dark/glint_1.png')?.sheet).toBe('fx');
+    expect(lookupFrame('proto3d/fx/dark/stairs_glow.png')?.sheet).toBe('fx');
     expect(lookupFrame('art/intro/shot1_keep.png')).toBeNull();
+    const darkFrames = Object.keys(readMap('fx').frames).filter((p) => p.startsWith('proto3d/fx/dark/'));
+    expect(darkFrames).toHaveLength(37);
   });
 
   it('scales dust’s 2×2 cells onto its fx-sheet rect', () => {
@@ -104,7 +108,12 @@ describe('floor 1 sprite atlases', () => {
       'proto3d/atmo/dust.png',
       'proto3d/atmo/desk_note.png',
       'art/dungeon/monsters_v2/slime_idle_1_near.png',
-      'art/fx/hits/resist_goo_1_near.png'
+      'art/fx/hits/resist_goo_1_near.png',
+      'proto3d/fx/dark/eyes_amber_1.png',
+      'proto3d/fx/dark/eyes_green_1.png',
+      'proto3d/fx/dark/eyes_pale_1.png',
+      'proto3d/fx/dark/glint_1.png',
+      'proto3d/fx/dark/stairs_glow.png'
     ];
     for (const path of skipPacked) {
       expect(lookupFrame(path), path).toBeTruthy();

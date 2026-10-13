@@ -1,6 +1,8 @@
+import { mkdirSync } from 'fs';
 import { test, expect, devices } from '@playwright/test';
 
 const BASE_URL = 'http://127.0.0.1:4173/sunken-keep';
+const OUT = '/opt/cursor/artifacts/screenshots';
 
 type Boot = {
   skipToPlayableMs?: number | null;
@@ -10,10 +12,35 @@ type Boot = {
   pendingFirstFightSounds?: string[];
 };
 
+type Proto3d = {
+  boot: () => Boot;
+  setPosition: (x: number, y: number, dir: number) => void;
+  snuffFacing: () => void;
+  isSquareLit: (x: number, y: number) => boolean;
+  darkFx: () => {
+    eyes: Array<{ x: number; y: number; monster: string; tint: string; visible: boolean }>;
+    glints: Array<{ x: number; y: number; item: string; visible: boolean }>;
+    stairs: number;
+  };
+};
+
 test.use({ ...devices['iPhone 15'], hasTouch: true, isMobile: true });
 
-test('New Game skip to first fight has no packed-frame single-file loads', async ({ page }) => {
+function pngReport() {
+  const boot = (window as unknown as { __proto3d: Proto3d }).__proto3d.boot();
+  const pngs = boot.imagePngs ?? [];
+  return {
+    leaks: boot.atlasLeaks ?? ['missing'],
+    fallbacks: boot.atlasFallbacks ?? [],
+    pngCount: pngs.length,
+    pngs,
+    darkSingles: pngs.filter((p) => p.startsWith('proto3d/fx/dark/'))
+  };
+}
+
+test('New Game skip to first fight then dark corridor has no packed-frame single-file loads', async ({ page }) => {
   test.setTimeout(120000);
+  mkdirSync(OUT, { recursive: true });
   await page.goto(`${BASE_URL}/proto3d.html`);
   await page.waitForFunction(
     () => {
@@ -55,14 +82,69 @@ test('New Game skip to first fight has no packed-frame single-file loads', async
     null,
     { timeout: 8000 }
   );
-  const report = await page.evaluate(() => {
-    const boot = (window as unknown as { __proto3d: { boot: () => Boot } }).__proto3d.boot();
+  const firstFight = await page.evaluate(pngReport);
+  console.log('ATLAS first fight', {
+    pngCount: firstFight.pngCount,
+    leaks: firstFight.leaks,
+    darkSingles: firstFight.darkSingles
+  });
+  expect(firstFight.leaks, `packed frames loaded as singles: ${firstFight.leaks.join(', ')}`).toEqual([]);
+  expect(firstFight.darkSingles, 'no fx/dark frame as a single file at first fight').toEqual([]);
+  expect(firstFight.pngCount).toBeGreaterThan(0);
+
+  // Beam-hall rat eyes at (10,1); snuff the start torch so the (2,5) key glints in the dark.
+  await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    p.setPosition(1, 6, 3);
+    p.snuffFacing();
+    p.setPosition(13, 1, 3);
+  });
+  await page.waitForFunction(
+    () => {
+      const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+      const fx = p.darkFx();
+      const ratEyes = fx.eyes.find((e) => e.x === 10 && e.y === 1);
+      const keyGlint = fx.glints.find((g) => g.x === 2 && g.y === 5 && g.item === 'key');
+      return (
+        p.isSquareLit(10, 1) === false &&
+        p.isSquareLit(2, 5) === false &&
+        ratEyes?.visible === true &&
+        keyGlint?.visible === true
+      );
+    },
+    null,
+    { timeout: 8000 }
+  );
+  await page.waitForTimeout(220);
+  await page.screenshot({ path: `${OUT}/atlas_dark_corridor_eyes.png`, fullPage: false });
+
+  const dark = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    const boot = p.boot();
+    const pngs = boot.imagePngs ?? [];
     return {
       leaks: boot.atlasLeaks ?? ['missing'],
       fallbacks: boot.atlasFallbacks ?? [],
-      pngCount: boot.imagePngs?.length ?? -1
+      pngCount: pngs.length,
+      pngs,
+      darkSingles: pngs.filter((path) => path.startsWith('proto3d/fx/dark/')),
+      ratLit: p.isSquareLit(10, 1),
+      keyLit: p.isSquareLit(2, 5),
+      fx: p.darkFx()
     };
   });
-  expect(report.leaks, `packed frames loaded as singles: ${report.leaks.join(', ')}`).toEqual([]);
-  expect(report.pngCount).toBeGreaterThan(0);
+  console.log('ATLAS dark corridor', {
+    pngCount: dark.pngCount,
+    leaks: dark.leaks,
+    darkSingles: dark.darkSingles,
+    ratLit: dark.ratLit,
+    keyLit: dark.keyLit,
+    eyes: dark.fx.eyes.filter((e) => e.visible),
+    glints: dark.fx.glints.filter((g) => g.visible)
+  });
+  expect(dark.leaks, `packed frames loaded as singles in dark corridor: ${dark.leaks.join(', ')}`).toEqual([]);
+  expect(dark.darkSingles, 'no fx/dark frame loads as a single file').toEqual([]);
+  expect(dark.fx.eyes.find((e) => e.x === 10 && e.y === 1)?.visible, 'rat eyes show in the dark').toBe(true);
+  expect(dark.fx.glints.find((g) => g.item === 'key')?.visible, 'key glint shows in the dark').toBe(true);
+  expect(dark.pngCount).toBeGreaterThan(0);
 });

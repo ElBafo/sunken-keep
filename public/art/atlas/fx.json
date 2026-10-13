@@ -1,8 +1,8 @@
 {
  "image": "art/atlas/fx.png",
  "size": {
-  "w": 400,
-  "h": 920
+  "w": 500,
+  "h": 932
  },
  "padding": 2,
  "extrude": 1,
@@ -62,7 +62,7 @@
    "h": 128
   },
   "proto3d/atmo/drip_drop.png": {
-   "x": 206,
+   "x": 242,
    "y": 790,
    "w": 4,
    "h": 8
@@ -74,7 +74,7 @@
    "h": 128
   },
   "proto3d/atmo/dust.png": {
-   "x": 214,
+   "x": 250,
    "y": 790,
    "w": 8,
    "h": 8
@@ -128,19 +128,19 @@
    "h": 256
   },
   "proto3d/atmo/splash_1.png": {
-   "x": 226,
+   "x": 262,
    "y": 790,
    "w": 16,
    "h": 8
   },
   "proto3d/atmo/splash_2.png": {
-   "x": 246,
+   "x": 282,
    "y": 790,
    "w": 16,
    "h": 8
   },
   "proto3d/atmo/splash_3.png": {
-   "x": 266,
+   "x": 302,
    "y": 790,
    "w": 16,
    "h": 8
@@ -150,6 +150,228 @@
    "y": 790,
    "w": 128,
    "h": 128
+  },
+  "proto3d/fx/dark/eyes_amber_1.png": {
+   "x": 322,
+   "y": 790,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_amber_10.png": {
+   "x": 342,
+   "y": 790,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_amber_2.png": {
+   "x": 362,
+   "y": 790,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_amber_3.png": {
+   "x": 382,
+   "y": 790,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_amber_4.png": {
+   "x": 402,
+   "y": 790,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_amber_5.png": {
+   "x": 422,
+   "y": 790,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_amber_6.png": {
+   "x": 442,
+   "y": 790,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_amber_7.png": {
+   "x": 462,
+   "y": 790,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_amber_8.png": {
+   "x": 482,
+   "y": 790,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_amber_9.png": {
+   "x": 2,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_green_1.png": {
+   "x": 22,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_green_10.png": {
+   "x": 42,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_green_2.png": {
+   "x": 62,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_green_3.png": {
+   "x": 82,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_green_4.png": {
+   "x": 102,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_green_5.png": {
+   "x": 122,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_green_6.png": {
+   "x": 142,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_green_7.png": {
+   "x": 162,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_green_8.png": {
+   "x": 182,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_green_9.png": {
+   "x": 202,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_pale_1.png": {
+   "x": 222,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_pale_10.png": {
+   "x": 242,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_pale_2.png": {
+   "x": 262,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_pale_3.png": {
+   "x": 282,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_pale_4.png": {
+   "x": 302,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_pale_5.png": {
+   "x": 322,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_pale_6.png": {
+   "x": 342,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_pale_7.png": {
+   "x": 362,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_pale_8.png": {
+   "x": 382,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/eyes_pale_9.png": {
+   "x": 402,
+   "y": 922,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/fx/dark/glint_1.png": {
+   "x": 422,
+   "y": 922,
+   "w": 7,
+   "h": 7
+  },
+  "proto3d/fx/dark/glint_2.png": {
+   "x": 433,
+   "y": 922,
+   "w": 7,
+   "h": 7
+  },
+  "proto3d/fx/dark/glint_3.png": {
+   "x": 444,
+   "y": 922,
+   "w": 7,
+   "h": 7
+  },
+  "proto3d/fx/dark/glint_4.png": {
+   "x": 455,
+   "y": 922,
+   "w": 7,
+   "h": 7
+  },
+  "proto3d/fx/dark/glint_5.png": {
+   "x": 466,
+   "y": 922,
+   "w": 7,
+   "h": 7
+  },
+  "proto3d/fx/dark/glint_6.png": {
+   "x": 477,
+   "y": 922,
+   "w": 7,
+   "h": 7
+  },
+  "proto3d/fx/dark/stairs_glow.png": {
+   "x": 206,
+   "y": 790,
+   "w": 32,
+   "h": 16
   }
  }
 }
