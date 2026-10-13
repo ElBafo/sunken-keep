@@ -2,16 +2,25 @@ import { readFileSync, statSync } from 'fs';
 import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
 import {
+  act1MusicStem,
   audioGroupRelPaths,
   audioGroupStems,
   audioStemKeys,
   beforePlayRelPaths,
+  firstFightPriorityStems,
+  firstFightRestStems,
   firstFightStems,
   floor1StreamStems,
   titleMenuStems
 } from '../src/proto3d/audio-groups';
 import { titleBootRelPaths } from '../src/proto3d/boot-assets';
-import { BEFORE_PLAY_STEMS, FIRST_FIGHT_STEMS } from '../src/proto3d/floor1-sounds';
+import {
+  ACT1_MUSIC_STEM,
+  BEFORE_PLAY_STEMS,
+  FIRST_FIGHT_PRIORITY_STEMS,
+  FIRST_FIGHT_REST_STEMS,
+  FIRST_FIGHT_STEMS
+} from '../src/proto3d/floor1-sounds';
 import { floor1PlayableRelPaths } from '../src/proto3d/floor1-prefetch';
 
 describe('audio load groups', () => {
@@ -42,9 +51,10 @@ describe('audio load groups', () => {
     expect(playable.has('audio/sfx_bark.mp3')).toBe(true);
     expect(playable.has('audio/amb_flooded_halls_loop.mp3')).toBe(false);
     expect(playable.has('audio/sfx_keep_rat_alert.mp3')).toBe(false);
-    expect(later).toContain('audio/music_act1_loop.mp3');
+    expect(later).not.toContain('audio/music_act1_loop.mp3');
     expect(later).toContain('audio/amb_swamp_loop.mp3');
     expect(playable.has('audio/music_act1_loop.mp3')).toBe(false);
+    expect(audioGroupStems('floor1')).toContain('music_act1_loop');
   });
 
   it('keeps before-play and first-fight stems out of later, and streams flooded halls after play', () => {
@@ -58,8 +68,23 @@ describe('audio load groups', () => {
       expect(firstFightStems()).toContain(stem);
     }
     expect(stream.has('amb_flooded_halls_loop')).toBe(true);
+    expect(stream.has('music_act1_loop')).toBe(false);
+    expect(firstFightStems()).not.toContain('music_act1_loop');
+    expect(act1MusicStem()).toBe(ACT1_MUSIC_STEM);
     expect(beforePlayRelPaths()).not.toContain('audio/amb_flooded_halls_loop.mp3');
     expect(later.has('amb_flood_rush_1_loop')).toBe(true);
+    expect([...firstFightPriorityStems()]).toEqual([...FIRST_FIGHT_PRIORITY_STEMS]);
+    expect([...firstFightRestStems()]).toEqual([...FIRST_FIGHT_REST_STEMS]);
+    expect(firstFightPriorityStems()[0]).toBe('sfx_hit');
+    expect(firstFightPriorityStems()).toContain('sfx_keep_rat_attack');
+    expect(firstFightPriorityStems()).toContain('sfx_keep_rat_alert');
+    expect(firstFightPriorityStems()).toContain('sfx_act_miss');
+    expect(firstFightRestStems()).toContain('sfx_keep_rat_death');
+    expect(firstFightRestStems()).toContain('sfx_act_axe');
+    const overlap = FIRST_FIGHT_PRIORITY_STEMS.filter((s) =>
+      (FIRST_FIGHT_REST_STEMS as readonly string[]).includes(s)
+    );
+    expect(overlap).toEqual([]);
     for (const hero of ['brannoc', 'wren', 'ilsevar', 'mags']) {
       const stem = `vox_${hero}_talk`;
       expect(firstFightStems()).toContain(stem);
@@ -75,6 +100,23 @@ describe('audio load groups', () => {
         expect(statSync(resolve(root, rel)).size).toBeGreaterThan(0);
       }
     }
+  });
+
+  it('loads first-fight in two waves, then act-1 music, and gates combat on that burst', () => {
+    const audio = readFileSync(resolve(__dirname, '../src/proto3d/audio.ts'), 'utf8');
+    const main = readFileSync(resolve(__dirname, '../src/proto3d/main.ts'), 'utf8');
+    const loadFn = audio.slice(audio.indexOf('startPlayStreaming'), audio.indexOf('async loadSounds'));
+    expect(loadFn).toContain('loadFirstFight');
+    expect(loadFn).toContain('act1MusicStem');
+    expect(loadFn.indexOf('loadFirstFight')).toBeLessThan(loadFn.indexOf('act1MusicStem'));
+    expect(loadFn.indexOf('act1MusicStem')).toBeLessThan(loadFn.indexOf('floor1StreamStems'));
+    expect(audio).toContain('FIRST_FIGHT_CAP_MS');
+    expect(audio).toContain('ACT1_MUSIC_FADE_MS');
+    expect(audio).toContain('act1MusicAllowed');
+    expect(main).toContain('isCombatAwake');
+    expect(main).toMatch(/if \(this\.isCombatAwake\(\)\) this\.applyEvents\(this\.combat\.bump/);
+    expect(main).toContain('this.combat.tick(this.nowSec())');
+    expect(main).toContain('this.isCombatAwake()');
   });
 
   it('keeps the public groups file in sync with the bundled copy', () => {

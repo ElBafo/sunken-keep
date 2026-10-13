@@ -80,5 +80,8 @@ describe('wall vs floor props', () => {
     expect(src).toContain('NearestFilter');
     expect(src).toContain('vertexColors: true');
     expect(src).toContain('emissive');
+    expect(src).toContain('0xffffff');
+    expect(src).toMatch(/emissiveIntensity:\s*0\.3[0-9]/);
+    expect(src).toContain('emissiveMap: this.lampTex');
   });
 });

@@ -135,6 +135,7 @@ class Game {
   private barkDirector = new BarkDirector();
   private lastBarkFace: { speaker: string; face?: string; listener?: string; listenerFace?: string } | null = null;
   private playStartedAt = 0;
+  private combatAudioReady = false;
   private playAccMs = 0;
   private escapeRunActive = false;
   private phase: 'title' | 'intro' | 'play' = 'play';
@@ -512,6 +513,16 @@ class Game {
     }
   }
 
+  /** Monsters stay asleep until first-fight audio is in (or the 4s cap). */
+  private isCombatAwake() {
+    if (this.combatAudioReady) return true;
+    if (this.audioManager.isFirstFightUnlocked()) {
+      this.combatAudioReady = true;
+      return true;
+    }
+    return false;
+  }
+
   handleMove(result: MoveResult) {
     if (this.phase !== 'play') return;
     this.cancelSwap();
@@ -529,7 +540,7 @@ class Game {
     if (result === 'busy') return;
     if (result === 'monster') {
       const { x, y } = this.player.facingPos(1);
-      this.applyEvents(this.combat.bump(x, y, this.nowSec()));
+      if (this.isCombatAwake()) this.applyEvents(this.combat.bump(x, y, this.nowSec()));
     }
     this.audioManager.playUi('bump');
   }
@@ -2071,6 +2082,7 @@ class Game {
         floor1Prefetch: this.floor1PrefetchStarted,
         pendingBeforePlaySounds: this.audioManager.pendingBeforePlayStems(),
         pendingFirstFightSounds: this.audioManager.pendingFirstFightStems(),
+        firstFightUnlocked: this.audioManager.isFirstFightUnlocked(),
         playAgeMs: this.playStartedAt ? Math.round(performance.now() - this.playStartedAt) : null
       }),
       setPosition: (x: number, y: number, dir: number) => {
@@ -2593,6 +2605,7 @@ class Game {
       lanternLoop: () => this.audioManager.lanternLoop(),
       playLevelUp: (id: HeroId) => this.hud.playLevelUp(id),
       inCombat: () => !!this.combat?.fight,
+      combatAwake: () => this.isCombatAwake(),
       combatHeroes: () =>
         HERO_IDS.map((id) => {
           const h = this.combat.heroes[id];
@@ -2762,7 +2775,7 @@ class Game {
       this.updateDoorButton();
     }
 
-    if (this.combat && !this.combat.gameOver) {
+    if (this.combat && !this.combat.gameOver && this.isCombatAwake()) {
       this.applyEvents(this.combat.tick(this.nowSec()));
     }
 

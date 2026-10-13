@@ -16,6 +16,7 @@ type Proto3d = {
   doorOpen: (x: number, y: number) => boolean;
   openDoor: (x: number, y: number) => boolean;
   inCombat: () => boolean;
+  combatAwake: () => boolean;
   tryMoveForward: () => { result: string };
   requestManualSave: () => void;
   saveToSlot: (n: number) => boolean;
@@ -364,6 +365,11 @@ test.describe('proto3d step4 title and saves', () => {
     expect(restored.pos).toMatchObject({ x: 1, y: 7 });
 
     await bootPlay(page, 'test=1&persist=1&debug=1');
+    await page.waitForFunction(
+      () => (window as unknown as { __proto3d?: Proto3d }).__proto3d?.combatAwake?.() === true,
+      null,
+      { timeout: 8000 }
+    );
     await page.evaluate(() => {
       const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
       p.setPosition(6, 2, 1);

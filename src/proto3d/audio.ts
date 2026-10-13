@@ -14,14 +14,18 @@ import {
 import { QUALITY_PRESETS, QualityLevel } from './quality';
 import { DressingMarks } from './dressing';
 import {
+  act1MusicStem,
   audioGroupStems,
   audioStemKeys,
   audioStemPath,
   beforePlayStems,
+  firstFightPriorityStems,
+  firstFightRestStems,
   firstFightStems,
   floor1StreamStems,
   titleMenuStems
 } from './audio-groups';
+import { ACT1_MUSIC_FADE_MS, FIRST_FIGHT_CAP_MS } from './floor1-sounds';
 import { HERO_IDS } from '../core/types';
 import { loadAudioCached } from './asset-cache';
 import { mapPool, SPRITE_LOAD_CONCURRENCY } from './load-pool';
@@ -108,6 +112,9 @@ export class AudioManager {
   private nextHeroHurtAt = 0;
   lastHeroVoice: string | null = null;
   playStarted = false;
+  firstFightUnlocked = false;
+  private firstFightDeadline = 0;
+  private act1MusicAllowed = false;
   private windups = new Map<string, PositionalVoice>();
   private combatPool: PositionalVoice[] = [];
   private resumeWired = false;
@@ -185,6 +192,19 @@ export class AudioManager {
 
   pendingFirstFightStems(): string[] {
     return this.pendingStems(firstFightStems());
+  }
+
+  isFirstFightUnlocked(): boolean {
+    if (this.firstFightUnlocked) return true;
+    if (this.pendingFirstFightStems().length === 0) {
+      this.firstFightUnlocked = true;
+      return true;
+    }
+    if (this.firstFightDeadline && performance.now() >= this.firstFightDeadline) {
+      this.firstFightUnlocked = true;
+      return true;
+    }
+    return false;
   }
 
   /** @deprecated Use pendingBeforePlayStems. */
@@ -340,16 +360,34 @@ export class AudioManager {
     await this.loadBeforePlaySounds(scene, sconces);
   }
 
-  /** First-fight burst, then the rest of floor 1, then later. Never blocks play. */
+  /** First-fight burst, then act-1 music, then the rest of floor 1, then later. Never blocks play. */
   startPlayStreaming(): Promise<void> {
     if (this.streamPromise) return this.streamPromise;
     this.streamPromise = (async () => {
       const loader = new THREE.AudioLoader();
-      await this.loadStems(loader, firstFightStems(), FIRST_FIGHT_CONCURRENCY);
+      const firstFight = this.loadFirstFight(loader);
+      const capMs = this.firstFightDeadline
+        ? Math.max(0, this.firstFightDeadline - performance.now())
+        : FIRST_FIGHT_CAP_MS;
+      await Promise.race([
+        firstFight.then(() => {
+          this.firstFightUnlocked = true;
+        }),
+        new Promise<void>((resolve) => setTimeout(resolve, capMs))
+      ]);
+      this.firstFightUnlocked = true;
+      await firstFight;
+      this.act1MusicAllowed = true;
+      await this.loadStems(loader, [act1MusicStem()], 1);
       await this.loadStems(loader, floor1StreamStems(), STREAM_CONCURRENCY);
       await this.loadLaterSounds();
     })();
     return this.streamPromise;
+  }
+
+  private async loadFirstFight(loader: THREE.AudioLoader) {
+    await this.loadStems(loader, firstFightPriorityStems(), FIRST_FIGHT_CONCURRENCY);
+    await this.loadStems(loader, firstFightRestStems(), FIRST_FIGHT_CONCURRENCY);
   }
 
   async loadSounds(scene: THREE.Scene, sconces: readonly Sconce[]) {
@@ -392,11 +430,11 @@ export class AudioManager {
       this.musicSound.setLoop(true);
       this.musicSound.setVolume(this.musicVolume);
     }
-    if (this.playStarted && this.musicSound && !this.musicSound.isPlaying) {
+    if (this.playStarted && this.act1MusicAllowed && this.musicSound && !this.musicSound.isPlaying) {
       this.musicSound.setVolume(0);
       try {
         this.musicSound.play();
-        this.fadeIn(this.musicSound, this.musicVolume, 4000);
+        this.fadeIn(this.musicSound, this.musicVolume, ACT1_MUSIC_FADE_MS);
       } catch {
         // Host audio can refuse playback; later beds still load.
       }
@@ -740,6 +778,7 @@ export class AudioManager {
 
   markPlayStarted() {
     this.playStarted = true;
+    if (!this.firstFightDeadline) this.firstFightDeadline = performance.now() + FIRST_FIGHT_CAP_MS;
     this.fadeOut(this.menuSound, 1000);
   }
 
@@ -770,11 +809,7 @@ export class AudioManager {
       this.ambientSound.play();
       this.fadeIn(this.ambientSound, this.ambVolume, ms);
     }
-    if (this.musicSound && !this.musicSound.isPlaying) {
-      this.musicSound.setVolume(0);
-      this.musicSound.play();
-      this.fadeIn(this.musicSound, this.musicVolume, Math.max(ms, 4000));
-    }
+    this.ensureAct1Music();
   }
 
   rebuildFloorLoops(state: {

@@ -7,6 +7,7 @@
  ],
  "floor1": [
   "amb_flooded_halls_loop",
+  "music_act1_loop",
   "sfx_act_axe",
   "sfx_act_dagger",
   "sfx_act_mace",
@@ -152,7 +153,6 @@
   "amb_flood_rush_3_loop",
   "amb_flood_rush_4_loop",
   "amb_swamp_loop",
-  "music_act1_loop",
   "sfx_bowl_offering",
   "sfx_carving_reveal",
   "sfx_dark_presence_loop",

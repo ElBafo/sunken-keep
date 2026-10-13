@@ -1,5 +1,11 @@
 import loadGroups from './audio-load-groups.json';
-import { BEFORE_PLAY_STEMS, FIRST_FIGHT_STEMS } from './floor1-sounds';
+import {
+  ACT1_MUSIC_STEM,
+  BEFORE_PLAY_STEMS,
+  FIRST_FIGHT_PRIORITY_STEMS,
+  FIRST_FIGHT_REST_STEMS,
+  FIRST_FIGHT_STEMS
+} from './floor1-sounds';
 
 export type AudioLoadGroup = 'title' | 'floor1' | 'later';
 
@@ -74,13 +80,25 @@ export function firstFightStems(): readonly string[] {
   return FIRST_FIGHT_STEMS;
 }
 
+export function firstFightPriorityStems(): readonly string[] {
+  return FIRST_FIGHT_PRIORITY_STEMS;
+}
+
+export function firstFightRestStems(): readonly string[] {
+  return FIRST_FIGHT_REST_STEMS;
+}
+
+export function act1MusicStem(): string {
+  return ACT1_MUSIC_STEM;
+}
+
 const BEFORE_PLAY_SET = new Set<string>(BEFORE_PLAY_STEMS);
 const FIRST_FIGHT_SET = new Set<string>(FIRST_FIGHT_STEMS);
 
-/** Floor 1 beds that stream after the first-fight burst (includes flooded-halls ambience). */
+/** Floor 1 beds that stream after first-fight and act-1 music (includes flooded-halls ambience). */
 export function floor1StreamStems(): string[] {
   return audioGroupStems('floor1').filter(
-    (stem) => !BEFORE_PLAY_SET.has(stem) && !FIRST_FIGHT_SET.has(stem)
+    (stem) => !BEFORE_PLAY_SET.has(stem) && !FIRST_FIGHT_SET.has(stem) && stem !== ACT1_MUSIC_STEM
   );
 }
 
