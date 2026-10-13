@@ -701,6 +701,60 @@ describe('slime split', () => {
     expect(m.alive).toBe(false);
     expect(e.livingMonsters().map((x) => x.kind).sort()).toEqual(['slime_small', 'slime_small']);
   });
+
+  it('spawns split pieces on the slime square or a free neighbor, never the party or a block', () => {
+    const e = new CombatEngine(rules, {
+      d20: () => 20,
+      int: (a: number, b: number) => a,
+      next: () => 0,
+      pick: <T>(xs: T[]) => xs[0],
+      chance: () => false
+    } as unknown as Rng);
+    e.setOccupancy(
+      openGrid((x, y) => x === 3 && y === 1, 5, 5)
+    );
+    const m = e.spawnMonster('slime', 2, 1, 70, { split: true });
+    e.setPartyPos(2, 0, 2);
+    e.beginFight(m, 0);
+    m.hp = 35;
+    const ev = e.useHand('brannoc', 'main', 0);
+    const split = ev.find((x) => x.type === 'slime_split');
+    expect(split && split.type === 'slime_split').toBe(true);
+    if (split && split.type === 'slime_split') {
+      const squares = split.kids.map((k) => `${k.x},${k.y}`);
+      expect(squares).toContain('2,1');
+      expect(squares).not.toContain('2,0');
+      expect(squares).not.toContain('3,1');
+      for (const kid of split.kids) {
+        const onSlime = kid.x === 2 && kid.y === 1;
+        const onEast = kid.x === 3 && kid.y === 1;
+        const onParty = kid.x === 2 && kid.y === 0;
+        expect(onEast).toBe(false);
+        expect(onParty).toBe(false);
+        expect(onSlime || (kid.x === 1 && kid.y === 1) || (kid.x === 2 && kid.y === 2)).toBe(true);
+      }
+    }
+  });
+
+  it('keeps the hit log and frost resist flash when that hit splits the slime', () => {
+    const e = new CombatEngine(rules, {
+      d20: () => 18,
+      int: (a: number, b: number) => a,
+      next: () => 0,
+      pick: <T>(xs: T[]) => xs[0],
+      chance: () => false
+    } as unknown as Rng);
+    const m = e.spawnMonster('slime', 2, 0, 70, { split: true });
+    e.setPartyPos(1, 0, 1);
+    e.beginFight(m, 0);
+    m.hp = 35;
+    const ev = e.useHand('ilsevar', 'off', 0);
+    expect(ev.some((x) => x.type === 'slime_split')).toBe(true);
+    expect(ev.some((x) => x.type === 'log' && x.key === 'hit')).toBe(true);
+    expect(ev.some((x) => x.type === 'hit_type' && x.kind === 'resist')).toBe(true);
+    expect(ev.some((x) => x.type === 'sfx' && x.name === 'hit_resist')).toBe(true);
+    expect(ev.some((x) => x.type === 'log' && x.key === 'slime_frost_resist')).toBe(true);
+  });
 });
 
 describe('floor 1 scripted playthrough', () => {

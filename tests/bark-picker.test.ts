@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   BarkDirector,
+  barkDurationMs,
   eligibleBarks,
   lineId,
   type BarkLine
@@ -98,5 +99,57 @@ describe('bark picker', () => {
     expect(first).toBeTruthy();
     const tooSoon = director.pick('deep_water', deepWater, { nowMs: 1000, party, flags: new Set() });
     expect(tooSoon).toBeNull();
+  });
+
+  it('queues story barks so opening_cavein_2 is never dropped', () => {
+    const director = new BarkDirector({
+      flavour_gap_s: 120,
+      flavour_min_interval_s: 180,
+      min_gap_s: 8
+    });
+    const lines: BarkLine[] = [
+      {
+        trigger: 'opening_cavein',
+        speaker: 'brannoc',
+        text: 'The way home just closed.',
+        tier: 'story'
+      },
+      {
+        trigger: 'opening_cavein_2',
+        speaker: 'mags',
+        text: 'Brilliant.',
+        tier: 'story'
+      }
+    ];
+    const ctx = (nowMs: number) => ({ nowMs, party, flags: new Set<string>() });
+    const first = director.pick('opening_cavein', lines, ctx(0));
+    expect(first?.trigger).toBe('opening_cavein');
+    const requested = director.pick('opening_cavein_2', lines, ctx(800));
+    expect(requested).toBeNull();
+    expect(director.queuedCount()).toBe(1);
+    expect(director.flush(800)).toBeNull();
+    const readyAt = barkDurationMs(first!);
+    expect(director.flush(readyAt - 1)).toBeNull();
+    const second = director.flush(readyAt);
+    expect(second?.trigger).toBe('opening_cavein_2');
+    expect(director.queuedCount()).toBe(0);
+  });
+
+  it('clears queued story barks when leaving the game screen', () => {
+    const director = new BarkDirector({
+      flavour_gap_s: 120,
+      flavour_min_interval_s: 180,
+      min_gap_s: 8
+    });
+    const lines: BarkLine[] = [
+      { trigger: 'opening_cavein', speaker: 'brannoc', text: 'Closed.', tier: 'story' },
+      { trigger: 'opening_cavein_2', speaker: 'mags', text: 'Brilliant.', tier: 'story' }
+    ];
+    director.pick('opening_cavein', lines, { nowMs: 0, party, flags: new Set() });
+    director.pick('opening_cavein_2', lines, { nowMs: 800, party, flags: new Set() });
+    expect(director.queuedCount()).toBe(1);
+    director.clearQueue();
+    expect(director.queuedCount()).toBe(0);
+    expect(director.flush(20_000)).toBeNull();
   });
 });

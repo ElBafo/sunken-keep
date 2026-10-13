@@ -105,6 +105,12 @@ function pickRandom<T>(items: readonly T[], rng: () => number): T {
   return items[Math.floor(rng() * items.length) % items.length];
 }
 
+export function barkDurationMs(line: BarkLine): number {
+  return 1500 + line.text.length * 40 + (line.listener ? 800 : 0);
+}
+
+const MAX_STORY_QUEUE = 3;
+
 export class BarkDirector {
   private lastLineId: string | null = null;
   private lastBarkEndMs = Number.NEGATIVE_INFINITY;
@@ -112,6 +118,7 @@ export class BarkDirector {
   private lastFlavourMs = Number.NEGATIVE_INFINITY;
   private usedFlavour = new Set<string>();
   private playedOnce = new Set<string>();
+  private storyQueue: BarkLine[] = [];
 
   constructor(
     private rules: BarkRules = DEFAULT_BARK_RULES,
@@ -129,6 +136,28 @@ export class BarkDirector {
     this.lastFlavourMs = Number.NEGATIVE_INFINITY;
     this.usedFlavour.clear();
     this.playedOnce.clear();
+    this.clearQueue();
+  }
+
+  /** Title / New Game / load leave the moment a queued story bark belonged to. */
+  clearQueue() {
+    this.storyQueue = [];
+  }
+
+  queuedCount(): number {
+    return this.storyQueue.length;
+  }
+
+  /**
+   * Play the next queued story/tutorial bark once the previous line has finished.
+   * Story barks bypass min_gap_s; they only wait for the current bark to end.
+   */
+  flush(nowMs: number): BarkLine | null {
+    if (!this.storyQueue.length) return null;
+    if (nowMs < this.lastBarkEndMs) return null;
+    const next = this.storyQueue.shift()!;
+    this.commit(next, nowMs);
+    return next;
   }
 
   pick(trigger: string, lines: readonly BarkLine[], ctx: BarkPickContext): BarkLine | null {
@@ -142,9 +171,11 @@ export class BarkDirector {
     const tier = (pool[0].tier ?? 'flavour') as BarkTier;
     const now = ctx.nowMs;
     const minGapMs = this.rules.min_gap_s * 1000;
-    if (!ctx.skipRateLimits && now < this.lastBarkEndMs + minGapMs) return null;
+    const inGap = now < this.lastBarkEndMs + minGapMs;
+    const speaking = now < this.lastBarkEndMs;
 
     if (!ctx.skipRateLimits && tier === 'flavour') {
+      if (inGap) return null;
       if (now - this.lastAnyBarkMs < this.rules.flavour_gap_s * 1000) return null;
       if (now - this.lastFlavourMs < this.rules.flavour_min_interval_s * 1000) return null;
     }
@@ -155,7 +186,8 @@ export class BarkDirector {
       if (!unused.length) return null;
       candidates = unused;
     } else if (tier !== 'flavour') {
-      const fresh = pool.filter((l) => !this.playedOnce.has(lineId(l)));
+      const queued = new Set(this.storyQueue.map(lineId));
+      const fresh = pool.filter((l) => !this.playedOnce.has(lineId(l)) && !queued.has(lineId(l)));
       if (!fresh.length) return null;
       candidates = fresh;
     }
@@ -164,18 +196,34 @@ export class BarkDirector {
     const pickFrom = notLast.length ? notLast : candidates;
     const chosen = pickRandom(pickFrom, this.rng);
 
+    if (!ctx.skipRateLimits && tier !== 'flavour' && speaking) {
+      this.enqueueStory(chosen);
+      return null;
+    }
+
+    this.commit(chosen, now);
+    return chosen;
+  }
+
+  private enqueueStory(line: BarkLine) {
+    const id = lineId(line);
+    if (this.storyQueue.some((q) => lineId(q) === id)) return;
+    if (this.storyQueue.length >= MAX_STORY_QUEUE) return;
+    this.storyQueue.push(line);
+  }
+
+  private commit(chosen: BarkLine, now: number) {
     const id = lineId(chosen);
+    const tier = (chosen.tier ?? 'flavour') as BarkTier;
     this.lastLineId = id;
     this.lastAnyBarkMs = now;
-    const durationMs = 1500 + chosen.text.length * 40 + (chosen.listener ? 800 : 0);
-    this.lastBarkEndMs = now + durationMs;
+    this.lastBarkEndMs = now + barkDurationMs(chosen);
     if (tier === 'flavour') {
       this.lastFlavourMs = now;
       this.usedFlavour.add(id);
     } else {
       this.playedOnce.add(id);
     }
-    return chosen;
   }
 }
 

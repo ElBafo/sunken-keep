@@ -86,6 +86,7 @@ import {
   asHeroId,
   BarkDirector,
   DEFAULT_BARK_RULES,
+  type BarkLine,
   type BarkPartyMember,
   type BarkRules
 } from './bark-picker';
@@ -1115,12 +1116,14 @@ class Game {
           this.spriteManager.playAnimId(e.id, 'death', nowMs);
           this.darkFx.hideEye(e.x, e.y, this.audioManager);
           this.audioManager?.stopWindup(e.id);
+          this.syncSlimeAudio();
           break;
         case 'slime_split':
           this.spriteManager.hideDeadMonsterId(e.from);
           for (const kid of e.kids) {
             void this.spriteManager.addLiveMonster(this.renderer.scene, kid.kind, kid.x, kid.y, kid.id);
           }
+          this.syncSlimeAudio();
           break;
         case 'hero':
         case 'hero_revive':
@@ -1144,9 +1147,11 @@ class Game {
           break;
         case 'fight_start':
           this.audioManager?.setFightDuck(true);
+          this.syncSlimeAudio();
           break;
         case 'fight_end':
           this.audioManager?.setFightDuck(false);
+          this.audioManager?.stopSlimeBattleLoop();
           this.hud.hideFrostHint();
           this.clearFlankFlash();
           break;
@@ -1829,6 +1834,8 @@ class Game {
 
   private leaveGameScreen() {
     this.caveIn.clearLeaveScreen();
+    this.barkDirector.clearQueue();
+    this.audioManager?.stopSlimeLoops();
     this.clearOilGlugs();
     if (this.caveInBusy) {
       this.caveInBusy = false;
@@ -1973,6 +1980,7 @@ class Game {
       leeches: this.combat.monsters.map((m) => ({ kind: m.kind, x: m.x, y: m.y, alive: m.alive })),
       carriedTorch: !!this.hud.carriedTorch()?.lit
     });
+    this.syncSlimeAudio();
   }
 
   canAutosave(): boolean {
@@ -2061,6 +2069,15 @@ class Game {
       skipRateLimits: !!forcedSpeaker
     });
     if (!picked) return false;
+    return this.deliverBark(picked);
+  }
+
+  private flushBarks(nowMs: number) {
+    const picked = this.barkDirector.flush(nowMs);
+    if (picked) this.deliverBark(picked);
+  }
+
+  private deliverBark(picked: BarkLine) {
     const speaker = asHeroId(picked.speaker);
     const name = this.story.speakerName(picked.speaker);
     this.lastMessage = `${name}: ${picked.text}`;
@@ -2074,6 +2091,13 @@ class Game {
     };
     this.audioManager.playBarkVoice(picked.speaker);
     return true;
+  }
+
+  private syncSlimeAudio() {
+    const slimes = this.combat.monsters
+      .filter((m) => isSlimeKind(m.kind) && m.alive)
+      .map((m) => ({ kind: m.kind, x: m.x, y: m.y }));
+    this.audioManager?.syncSlimeLoops(slimes, !!this.combat.fight);
   }
 
   private fireTileBark(x: number, y: number) {
@@ -2995,6 +3019,7 @@ class Game {
     this.lastTime = now;
     const dtSec = Math.min(0.05, deltaTime / 1000);
     this.bubble?.update(now);
+    this.flushBarks(now);
     if (this.phase !== 'play') {
       this.renderer.render();
       requestAnimationFrame(() => this.gameLoop());

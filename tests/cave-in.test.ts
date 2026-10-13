@@ -90,6 +90,9 @@ describe('floor 1 cave-in', () => {
     expect(src).toContain('playCaveIn()');
     expect(src).toContain('opening_cavein_2');
     expect(src).toContain('caveInClockStarted');
+    expect(src).toContain('flushBarks');
+    expect(src).toContain('barkDirector.flush');
+    expect(src).toContain('barkDirector.clearQueue');
     expect(src).toMatch(/!this\.player\.isMoving[\s\S]*playCaveIn\(\)/);
     expect(src).toMatch(/caveInCrashed\(elapsed\)[\s\S]*applyRubble\(\)[\s\S]*dustBurstFrame\(0\)/);
   });

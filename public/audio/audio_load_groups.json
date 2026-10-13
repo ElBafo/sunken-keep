@@ -8,6 +8,7 @@
  "floor1": [
   "amb_flooded_halls_loop",
   "music_act1_loop",
+  "music_slime_battle",
   "sfx_act_axe",
   "sfx_act_dagger",
   "sfx_act_mace",
@@ -101,6 +102,7 @@
   "sfx_slime_alert",
   "sfx_slime_attack",
   "sfx_slime_death",
+  "sfx_slime_gurgle_loop",
   "sfx_slime_hurt",
   "sfx_step",
   "sfx_step_1",

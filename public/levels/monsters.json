@@ -73,8 +73,8 @@
     "floor": 1,
     "hp": 40,
     "damage": [
-      3,
-      6
+      4,
+      8
     ],
     "_role": "toughest thing on floor 1",
     "ac": 11,

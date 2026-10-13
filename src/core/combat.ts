@@ -171,15 +171,20 @@ export class CombatEngine {
     return m;
   }
 
+  private splitSquareFree(x: number, y: number): boolean {
+    if (x === this.partyX && y === this.partyY) return false;
+    if (this.monsterAt(x, y)) return false;
+    if (this.openMap && !this.openMap.walkable(x, y)) return false;
+    return true;
+  }
+
   private splitNeighbor(x: number, y: number): { x: number; y: number } {
     for (const [dx, dy] of DIRS) {
       const nx = x + dx;
       const ny = y + dy;
-      if (this.monsterAt(nx, ny)) continue;
-      if (this.openMap && !this.openMap.walkable(nx, ny)) continue;
-      return { x: nx, y: ny };
+      if (this.splitSquareFree(nx, ny)) return { x: nx, y: ny };
     }
-    return { x, y: y - 1 };
+    return { x, y };
   }
 
   maybeSplit(m: MonsterState, now: number): boolean {
@@ -700,7 +705,6 @@ export class CombatEngine {
     const mul = this.resistMul(target.kind, item);
     dmg = Math.max(1, Math.floor(dmg * mul));
     target.hp -= dmg;
-    if (this.maybeSplit(target, now)) return this.flush();
     const kind = this.hitKind(crit, mul);
     if (kind !== 'resist') this.emit({ type: 'monster_anim', id: target.id, anim: 'hurt' });
     this.emit({ type: 'sfx', name: `${target.kind}_hurt`, x: target.x, y: target.y, combat: true });
@@ -729,6 +733,7 @@ export class CombatEngine {
     ) {
       this.emit({ type: 'log', key: 'slime_frost_resist', vars: { monster: target.kind } });
     }
+    if (this.maybeSplit(target, now)) return this.flush();
 
     if (damageType(item) === 'fire') {
       for (const id of HERO_IDS) {

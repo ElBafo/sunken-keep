@@ -220,12 +220,7 @@ export class StoryText {
   }
 
   monsterName(id: string): string {
-    const monsters = this.names.monsters;
-    if (monsters && typeof monsters === 'object') {
-      const name = (monsters as Json)[id];
-      if (typeof name === 'string') return name;
-    }
-    return id.replace(/_/g, ' ');
+    return this.nameIn('monsters', id);
   }
 
   itemName(id: string): string {

@@ -35,7 +35,9 @@ const EXTRA_ALIASES: Record<string, readonly string[]> = {
   sfx_drowned_dwarf_hurt: ['captain_dural_hurt'],
   sfx_drowned_dwarf_death: ['captain_dural_death'],
   sfx_hit_resist_1: ['hit_resist'],
-  sfx_hit_weak_1: ['hit_weak']
+  sfx_hit_weak_1: ['hit_weak'],
+  sfx_slime_gurgle_loop: ['slime_gurgle_loop'],
+  music_slime_battle: ['slime_battle']
 };
 
 export function audioGroupStems(group: AudioLoadGroup): readonly string[] {

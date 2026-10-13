@@ -7,7 +7,7 @@ import { getLogMessage } from './log-messages';
 import { gameLog } from './game-log';
 
 function monsterName(id: string): string {
-  return id.replace(/_/g, ' ');
+  return id;
 }
 
 export class CombatController {

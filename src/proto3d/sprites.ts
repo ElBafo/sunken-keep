@@ -1149,11 +1149,13 @@ export class SpriteManager {
       pivotYFromTop: 0.5,
       holdFrames: FROST_HOLD_FRAMES,
       holdFps: FROST_HOLD_FPS,
-      tintHost: true,
+      tintHost: false,
       frame: 0,
       restoreHostMap: restore,
       bodySwap: true
     };
+    host.frostAmount = 0;
+    if (host.material instanceof THREE.SpriteMaterial) setFrostAmount(host.material, 0);
     this.playingFx.push(play);
     this.applyHostTint(play, host);
   }
