@@ -1,0 +1,95 @@
+{
+ "image": "art/atlas/portraits.png",
+ "size": {
+  "w": 204,
+  "h": 340
+ },
+ "padding": 2,
+ "extrude": 1,
+ "frames": {
+  "art/portraits/brannoc_healthy.png": {
+   "x": 2,
+   "y": 2,
+   "w": 64,
+   "h": 64
+  },
+  "art/portraits/brannoc_near_death.png": {
+   "x": 70,
+   "y": 2,
+   "w": 64,
+   "h": 64
+  },
+  "art/portraits/brannoc_wounded.png": {
+   "x": 138,
+   "y": 2,
+   "w": 64,
+   "h": 64
+  },
+  "art/portraits/ilsevar_healthy.png": {
+   "x": 2,
+   "y": 70,
+   "w": 64,
+   "h": 64
+  },
+  "art/portraits/ilsevar_near_death.png": {
+   "x": 70,
+   "y": 70,
+   "w": 64,
+   "h": 64
+  },
+  "art/portraits/ilsevar_wounded.png": {
+   "x": 138,
+   "y": 70,
+   "w": 64,
+   "h": 64
+  },
+  "art/portraits/mags_healthy.png": {
+   "x": 2,
+   "y": 138,
+   "w": 64,
+   "h": 64
+  },
+  "art/portraits/mags_near_death.png": {
+   "x": 70,
+   "y": 138,
+   "w": 64,
+   "h": 64
+  },
+  "art/portraits/mags_wounded.png": {
+   "x": 138,
+   "y": 138,
+   "w": 64,
+   "h": 64
+  },
+  "art/portraits/wren_healthy.png": {
+   "x": 2,
+   "y": 206,
+   "w": 64,
+   "h": 64
+  },
+  "art/portraits/wren_lantern_bright.png": {
+   "x": 70,
+   "y": 206,
+   "w": 64,
+   "h": 64
+  },
+  "art/portraits/wren_lantern_ember.png": {
+   "x": 138,
+   "y": 206,
+   "w": 64,
+   "h": 64
+  },
+  "art/portraits/wren_near_death.png": {
+   "x": 2,
+   "y": 274,
+   "w": 64,
+   "h": 64
+  },
+  "art/portraits/wren_wounded.png": {
+   "x": 70,
+   "y": 274,
+   "w": 64,
+   "h": 64
+  }
+ }
+}

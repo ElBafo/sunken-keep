@@ -1,0 +1,335 @@
+{
+ "image": "art/atlas/props.png",
+ "size": {
+  "w": 252,
+  "h": 558
+ },
+ "padding": 2,
+ "extrude": 1,
+ "frames": {
+  "art/dungeon/item_chest_far.png": {
+   "x": 218,
+   "y": 487,
+   "w": 30,
+   "h": 25
+  },
+  "art/dungeon/item_chest_mid.png": {
+   "x": 2,
+   "y": 311,
+   "w": 50,
+   "h": 40
+  },
+  "art/dungeon/item_chest_near.png": {
+   "x": 2,
+   "y": 70,
+   "w": 80,
+   "h": 60
+  },
+  "art/dungeon/item_chest_open_far.png": {
+   "x": 2,
+   "y": 531,
+   "w": 30,
+   "h": 25
+  },
+  "art/dungeon/item_chest_open_mid.png": {
+   "x": 56,
+   "y": 311,
+   "w": 50,
+   "h": 40
+  },
+  "art/dungeon/item_chest_open_near.png": {
+   "x": 86,
+   "y": 70,
+   "w": 80,
+   "h": 60
+  },
+  "art/dungeon/item_key_far.png": {
+   "x": 36,
+   "y": 531,
+   "w": 30,
+   "h": 25
+  },
+  "art/dungeon/item_key_mid.png": {
+   "x": 110,
+   "y": 311,
+   "w": 50,
+   "h": 40
+  },
+  "art/dungeon/item_key_near.png": {
+   "x": 170,
+   "y": 70,
+   "w": 80,
+   "h": 60
+  },
+  "art/dungeon/item_potion_blue_far.png": {
+   "x": 70,
+   "y": 531,
+   "w": 30,
+   "h": 25
+  },
+  "art/dungeon/item_potion_blue_mid.png": {
+   "x": 164,
+   "y": 311,
+   "w": 50,
+   "h": 40
+  },
+  "art/dungeon/item_potion_blue_near.png": {
+   "x": 2,
+   "y": 134,
+   "w": 80,
+   "h": 60
+  },
+  "art/dungeon/item_potion_green_far.png": {
+   "x": 104,
+   "y": 531,
+   "w": 30,
+   "h": 25
+  },
+  "art/dungeon/item_potion_green_mid.png": {
+   "x": 2,
+   "y": 355,
+   "w": 50,
+   "h": 40
+  },
+  "art/dungeon/item_potion_green_near.png": {
+   "x": 86,
+   "y": 134,
+   "w": 80,
+   "h": 60
+  },
+  "art/dungeon/item_potion_red_far.png": {
+   "x": 138,
+   "y": 531,
+   "w": 30,
+   "h": 25
+  },
+  "art/dungeon/item_potion_red_mid.png": {
+   "x": 56,
+   "y": 355,
+   "w": 50,
+   "h": 40
+  },
+  "art/dungeon/item_potion_red_near.png": {
+   "x": 170,
+   "y": 134,
+   "w": 80,
+   "h": 60
+  },
+  "art/dungeon/item_scroll_far.png": {
+   "x": 172,
+   "y": 531,
+   "w": 30,
+   "h": 25
+  },
+  "art/dungeon/item_scroll_mid.png": {
+   "x": 110,
+   "y": 355,
+   "w": 50,
+   "h": 40
+  },
+  "art/dungeon/item_scroll_near.png": {
+   "x": 2,
+   "y": 198,
+   "w": 80,
+   "h": 60
+  },
+  "art/fx/hits/resist_goo_1_near.png": {
+   "x": 38,
+   "y": 487,
+   "w": 41,
+   "h": 30
+  },
+  "art/fx/hits/resist_goo_2_near.png": {
+   "x": 83,
+   "y": 487,
+   "w": 41,
+   "h": 30
+  },
+  "art/fx/hits/resist_goo_3_near.png": {
+   "x": 128,
+   "y": 487,
+   "w": 41,
+   "h": 30
+  },
+  "art/fx/hits/resist_goo_4_near.png": {
+   "x": 173,
+   "y": 487,
+   "w": 41,
+   "h": 30
+  },
+  "art/fx/hits/weak_frost_1_near.png": {
+   "x": 170,
+   "y": 198,
+   "w": 57,
+   "h": 45
+  },
+  "art/fx/hits/weak_frost_2_near.png": {
+   "x": 2,
+   "y": 262,
+   "w": 57,
+   "h": 45
+  },
+  "art/fx/hits/weak_frost_3_near.png": {
+   "x": 63,
+   "y": 262,
+   "w": 57,
+   "h": 45
+  },
+  "art/fx/hits/weak_frost_4_near.png": {
+   "x": 124,
+   "y": 262,
+   "w": 57,
+   "h": 45
+  },
+  "art/fx/hits/weak_frost_5_near.png": {
+   "x": 185,
+   "y": 262,
+   "w": 57,
+   "h": 45
+  },
+  "proto3d/tex3d/torch/bracket_capped_front.png": {
+   "x": 2,
+   "y": 2,
+   "w": 32,
+   "h": 64
+  },
+  "proto3d/tex3d/torch/bracket_capped_side.png": {
+   "x": 38,
+   "y": 2,
+   "w": 32,
+   "h": 64
+  },
+  "proto3d/tex3d/torch/bracket_dead_front.png": {
+   "x": 74,
+   "y": 2,
+   "w": 32,
+   "h": 64
+  },
+  "proto3d/tex3d/torch/bracket_dead_side.png": {
+   "x": 110,
+   "y": 2,
+   "w": 32,
+   "h": 64
+  },
+  "proto3d/tex3d/torch/bracket_lit_front.png": {
+   "x": 146,
+   "y": 2,
+   "w": 32,
+   "h": 64
+  },
+  "proto3d/tex3d/torch/bracket_lit_side.png": {
+   "x": 182,
+   "y": 2,
+   "w": 32,
+   "h": 64
+  },
+  "proto3d/tex3d/torch/flame_calm_1.png": {
+   "x": 164,
+   "y": 355,
+   "w": 32,
+   "h": 40
+  },
+  "proto3d/tex3d/torch/flame_calm_2.png": {
+   "x": 200,
+   "y": 355,
+   "w": 32,
+   "h": 40
+  },
+  "proto3d/tex3d/torch/flame_calm_3.png": {
+   "x": 2,
+   "y": 399,
+   "w": 32,
+   "h": 40
+  },
+  "proto3d/tex3d/torch/flame_calm_4.png": {
+   "x": 38,
+   "y": 399,
+   "w": 32,
+   "h": 40
+  },
+  "proto3d/tex3d/torch/flare_1.png": {
+   "x": 74,
+   "y": 399,
+   "w": 32,
+   "h": 40
+  },
+  "proto3d/tex3d/torch/flare_2.png": {
+   "x": 110,
+   "y": 399,
+   "w": 32,
+   "h": 40
+  },
+  "proto3d/tex3d/torch/flare_3.png": {
+   "x": 146,
+   "y": 399,
+   "w": 32,
+   "h": 40
+  },
+  "proto3d/tex3d/torch/flare_4.png": {
+   "x": 182,
+   "y": 399,
+   "w": 32,
+   "h": 40
+  },
+  "proto3d/tex3d/torch/flare_5.png": {
+   "x": 218,
+   "y": 399,
+   "w": 32,
+   "h": 40
+  },
+  "proto3d/tex3d/torch/flare_6.png": {
+   "x": 2,
+   "y": 443,
+   "w": 32,
+   "h": 40
+  },
+  "proto3d/tex3d/torch/item_oil_far.png": {
+   "x": 206,
+   "y": 531,
+   "w": 30,
+   "h": 25
+  },
+  "proto3d/tex3d/torch/item_oil_mid.png": {
+   "x": 38,
+   "y": 443,
+   "w": 50,
+   "h": 40
+  },
+  "proto3d/tex3d/torch/item_oil_near.png": {
+   "x": 86,
+   "y": 198,
+   "w": 80,
+   "h": 60
+  },
+  "proto3d/tex3d/torch/snuff_1.png": {
+   "x": 92,
+   "y": 443,
+   "w": 32,
+   "h": 40
+  },
+  "proto3d/tex3d/torch/snuff_2.png": {
+   "x": 128,
+   "y": 443,
+   "w": 32,
+   "h": 40
+  },
+  "proto3d/tex3d/torch/snuff_3.png": {
+   "x": 164,
+   "y": 443,
+   "w": 32,
+   "h": 40
+  },
+  "proto3d/tex3d/torch/snuff_4.png": {
+   "x": 200,
+   "y": 443,
+   "w": 32,
+   "h": 40
+  },
+  "proto3d/tex3d/torch/snuff_5.png": {
+   "x": 2,
+   "y": 487,
+   "w": 32,
+   "h": 40
+  }
+ }
+}
