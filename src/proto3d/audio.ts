@@ -740,8 +740,6 @@ export class AudioManager {
   markPlayStarted() {
     this.playStarted = true;
     this.fadeOut(this.menuSound, 1000);
-    void this.startPlayStreaming();
-    this.startAmbienceIfReady();
   }
 
   crossfadeToIntro(ms = 1000) {

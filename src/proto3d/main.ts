@@ -41,8 +41,8 @@ import {
   type SavedFloor
 } from './saves';
 import { TitleScreen, type TitleAction } from './title';
-import { beforePlayRelPaths, firstFightRelPaths } from './audio-groups';
-import { floor1MonsterArtPaths, prefetchRelPaths } from './floor1-prefetch';
+import { beforePlayRelPaths } from './audio-groups';
+import { prefetchRelPaths } from './floor1-prefetch';
 import { IntroPlayer } from './intro';
 import { mountIntroSkip, type IntroSkipHandle } from './intro-skip';
 import { interactPropAt, tileBlocksPath } from './wall-props';
@@ -399,7 +399,6 @@ class Game {
 
     this.spriteManager = new SpriteManager(this.renderer.camera);
     await this.spriteManager.loadSprites(this.renderer.scene, floor1, { monsters: false });
-    void this.spriteManager.ensureMonsters(this.renderer.scene, floor1);
     this.darkFx = new DarkFx();
     await this.darkFx.load(this.renderer.scene, floor1, this.spriteManager);
     this.hud = new PartyHud(this.story, () => this.oil, layout, {
@@ -480,9 +479,8 @@ class Game {
   private beginFloor1BackgroundLoads() {
     if (this.floor1PrefetchStarted) return;
     this.floor1PrefetchStarted = true;
-    void prefetchRelPaths([...floor1MonsterArtPaths(), ...beforePlayRelPaths()], 8);
+    void prefetchRelPaths(beforePlayRelPaths(), 8);
     void this.audioManager.loadBeforePlaySounds();
-    void prefetchRelPaths(firstFightRelPaths(), 4);
   }
 
   private async ensureIntroStartReady() {
@@ -492,10 +490,14 @@ class Game {
   private async ensurePlayReady() {
     await this.worldBoot;
     await this.audioManager.loadBeforePlaySounds(this.renderer.scene, floor1Sconces);
-    await this.spriteManager.ensureMonsters(this.renderer.scene, floor1);
     if (this.combat.monsters.length === 0) this.spawnFloorMonsters();
     else this.rebindMonsters();
     this.playReady = true;
+  }
+
+  private beginMonsterStreaming() {
+    if (!this.spriteManager || !this.renderer) return;
+    void this.spriteManager.ensureMonsters(this.renderer.scene, floor1).then(() => this.rebindMonsters());
   }
 
   private rebindMonsters() {
@@ -1904,16 +1906,7 @@ class Game {
     this.skipIntroRequested = false;
     this.pendingNewGameReset = true;
     this.pendingStartSnapshot = true;
-    void this.prefetchFloor();
     void this.runNewGame();
-  }
-
-  private prefetchFloor() {
-    void this.worldBoot.then(() => {
-      if (this.spriteManager && this.renderer) {
-        return this.spriteManager.ensureMonsters(this.renderer.scene, floor1);
-      }
-    });
   }
 
   private async applyNewGameReset() {
@@ -1982,6 +1975,8 @@ class Game {
     this.phase = 'play';
     if (!this.playStartedAt) this.playStartedAt = performance.now();
     this.audioManager.markPlayStarted();
+    void this.audioManager.startPlayStreaming();
+    this.beginMonsterStreaming();
     if (this.storyProgress.fire('enter_floor1')) this.showMessage(this.storyLog('enter_floor1'));
     this.storyProgress.fire('f1_start');
     if (this.pendingStartSnapshot) {
