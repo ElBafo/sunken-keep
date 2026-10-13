@@ -28,6 +28,7 @@ import {
 import { ACT1_MUSIC_FADE_MS, FIRST_FIGHT_CAP_MS } from './floor1-sounds';
 import { HERO_IDS } from '../core/types';
 import { isSlimeKind } from '../core/slime-frost';
+import { SLIME_SMALL_SFX_GAP_MS, slimeSmallPitchRate } from '../core/slime-pair';
 import { loadAudioCached } from './asset-cache';
 import { mapPool, SPRITE_LOAD_CONCURRENCY } from './load-pool';
 import { FloorData, Sconce } from './types';
@@ -125,6 +126,8 @@ export class AudioManager {
   private slimeGurgleGain: GainNode | null = null;
   private slimeBattleSrc: AudioBufferSourceNode | null = null;
   private slimeBattleGain: GainNode | null = null;
+  private slimelingPan = new Map<string, number>();
+  private lastSlimelingSfxAt = Number.NEGATIVE_INFINITY;
 
   constructor(quality: QualityLevel) {
     this.listener = new THREE.AudioListener();
@@ -685,9 +688,22 @@ export class AudioManager {
     hit_weak: ['hit_weak', 'hit_weak_2']
   };
 
+  setSlimelingPan(id: string, pan: number) {
+    this.slimelingPan.set(id, pan);
+  }
+
+  clearSlimelingPan(id?: string) {
+    if (id) this.slimelingPan.delete(id);
+    else this.slimelingPan.clear();
+  }
+
   playCombat(name: string, volume = 1, x?: number, y?: number, id?: string) {
     const family = this.combatFamilies[name];
     const pick = family ? this.pickVariant(name, family) : name;
+    if (this.isSlimelingStem(name) || (id && this.slimelingPan.has(id))) {
+      this.playSlimeling(pick, volume, id);
+      return;
+    }
     const rate = 0.95 + Math.random() * 0.1;
     if (name.endsWith('_windup')) {
       const key = id ?? name;
@@ -716,6 +732,43 @@ export class AudioManager {
       return;
     }
     this.playUi(pick, volume, rate);
+  }
+
+  private isSlimelingStem(name: string): boolean {
+    return name.startsWith('slime_small_') || name.startsWith('sfx_slime_small_');
+  }
+
+  private playSlimeling(name: string, volume: number, id?: string) {
+    const buf = this.buffers.get(name) ?? this.buffers.get(`sfx_${name}`);
+    if (!buf) return;
+    const now = performance.now();
+    const wait = Math.max(0, this.lastSlimelingSfxAt + SLIME_SMALL_SFX_GAP_MS - now);
+    this.lastSlimelingSfxAt = now + wait;
+    const pan = id != null ? (this.slimelingPan.get(id) ?? 0) : 0;
+    const semitone = Math.random() * 2 - 1;
+    const start = () => this.startSlimelingVoice(buf, volume, pan, slimeSmallPitchRate(semitone));
+    if (wait > 0) setTimeout(start, wait);
+    else start();
+  }
+
+  private startSlimelingVoice(buf: AudioBuffer, volume: number, pan: number, rate: number) {
+    const ctx = this.listener.context;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = false;
+    src.playbackRate.value = rate;
+    const panner = ctx.createStereoPanner();
+    panner.pan.value = pan;
+    const gain = ctx.createGain();
+    gain.gain.value = volume;
+    src.connect(panner);
+    panner.connect(gain);
+    gain.connect(this.listener.gain);
+    try {
+      src.start();
+    } catch {
+      // Host audio can refuse playback.
+    }
   }
 
   stopWindup(id?: string) {

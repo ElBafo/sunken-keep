@@ -10,6 +10,12 @@ import {
 } from './constants';
 import type { HitKind } from '../core/types';
 import { isSlimeKind, slimeFrostFramePath } from '../core/slime-frost';
+import {
+  SLIME_PAIR_OFFSET_FRAC,
+  SLIME_PAIR_SLIDE_MS,
+  slimePairSideSign,
+  type SlimePairSlot
+} from '../core/slime-pair';
 import { loadSpriteTexture, textureFrameSize } from './atlas';
 import { fetchJsonCached } from './asset-cache';
 import { createLimiter, mapPool, SPRITE_LOAD_CONCURRENCY } from './load-pool';
@@ -208,6 +214,12 @@ interface SpriteInfo {
   itemId?: string;
   frostAmount?: number;
   frostFlash?: boolean;
+  pairSlot?: SlimePairSlot;
+  pairId?: string;
+  pairSlide?: number;
+  pairSlideFrom?: number;
+  pairSlideTo?: number;
+  pairSlideAt?: number;
 }
 
 function configureSpriteTexture(tex: THREE.Texture) {
@@ -616,14 +628,14 @@ export class SpriteManager {
     for (const sprite of this.sprites) {
       if (sprite.hidden || sprite.pickedUp) continue;
       if (sprite.kind === 'monster') {
-        this.placeMonster(sprite, playerX, playerY);
+        this.placeMonster(sprite, playerX, playerY, dir);
         continue;
       }
       if (sprite.kind === 'item') this.placeItem(sprite, playerX, playerY, camX, camZ, fx, fz);
     }
   }
 
-  private placeMonster(sprite: SpriteInfo, playerX: number, playerY: number) {
+  private placeMonster(sprite: SpriteInfo, playerX: number, playerY: number, dir: number) {
     const dist = Math.max(Math.abs(sprite.x - playerX), Math.abs(sprite.y - playerY));
     this.applyMonsterLod(sprite, dist);
     const size = sprite.lodSize?.[sprite.currentLod ?? 'near'] ?? { w: sprite.baseW, h: sprite.baseH };
@@ -633,8 +645,21 @@ export class SpriteManager {
     const floor = sprite.tileFloorY ?? sprite.floorY;
     const feet = file ? this.feetFor(file, size.h, floor) : floor;
     const { ox, oz } = monsterVisualOffset(sprite.x, sprite.y, playerX, playerY);
-    sprite.object.position.set(sprite.x * CELL_SIZE + ox, feet, sprite.y * CELL_SIZE + oz);
-    sprite.object.scale.set(size.w, size.h, 1);
+    const slide = sprite.pairSlide ?? (sprite.pairSlot ? 1 : 0);
+    const lat = slimePairSideSign(sprite.pairSlot) * SLIME_PAIR_OFFSET_FRAC * size.w * slide;
+    const right = ([
+      [1, 0],
+      [0, 1],
+      [-1, 0],
+      [0, -1]
+    ] as const)[dir & 3];
+    sprite.object.position.set(
+      sprite.x * CELL_SIZE + ox + right[0] * lat,
+      feet,
+      sprite.y * CELL_SIZE + oz + right[1] * lat
+    );
+    const flip = sprite.pairSlot === 'right' ? -1 : 1;
+    sprite.object.scale.set(size.w * flip, size.h, 1);
     sprite.object.renderOrder = SPRITE_RENDER_ORDER;
   }
 
@@ -777,9 +802,38 @@ export class SpriteManager {
       }
     }
     this.updateHitFx(time);
+    this.tickPairSlides(time);
     if (playerX !== undefined && playerY !== undefined && dir !== undefined) {
       this.layoutBillboards(playerX, playerY, dir);
     }
+  }
+
+  private tickPairSlides(time: number) {
+    for (const sprite of this.sprites) {
+      if (sprite.pairSlideTo == null || sprite.pairSlideAt == null) continue;
+      const t = Math.min(1, (time - sprite.pairSlideAt) / SLIME_PAIR_SLIDE_MS);
+      const from = sprite.pairSlideFrom ?? 1;
+      sprite.pairSlide = from + (sprite.pairSlideTo - from) * t;
+      if (t >= 1) {
+        sprite.pairSlide = sprite.pairSlideTo;
+        sprite.pairSlideTo = undefined;
+        sprite.pairSlot = undefined;
+      }
+    }
+  }
+
+  /** Slide the surviving slimeling back to the square centre. Returns its id. */
+  beginPairSlide(deadId: string, now: number): string | null {
+    const dead = this.spriteByMonsterId(deadId);
+    if (!dead?.pairId) return null;
+    const mate = this.sprites.find(
+      (s) => s.kind === 'monster' && s.pairId === dead.pairId && s.monsterId !== deadId && !s.hidden
+    );
+    if (!mate?.monsterId) return null;
+    mate.pairSlideFrom = mate.pairSlide ?? 1;
+    mate.pairSlideTo = 0;
+    mate.pairSlideAt = now;
+    return mate.monsterId;
   }
 
   private async loadAnchors(baseUrl: string) {
@@ -983,7 +1037,15 @@ export class SpriteManager {
     s.object.visible = false;
   }
 
-  async addLiveMonster(scene: THREE.Scene, kind: string, x: number, y: number, id: string, feetY = 0) {
+  async addLiveMonster(
+    scene: THREE.Scene,
+    kind: string,
+    x: number,
+    y: number,
+    id: string,
+    feetY = 0,
+    pair?: { pairSlot: SlimePairSlot; pairId: string }
+  ) {
     const v2 = this.v2Px.has(kind);
     const folder = v2 ? V2_FOLDER : V1_FOLDER;
     const lodSets: NonNullable<SpriteInfo['lodSets']> = {};
@@ -1040,7 +1102,10 @@ export class SpriteManager {
       animSpeed: 200,
       lastFrameTime: 0,
       anim: 'idle',
-      animOnce: false
+      animOnce: false,
+      pairSlot: pair?.pairSlot,
+      pairId: pair?.pairId,
+      pairSlide: pair ? 1 : 0
     };
     this.sprites.push(info);
     return info;
@@ -1134,6 +1199,8 @@ export class SpriteManager {
     host.frostFlash = true;
     if (tex && host.material instanceof THREE.SpriteMaterial) {
       host.material.map = tex;
+      host.material.blending = THREE.NormalBlending;
+      host.material.opacity = 1;
       host.material.needsUpdate = true;
     }
     const play: HitFxPlay = {
@@ -1157,7 +1224,6 @@ export class SpriteManager {
     host.frostAmount = 0;
     if (host.material instanceof THREE.SpriteMaterial) setFrostAmount(host.material, 0);
     this.playingFx.push(play);
-    this.applyHostTint(play, host);
   }
 
   private async loadSlimeFrostFrames() {
@@ -1168,7 +1234,7 @@ export class SpriteManager {
             const tex = await this.loadTex(slimeFrostFramePath(kind, lod));
             this.slimeFrostTex.set(`${kind}:${lod}`, tex);
           } catch {
-            // missing LOD still tints; each kind uses its own <idle>_frost name
+            // missing LOD keeps the idle frame; each kind uses its own <idle>_frost name
           }
         })
       );
@@ -1308,10 +1374,13 @@ export class SpriteManager {
     }
     if (host && fx.bodySwap) {
       host.frostFlash = false;
-      if (fx.restoreHostMap && host.material instanceof THREE.SpriteMaterial) {
-        host.material.map = fx.restoreHostMap;
-        host.material.needsUpdate = true;
+      host.frostAmount = 0;
+      if (host.material instanceof THREE.SpriteMaterial) {
+        setFrostAmount(host.material, 0);
+        host.material.blending = THREE.NormalBlending;
+        host.material.opacity = 1;
       }
+      this.playAnimAt(host, 'idle', 0);
     }
     if (fx.sprite) {
       fx.sprite.visible = false;

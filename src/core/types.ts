@@ -125,6 +125,8 @@ export interface MonsterState {
   deadAt: number;
   split?: boolean;
   splitDone?: boolean;
+  pairSlot?: 'left' | 'right';
+  pairId?: string;
 }
 
 export interface FightState {
@@ -158,7 +160,11 @@ export type CombatEvent =
   | { type: 'leech_latch'; hero: HeroId }
   | { type: 'leech_off'; hero: HeroId }
   | { type: 'web'; hero: HeroId; until: number }
-  | { type: 'slime_split'; from: string; kids: Array<{ id: string; x: number; y: number; kind: string }> };
+  | {
+      type: 'slime_split';
+      from: string;
+      kids: Array<{ id: string; x: number; y: number; kind: string; slot: 'left' | 'right' }>;
+    };
 
 export interface Occupancy {
   walkable(x: number, y: number): boolean;

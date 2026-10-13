@@ -702,7 +702,7 @@ describe('slime split', () => {
     expect(e.livingMonsters().map((x) => x.kind).sort()).toEqual(['slime_small', 'slime_small']);
   });
 
-  it('spawns split pieces on the slime square or a free neighbor, never the party or a block', () => {
+  it('puts both slimelings on the slime square, never the party square', () => {
     const e = new CombatEngine(rules, {
       d20: () => 20,
       int: (a: number, b: number) => a,
@@ -710,30 +710,65 @@ describe('slime split', () => {
       pick: <T>(xs: T[]) => xs[0],
       chance: () => false
     } as unknown as Rng);
-    e.setOccupancy(
-      openGrid((x, y) => x === 3 && y === 1, 5, 5)
-    );
-    const m = e.spawnMonster('slime', 2, 1, 70, { split: true });
-    e.setPartyPos(2, 0, 2);
+    const m = e.spawnMonster('slime', 2, 0, 70, { split: true });
+    e.setPartyPos(1, 0, 1);
     e.beginFight(m, 0);
     m.hp = 35;
     const ev = e.useHand('brannoc', 'main', 0);
     const split = ev.find((x) => x.type === 'slime_split');
     expect(split && split.type === 'slime_split').toBe(true);
     if (split && split.type === 'slime_split') {
-      const squares = split.kids.map((k) => `${k.x},${k.y}`);
-      expect(squares).toContain('2,1');
-      expect(squares).not.toContain('2,0');
-      expect(squares).not.toContain('3,1');
-      for (const kid of split.kids) {
-        const onSlime = kid.x === 2 && kid.y === 1;
-        const onEast = kid.x === 3 && kid.y === 1;
-        const onParty = kid.x === 2 && kid.y === 0;
-        expect(onEast).toBe(false);
-        expect(onParty).toBe(false);
-        expect(onSlime || (kid.x === 1 && kid.y === 1) || (kid.x === 2 && kid.y === 2)).toBe(true);
-      }
+      expect(split.kids.map((k) => k.slot)).toEqual(['left', 'right']);
+      expect(split.kids.every((k) => k.x === 2 && k.y === 0)).toBe(true);
+      expect(split.kids.every((k) => !(k.x === 1 && k.y === 0))).toBe(true);
     }
+    const combatSrc = readFileSync(resolve(__dirname, '../../src/core/combat.ts'), 'utf8');
+    expect(combatSrc).not.toContain('splitNeighbor');
+  });
+
+  it('keeps attacks on the left slimeling until it dies, then switches', () => {
+    const e = new CombatEngine(rules, {
+      d20: () => 20,
+      int: (a: number, b: number) => a,
+      next: () => 0,
+      pick: <T>(xs: T[]) => xs[0],
+      chance: () => false
+    } as unknown as Rng);
+    const m = e.spawnMonster('slime', 2, 0, 70, { split: true });
+    e.setPartyPos(1, 0, 1);
+    e.beginFight(m, 0);
+    m.hp = 35;
+    e.useHand('brannoc', 'main', 0);
+    const left = e.livingMonsters().find((k) => k.pairSlot === 'left');
+    const right = e.livingMonsters().find((k) => k.pairSlot === 'right');
+    expect(left).toBeTruthy();
+    expect(right).toBeTruthy();
+    expect(e.facingMonster()?.id).toBe(left!.id);
+    expect(e.fight?.monsterId).toBe(left!.id);
+    left!.hp = 1;
+    e.useHand('brannoc', 'main', 3);
+    expect(left!.alive).toBe(false);
+    expect(e.facingMonster()?.id).toBe(right!.id);
+    expect(e.fight?.monsterId).toBe(right!.id);
+  });
+
+  it('staggers the second slimeling timer by 1.25s', () => {
+    const e = new CombatEngine(rules, {
+      d20: () => 20,
+      int: (a: number, b: number) => a,
+      next: () => 0,
+      pick: <T>(xs: T[]) => xs[0],
+      chance: () => false
+    } as unknown as Rng);
+    const m = e.spawnMonster('slime', 2, 0, 70, { split: true });
+    e.setPartyPos(1, 0, 1);
+    e.beginFight(m, 0);
+    m.hp = 35;
+    e.useHand('brannoc', 'main', 10);
+    const left = e.livingMonsters().find((k) => k.pairSlot === 'left')!;
+    const right = e.livingMonsters().find((k) => k.pairSlot === 'right')!;
+    expect(right.nextAttackAt - left.nextAttackAt).toBeCloseTo(1.25, 5);
+    expect(left.nextAttackAt).toBeCloseTo(10 + (rules.monsters.slime_small.interval ?? 2.5), 5);
   });
 
   it('keeps the hit log and frost resist flash when that hit splits the slime', () => {

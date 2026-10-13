@@ -18,6 +18,7 @@ import {
 } from './constants';
 import { CombatEngine, HERO_IDS, openGrid, parseRules, Rng, type CombatEvent } from '../core';
 import { isSlimeKind, takeSlimeFrostBark } from '../core/slime-frost';
+import { SLIME_SMALL_PAN } from '../core/slime-pair';
 import { Dressing } from './dressing';
 import {
   CaveInDirector,
@@ -1116,12 +1117,21 @@ class Game {
           this.spriteManager.playAnimId(e.id, 'death', nowMs);
           this.darkFx.hideEye(e.x, e.y, this.audioManager);
           this.audioManager?.stopWindup(e.id);
+          {
+            const survivor = this.spriteManager.beginPairSlide(e.id, nowMs);
+            if (survivor) this.audioManager?.setSlimelingPan(survivor, 0);
+            this.audioManager?.clearSlimelingPan(e.id);
+          }
           this.syncSlimeAudio();
           break;
         case 'slime_split':
           this.spriteManager.hideDeadMonsterId(e.from);
           for (const kid of e.kids) {
-            void this.spriteManager.addLiveMonster(this.renderer.scene, kid.kind, kid.x, kid.y, kid.id);
+            void this.spriteManager.addLiveMonster(this.renderer.scene, kid.kind, kid.x, kid.y, kid.id, 0, {
+              pairSlot: kid.slot,
+              pairId: e.from
+            });
+            this.audioManager?.setSlimelingPan(kid.id, SLIME_SMALL_PAN[kid.slot]);
           }
           this.syncSlimeAudio();
           break;
@@ -1836,6 +1846,7 @@ class Game {
     this.caveIn.clearLeaveScreen();
     this.barkDirector.clearQueue();
     this.audioManager?.stopSlimeLoops();
+    this.audioManager?.clearSlimelingPan();
     this.clearOilGlugs();
     if (this.caveInBusy) {
       this.caveInBusy = false;

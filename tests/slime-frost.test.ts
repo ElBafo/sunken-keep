@@ -70,6 +70,9 @@ describe('slime frost data and bark flag', () => {
     expect(sprites).toMatch(/playSlimeFrostFlash[\s\S]*tintHost:\s*false/);
     expect(sprites).not.toMatch(/playSlimeFrostFlash[\s\S]*tintHost:\s*true/);
     expect(sprites).toMatch(/playSlimeFrostFlash[\s\S]*frostAmount\s*=\s*0/);
+    expect(sprites).toMatch(/playSlimeFrostFlash[\s\S]*NormalBlending/);
+    expect(sprites).toMatch(/playSlimeFrostFlash[\s\S]*opacity\s*=\s*1/);
+    expect(sprites).not.toMatch(/playSlimeFrostFlash[\s\S]*AdditiveBlending/);
     const atlas = readFileSync(resolve(__dirname, '../public/art/atlas/monsters.json'), 'utf8');
     for (const lod of ['close', 'near', 'mid', 'far']) {
       expect(atlas).toContain(`slime_small_idle_1_${lod}_frost.png`);

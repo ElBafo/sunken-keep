@@ -37,7 +37,11 @@ const EXTRA_ALIASES: Record<string, readonly string[]> = {
   sfx_hit_resist_1: ['hit_resist'],
   sfx_hit_weak_1: ['hit_weak'],
   sfx_slime_gurgle_loop: ['slime_gurgle_loop'],
-  music_slime_battle: ['slime_battle']
+  music_slime_battle: ['slime_battle'],
+  sfx_slime_small_alert: ['slime_small_alert'],
+  sfx_slime_small_attack: ['slime_small_attack'],
+  sfx_slime_small_hurt: ['slime_small_hurt'],
+  sfx_slime_small_death: ['slime_small_death']
 };
 
 export function audioGroupStems(group: AudioLoadGroup): readonly string[] {
