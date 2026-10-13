@@ -52,10 +52,16 @@ describe('wall vs floor props', () => {
     expect(miss).toBeNull();
   });
 
-  it('does not trigger a neighbouring floor prop from a wall-prop square', () => {
+  it('falls through to the desk when standing on the lamp and facing west', () => {
     const west = interactPropAt(floor1.tiles, floor1.width, floor1.height, 13, 9, 3);
-    expect(west).toBeNull();
-    expect(desk.prop).toBeTruthy();
+    expect(west?.x).toBe(12);
+    expect(west?.y).toBe(9);
+    expect(west?.tile.prop).toBe('desk');
+  });
+
+  it('keeps own-square lamp interact when facing its propWall', () => {
+    const east = interactPropAt(floor1.tiles, floor1.width, floor1.height, 13, 9, 1);
+    expect(east?.tile.prop).toBe('lamp_capped');
   });
 
   it('draws the wall-flat plane on the E wall at wall height, inset from the camera', () => {
@@ -73,5 +79,6 @@ describe('wall vs floor props', () => {
     expect(src).toMatch(/MeshLambertMaterial|MeshStandardMaterial/);
     expect(src).toContain('NearestFilter');
     expect(src).toContain('vertexColors: true');
+    expect(src).toContain('emissive');
   });
 });

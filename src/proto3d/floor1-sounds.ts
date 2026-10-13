@@ -29,6 +29,7 @@ export const BEFORE_PLAY_STEMS = [
   'sfx_ui_button',
   'sfx_ui_turn',
   'sfx_ui_log_line',
+  'sfx_bark',
   'sfx_lantern_loop',
   'sfx_lantern_ember_loop'
 ] as const;

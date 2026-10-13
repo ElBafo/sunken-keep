@@ -60,7 +60,7 @@ import { WaterSystem } from './water';
 import { DarkFx } from './dark-fx';
 import { PropBuilder } from './props';
 import { resolveLocale, StoryText } from './i18n';
-import { fitGameStage } from './game-stage';
+import { applyLetterboxStone, fitGameStage } from './game-stage';
 import { loadLayout585 } from './layout585';
 import { PartyHud, type GearId, type HandSlot } from './party-hud';
 import type { HeroId } from '../constants';
@@ -188,6 +188,7 @@ class Game {
     this.skipTitle = params.get('test') === '1' && params.get('title') !== '1';
 
     this.fitStage();
+    void applyLetterboxStone();
     this.audioManager = new AudioManager(this.quality);
     this.setupTapToStart();
 
@@ -540,6 +541,7 @@ class Game {
       this.audioManager.playStep('step_water_deep');
       this.atmosphere.spawnStepSplash(x * CELL_SIZE, y * CELL_SIZE);
       if (this.storyProgress.fire('water_deep')) this.showMessage(this.storyLog('water_deep'));
+      this.speakBark('deep_water');
     } else if (tile.shallowWater) {
       this.audioManager.playStep('step_water_shallow');
       this.atmosphere.spawnStepSplash(x * CELL_SIZE, y * CELL_SIZE);
@@ -1288,7 +1290,7 @@ class Game {
     if (!sconce) return false;
     if (sconce.capped) {
       this.audioManager.playDoor('door_locked', sconce.x, sconce.y);
-      this.showPrompt(this.storyLog('torch_capped'));
+      this.showMessage(this.storyLog('torch_capped'));
       return true;
     }
     if (this.torches.isTapLocked(sconce)) return true;
@@ -1392,7 +1394,7 @@ class Game {
       if (this.speakBark(tile.bark)) return true;
     }
     if (tile.prop === 'lamp_capped') {
-      this.showPrompt(this.storyLog('torch_capped'));
+      this.showMessage(this.storyLog('torch_capped'));
       return true;
     }
     return true;
@@ -1837,6 +1839,7 @@ class Game {
       listener: picked.listener,
       listenerFace: picked.listenerFace
     };
+    this.audioManager.playBarkVoice(speaker);
     return true;
   }
 

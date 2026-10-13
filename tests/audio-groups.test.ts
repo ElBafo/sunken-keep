@@ -23,6 +23,7 @@ describe('audio load groups', () => {
     expect(audioStemKeys('amb_swamp_loop')).not.toContain('ambience');
     expect(audioStemKeys('music_menu_loop')).toContain('menu');
     expect(audioStemKeys('music_act1_loop')).toContain('music_act1');
+    expect(audioStemKeys('sfx_bark')).toContain('bark');
   });
 
   it('keeps intro music out of the title-blocking menu stems', () => {
@@ -37,6 +38,7 @@ describe('audio load groups', () => {
     expect(playable.has('audio/sfx_step_1.mp3')).toBe(true);
     expect(playable.has('audio/sfx_lantern_loop.mp3')).toBe(true);
     expect(playable.has('audio/sfx_bump.mp3')).toBe(true);
+    expect(playable.has('audio/sfx_bark.mp3')).toBe(true);
     expect(playable.has('audio/amb_flooded_halls_loop.mp3')).toBe(false);
     expect(playable.has('audio/sfx_keep_rat_alert.mp3')).toBe(false);
     expect(later).toContain('audio/music_act1_loop.mp3');

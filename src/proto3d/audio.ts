@@ -952,6 +952,18 @@ export class AudioManager {
     return pick;
   }
 
+  /** Wordless bark sting. Prefer vox_<hero>_talk when that buffer exists. */
+  playBarkVoice(hero: string) {
+    const talk = `vox_${hero}_talk`;
+    if (this.buffers.has(talk)) {
+      this.lastHeroVoice = talk;
+      this.playUi(talk, 0.7);
+      return;
+    }
+    this.lastHeroVoice = 'bark';
+    this.playUi('bark', 0.4);
+  }
+
   playHeroHurt(hero: string, nowSec: number) {
     if (!HERO_VOICES) return;
     if (nowSec < this.nextHeroHurtAt) return;

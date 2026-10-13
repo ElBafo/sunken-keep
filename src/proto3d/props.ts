@@ -263,6 +263,9 @@ export class PropBuilder {
     const pose = wallPropPlanePose(x, y, face, img?.width ?? 32, img?.height ?? 48);
     const wallMat = new THREE.MeshLambertMaterial({
       map: this.lampTex,
+      emissive: new THREE.Color(0x3a2818),
+      emissiveMap: this.lampTex,
+      emissiveIntensity: 0.55,
       transparent: true,
       alphaTest: 0.12,
       toneMapped: false,

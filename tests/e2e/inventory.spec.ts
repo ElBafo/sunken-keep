@@ -390,7 +390,8 @@ test('proto3d step3 inventory: pickup, chest loot-all, bag, potions, key, oil, g
   for (const pose of [
     { x: 12, y: 8, dir: 2 },
     { x: 11, y: 9, dir: 1 },
-    { x: 12, y: 10, dir: 0 }
+    { x: 12, y: 10, dir: 0 },
+    { x: 13, y: 9, dir: 3 }
   ]) {
     await page.evaluate(({ x, y, dir }) => {
       const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
