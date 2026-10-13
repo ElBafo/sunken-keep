@@ -7,6 +7,7 @@ import {
 } from '../constants';
 import { ITEM_ACT_SFX } from '../core/types';
 import { HAND_COOLDOWN_MS, OIL_MAX } from './constants';
+import { fetchJsonCached, loadHtmlImage } from './asset-cache';
 import { StoryText } from './i18n';
 import { drawFont5x7, wrapFontLine, type FontGlyphs } from './font5x7';
 import {
@@ -181,14 +182,7 @@ export class PartyHud {
 
   async load() {
     const base = import.meta.env.BASE_URL;
-    const loadImg = (rel: string) =>
-      new Promise<HTMLImageElement>((resolve, reject) => {
-        const img = new Image();
-        img.decoding = 'async';
-        img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error(`Failed to load ${rel}`));
-        img.src = `${base}${rel}`;
-      });
+    const loadImg = (rel: string) => loadHtmlImage(`${base}${rel}`);
     const cache = async (key: string, rel: string) => {
       const img = await loadImg(rel);
       this.images.set(key, img);
@@ -196,15 +190,15 @@ export class PartyHud {
     };
 
     const [hands, fontMeta] = await Promise.all([
-      fetch(`${base}art/ui/hands/hands.json`).then((r) => r.json()) as Promise<{
+      fetchJsonCached<{
         icons?: Record<string, string>;
         size?: [number, number];
-      }>,
-      fetch(`${base}art/font/font_5x7.json`).then((r) => r.json()) as Promise<{
+      }>(`${base}art/ui/hands/hands.json`),
+      fetchJsonCached<{
         columns?: number;
         cellWidth?: number;
         glyphs?: FontGlyphs;
-      }>
+      }>(`${base}art/font/font_5x7.json`)
     ]);
 
     if (Array.isArray(hands.size) && Number.isFinite(hands.size[0])) this.iconSize = hands.size[0];

@@ -10,6 +10,7 @@ import {
   isWaterTile,
   tileBedY
 } from './constants';
+import { loadTextureCached } from './asset-cache';
 import { FloorData, Tile } from './types';
 import { SpriteManager } from './sprites';
 import { VertexLightingManager } from './vertex-lighting';
@@ -95,20 +96,12 @@ export class DarkFx {
   private glowMap: THREE.Texture | null = null;
 
   async load(scene: THREE.Scene, floorData: FloorData, sprites: SpriteManager) {
-    const loader = new THREE.TextureLoader();
     const baseUrl = import.meta.env.BASE_URL;
-    const loadTex = (path: string) =>
-      new Promise<THREE.Texture>((resolve, reject) => {
-        loader.load(
-          `${baseUrl}${path}`,
-          (tex) => {
-            configureFxTexture(tex);
-            resolve(tex);
-          },
-          undefined,
-          (err) => reject(new Error(`Failed to load ${path}: ${String(err)}`))
-        );
-      });
+    const loadTex = async (path: string) => {
+      const tex = await loadTextureCached(`${baseUrl}${path}`);
+      configureFxTexture(tex);
+      return tex;
+    };
 
     const green = await Promise.all(
       Array.from({ length: EYE_FRAMES }, (_, i) => loadTex(`proto3d/fx/dark/eyes_green_${i + 1}.png`))

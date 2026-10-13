@@ -51,6 +51,13 @@ export function interactPropAt(
   playerY: number,
   dir: number
 ): { x: number; y: number; tile: Tile } | null {
+  const here = inBounds(playerX, playerY, width, height) ? tiles[playerY][playerX] : undefined;
+  if (here && isWallProp(here)) {
+    if (canInteractProp(playerX, playerY, dir, playerX, playerY, here)) {
+      return { x: playerX, y: playerY, tile: here };
+    }
+    return null;
+  }
   const [dx, dy] = DIR_DELTA[dir & 3];
   const fx = playerX + dx;
   const fy = playerY + dy;
@@ -58,7 +65,6 @@ export function interactPropAt(
   if (facing && canInteractProp(playerX, playerY, dir, fx, fy, facing)) {
     return { x: fx, y: fy, tile: facing };
   }
-  const here = inBounds(playerX, playerY, width, height) ? tiles[playerY][playerX] : undefined;
   if (here && canInteractProp(playerX, playerY, dir, playerX, playerY, here)) {
     return { x: playerX, y: playerY, tile: here };
   }

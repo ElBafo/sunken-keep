@@ -67,6 +67,14 @@ import type { HeroId } from '../constants';
 import { PartyBag } from './bag';
 import { InventoryUi } from './inventory-ui';
 import { canEquip, equipSfx, pickupSfx, preferredHand } from './items';
+import { fetchJsonCached } from './asset-cache';
+import {
+  asHeroId,
+  BarkDirector,
+  DEFAULT_BARK_RULES,
+  type BarkPartyMember,
+  type BarkRules
+} from './bark-picker';
 
 const FLOOR_NUMBER = 1;
 const FLOOR_SCONCE_DEFAULTS = floor1Sconces.map((s) => ({ ...s }));
@@ -124,6 +132,8 @@ class Game {
   private dialogue = new Map<string, string>();
   private floorStates: Record<string, SavedFloor> = {};
   private storyProgress = new StoryProgress();
+  private barkDirector = new BarkDirector();
+  private lastBarkFace: { speaker: string; face?: string; listener?: string; listenerFace?: string } | null = null;
   private playStartedAt = 0;
   private playAccMs = 0;
   private escapeRunActive = false;
@@ -184,6 +194,7 @@ class Game {
     const locale = resolveLocale(params, this.persist);
     document.documentElement.lang = locale;
     await this.story.load(locale);
+    await this.loadBarkRules();
     this.setTapStatus('loading');
     if (this.skipTitle) {
       this.storyProgress.startNewGame();
@@ -937,8 +948,8 @@ class Game {
   private async initCombat(params: URLSearchParams) {
     const base = import.meta.env.BASE_URL;
     const [actions, monsters] = await Promise.all([
-      fetch(`${base}levels/actions.json`).then((r) => r.json()),
-      fetch(`${base}levels/monsters.json`).then((r) => r.json())
+      fetchJsonCached(`${base}levels/actions.json`),
+      fetchJsonCached(`${base}levels/monsters.json`)
     ]);
     const seedRaw = params.get('seed');
     const seed = seedRaw != null && seedRaw !== '' && Number.isFinite(Number(seedRaw)) ? Number(seedRaw) : Date.now() >>> 0;
@@ -1775,15 +1786,49 @@ class Game {
     }
   }
 
+  private async loadBarkRules() {
+    try {
+      const raw = await fetchJsonCached<Partial<BarkRules>>(`${import.meta.env.BASE_URL}bark_rules.json`);
+      this.barkDirector.setRules({
+        flavour_gap_s: raw.flavour_gap_s ?? DEFAULT_BARK_RULES.flavour_gap_s,
+        flavour_min_interval_s: raw.flavour_min_interval_s ?? DEFAULT_BARK_RULES.flavour_min_interval_s,
+        min_gap_s: raw.min_gap_s ?? DEFAULT_BARK_RULES.min_gap_s
+      });
+    } catch {
+      this.barkDirector.setRules(DEFAULT_BARK_RULES);
+    }
+  }
+
+  private partyForBarks(): BarkPartyMember[] {
+    return HERO_IDS.map((id) => {
+      const hud = this.hud?.heroes[id];
+      const combat = this.combat?.heroes[id];
+      const hp = combat?.hp ?? hud?.hp ?? 1;
+      return { id, downed: !!(hud?.downed || hp <= 0), hp };
+    });
+  }
+
   private speakBark(trigger: string, forcedSpeaker?: HeroId) {
-    const entry = this.story.barkEntry(trigger);
-    const text = entry?.text || this.story.bark(trigger);
-    if (!text) return false;
-    const speaker = (forcedSpeaker || (entry?.speaker as HeroId) || 'brannoc') as HeroId;
+    const picked = this.barkDirector.pick(trigger, this.story.barksFor(trigger), {
+      nowMs: performance.now(),
+      party: this.partyForBarks(),
+      flags: this.flags,
+      act: 1,
+      forcedSpeaker,
+      skipRateLimits: !!forcedSpeaker
+    });
+    if (!picked) return false;
+    const speaker = asHeroId(picked.speaker);
     const name = this.story.speakerName(speaker);
-    this.lastMessage = `${name}: ${text}`;
-    this.hud?.pushLog(`${name}: ${text}`);
-    this.bubble?.show(text, speaker, name);
+    this.lastMessage = `${name}: ${picked.text}`;
+    this.hud?.pushLog(`${name}: ${picked.text}`);
+    this.bubble?.show(picked.text, speaker, name);
+    this.lastBarkFace = {
+      speaker: picked.speaker,
+      face: picked.face,
+      listener: picked.listener,
+      listenerFace: picked.listenerFace
+    };
     return true;
   }
 
@@ -1815,7 +1860,7 @@ class Game {
     );
     this.vertexLighting.relight();
     if (this.storyProgress.fire('secret_found')) this.showMessage(this.storyLog('secret_found'));
-    this.speakBark('secret_wall', 'brannoc');
+    this.speakBark('secret_wall');
     return true;
   }
 
@@ -1881,6 +1926,8 @@ class Game {
     this.playAccMs = 0;
     this.playStartedAt = performance.now();
     this.storyProgress.startNewGame();
+    this.barkDirector.reset();
+    this.lastBarkFace = null;
     this.journalPages.clear();
     this.dialogue.clear();
     this.floorStates = {};
@@ -1967,11 +2014,10 @@ class Game {
   private async loadFloorAudio() {
     try {
       this.audioManager.attachWaterPools(this.renderer.scene, floor1);
-      void this.audioManager.loadLaterSounds().then(() => {
-        this.audioManager.attachDressing(this.renderer.scene, this.dressing.marks);
-        this.audioManager.startNamedLoop('lamp_hooks', 11 * CELL_SIZE, 0.55, 9 * CELL_SIZE, 0.38, 'named');
-        this.rebuildAudioFromState();
-      });
+      this.audioManager.attachDressing(this.renderer.scene, this.dressing.marks);
+      this.audioManager.startNamedLoop('lamp_hooks', 11 * CELL_SIZE, 0.55, 9 * CELL_SIZE, 0.38, 'named');
+      this.rebuildAudioFromState();
+      void this.audioManager.loadLaterSounds();
     } catch (err) {
       console.warn('Audio init failed', err);
       this.audioManager.startLanternLoop(this.oil > 0);
@@ -2018,7 +2064,8 @@ class Game {
         introMusic: this.audioManager.hasIntroMusic(),
         introStarted: this.intro?.hasStarted() ?? false,
         skipToPlayableMs: this.skipToPlayableMs,
-        floor1Prefetch: this.floor1PrefetchStarted
+        floor1Prefetch: this.floor1PrefetchStarted,
+        pendingFloor1Sounds: this.audioManager.pendingFloor1Stems()
       }),
       setPosition: (x: number, y: number, dir: number) => {
         this.cancelSwap();
@@ -2447,6 +2494,7 @@ class Game {
       openSecret: (x: number, y: number) => this.openSecretAt(x, y),
       secretOpen: (x: number, y: number) => !!this.player.tileAt(x, y)?.secretOpen,
       speakBark: (trigger: string, speaker?: HeroId) => this.speakBark(trigger, speaker),
+      lastBark: () => this.lastBarkFace,
       bubbleVisible: () => !!this.bubble?.visible,
       bubbleText: () => this.bubble?.displayText() ?? '',
       flags: () => [...this.flags],

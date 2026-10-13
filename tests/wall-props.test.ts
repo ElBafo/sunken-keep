@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
 import { CELL_SIZE } from '../src/proto3d/constants';
 import { floor1 } from '../src/proto3d/floor-data';
@@ -50,6 +52,12 @@ describe('wall vs floor props', () => {
     expect(miss).toBeNull();
   });
 
+  it('does not trigger a neighbouring floor prop from a wall-prop square', () => {
+    const west = interactPropAt(floor1.tiles, floor1.width, floor1.height, 13, 9, 3);
+    expect(west).toBeNull();
+    expect(desk.prop).toBeTruthy();
+  });
+
   it('draws the wall-flat plane on the E wall at wall height, inset from the camera', () => {
     const pose = wallPropPlanePose(13, 9, 'E', 32, 48);
     expect(pose.scaleY).toBe(CELL_SIZE);
@@ -58,5 +66,12 @@ describe('wall vs floor props', () => {
     expect(wallPropShowsFlat(13, 9, 1, 13, 9, 'E')).toBe(true);
     expect(wallPropShowsFlat(13, 9, 3, 13, 9, 'E')).toBe(false);
     expect(wallPropShowsFlat(13, 8, 2, 13, 9, 'E')).toBe(false);
+  });
+
+  it('draws the own-square stand-in with a lit nearest-filtered material', () => {
+    const src = readFileSync(resolve(__dirname, '../src/proto3d/props.ts'), 'utf8');
+    expect(src).toMatch(/MeshLambertMaterial|MeshStandardMaterial/);
+    expect(src).toContain('NearestFilter');
+    expect(src).toContain('vertexColors: true');
   });
 });

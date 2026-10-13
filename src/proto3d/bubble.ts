@@ -1,4 +1,5 @@
 import type { HeroId } from '../constants';
+import { fetchJsonCached, loadHtmlImage } from './asset-cache';
 import { drawFont5x7, type FontGlyphs } from './font5x7';
 
 const VIEW_W = 270;
@@ -47,7 +48,7 @@ export class SpeechBubble {
       this.loadImg(`${base}art/ui/bubble_9slice.png`),
       this.loadImg(`${base}art/ui/bubble_tail.png`),
       this.loadImg(`${base}art/font/font_5x7.png`),
-      fetch(`${base}art/font/font_5x7.json`).then((r) => r.json()) as Promise<{ glyphs?: FontGlyphs }>
+      fetchJsonCached<{ glyphs?: FontGlyphs }>(`${base}art/font/font_5x7.json`)
     ]);
     this.slice = slice;
     this.tail = tail;
@@ -56,12 +57,7 @@ export class SpeechBubble {
   }
 
   private loadImg(src: string) {
-    return new Promise<HTMLImageElement>((resolve) => {
-      const img = new Image();
-      img.onload = () => resolve(img);
-      img.onerror = () => resolve(img);
-      img.src = src;
-    });
+    return loadHtmlImage(src).catch(() => new Image());
   }
 
   show(text: string, speaker: HeroId, speakerName = '', now = performance.now()) {

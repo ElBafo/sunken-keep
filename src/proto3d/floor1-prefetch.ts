@@ -1,4 +1,5 @@
 import { audioGroupFiles, audioGroupRelPaths } from './audio-groups';
+import { prefetchUrl } from './asset-cache';
 import { floor1 } from './floor-data';
 import { mapPool, SPRITE_LOAD_CONCURRENCY } from './load-pool';
 import { listedTex3dFiles, VARIANT_SURFACES, variantFilenames } from './texture-variants';
@@ -75,7 +76,7 @@ export async function prefetchRelPaths(
   const base = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.BASE_URL : '/';
   await mapPool(paths, limit, async (rel) => {
     try {
-      await fetch(`${base}${rel}`);
+      await prefetchUrl(`${base}${rel}`);
     } catch {
       // Background warm-up; world boot will retry.
     }

@@ -8,6 +8,7 @@ import {
   titleMenuStems
 } from '../src/proto3d/audio-groups';
 import { titleBootRelPaths } from '../src/proto3d/boot-assets';
+import { FLOOR1_PLAY_STEMS } from '../src/proto3d/floor1-sounds';
 import { floor1PlayableRelPaths } from '../src/proto3d/floor1-prefetch';
 
 describe('audio load groups', () => {
@@ -15,7 +16,8 @@ describe('audio load groups', () => {
     expect(audioStemKeys('sfx_oil_pickup')).toContain('oil_pickup');
     expect(audioStemKeys('sfx_lantern_loop')).toContain('lantern_loop');
     expect(audioStemKeys('sfx_lantern_ember_loop')).toContain('lantern_ember_loop');
-    expect(audioStemKeys('amb_swamp_loop')).toContain('ambience');
+    expect(audioStemKeys('amb_flooded_halls_loop')).toContain('ambience');
+    expect(audioStemKeys('amb_swamp_loop')).not.toContain('ambience');
     expect(audioStemKeys('music_menu_loop')).toContain('menu');
     expect(audioStemKeys('music_act1_loop')).toContain('music_act1');
   });
@@ -29,13 +31,24 @@ describe('audio load groups', () => {
   it('puts floor1 beds in the playable list and later beds out of it', () => {
     const playable = new Set(floor1PlayableRelPaths());
     const later = audioGroupRelPaths('later');
-    expect(playable.has('audio/amb_swamp_loop.mp3')).toBe(true);
+    expect(playable.has('audio/amb_flooded_halls_loop.mp3')).toBe(true);
     expect(playable.has('audio/sfx_oil_pickup.mp3')).toBe(true);
     expect(playable.has('audio/sfx_lantern_refill.mp3')).toBe(true);
     expect(later).toContain('audio/music_act1_loop.mp3');
-    expect(later).toContain('audio/amb_flooded_halls_loop.mp3');
+    expect(later).toContain('audio/amb_swamp_loop.mp3');
     expect(playable.has('audio/music_act1_loop.mp3')).toBe(false);
-    expect(playable.has('audio/amb_flooded_halls_loop.mp3')).toBe(false);
+    expect(playable.has('audio/amb_swamp_loop.mp3')).toBe(false);
+  });
+
+  it('keeps every floor 1 playable stem out of the later group', () => {
+    const ready = new Set([...audioGroupStems('title'), ...audioGroupStems('floor1')]);
+    const later = new Set(audioGroupStems('later'));
+    for (const stem of FLOOR1_PLAY_STEMS) {
+      expect(later.has(stem), `${stem} must not stay in later`).toBe(false);
+      expect(ready.has(stem), `${stem} must be in title or floor1`).toBe(true);
+    }
+    expect(later.has('amb_flooded_halls_loop')).toBe(false);
+    expect(ready.has('amb_flood_rush_1_loop')).toBe(false);
   });
 
   it('ships every grouped mp3', () => {

@@ -14,6 +14,7 @@ import {
 import { QUALITY_PRESETS, QualityLevel } from './quality';
 import { DressingMarks } from './dressing';
 import { audioGroupStems, audioStemKeys, audioStemPath, titleMenuStems } from './audio-groups';
+import { loadAudioCached } from './asset-cache';
 import { mapPool, SPRITE_LOAD_CONCURRENCY } from './load-pool';
 import { FloorData, Sconce } from './types';
 
@@ -141,11 +142,13 @@ export class AudioManager {
     document.addEventListener('click', resume, true);
   }
 
-  private async loadBuffer(loader: THREE.AudioLoader, path: string): Promise<AudioBuffer> {
+  private async loadBuffer(_loader: THREE.AudioLoader, path: string): Promise<AudioBuffer> {
     const baseUrl = import.meta.env.BASE_URL;
-    return new Promise((resolve, reject) => {
-      loader.load(`${baseUrl}${path}`, resolve, undefined, reject);
-    });
+    return loadAudioCached(`${baseUrl}${path}`, this.listener.context as AudioContext);
+  }
+
+  pendingFloor1Stems(): string[] {
+    return audioGroupStems('floor1').filter((stem) => !this.stemLoaded(stem));
   }
 
   async loadMenuSounds() {
@@ -1109,7 +1112,7 @@ export class AudioManager {
   }
 
   update(now: number, camX: number, camZ: number) {
-    if (!this.loaded) return;
+    if (!this.playableLoaded && !this.loaded) return;
     const preset = QUALITY_PRESETS[this.quality];
     if (preset.farAudio && now >= this.nextFarAt) {
       this.playFar(camX, camZ, now);

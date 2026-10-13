@@ -1,3 +1,4 @@
+import { fetchJsonCached, loadHtmlImage } from './asset-cache';
 import { titleEssentialImageKeys } from './boot-assets';
 import { StoryText, type Locale } from './i18n';
 import { drawFont5x7, type FontGlyphs } from './font5x7';
@@ -120,8 +121,7 @@ export class TitleScreen {
   async loadEssential() {
     if (this.essentialReady) return;
     const base = import.meta.env.BASE_URL;
-    const res = await fetch(`${base}art/ui/title/title.json`);
-    this.layout = (await res.json()) as TitleLayout;
+    this.layout = (await fetchJsonCached(`${base}art/ui/title/title.json`)) as TitleLayout;
     const files = titleEssentialImageKeys(this.story.locale, this.layout);
     await Promise.all([
       ...files.map((file) => this.cache(file, this.fileUrl(base, file))),
@@ -175,7 +175,7 @@ export class TitleScreen {
 
   private async loadFontMeta(base: string) {
     try {
-      const meta = (await fetch(`${base}art/font/font_5x7.json`).then((r) => r.json())) as { glyphs?: FontGlyphs };
+      const meta = await fetchJsonCached<{ glyphs?: FontGlyphs }>(`${base}art/font/font_5x7.json`);
       this.fontGlyphs = meta.glyphs ?? {};
     } catch {
       this.fontGlyphs = {};
@@ -184,15 +184,11 @@ export class TitleScreen {
 
   private cache(key: string, src: string) {
     if (this.images.has(key)) return Promise.resolve();
-    return new Promise<void>((resolve) => {
-      const img = new Image();
-      img.onload = () => {
+    return loadHtmlImage(src)
+      .then((img) => {
         this.images.set(key, img);
-        resolve();
-      };
-      img.onerror = () => resolve();
-      img.src = src;
-    });
+      })
+      .catch(() => undefined);
   }
 
   show(mode: Mode = 'title') {

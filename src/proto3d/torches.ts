@@ -13,6 +13,7 @@ import {
   TORCH_SNUFF_FPS,
   TORCH_TAP_GUARD_MS
 } from './constants';
+import { loadTextureCached } from './asset-cache';
 import { Sconce } from './types';
 
 export type TorchVisualState = 'lit' | 'dead' | 'capped';
@@ -98,20 +99,12 @@ export class TorchSystem {
   }
 
   async load(scene: THREE.Scene, sconces: Sconce[]) {
-    const loader = new THREE.TextureLoader();
     const baseUrl = import.meta.env.BASE_URL;
-    const loadTex = (path: string): Promise<THREE.Texture> =>
-      new Promise((resolve, reject) => {
-        loader.load(
-          `${baseUrl}${path}`,
-          (tex) => {
-            configureTex(tex);
-            resolve(tex);
-          },
-          undefined,
-          (err) => reject(new Error(`Failed to load torch texture ${path}: ${String(err)}`))
-        );
-      });
+    const loadTex = async (path: string): Promise<THREE.Texture> => {
+      const tex = await loadTextureCached(`${baseUrl}${path}`);
+      configureTex(tex);
+      return tex;
+    };
 
     const states: TorchVisualState[] = ['lit', 'dead', 'capped'];
     const loaded = await Promise.all(

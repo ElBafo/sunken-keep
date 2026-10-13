@@ -8,6 +8,7 @@ import {
 } from './constants';
 import { DoorSystem } from './doors';
 import { makeWallGeometry, wallMidY } from './geometry';
+import { loadTextureCached } from './asset-cache';
 import { mapPool, SPRITE_LOAD_CONCURRENCY } from './load-pool';
 import {
   flipUVsX,
@@ -45,31 +46,20 @@ export class SceneBuilder {
   doors = new DoorSystem();
 
   async loadTextures(): Promise<void> {
-    const loader = new THREE.TextureLoader();
     const baseUrl = import.meta.env.BASE_URL;
     const files = listedTex3dFiles();
 
-    const loadTex = (path: string, opts: TexOpts): Promise<THREE.Texture> => {
-      return new Promise((resolve, reject) => {
-        loader.load(
-          `${baseUrl}${path}`,
-          (tex) => {
-            tex.colorSpace = THREE.SRGBColorSpace;
-            (tex as any).encoding = 3001;
-            tex.magFilter = THREE.NearestFilter;
-            tex.generateMipmaps = opts.mipmaps;
-            tex.minFilter = opts.mipmaps
-              ? THREE.NearestMipmapNearestFilter
-              : THREE.NearestFilter;
-            tex.wrapS = opts.wrapS;
-            tex.wrapT = opts.wrapT;
-            tex.needsUpdate = true;
-            resolve(tex);
-          },
-          undefined,
-          (err) => reject(err)
-        );
-      });
+    const loadTex = async (path: string, opts: TexOpts): Promise<THREE.Texture> => {
+      const tex = await loadTextureCached(`${baseUrl}${path}`);
+      tex.colorSpace = THREE.SRGBColorSpace;
+      (tex as any).encoding = 3001;
+      tex.magFilter = THREE.NearestFilter;
+      tex.generateMipmaps = opts.mipmaps;
+      tex.minFilter = opts.mipmaps ? THREE.NearestMipmapNearestFilter : THREE.NearestFilter;
+      tex.wrapS = opts.wrapS;
+      tex.wrapT = opts.wrapT;
+      tex.needsUpdate = true;
+      return tex;
     };
 
     const wall: TexOpts = {

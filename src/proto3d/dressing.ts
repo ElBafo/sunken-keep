@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { fetchJsonCached, loadTextureCached } from './asset-cache';
 import { CELL_SIZE, FACE_INTO_ROOM, hideWallProp, tileBedY } from './constants';
 import { faceHash } from './texture-variants';
 import { FloorData, Sconce, Tile } from './types';
@@ -118,24 +119,13 @@ export class Dressing {
   private group = new THREE.Group();
 
   async load(): Promise<void> {
-    const loader = new THREE.TextureLoader();
     const baseUrl = import.meta.env.BASE_URL;
     await Promise.all(
-      ATMO_FILES.map(
-        (name) =>
-          new Promise<void>((resolve, reject) => {
-            loader.load(
-              `${baseUrl}proto3d/atmo/${name}.png`,
-              (tex) => {
-                configureAtmoTex(tex, name === 'water_line' || name === 'water_edge');
-                this.textures.set(name, tex);
-                resolve();
-              },
-              undefined,
-              reject
-            );
-          })
-      )
+      ATMO_FILES.map(async (name) => {
+        const tex = await loadTextureCached(`${baseUrl}proto3d/atmo/${name}.png`);
+        configureAtmoTex(tex, name === 'water_line' || name === 'water_edge');
+        this.textures.set(name, tex);
+      })
     );
   }
 
@@ -151,8 +141,7 @@ export class Dressing {
     scene.add(this.group);
 
     const baseUrl = import.meta.env.BASE_URL;
-    const res = await fetch(`${baseUrl}levels/dressing_act1.json`);
-    const data = (await res.json()) as DressingFile;
+    const data = (await fetchJsonCached(`${baseUrl}levels/dressing_act1.json`)) as DressingFile;
     const floor = data.floor1;
     if (!floor) return;
 

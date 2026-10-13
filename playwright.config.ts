@@ -22,11 +22,13 @@ export default defineConfig({
       },
     },
     {
-      name: 'chromium-4g',
+      name: 'iphone-4g',
       testMatch: /skip-playable-4g/,
       use: {
-        ...devices['Desktop Chrome'],
+        ...devices['iPhone 15'],
+        browserName: 'chromium',
         hasTouch: true,
+        isMobile: true,
       },
     },
   ],

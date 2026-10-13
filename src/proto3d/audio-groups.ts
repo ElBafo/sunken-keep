@@ -9,7 +9,7 @@ const EXTRA_ALIASES: Record<string, readonly string[]> = {
   music_menu_loop: ['menu'],
   music_intro: ['intro'],
   music_act1_loop: ['music_act1'],
-  amb_swamp_loop: ['ambience'],
+  amb_flooded_halls_loop: ['ambience'],
   sfx_torch_loop: ['torch'],
   sfx_drip_1: ['drip1'],
   sfx_drip_2: ['drip2'],

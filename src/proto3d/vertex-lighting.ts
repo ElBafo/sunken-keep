@@ -211,6 +211,11 @@ export class VertexLightingManager {
   registerScene(scene: THREE.Scene) {
     this.faces = [];
     const radiusTiles = SCONCE_RADIUS_TILES + 1;
+    if (!scene.getObjectByName('proto3d-vertex-ambient')) {
+      const ambient = new THREE.AmbientLight(0xffffff, 1);
+      ambient.name = 'proto3d-vertex-ambient';
+      scene.add(ambient);
+    }
 
     // Nested door groups store translation/rotation on a parent holder, not the
     // mesh. updateMatrixWorld(true) on the mesh alone does not refresh ancestors,
@@ -231,7 +236,11 @@ export class VertexLightingManager {
         geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
       }
 
-      if (obj.material instanceof THREE.MeshBasicMaterial) {
+      if (
+        obj.material instanceof THREE.MeshBasicMaterial ||
+        obj.material instanceof THREE.MeshLambertMaterial ||
+        obj.material instanceof THREE.MeshStandardMaterial
+      ) {
         obj.material.vertexColors = true;
         obj.material.needsUpdate = true;
       }

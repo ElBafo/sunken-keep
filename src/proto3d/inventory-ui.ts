@@ -1,4 +1,5 @@
 import type { HeroId } from '../core/types';
+import { fetchJsonCached, loadHtmlImage } from './asset-cache';
 import { StoryText } from './i18n';
 import { drawFont5x7, type FontGlyphs } from './font5x7';
 import {
@@ -118,14 +119,7 @@ export class InventoryUi {
 
   async load() {
     const base = import.meta.env.BASE_URL;
-    const loadImg = (rel: string) =>
-      new Promise<HTMLImageElement>((resolve, reject) => {
-        const img = new Image();
-        img.decoding = 'async';
-        img.onload = () => resolve(img);
-        img.onerror = () => reject(new Error(`Failed to load ${rel}`));
-        img.src = `${base}${rel}`;
-      });
+    const loadImg = (rel: string) => loadHtmlImage(`${base}${rel}`);
     const cache = async (key: string, rel: string) => {
       try {
         this.images.set(key, await loadImg(rel));
@@ -133,20 +127,15 @@ export class InventoryUi {
         /* optional plate / icon */
       }
     };
-    const items = (await fetch(`${base}art/ui/items/items.json`).then((r) => r.json())) as {
-      icons?: Record<string, string>;
-    };
-    const hands = (await fetch(`${base}art/ui/hands/hands.json`).then((r) => r.json())) as {
-      icons?: Record<string, string>;
-    };
+    const items = await fetchJsonCached<{ icons?: Record<string, string> }>(`${base}art/ui/items/items.json`);
+    const hands = await fetchJsonCached<{ icons?: Record<string, string> }>(`${base}art/ui/hands/hands.json`);
     for (const [id, file] of Object.entries(items.icons ?? {})) this.itemIcons.set(id, file);
     for (const [id, file] of Object.entries(hands.icons ?? {})) this.handIcons.set(id, file);
 
     const jobs: Array<Promise<void>> = [
       cache('font', 'art/font/font_5x7.png'),
-      fetch(`${base}art/font/font_5x7.json`)
-        .then((r) => r.json())
-        .then((meta: { cellWidth?: number; glyphs?: FontGlyphs }) => {
+      fetchJsonCached<{ cellWidth?: number; glyphs?: FontGlyphs }>(`${base}art/font/font_5x7.json`)
+        .then((meta) => {
           if (Number.isFinite(meta.cellWidth)) this.fontCellW = meta.cellWidth!;
           if (meta.glyphs) this.fontGlyphs = meta.glyphs;
         })

@@ -1,4 +1,5 @@
 import type { HeroId } from '../constants';
+import { fetchJsonCached } from './asset-cache';
 
 export type LayoutRect = [number, number, number, number];
 
@@ -93,9 +94,7 @@ function requireRect(value: unknown, key: string): LayoutRect {
 /** Load every panel/view box from art/ui/layout585/layout585.json. No coordinate fallbacks. */
 export async function loadLayout585(): Promise<Layout585> {
   const base = import.meta.env.BASE_URL;
-  const res = await fetch(`${base}art/ui/layout585/layout585.json`);
-  if (!res.ok) throw new Error(`Failed to load layout585.json (${res.status})`);
-  const raw = (await res.json()) as Record<string, unknown>;
+  const raw = (await fetchJsonCached(`${base}art/ui/layout585/layout585.json`)) as Record<string, unknown>;
   const canvas = raw.canvas;
   if (!Array.isArray(canvas) || canvas.length < 2 || !Number.isFinite(canvas[0]) || !Number.isFinite(canvas[1])) {
     throw new Error('layout585.json is missing canvas');

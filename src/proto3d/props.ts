@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { loadTextureCached } from './asset-cache';
 import { CELL_SIZE } from './constants';
 import { FloorData, Tile } from './types';
 import {
@@ -34,20 +35,12 @@ export class PropBuilder {
   private group = new THREE.Group();
 
   async load(): Promise<void> {
-    const loader = new THREE.TextureLoader();
     const baseUrl = import.meta.env.BASE_URL;
-    const load = (path: string, repeat: boolean): Promise<THREE.Texture> =>
-      new Promise((resolve, reject) => {
-        loader.load(
-          `${baseUrl}${path}`,
-          (tex) => {
-            configureTex(tex, repeat);
-            resolve(tex);
-          },
-          undefined,
-          reject
-        );
-      });
+    const load = async (path: string, repeat: boolean): Promise<THREE.Texture> => {
+      const tex = await loadTextureCached(`${baseUrl}${path}`);
+      configureTex(tex, repeat);
+      return tex;
+    };
 
     const [beam, plain, desk, jar, lamp] = await Promise.all([
       load('proto3d/tex3d/wood_beam.png', true),
@@ -268,14 +261,15 @@ export class PropBuilder {
 
     const img = this.lampTex.image as { width?: number; height?: number } | undefined;
     const pose = wallPropPlanePose(x, y, face, img?.width ?? 32, img?.height ?? 48);
-    const wallMat = new THREE.MeshBasicMaterial({
+    const wallMat = new THREE.MeshLambertMaterial({
       map: this.lampTex,
       transparent: true,
       alphaTest: 0.12,
       toneMapped: false,
       depthTest: true,
       depthWrite: false,
-      side: THREE.FrontSide
+      side: THREE.FrontSide,
+      vertexColors: true
     });
     const plane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), wallMat);
     plane.position.set(pose.x, pose.y, pose.z);
@@ -284,7 +278,6 @@ export class PropBuilder {
     plane.visible = false;
     plane.frustumCulled = false;
     plane.renderOrder = 8;
-    plane.userData.skipVertexLighting = true;
     plane.userData.noPick = true;
     plane.userData.kind = 'lamp_capped_wall';
     plane.userData.lightX = x;

@@ -1,3 +1,5 @@
+import { fetchJsonCached } from './asset-cache';
+
 export type GoalStatus = 'hidden' | 'active' | 'done' | 'failed';
 
 export interface GoalDef {
@@ -194,9 +196,7 @@ export class StoryProgress {
 
 async function fetchJson(url: string): Promise<unknown | null> {
   try {
-    const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
-    if (!res.ok) return null;
-    return res.json();
+    return await fetchJsonCached(url);
   } catch {
     return null;
   }

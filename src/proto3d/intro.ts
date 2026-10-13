@@ -1,3 +1,4 @@
+import { fetchJsonCached, loadHtmlImage } from './asset-cache';
 import { drawFont5x7, wrapCaption, CAPTION_CHAR_PX, type FontGlyphs } from './font5x7';
 import { StoryText } from './i18n';
 
@@ -209,18 +210,15 @@ export class IntroPlayer {
     const existing = this.imageLoads.get(name);
     if (existing) return existing;
     const base = import.meta.env.BASE_URL;
-    const pending = new Promise<HTMLImageElement | null>((resolve) => {
-      const img = new Image();
-      img.onload = () => {
+    const pending = loadHtmlImage(`${base}art/intro/${name}`)
+      .then((img) => {
         this.images.set(name, img);
-        resolve(img);
-      };
-      img.onerror = () => {
+        return img;
+      })
+      .catch(() => {
         this.failed.add(name);
-        resolve(null);
-      };
-      img.src = `${base}art/intro/${name}`;
-    });
+        return null;
+      });
     this.imageLoads.set(name, pending);
     return pending;
   }
@@ -237,9 +235,7 @@ export class IntroPlayer {
     const base = import.meta.env.BASE_URL;
     this.captionsPromise = (async () => {
       try {
-        const res = await fetch(`${base}story/intro_captions.json`);
-        if (!res.ok) return;
-        this.captionFile = (await res.json()) as CaptionFile;
+        this.captionFile = (await fetchJsonCached(`${base}story/intro_captions.json`)) as CaptionFile;
         this.applyCaptionRows();
       } catch {
         this.captionFile = this.captionFile ?? null;
@@ -264,22 +260,15 @@ export class IntroPlayer {
   private loadFont(): Promise<void> {
     const base = import.meta.env.BASE_URL;
     return Promise.all([
-      new Promise<void>((resolve) => {
-        if (this.font) {
-          resolve();
-          return;
-        }
-        const img = new Image();
-        img.onload = () => {
-          this.font = img;
-          resolve();
-        };
-        img.onerror = () => resolve();
-        img.src = `${base}art/font/font_5x7.png`;
-      }),
-      fetch(`${base}art/font/font_5x7.json`)
-        .then((r) => r.json())
-        .then((meta: { glyphs?: FontGlyphs }) => {
+      this.font
+        ? Promise.resolve()
+        : loadHtmlImage(`${base}art/font/font_5x7.png`)
+            .then((img) => {
+              this.font = img;
+            })
+            .catch(() => undefined),
+      fetchJsonCached<{ glyphs?: FontGlyphs }>(`${base}art/font/font_5x7.json`)
+        .then((meta) => {
           this.fontGlyphs = meta.glyphs ?? {};
         })
         .catch(() => undefined)
