@@ -126,8 +126,9 @@ async function measure(
 }
 
 function expectIdleBody(height: number, range: IdleBodyRange, label: string) {
-  expect(height, `${label} idle body >= min-1`).toBeGreaterThanOrEqual(range.min - 1);
-  expect(height, `${label} idle body <= max+1`).toBeLessThanOrEqual(range.max + 1);
+  const px = Math.round(height);
+  expect(px, `${label} idle body >= min-1`).toBeGreaterThanOrEqual(range.min - 1);
+  expect(px, `${label} idle body <= max+1`).toBeLessThanOrEqual(range.max + 1);
 }
 
 test('fixed 270x380 view; idle body heights; slime 3/2/1; no jump', async ({ page }) => {

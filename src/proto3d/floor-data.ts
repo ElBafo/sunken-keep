@@ -46,7 +46,7 @@ export const floor1: FloorData = {
     ],
     [
       { wall: true }, { shallowWater: true }, { deepWater: true }, { shallowWater: true }, { wall: true },
-      m('rust_crab', 24), { item: 'potion_red' }, {}, { wall: true }, {},
+      { ...m('rust_crab', 24), item: 'potion_red' }, { item: 'potion_red' }, {}, { wall: true }, {},
       { prop: 'beams_fallen', propPlacement: 'floor' }, {}, {}, {}, { wall: true }
     ],
     [
@@ -96,9 +96,11 @@ export const floor1: FloorData = {
 };
 
 /**
- * Proto3d only — do not copy this into shared floor1. Until combat is ported,
- * the locked door at (4,2) must have a free square in front at (3,2).
- * Move the leeches onto (3,3) in the water hall (same shallow-water floor height).
+ * Proto3d only — do not copy this into shared floor1.
+ * Until combat is ported, keep a potion under the rust crab at (5,3) so the
+ * guarded-item sprite tests still have a live monster on loot.
+ * The locked door at (4,2) must have a free square in front at (3,2);
+ * move the leeches onto (3,3) in the water hall (same shallow-water floor height).
  */
 function relocateLeechesOffDoor(floor: FloorData) {
   const front = floor.tiles[2][3];

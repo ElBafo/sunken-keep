@@ -140,7 +140,6 @@ class Game {
   private playReady = false;
   private pendingTap = false;
   private skipIntroRequested = false;
-  private lastTapAt = 0;
   private worldBoot: Promise<void> = Promise.resolve();
   private stageFitWired = false;
   private newGameStarted = false;
@@ -2645,9 +2644,6 @@ class Game {
     const onTap = (_e: Event) => {
       this.audioManager.unlock();
       if (!overlayActive()) return;
-      const now = performance.now();
-      if (now - this.lastTapAt < 400) return;
-      this.lastTapAt = now;
       if (this.phase === 'intro') {
         this.flashTapFeedback();
         return;

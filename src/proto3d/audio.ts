@@ -787,7 +787,9 @@ export class AudioManager {
   }
 
   fadeGameOver(ms = 300) {
-    this.fadeOut(this.gameOverSound, ms);
+    const sound = this.gameOverSound;
+    this.gameOverSound = null;
+    this.fadeOut(sound, ms);
   }
 
   isGameOverPlaying() {

@@ -26,6 +26,7 @@ export default defineConfig({
       testMatch: /skip-playable-4g/,
       use: {
         ...devices['Desktop Chrome'],
+        hasTouch: true,
       },
     },
   ],

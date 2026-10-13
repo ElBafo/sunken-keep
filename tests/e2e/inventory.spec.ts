@@ -195,13 +195,15 @@ test('proto3d step3 inventory: pickup, chest loot-all, bag, potions, key, oil, g
     const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
     return proto.getBag().findIndex((s) => s.item === 'oil_flask');
   });
+  expect(oilIndex, 'picked-up oil in bag').toBeGreaterThanOrEqual(0);
   await page.locator(`.inv-slot[data-name="slot-${oilIndex}"]`).tap();
-  await page.locator('#inventory-canvas').tap();
+  await page.locator('#inventory-canvas').tap({ position: { x: 135, y: 370 } });
   await page.waitForTimeout(80);
   expect(await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.getOil())).toBe(3);
   expect(await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.lastUi())).toContain(
     'lantern_refill'
   );
+  await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.closeBag());
 
   await page.evaluate(() => {
     const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
@@ -213,10 +215,12 @@ test('proto3d step3 inventory: pickup, chest loot-all, bag, potions, key, oil, g
     const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
     return proto.getBag().findIndex((s) => s.item === 'oil_flask');
   });
+  expect(oilIndex2, 'given oil in bag').toBeGreaterThanOrEqual(0);
   await page.locator(`.inv-slot[data-name="slot-${oilIndex2}"]`).tap();
   await page.locator('.inv-hero[data-hero="brannoc"]').tap();
   await page.waitForTimeout(80);
   expect(await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.getOil())).toBe(2);
+  await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.closeBag());
 
   await page.evaluate(() => {
     const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
@@ -228,6 +232,7 @@ test('proto3d step3 inventory: pickup, chest loot-all, bag, potions, key, oil, g
     const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
     return proto.getBag().findIndex((s) => s.item === 'oil_flask');
   });
+  expect(oilIndexFull, 'full-lantern oil in bag').toBeGreaterThanOrEqual(0);
   await page.locator(`.inv-slot[data-name="slot-${oilIndexFull}"]`).tap();
   await page.locator('.inv-hero[data-hero="wren"]').tap();
   await page.waitForTimeout(80);
