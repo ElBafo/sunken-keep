@@ -1992,6 +1992,7 @@ class Game {
     await this.withLoading(this.ensurePlayReady());
     await this.applyNewGameReset();
     if (this.skipPlayAt) this.skipToPlayableMs = Math.round(performance.now() - this.skipPlayAt);
+    this.audioManager.armFirstFightCap();
     this.phase = 'play';
     if (!this.playStartedAt) this.playStartedAt = performance.now();
     this.audioManager.markPlayStarted();

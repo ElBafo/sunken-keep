@@ -778,8 +778,11 @@ export class AudioManager {
 
   markPlayStarted() {
     this.playStarted = true;
-    if (!this.firstFightDeadline) this.firstFightDeadline = performance.now() + FIRST_FIGHT_CAP_MS;
     this.fadeOut(this.menuSound, 1000);
+  }
+
+  armFirstFightCap() {
+    if (!this.firstFightDeadline) this.firstFightDeadline = performance.now() + FIRST_FIGHT_CAP_MS;
   }
 
   crossfadeToIntro(ms = 1000) {
