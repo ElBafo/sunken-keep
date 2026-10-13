@@ -20,6 +20,9 @@ def build(dist,seed,fk=1.0,save=True):
     H,W=src.shape[:2]; s=W/160; r=random.Random(seed)
     P=np.unique(src.reshape(-1,3),axis=0); Pl=P.sum(1)
     order=np.argsort(Pl); dark=P[order[0]]; dark2=P[order[min(3,len(P)-1)]]
+    RAMP=P[order]; RIDX={tuple(c):i for i,c in enumerate(RAMP)}
+    STEP=max(1,len(RAMP)//8)   # one ramp step = 1/8 of the wall's luminance ramp
+    def bump(c,n): return RAMP[min(len(RAMP)-1,RIDX[tuple(c)]+n*STEP)]
     def quant(img):  # snap to nearest wall colour
         f=img.reshape(-1,1,3); i=((f-P[None])**2).sum(2).argmin(1); return P[i].reshape(img.shape)
     def shade(img,k): return quant(np.clip(img*k,0,255))
@@ -71,7 +74,7 @@ def build(dist,seed,fk=1.0,save=True):
         x=-r.randint(0,8); rowh=0
         while x<W:
             b,m=chunk(r.choice(plainall),.5); h,w=m.shape
-            if y+h>top(x+w/2)-3*s: place(b,m,x,y+r.randint(-1,1),r.uniform(.3,.4))
+            if y+h>top(x+w/2)-3*s: place(b,m,x,y+r.randint(-1,1),r.uniform(.65,.75))
             x+=w-r.randint(0,2); rowh=max(rowh,h)
         y+=max(3,int(rowh*.7))
     # 2) front pile, stacked with a skyline: each chunk drops until it rests on what is below it.
@@ -82,7 +85,17 @@ def build(dist,seed,fk=1.0,save=True):
         low={c:np.nonzero(m[:,c])[0].max() for c in cols}; hi_={c:np.nonzero(m[:,c])[0].min() for c in cols}
         y=min(surf[x+c]-low[c]-1 for c in cols)+int(s)   # sink 1px: chunks bite into each other
         if y+min(hi_.values())<min(top(x+c) for c in cols)-2*s: return False   # above pile outline
-        place(b,m,x,y,k)
+        place(b,m,x,y,1.0)   # original shading kept inside the block
+        # light catches the top face and the edge facing down the slope: +1/+2 ramp steps
+        t=max(2,int(round(s*3))); right=(x+w/2)>W/2
+        ys,xs=np.nonzero(m)
+        for yy,xx in zip(ys,xs):
+            X,Y=x+xx,y+yy
+            if not(0<=X<W and 0<=Y<H): continue
+            top_d=yy-hi_.get(xx,yy) if xx in hi_ else 99
+            row=np.nonzero(m[yy])[0]; edge_d=(row.max()-xx) if right else (xx-row.min())
+            if top_d<t: out[Y,X]=bump(out[Y,X],2 if top_d<t-1 else 1)
+            elif edge_d<t: out[Y,X]=bump(out[Y,X],1)
         for c in cols: surf[x+c]=min(surf[x+c],y+hi_[c])
         return True
     pieces=[]
@@ -97,11 +110,11 @@ def build(dist,seed,fk=1.0,save=True):
             x=int(r.uniform(-.15,1.0)*W-w*.3)
             if drop(b,m,x,fk*[1.0,.95,.98][tier]*r.uniform(.93,1.05)): break
     # 3) grit: 1-3px crumbs of wall pixels lying on the pile surface and spilled on the floor
-    for _ in range(int(160*s)):
+    for _ in range(int(50*s)):
         x=r.randrange(W); g=max(1,int(r.uniform(1,2.6)*s+.4))
-        y=int(min(H-1,surf[x]+r.uniform(-1,1)*s)) if r.random()<.6 else int(H-r.uniform(1,8)*s)
+        y=int(H-r.uniform(1,6)*s)
         sx=r.randrange(W-g); sy=r.randrange(H-g); gg=src[sy:sy+g,sx:sx+g]
-        place(gg,np.ones((g,g),bool),x,y-g+1,fk,outline=True)
+        place(gg,np.ones((g,g),bool),x,y-g+1,.7,outline=False)
     # 6) a few irregular dark cracks between blocks (no light through)
     for _ in range(int(5+3*s)):
         x=r.uniform(.1,.9)*W; y=r.uniform(.15,.85)*H; L=int(r.uniform(5,14)*s)
@@ -119,16 +132,9 @@ def build(dist,seed,fk=1.0,save=True):
     a=np.dstack([out,np.full((H,W),255)]).astype(np.uint8)
     Image.fromarray(a,'RGBA').save(D+f'rubble_front_{dist}.png'); return m1
 KN={'near':2,'mid':1,'far':0}
-TARGET={'near':24,'mid':18,'far':13}
 for dist,seed in (('near',11),('mid',12),('far',13)):
-    # pick the front-block brightness so the piece hits its target mean; colours are
-    # snapped to existing (brighter) wall colours, the back layer stays dim
-    lo,hi=1.0,4.0
-    for _ in range(12):
-        fk=(lo+hi)/2
-        if build(dist,seed,fk,False)<TARGET[dist]: lo=fk
-        else: hi=fk
-    m=build(dist,seed,(lo+hi)/2); print(f'{dist}: mean {m:.1f} (target {TARGET[dist]}), front gain {(lo+hi)/2:.2f}')
+    m=build(dist,seed); w=np.array(Image.open(D+f'wall_front_{dist}.png').convert('RGB')).mean()
+    print(f'{dist}: rubble mean {m:.1f}, wall mean {w:.1f}')
 # dust burst, 160x140: stringy smeared wisps drifting down/out, dust.png colours + 17-step alpha
 DUST=[(145,141,125),(188,184,168)]
 os.makedirs('public/proto3d/fx',exist_ok=True)
@@ -159,6 +165,20 @@ def frame(f):
                         a=fade*life*max(0,1-abs(j)*.12)*(0.5 if w['hi'] else 0.36)
                         acc[yi,xi]=min(1,acc[yi,xi]+a*.5)
                         if w['hi'] and abs(j)<1 and fade>.5: hi[yi,xi]=True
+    if f==5: acc*=.45   # last frame: faint leftover wisps, no bright streak pop after the soft cloud
+    if f in (2,3,4):   # merge into 2-3 large soft drifting shapes
+        rs=np.random.default_rng(7)
+        cl=np.zeros((140,160)); yy,xx=np.mgrid[0:140,0:160]
+        for (cx,cy,rx,ry,wt) in ((40,92,46,20,1.0),(118,88,44,22,.9),(80,112,52,16,.7))[:3 if f<4 else 2]:
+            cx+=(-1 if cx<80 else 1)*(f-2)*8; cy+=(f-2)*6; rx*=1+.15*(f-2)
+            # warped, ragged edge: radius modulated by low-freq noise per angle and row
+            ang=np.arctan2((yy-cy)/ry,(xx-cx)/rx); rad=np.hypot((xx-cx)/rx,(yy-cy)/ry)
+            warp=1+.25*np.sin(3*ang+cx)+.18*np.sin(5*ang+cy)+.12*np.sin(yy*.35+cx)
+            cl=np.maximum(cl,wt*np.clip(1-rad/warp,0,1)**.8)
+        n=rs.random((140,160)); n=(n+np.roll(n,1,1)+np.roll(n,-1,1)+np.roll(n,2,1))/4   # horizontal smear grain
+        k=[0,0,.42,.38,.24][f]
+        acc=np.maximum(acc*.35,cl*k*(.75+.5*n)); hi[:]=False
+        hi|=(cl>.75)&(n>.55)
     a=(np.clip(acc,0,221/255)*255/17).astype(int)*17
     im=np.zeros((140,160,4),np.uint8)
     for c,msk in ((DUST[0],~hi),(DUST[1],hi)):
