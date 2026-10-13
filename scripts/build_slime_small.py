@@ -2,6 +2,7 @@
 import os,json,glob,colorsys
 os.chdir(os.path.join(os.path.dirname(os.path.abspath(__file__)),'..'))
 from PIL import Image
+import sys; sys.path.insert(0,'scripts'); from slime_clean import clean, helmet_sprite
 D='public/art/dungeon/monsters_v2/'; DISTS=['close','near','mid','far']
 SZ=json.load(open(D+'sizes.json')); WALL=SZ['wallPx']; SQ={'close':'1','near':'2','mid':'3','far':'4'}
 BIG=SZ['monsters']['slime']; H_SMALL=0.44
@@ -35,41 +36,67 @@ def finish(im,do_tint):
     return im
 def small_canvas(d):
     bw,bh=BIG[d]['px']; s=H_SMALL/BIG['worldHeight']; return round(bw*s),round(WALL[SQ[d]]*H_SMALL)
+HURT=[(120,128,81),(132,145,97),(152,152,117),(175,180,128)]
+def lum(c): return 0.299*c[0]+0.587*c[1]+0.114*c[2]
+def hurt_from(idle,ref):
+    # flash frame rebuilt from the cleaned idle: squash to the hurt bbox, recolour onto the hurt ramp by luminance quartile
+    b=idle.crop(idle.getbbox()); rb=ref.getbbox(); b=b.resize((rb[2]-rb[0],rb[3]-rb[1]),Image.NEAREST)
+    out=Image.new('RGBA',ref.size,(0,0,0,0)); out.paste(b,(rb[0],rb[1]))
+    p=out.load(); ls=sorted(lum(p[x,y]) for y in range(out.height) for x in range(out.width) if p[x,y][3])
+    q=[ls[int(len(ls)*k/4)] for k in (1,2,3)]
+    for y in range(out.height):
+        for x in range(out.width):
+            c=p[x,y]
+            if c[3]: p[x,y]=HURT[sum(lum(c)>t for t in q)]+(255,)
+    return out
+_cache={}
+def clean_src(stem):
+    if stem not in _cache:
+        if stem=='slime_hurt_1':
+            _cache[stem]=hurt_from(clean_src('slime_idle_1'),Image.open(D+stem+'_close.png').convert('RGBA'))
+        else: _cache[stem]=clean(Image.open(D+stem+'_close.png'))
+    return _cache[stem]
 made=[]
 for f in files:
     d=f[:-4].rsplit('_',1)[1]; stem=f[:-4].rsplit('_',1)[0]
-    src=Image.open(D+stem+'_close.png').convert('RGBA')   # largest source
+    src=clean_src(stem)   # largest source, helmet + bones painted out
     cw,ch=small_canvas(d)
     out=finish(src.resize((cw,ch),Image.LANCZOS),True)
     name=f.replace('slime','slime_small',1); out.save(D+name); made.append(name)
 # split frames
 def body(im):  # crop to opaque bbox
     return im.crop(im.getbbox())
+WAIST=0.40
 for d in DISTS:
-    big=Image.open(D+f'slime_idle_1_{d}.png').convert('RGBA'); sm=Image.open(D+f'slime_small_idle_1_{d}.png').convert('RGBA')
+    bigraw=Image.open(D+f'slime_idle_1_{d}.png').convert('RGBA'); big=clean(bigraw)
+    sm=Image.open(D+f'slime_small_idle_1_{d}.png').convert('RGBA')
     bw,bh=big.size; sw,sh=sm.size; W=max(bw,2*sw+2); H=bh
     def canvas(): return Image.new('RGBA',(W,H),(0,0,0,0))
-    # 1: squash + waist
+    helm=helmet_sprite(bigraw)
+    # 1: squash + deep waist (40% of body height, pinched from the top), helmet kept, sitting under the pinch
     b=body(big); nw,nh=round(b.width*1.12),round(b.height*0.9)
-    sq=b.resize((nw,nh),Image.NEAREST); p=sq.load(); cx=nw/2; waist=max(1,round(nh*0.18)); half=max(1,round(nw*0.12))
+    sq=b.resize((nw,nh),Image.NEAREST); p=sq.load(); cx=(nw-1)/2; depth=round(nh*WAIST); half=max(2,round(nw*0.10))
     for x in range(nw):
-        t=1-abs(x-cx)/half
+        t=1-((x-cx)/half)**2
         if t<=0: continue
-        cut=round(waist*t)
-        for y in range(nh):
-            if p[x,y][3]:
-                for yy in range(y,min(nh,y+cut)): p[x,yy]=(0,0,0,0)
-                break
+        cut=max(1,round(depth*t**0.5))
+        top=next((y for y in range(nh) if p[x,y][3]),None)
+        if top is None: continue
+        for yy in range(top,min(nh-1,top+cut)): p[x,yy]=(0,0,0,0)
+    hs=helm.resize((max(1,round(helm.width*1.12)),max(1,round(helm.height*0.9))),Image.NEAREST)
+    hy=min(nh-hs.height-1,depth+1)
+    sq.alpha_composite(hs,(round(cx-hs.width/2+0.5),hy))
     c=canvas(); c.paste(sq,((W-nw)//2,H-nh),sq); c=finish(c,False)
-    # 2: two blobs overlapping/separating ; 3: two smalls apart
-    for n,off in ((2,0.28),(3,0.5)):
-        c2=canvas() if n==2 else canvas()
-        if n==1: pass
-        s=body(sm); dx=round(s.width*off)
-        for sx in (W//2-dx-s.width//2+ (0 if n==3 else 0), W//2+dx-s.width//2):
-            c2.alpha_composite(s,(max(0,min(W-s.width,sx)),H-s.height))
-        outs={2:finish(c2,True),3:c2}
-        outs[n].save(D+f'slime_split_{n}_{d}.png'); made.append(f'slime_split_{n}_{d}.png')
+    # 2: two smalls tearing apart, helmet dropped on the floor between them ; 3: two smalls apart
+    hsm=helm.resize((max(1,round(helm.width*sw/bw)),max(1,round(helm.height*sw/bw))),Image.LANCZOS)
+    for n,off in ((2,0.34),(3,0.5)):
+        c2=canvas(); s_=body(sm); dx=round(s_.width*off)
+        for sx in (W//2-dx-s_.width//2, W//2+dx-s_.width//2):
+            c2.alpha_composite(s_,(max(0,min(W-s_.width,sx)),H-s_.height))
+        if n==2:
+            hb=finish(hsm,False); hb=hb.crop(hb.getbbox()); c2.alpha_composite(hb,(W//2-hb.width//2,H-hb.height))
+        out=c2
+        out.save(D+f'slime_split_{n}_{d}.png'); made.append(f'slime_split_{n}_{d}.png')
     c.save(D+f'slime_split_1_{d}.png'); made.append(f'slime_split_1_{d}.png')
 # metadata
 SZ['monsters']['slime_small']={'worldHeight':H_SMALL,'worldHeightSource':'floor1 v2 split (0.8 x slime)',
