@@ -22,6 +22,7 @@ import {
   WINDUP_SOUND,
   WINDUP_SOUND_SEC
 } from './types';
+import { isSlimeKind } from './slime-frost';
 
 const DIRS: Array<[number, number]> = [
   [0, -1],
@@ -383,7 +384,10 @@ export class CombatEngine {
     const b = this.def(kind)?.behavior;
     if (!b || b.habit !== 'resist_blades') return 1;
     const dtype = damageType(item);
-    if (dtype === 'frost' || item === 'scroll' || item === 'wand') return 1 + (b.frostBonus ?? 0.25);
+    if (dtype === 'frost' || item === 'scroll' || item === 'wand') {
+      if (typeof b.frostMul === 'number') return b.frostMul;
+      return 1 + (b.frostBonus ?? 0.25);
+    }
     if (dtype === 'blade' || dtype === 'pierce' || b.halfDamage?.includes(item)) return 0.5;
     return 1;
   }
@@ -718,6 +722,13 @@ export class CombatEngine {
       this.emit({ type: 'log', key: 'hit', vars: { hero: heroId, monster: target.kind, n: dmg } });
     }
     this.emit({ type: 'sfx', name: this.hitSfx(kind), x: target.x, y: target.y, combat: true });
+    if (
+      kind === 'resist' &&
+      isSlimeKind(target.kind) &&
+      (damageType(item) === 'frost' || item === 'scroll' || item === 'wand')
+    ) {
+      this.emit({ type: 'log', key: 'slime_frost_resist', vars: { monster: target.kind } });
+    }
 
     if (damageType(item) === 'fire') {
       for (const id of HERO_IDS) {

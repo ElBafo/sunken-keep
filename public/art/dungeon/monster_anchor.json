@@ -3833,7 +3833,21 @@
     "gapBelow": 0,
     "topRow": 8
    },
+   "slime_idle_1_close_frost.png": {
+    "imageW": 102,
+    "imageH": 71,
+    "footRow": 70,
+    "gapBelow": 0,
+    "topRow": 8
+   },
    "slime_idle_1_far.png": {
+    "imageW": 31,
+    "imageH": 21,
+    "footRow": 20,
+    "gapBelow": 0,
+    "topRow": 2
+   },
+   "slime_idle_1_far_frost.png": {
     "imageW": 31,
     "imageH": 21,
     "footRow": 20,
@@ -3847,7 +3861,21 @@
     "gapBelow": 0,
     "topRow": 3
    },
+   "slime_idle_1_mid_frost.png": {
+    "imageW": 40,
+    "imageH": 27,
+    "footRow": 26,
+    "gapBelow": 0,
+    "topRow": 3
+   },
    "slime_idle_1_near.png": {
+    "imageW": 56,
+    "imageH": 39,
+    "footRow": 38,
+    "gapBelow": 0,
+    "topRow": 5
+   },
+   "slime_idle_1_near_frost.png": {
     "imageW": 56,
     "imageH": 39,
     "footRow": 38,

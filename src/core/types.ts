@@ -47,6 +47,7 @@ export interface MonsterBehavior {
   halfDamage?: string[];
   fullDamage?: string[];
   frostBonus?: number;
+  frostMul?: number;
   phaseHpFrac?: number;
   block?: 'halve' | 'negate';
   stationary?: boolean;

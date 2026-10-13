@@ -17,6 +17,7 @@ import {
   TORCH_IGNITE_FLARE_MS
 } from './constants';
 import { CombatEngine, HERO_IDS, openGrid, parseRules, Rng, type CombatEvent } from '../core';
+import { isSlimeKind, takeSlimeFrostBark } from '../core/slime-frost';
 import { Dressing } from './dressing';
 import {
   CaveInDirector,
@@ -1085,6 +1086,9 @@ class Game {
       switch (e.type) {
         case 'log':
           this.combatLog(e.key, e.vars);
+          if (e.key === 'slime_frost_resist' && takeSlimeFrostBark(this.flags)) {
+            this.speakBark('slime_frost_resist');
+          }
           break;
         case 'sfx':
           if (e.name === 'hero_down') break;
@@ -1097,7 +1101,7 @@ class Game {
           this.lastHitType = e.kind;
           this.hud.lastHitType = e.kind;
           this.spriteManager.playHitFx(e.id, e.kind, nowMs);
-          if (e.kind === 'resist') this.hud.armFrostHint();
+          if (e.kind === 'resist' && !isSlimeKind(e.monster)) this.hud.armFrostHint();
           break;
         case 'monster_anim':
           this.spriteManager.playAnimId(e.id, e.anim, nowMs);

@@ -9,6 +9,7 @@ import {
   tileBedY
 } from './constants';
 import type { HitKind } from '../core/types';
+import { isSlimeKind, slimeFrostFramePath } from '../core/slime-frost';
 import { loadSpriteTexture, textureFrameSize } from './atlas';
 import { fetchJsonCached } from './asset-cache';
 import { createLimiter, mapPool, SPRITE_LOAD_CONCURRENCY } from './load-pool';
@@ -143,8 +144,8 @@ interface HitFxSpec {
 }
 
 interface HitFxPlay {
-  sprite: THREE.Sprite;
-  material: THREE.SpriteMaterial;
+  sprite: THREE.Sprite | null;
+  material: THREE.SpriteMaterial | null;
   frames: THREE.Texture[];
   started: number;
   fps: number;
@@ -157,6 +158,8 @@ interface HitFxPlay {
   holdFps: number;
   tintHost: boolean;
   frame: number;
+  restoreHostMap?: THREE.Texture | null;
+  bodySwap?: boolean;
 }
 
 interface BodyAnchor {
@@ -204,6 +207,7 @@ interface SpriteInfo {
   forceLit?: boolean;
   itemId?: string;
   frostAmount?: number;
+  frostFlash?: boolean;
 }
 
 function configureSpriteTexture(tex: THREE.Texture) {
@@ -290,6 +294,7 @@ export class SpriteManager {
   private v2Px = new Map<string, Partial<Record<LodName, [number, number]>>>();
   private heights = new Map<string, number>();
   private hitFx = new Map<string, HitFxSpec>();
+  private slimeFrostTex = new Map<string, THREE.Texture>();
   private bodyAnchors = new Map<string, BodyAnchor>();
   private playingFx: HitFxPlay[] = [];
   lastHitType: HitKind | null = null;
@@ -698,6 +703,7 @@ export class SpriteManager {
     if (!frames?.length) return;
     sprite.frames = frames;
     sprite.currentFrame = Math.min(sprite.currentFrame, frames.length - 1);
+    if (sprite.frostFlash) return;
     sprite.material.map = frames[sprite.currentFrame];
     sprite.material.needsUpdate = true;
   }
@@ -761,8 +767,10 @@ export class SpriteManager {
             sprite.currentFrame = sprite.animOnce
               ? Math.min(sprite.frames.length - 1, sprite.currentFrame + 1)
               : (sprite.currentFrame + 1) % sprite.frames.length;
-            sprite.material.map = sprite.frames[sprite.currentFrame];
-            sprite.material.needsUpdate = true;
+            if (!sprite.frostFlash) {
+              sprite.material.map = sprite.frames[sprite.currentFrame];
+              sprite.material.needsUpdate = true;
+            }
           }
           sprite.lastFrameTime = time;
         }
@@ -1058,10 +1066,14 @@ export class SpriteManager {
 
   playHitFx(id: string, kind: HitKind, now: number) {
     this.lastHitType = kind;
+    const host = this.spriteByMonsterId(id);
+    if (host && isSlimeKind(host.monsterKind) && kind === 'resist') {
+      this.playSlimeFrostFlash(host, now);
+      return;
+    }
     const specName = kind === 'resist' ? 'resist' : kind === 'weak' ? 'weak' : null;
     if (!specName) return;
     const spec = this.hitFx.get(specName);
-    const host = this.spriteByMonsterId(id);
     const scene = this.scene;
     if (!spec || !host || !scene || !spec.frames.length) return;
 
@@ -1110,6 +1122,55 @@ export class SpriteManager {
     this.playingFx.push(play);
     this.placeHitFx(play, host);
     this.applyHostTint(play, host);
+  }
+
+  private playSlimeFrostFlash(host: SpriteInfo, now: number) {
+    const existing = this.playingFx.find((fx) => fx.hostId === host.monsterId);
+    if (existing) this.removeHitFx(existing);
+    const lod = host.currentLod ?? 'near';
+    const kind = host.monsterKind ?? 'slime';
+    const tex = this.slimeFrostTex.get(`${kind}:${lod}`) ?? this.slimeFrostTex.get(`${kind}:near`);
+    const restore = host.material instanceof THREE.SpriteMaterial ? host.material.map : null;
+    host.frostFlash = true;
+    if (tex && host.material instanceof THREE.SpriteMaterial) {
+      host.material.map = tex;
+      host.material.needsUpdate = true;
+    }
+    const play: HitFxPlay = {
+      sprite: null,
+      material: null,
+      frames: tex ? [tex] : [],
+      started: now,
+      fps: FROST_HOLD_FPS,
+      hostId: host.monsterId ?? '',
+      imgW: 0,
+      imgH: 0,
+      pivotX: 0.5,
+      pivotYFromTop: 0.5,
+      holdFrames: FROST_HOLD_FRAMES,
+      holdFps: FROST_HOLD_FPS,
+      tintHost: true,
+      frame: 0,
+      restoreHostMap: restore,
+      bodySwap: true
+    };
+    this.playingFx.push(play);
+    this.applyHostTint(play, host);
+  }
+
+  private async loadSlimeFrostFrames() {
+    for (const kind of ['slime', 'slime_small'] as const) {
+      await Promise.all(
+        LOD_NAMES.map(async (lod) => {
+          try {
+            const tex = await this.loadTex(slimeFrostFramePath(kind, lod));
+            this.slimeFrostTex.set(`${kind}:${lod}`, tex);
+          } catch {
+            // slime_small frost art ships later; lookup still uses these names
+          }
+        })
+      );
+    }
   }
 
   private hitFxFrame(fx: HitFxPlay, elapsedSec: number): number {
@@ -1179,9 +1240,11 @@ export class SpriteManager {
     } catch {
       // optional art
     }
+    await this.loadSlimeFrostFrames();
   }
 
   private placeHitFx(fx: HitFxPlay, host: SpriteInfo) {
+    if (fx.bodySwap || !fx.sprite) return;
     const anchor = this.bodyAnchors.get(host.monsterKind ?? '') ?? { u: 0.5, vFromBottom: 0.4 };
     const wx = host.object.position.x + (anchor.u - 0.5) * host.baseW;
     const wy = host.floorY + anchor.vFromBottom * host.baseH;
@@ -1206,6 +1269,18 @@ export class SpriteManager {
         continue;
       }
       this.placeHitFx(fx, host);
+      if (fx.bodySwap) {
+        const elapsed = (time - fx.started) / 1000;
+        const holdDur = fx.holdFrames / fx.holdFps;
+        fx.frame = Math.min(Math.max(fx.holdFrames - 1, 0), Math.floor(elapsed * fx.holdFps));
+        if (elapsed >= holdDur) {
+          this.removeHitFx(fx);
+          continue;
+        }
+        this.applyHostTint(fx, host);
+        live.push(fx);
+        continue;
+      }
       const frame = this.hitFxFrame(fx, (time - fx.started) / 1000);
       if (frame >= fx.frames.length) {
         this.removeHitFx(fx);
@@ -1214,7 +1289,7 @@ export class SpriteManager {
       fx.frame = frame;
       this.applyHostTint(fx, host);
       const tex = fx.frames[Math.max(0, frame)];
-      if (fx.material.map !== tex) {
+      if (fx.material && fx.material.map !== tex) {
         fx.material.map = tex;
         fx.material.needsUpdate = true;
       }
@@ -1229,9 +1304,18 @@ export class SpriteManager {
       host.frostAmount = 0;
       if (host.material instanceof THREE.SpriteMaterial) setFrostAmount(host.material, 0);
     }
-    fx.sprite.visible = false;
-    fx.sprite.parent?.remove(fx.sprite);
-    fx.material.dispose();
+    if (host && fx.bodySwap) {
+      host.frostFlash = false;
+      if (fx.restoreHostMap && host.material instanceof THREE.SpriteMaterial) {
+        host.material.map = fx.restoreHostMap;
+        host.material.needsUpdate = true;
+      }
+    }
+    if (fx.sprite) {
+      fx.sprite.visible = false;
+      fx.sprite.parent?.remove(fx.sprite);
+    }
+    fx.material?.dispose();
   }
 
   private clearHitFx() {

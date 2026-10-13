@@ -2,7 +2,7 @@
  "image": "art/atlas/monsters.png",
  "size": {
   "w": 511,
-  "h": 1261
+  "h": 1336
  },
  "padding": 2,
  "extrude": 1,
@@ -1638,6 +1638,30 @@
    "y": 835,
    "w": 92,
    "h": 39
+  },
+  "art/dungeon/monsters_v2/slime_idle_1_close_frost.png": {
+   "x": 2,
+   "y": 1263,
+   "w": 102,
+   "h": 71
+  },
+  "art/dungeon/monsters_v2/slime_idle_1_near_frost.png": {
+   "x": 108,
+   "y": 1263,
+   "w": 56,
+   "h": 39
+  },
+  "art/dungeon/monsters_v2/slime_idle_1_mid_frost.png": {
+   "x": 168,
+   "y": 1263,
+   "w": 40,
+   "h": 27
+  },
+  "art/dungeon/monsters_v2/slime_idle_1_far_frost.png": {
+   "x": 212,
+   "y": 1263,
+   "w": 31,
+   "h": 21
   }
  }
 }
