@@ -9,7 +9,8 @@ import {
   tileBedY
 } from './constants';
 import type { HitKind } from '../core/types';
-import { fetchJsonCached, loadTextureCached } from './asset-cache';
+import { loadSpriteTexture, textureFrameSize } from './atlas';
+import { fetchJsonCached } from './asset-cache';
 import { createLimiter, mapPool, SPRITE_LOAD_CONCURRENCY } from './load-pool';
 import { FloorData, Tile } from './types';
 
@@ -77,8 +78,7 @@ function lodFromFile(file: string): LodName {
 }
 
 function texSize(tex: THREE.Texture | undefined): { w: number; h: number } {
-  const img = tex?.image as { width?: number; height?: number } | undefined;
-  return { w: img?.width ?? 80, h: img?.height ?? 60 };
+  return textureFrameSize(tex);
 }
 
 const ITEM_SPRITE: Record<string, { file: string; h: number; base?: string; prefix?: string }> = {
@@ -412,9 +412,8 @@ export class SpriteManager {
   }
 
   private loadTex(path: string): Promise<THREE.Texture> {
-    const baseUrl = import.meta.env.BASE_URL;
     return this.limitTex(async () => {
-      const tex = await loadTextureCached(`${baseUrl}${path}`);
+      const tex = await loadSpriteTexture(path);
       configureSpriteTexture(tex);
       return tex;
     });

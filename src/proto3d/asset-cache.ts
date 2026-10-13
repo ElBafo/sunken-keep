@@ -9,6 +9,17 @@ const jsonCache = new Map<string, Promise<unknown>>();
 const imageCache = new Map<string, Promise<HTMLImageElement>>();
 const textureCache = new Map<string, Promise<THREE.Texture>>();
 const audioCache = new Map<string, Promise<AudioBuffer>>();
+const fetchLog: string[] = [];
+let resetHook: (() => void) | null = null;
+
+/** Tests and atlas leak checks subscribe so sheet maps clear with the URL cache. */
+export function onAssetCacheReset(fn: () => void): void {
+  resetHook = fn;
+}
+
+export function recordedFetchUrls(): readonly string[] {
+  return fetchLog;
+}
 
 function remember<T>(map: Map<string, Promise<T>>, key: string, factory: () => Promise<T>): Promise<T> {
   const existing = map.get(key);
@@ -22,6 +33,7 @@ function remember<T>(map: Map<string, Promise<T>>, key: string, factory: () => P
 }
 
 export function fetchArrayBuffer(url: string): Promise<ArrayBuffer> {
+  fetchLog.push(url);
   return remember(buffers, url, async () => {
     const res = await fetch(url);
     if (!res.ok) throw new Error(`Failed to fetch ${url} (${res.status})`);
@@ -97,4 +109,6 @@ export function resetAssetCache(): void {
   imageCache.clear();
   textureCache.clear();
   audioCache.clear();
+  fetchLog.length = 0;
+  resetHook?.();
 }

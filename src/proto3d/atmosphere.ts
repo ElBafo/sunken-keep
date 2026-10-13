@@ -150,9 +150,14 @@ export class Atmosphere {
         fog: true,
         alphaTest: 0.05
       });
+      // dust.png is a 2×2 grid; scale those cells onto dust's atlas rect (or the whole file).
+      const ox = atlas.offset.x;
+      const oy = atlas.offset.y;
+      const rx = atlas.repeat.x;
+      const ry = atlas.repeat.y;
       mat.map = atlas.clone();
-      mat.map.offset.set(offsets[g][0], offsets[g][1]);
-      mat.map.repeat.set(0.5, 0.5);
+      mat.map.offset.set(ox + offsets[g][0] * rx, oy + offsets[g][1] * ry);
+      mat.map.repeat.set(rx * 0.5, ry * 0.5);
       mat.map.needsUpdate = true;
       const points = new THREE.Points(geo, mat);
       points.frustumCulled = false;

@@ -1,0 +1,155 @@
+{
+ "image": "art/atlas/fx.png",
+ "size": {
+  "w": 400,
+  "h": 920
+ },
+ "padding": 2,
+ "extrude": 1,
+ "frames": {
+  "proto3d/atmo/ash_bowl.png": {
+   "x": 138,
+   "y": 2,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/banner_torn.png": {
+   "x": 270,
+   "y": 2,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/bones.png": {
+   "x": 2,
+   "y": 262,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/ceiling_crack.png": {
+   "x": 134,
+   "y": 262,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/chains.png": {
+   "x": 266,
+   "y": 262,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/cobweb_corner_l.png": {
+   "x": 2,
+   "y": 394,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/cobweb_corner_r.png": {
+   "x": 134,
+   "y": 394,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/crack_large.png": {
+   "x": 266,
+   "y": 394,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/desk_note.png": {
+   "x": 2,
+   "y": 526,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/drip_drop.png": {
+   "x": 206,
+   "y": 790,
+   "w": 4,
+   "h": 8
+  },
+  "proto3d/atmo/drip_stain.png": {
+   "x": 134,
+   "y": 526,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/dust.png": {
+   "x": 214,
+   "y": 790,
+   "w": 8,
+   "h": 8
+  },
+  "proto3d/atmo/jar_rack.png": {
+   "x": 266,
+   "y": 526,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/lamp_capped.png": {
+   "x": 170,
+   "y": 790,
+   "w": 32,
+   "h": 48
+  },
+  "proto3d/atmo/lamp_hooks.png": {
+   "x": 2,
+   "y": 658,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/moss_patch.png": {
+   "x": 134,
+   "y": 658,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/rust_stain.png": {
+   "x": 266,
+   "y": 658,
+   "w": 128,
+   "h": 128
+  },
+  "proto3d/atmo/sconce_capped.png": {
+   "x": 134,
+   "y": 790,
+   "w": 32,
+   "h": 64
+  },
+  "proto3d/atmo/shaft_1.png": {
+   "x": 2,
+   "y": 2,
+   "w": 64,
+   "h": 256
+  },
+  "proto3d/atmo/shaft_2.png": {
+   "x": 70,
+   "y": 2,
+   "w": 64,
+   "h": 256
+  },
+  "proto3d/atmo/splash_1.png": {
+   "x": 226,
+   "y": 790,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/atmo/splash_2.png": {
+   "x": 246,
+   "y": 790,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/atmo/splash_3.png": {
+   "x": 266,
+   "y": 790,
+   "w": 16,
+   "h": 8
+  },
+  "proto3d/atmo/tally_marks.png": {
+   "x": 2,
+   "y": 790,
+   "w": 128,
+   "h": 128
+  }
+ }
+}

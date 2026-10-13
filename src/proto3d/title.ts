@@ -1,3 +1,4 @@
+import { drawSprite, loadSpriteImage, type SpriteImage } from './atlas';
 import { fetchJsonCached, loadHtmlImage } from './asset-cache';
 import { titleEssentialImageKeys } from './boot-assets';
 import { StoryText, type Locale } from './i18n';
@@ -91,6 +92,7 @@ export class TitleScreen {
   story: StoryText;
   private layout: TitleLayout | null = null;
   private images = new Map<string, HTMLImageElement>();
+  private portraits = new Map<string, SpriteImage>();
   private ctx: CanvasRenderingContext2D;
   private glowAlpha = 0.4;
   private glowDir = 1;
@@ -163,7 +165,17 @@ export class TitleScreen {
       'ilsevar_healthy.png',
       'mags_healthy.png'
     ];
-    await Promise.all(files.map((file) => this.cache(file, this.fileUrl(base, file))));
+    await Promise.all([
+      ...files.filter((file) => !file.endsWith('_healthy.png')).map((file) => this.cache(file, this.fileUrl(base, file))),
+      ...['brannoc', 'wren', 'ilsevar', 'mags'].map(async (id) => {
+        const file = `${id}_healthy.png`;
+        try {
+          this.portraits.set(file, await loadSpriteImage(`art/portraits/${file}`));
+        } catch {
+          /* optional face */
+        }
+      })
+    ]);
   }
 
   private fileUrl(base: string, file: string): string {
@@ -403,9 +415,9 @@ export class TitleScreen {
     faces.forEach((id, i) => {
       const well = wells[i];
       if (!well) return;
-      const img = this.images.get(`${id}_healthy.png`);
+      const img = this.portraits.get(`${id}_healthy.png`);
       if (!img) return;
-      ctx.drawImage(img, x + well[0] + inset[0], y + well[1] + inset[1], inset[2], inset[3]);
+      drawSprite(ctx, img, x + well[0] + inset[0], y + well[1] + inset[1], inset[2], inset[3]);
     });
     const area = this.story.titleText(`areas.${save.floor}`) || '';
     const line1 = this.story.titleText('slot.line1', { n: save.floor, area });

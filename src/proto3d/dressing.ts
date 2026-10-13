@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { loadSpriteTexture } from './atlas';
 import { fetchJsonCached, loadTextureCached } from './asset-cache';
 import { CELL_SIZE, FACE_INTO_ROOM, hideWallProp, tileBedY } from './constants';
 import { faceHash } from './texture-variants';
@@ -73,6 +74,7 @@ const SKIP_KINDS = new Set([
   'beams_fallen'
 ]);
 const FOG_READABLE = new Set(['tally_marks', 'water_line', 'ash_bowl']);
+const TILE_ATMO = new Set(['water_edge', 'water_line']);
 const DECAL_OFFSET = 0.02;
 const AGAINST_TO_WALL: Record<Face, { dx: number; dy: number; face: Face }> = {
   W: { dx: -1, dy: 0, face: 'E' },
@@ -122,8 +124,10 @@ export class Dressing {
     const baseUrl = import.meta.env.BASE_URL;
     await Promise.all(
       ATMO_FILES.map(async (name) => {
-        const tex = await loadTextureCached(`${baseUrl}proto3d/atmo/${name}.png`);
-        configureAtmoTex(tex, name === 'water_line' || name === 'water_edge');
+        const path = `proto3d/atmo/${name}.png`;
+        const repeat = TILE_ATMO.has(name);
+        const tex = repeat ? await loadTextureCached(`${baseUrl}${path}`) : await loadSpriteTexture(path);
+        configureAtmoTex(tex, repeat);
         this.textures.set(name, tex);
       })
     );

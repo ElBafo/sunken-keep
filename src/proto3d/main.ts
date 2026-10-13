@@ -67,6 +67,7 @@ import type { HeroId } from '../constants';
 import { PartyBag } from './bag';
 import { InventoryUi } from './inventory-ui';
 import { canEquip, equipSfx, pickupSfx, preferredHand } from './items';
+import { atlasFallbackPaths, coveredSingleFileLoads, ensureAtlases, recordedPngRelPaths } from './atlas';
 import { fetchJsonCached } from './asset-cache';
 import {
   asHeroId,
@@ -386,12 +387,13 @@ class Game {
       onClose: () => this.closeBag(),
       playUi: (name) => this.audioManager?.playUi(name)
     });
+    const atlases = ensureAtlases();
     const hudReady = this.hud.load();
     void this.inventory.load();
     if (this.bubble) void this.bubble.load();
 
     this.sceneBuilder = new SceneBuilder();
-    await this.sceneBuilder.loadTextures();
+    await Promise.all([atlases, this.sceneBuilder.loadTextures()]);
     this.sceneBuilder.buildScene(this.renderer.scene, floor1);
     void this.audioManager.loadBeforePlaySounds();
 
@@ -2084,7 +2086,10 @@ class Game {
         pendingBeforePlaySounds: this.audioManager.pendingBeforePlayStems(),
         pendingFirstFightSounds: this.audioManager.pendingFirstFightStems(),
         firstFightUnlocked: this.audioManager.isFirstFightUnlocked(),
-        playAgeMs: this.playStartedAt ? Math.round(performance.now() - this.playStartedAt) : null
+        playAgeMs: this.playStartedAt ? Math.round(performance.now() - this.playStartedAt) : null,
+        atlasFallbacks: atlasFallbackPaths(),
+        atlasLeaks: coveredSingleFileLoads(),
+        imagePngs: recordedPngRelPaths()
       }),
       setPosition: (x: number, y: number, dir: number) => {
         this.cancelSwap();

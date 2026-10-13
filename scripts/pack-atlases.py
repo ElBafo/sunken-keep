@@ -4,7 +4,9 @@ P='public/'; title=[l.strip() for l in open('scripts/atlas-floor1-capture.txt')]
 groups={'monsters':sorted(os.path.relpath(f,P) for f in glob.glob(P+'art/dungeon/monsters_v2/*.png')),
  'portraits':[f for f in title if f.startswith('art/portraits/')],
  'ui':[f for f in title if f.startswith('art/ui/') and not f.startswith('art/ui/title/')],
- 'props':[f for f in title if f.startswith(('art/dungeon/','art/fx/hits/','proto3d/tex3d/torch/'))]}
+ 'props':[f for f in title if f.startswith(('art/dungeon/','art/fx/hits/','proto3d/tex3d/torch/'))],
+ # water_edge / water_line stay single files (RepeatWrapping). Darkness / wall / water tiles too.
+ 'fx':[f for f in title if f.startswith('proto3d/atmo/') and not f.endswith(('water_edge.png','water_line.png'))]}
 PAD=2; MAX=2048; out={}
 def pack(files,W):
     items=sorted(files,key=lambda f:(-Image.open(P+f).size[1],f)); pl={}; x=y=rowh=0; maxw=0
