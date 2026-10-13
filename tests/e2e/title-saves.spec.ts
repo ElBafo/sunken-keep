@@ -99,15 +99,30 @@ async function rememberSaves(page: import('@playwright/test').Page) {
   await page.evaluate(() => sessionStorage.setItem('proto3d-keep-saves', '1'));
 }
 
-async function bootPlay(page: import('@playwright/test').Page, qs = 'test=1&persist=1&debug=1') {
-  await page.goto(`${BASE_URL}/proto3d.html?${qs}`);
+async function dismissTapOverlay(page: import('@playwright/test').Page) {
+  const tap = page.locator('#tap-to-start');
+  if (!(await tap.isVisible())) return;
+  await tap.tap({ timeout: 3000 }).catch(() => undefined);
+  if (await tap.isVisible()) {
+    await page.evaluate(() => {
+      const api = (window as unknown as { __proto3d?: { dismissTap?: () => void } }).__proto3d;
+      api?.dismissTap?.();
+    });
+  }
+}
+
+async function waitGameReady(page: import('@playwright/test').Page, timeout = 30000) {
   await page.waitForFunction(
     () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
     null,
-    { timeout: 30000 }
+    { timeout }
   );
-  const tap = page.locator('#tap-to-start');
-  if (await tap.isVisible()) await tap.tap();
+  await dismissTapOverlay(page);
+}
+
+async function bootPlay(page: import('@playwright/test').Page, qs = 'test=1&persist=1&debug=1') {
+  await page.goto(`${BASE_URL}/proto3d.html?${qs}`);
+  await waitGameReady(page);
   await page.waitForTimeout(300);
 }
 
@@ -133,6 +148,68 @@ async function mapState(page: import('@playwright/test').Page) {
 test.describe('proto3d step4 title and saves', () => {
   test.setTimeout(180000);
 
+  test('tap to start waits for stage scale; New Game starts when shot 1 and intro music are ready', async ({
+    page
+  }) => {
+    const preloaded: string[] = [];
+    page.on('request', (req) => {
+      const url = req.url();
+      if (url.includes('/art/intro/shot') || url.includes('music_intro')) preloaded.push(url);
+    });
+    await keepSavesAcrossReload(page);
+    await page.goto(`${BASE_URL}/proto3d.html`);
+    await page.waitForFunction(
+      () => {
+        const api = (window as unknown as { __proto3d?: { ready?: boolean; boot?: () => { tapPromptReady?: boolean } } })
+          .__proto3d;
+        return api?.ready === true && api.boot?.().tapPromptReady === true;
+      },
+      null,
+      { timeout: 30000 }
+    );
+    const beforeTap = await page.evaluate(() => {
+      const stage = document.getElementById('game-stage');
+      const tap = document.getElementById('tap-to-start-text');
+      const api = (window as unknown as { __proto3d: { boot: () => Record<string, unknown> } }).__proto3d;
+      return {
+        transform: stage?.style.transform ?? '',
+        tap: tap?.textContent ?? '',
+        boot: api.boot()
+      };
+    });
+    expect(beforeTap.transform).toMatch(/scale\(/);
+    expect(beforeTap.tap).toMatch(/Tap to start/i);
+    expect(beforeTap.boot.tapPromptReady).toBe(true);
+    await page.evaluate(() => {
+      const canvas = document.getElementById('title-canvas');
+      canvas?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, isPrimary: true }));
+    });
+    await dismissTapOverlay(page);
+    await expect(page.locator('#tap-to-start')).toBeHidden();
+    await expect(page.locator('#title-overlay')).toHaveClass(/show/);
+    await page.waitForFunction(
+      () => {
+        const boot = (window as unknown as { __proto3d: { boot: () => { introShot1?: boolean } } }).__proto3d.boot();
+        return boot.introShot1 === true;
+      },
+      null,
+      { timeout: 15000 }
+    );
+    const started = Date.now();
+    await page.locator('.title-hit[data-id="New Game"]').tap();
+    await expect(page.locator('#intro-overlay')).toHaveClass(/show/, { timeout: 8000 });
+    const waitMs = Date.now() - started;
+    expect(waitMs).toBeLessThan(3000);
+    expect(preloaded.some((u) => u.includes('shot1_keep'))).toBe(true);
+    expect(preloaded.some((u) => u.includes('music_intro'))).toBe(true);
+    const after = await page.evaluate(() =>
+      (window as unknown as { __proto3d: { boot: () => { introStarted?: boolean } } }).__proto3d.boot()
+    );
+    expect(after.introStarted).toBe(true);
+    await page.locator('#intro-overlay').tap();
+    await expect(page.locator('#intro-overlay')).not.toHaveClass(/show/);
+  });
+
   test('new game plays intro then skip, greek title, continue restore, overwrite, blocked, autosave, game over', async ({
     page
   }) => {
@@ -149,11 +226,7 @@ test.describe('proto3d step4 title and saves', () => {
 
     await keepSavesAcrossReload(page);
     await page.goto(`${BASE_URL}/proto3d.html`);
-    await page.waitForFunction(
-      () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
-      null,
-      { timeout: 30000 }
-    );
+    await waitGameReady(page);
     await expect(page.locator('#title-overlay')).toHaveClass(/show/);
     await expect(page.locator('#fps-counter')).toHaveCount(0);
     const chrome = await page.evaluate(() => {
@@ -228,11 +301,7 @@ test.describe('proto3d step4 title and saves', () => {
     await page.locator('.title-hit[data-id="Overwrite"]').tap();
 
     await page.reload();
-    await page.waitForFunction(
-      () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
-      null,
-      { timeout: 30000 }
-    );
+    await waitGameReady(page);
     await expect(page.locator('#title-overlay')).toHaveClass(/show/);
     await page.locator('.title-hit[data-id="Load"]').tap();
     await page.waitForTimeout(200);
@@ -367,11 +436,7 @@ test.describe('proto3d step4 title and saves', () => {
     mkdirSync(OUT, { recursive: true });
     await keepSavesAcrossReload(page);
     await page.goto(`${BASE_URL}/proto3d.html`);
-    await page.waitForFunction(
-      () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
-      null,
-      { timeout: 30000 }
-    );
+    await waitGameReady(page);
     await rememberSaves(page);
     await page.evaluate(() => {
       localStorage.setItem(
@@ -380,11 +445,7 @@ test.describe('proto3d step4 title and saves', () => {
       );
     });
     await page.reload();
-    await page.waitForFunction(
-      () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
-      null,
-      { timeout: 30000 }
-    );
+    await waitGameReady(page);
     await page.locator('.title-hit[data-id="Load"]').tap();
     await page.waitForTimeout(250);
     const slot = page.locator('#title-canvas');
@@ -573,11 +634,7 @@ test.describe('proto3d step4 title and saves', () => {
     mkdirSync(OUT, { recursive: true });
     await keepSavesAcrossReload(page);
     await page.goto(`${BASE_URL}/proto3d.html`);
-    await page.waitForFunction(
-      () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
-      null,
-      { timeout: 30000 }
-    );
+    await waitGameReady(page);
     await page.locator('.title-hit[data-id="New Game"]').tap();
     await page.waitForTimeout(150);
     if (await page.locator('#intro-overlay').evaluate((el) => el.classList.contains('show'))) {
@@ -598,11 +655,7 @@ test.describe('proto3d step4 title and saves', () => {
     });
     await rememberSaves(page);
     await page.reload();
-    await page.waitForFunction(
-      () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
-      null,
-      { timeout: 30000 }
-    );
+    await waitGameReady(page);
     await page.waitForTimeout(2200);
     await page.locator('.title-hit[data-id="Continue"]').tap();
     await page.waitForTimeout(1200);
@@ -661,21 +714,13 @@ test.describe('proto3d step4 title and saves', () => {
     mkdirSync(OUT, { recursive: true });
     await keepSavesAcrossReload(page);
     await page.goto(`${BASE_URL}/proto3d.html`);
-    await page.waitForFunction(
-      () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
-      null,
-      { timeout: 30000 }
-    );
+    await waitGameReady(page);
     await rememberSaves(page);
     await page.evaluate(() => {
       localStorage.setItem('proto3d.save.v1.slot.3', 'not-json{{{');
     });
     await page.reload();
-    await page.waitForFunction(
-      () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
-      null,
-      { timeout: 30000 }
-    );
+    await waitGameReady(page);
     await page.locator('.title-hit[data-id="Load"]').tap();
     await page.waitForTimeout(250);
     await page.screenshot({ path: `${OUT}/corrupt-nonjson-slot.png`, fullPage: false });

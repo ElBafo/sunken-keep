@@ -13,6 +13,7 @@ import {
 } from './constants';
 import { QUALITY_PRESETS, QualityLevel } from './quality';
 import { DressingMarks } from './dressing';
+import { TITLE_MENU_AUDIO } from './boot-assets';
 import { FloorData, Sconce } from './types';
 
 const FAR_KEYS = ['far_draught', 'far_groan', 'far_pebbles', 'far_rumble'] as const;
@@ -50,6 +51,10 @@ export class AudioManager {
   private heardBones = new Set<string>();
   private scratchDist: number[] = [];
   private loaded = false;
+  private menuLoaded = false;
+  private soundsPromise: Promise<void> | null = null;
+  private introMusicPromise: Promise<void> | null = null;
+  private introStarted = false;
   private uiPool: THREE.Audio[] = [];
   private lanternSound: THREE.Audio | null = null;
   private lanternMode: 'oil' | 'ember' | 'off' = 'off';
@@ -137,8 +142,95 @@ export class AudioManager {
     });
   }
 
+  async loadMenuSounds() {
+    if (this.menuLoaded) return;
+    const loader = new THREE.AudioLoader();
+    await this.loadFileList(loader, TITLE_MENU_AUDIO);
+    this.ensureMenuSound();
+    if (!this.uiSound) {
+      this.uiSound = new THREE.Audio(this.listener);
+      this.uiPool.push(this.uiSound);
+    }
+    this.menuLoaded = true;
+  }
+
+  private async loadFileList(loader: THREE.AudioLoader, files: ReadonlyArray<readonly [string, string]>) {
+    const missing = files.filter(([name]) => !this.buffers.has(name));
+    const results = await Promise.all(
+      missing.map(async ([name, path]) => {
+        try {
+          const buf = await this.loadBuffer(loader, path);
+          return [name, buf] as const;
+        } catch (err) {
+          console.warn('Failed to load', path, err);
+          return null;
+        }
+      })
+    );
+    for (const pair of results) {
+      if (pair) this.buffers.set(pair[0], pair[1]);
+    }
+  }
+
+  private ensureMenuSound() {
+    if (this.menuSound) return;
+    const menu = this.buffers.get('menu');
+    if (!menu) return;
+    this.menuSound = new THREE.Audio(this.listener);
+    this.menuSound.setBuffer(menu);
+    this.menuSound.setLoop(true);
+    this.menuSound.setVolume(0.7);
+  }
+
+  private ensureIntroSound() {
+    if (this.introSound) return;
+    const intro = this.buffers.get('intro');
+    if (!intro) return;
+    this.introSound = new THREE.Audio(this.listener);
+    this.introSound.setBuffer(intro);
+    this.introSound.setLoop(false);
+    this.introSound.setVolume(0.7);
+  }
+
+  /** Background-load music_intro during the title. Safe to call more than once. */
+  async loadIntroMusic() {
+    if (this.buffers.has('intro')) {
+      this.ensureIntroSound();
+      return;
+    }
+    if (this.introMusicPromise) return this.introMusicPromise;
+    this.introMusicPromise = (async () => {
+      const loader = new THREE.AudioLoader();
+      await this.loadFileList(loader, [['intro', 'audio/music_intro.mp3']]);
+      this.ensureIntroSound();
+    })();
+    try {
+      await this.introMusicPromise;
+    } finally {
+      if (!this.buffers.has('intro')) this.introMusicPromise = null;
+    }
+  }
+
+  whenIntroMusic(): Promise<void> {
+    return this.loadIntroMusic();
+  }
+
+  hasIntroMusic(): boolean {
+    return this.buffers.has('intro');
+  }
+
   async loadSounds(scene: THREE.Scene, sconces: readonly Sconce[]) {
     if (this.loaded) return;
+    if (this.soundsPromise) return this.soundsPromise;
+    this.soundsPromise = this.loadSoundsInner(scene, sconces);
+    try {
+      await this.soundsPromise;
+    } finally {
+      if (!this.loaded) this.soundsPromise = null;
+    }
+  }
+
+  private async loadSoundsInner(scene: THREE.Scene, sconces: readonly Sconce[]) {
     const loader = new THREE.AudioLoader();
     const files: Array<[string, string]> = [
       ['ambience', 'audio/amb_flooded_halls_loop.mp3'],
@@ -287,20 +379,7 @@ export class AudioManager {
       ['vox_mags_down', 'audio/vox_mags_down.mp3']
     ];
 
-    const results = await Promise.all(
-      files.map(async ([name, path]) => {
-        try {
-          const buf = await this.loadBuffer(loader, path);
-          return [name, buf] as const;
-        } catch (err) {
-          console.warn('Failed to load', path, err);
-          return null;
-        }
-      })
-    );
-    for (const pair of results) {
-      if (pair) this.buffers.set(pair[0], pair[1]);
-    }
+    await this.loadFileList(loader, files);
 
     const amb = this.buffers.get('ambience');
     if (amb) {
@@ -318,24 +397,14 @@ export class AudioManager {
       this.musicSound.setVolume(0.3);
     }
 
-    const menu = this.buffers.get('menu');
-    if (menu) {
-      this.menuSound = new THREE.Audio(this.listener);
-      this.menuSound.setBuffer(menu);
-      this.menuSound.setLoop(true);
-      this.menuSound.setVolume(0.7);
-    }
+    this.ensureMenuSound();
+    this.ensureIntroSound();
+    this.menuLoaded = true;
 
-    const intro = this.buffers.get('intro');
-    if (intro) {
-      this.introSound = new THREE.Audio(this.listener);
-      this.introSound.setBuffer(intro);
-      this.introSound.setLoop(false);
-      this.introSound.setVolume(0.7);
+    if (!this.uiSound) {
+      this.uiSound = new THREE.Audio(this.listener);
+      this.uiPool.push(this.uiSound);
     }
-
-    this.uiSound = new THREE.Audio(this.listener);
-    this.uiPool.push(this.uiSound);
     this.scene = scene;
 
     void sconces;
@@ -630,7 +699,11 @@ export class AudioManager {
     this.stopIntro();
     if (this.menuSound && !this.menuSound.isPlaying) {
       this.menuSound.setVolume(0.7);
-      this.menuSound.play();
+      try {
+        this.menuSound.play();
+      } catch {
+        // Host audio can refuse playback; the bed is still intended to run.
+      }
     }
   }
 
@@ -642,12 +715,18 @@ export class AudioManager {
   crossfadeToIntro(ms = 1000) {
     this.unlock();
     this.fadeOut(this.menuSound, ms);
-    if (this.introSound) {
-      if (this.introSound.isPlaying) this.introSound.stop();
-      this.introSound.setVolume(0);
+    if (this.introStarted || this.introSound?.isPlaying) return;
+    this.introStarted = true;
+    this.ensureIntroSound();
+    if (!this.introSound) return;
+    this.introSound.setVolume(0);
+    try {
       this.introSound.play();
-      this.fadeIn(this.introSound, 0.7, ms);
+    } catch {
+      this.introStarted = false;
+      return;
     }
+    this.fadeIn(this.introSound, 0.7, ms);
   }
 
   crossfadeToAct1(ms = 1000) {

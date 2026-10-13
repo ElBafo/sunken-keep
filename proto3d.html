@@ -272,7 +272,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      z-index: 1000;
+      z-index: 1800;
       font-family: monospace;
       color: #fff;
     }
@@ -283,6 +283,10 @@
       font-size: 24px;
       margin-bottom: 20px;
       animation: pulse 2s infinite;
+    }
+    #tap-to-start.feedback #tap-to-start-text {
+      animation: none;
+      opacity: 0.35;
     }
     @keyframes pulse {
       0%, 100% { opacity: 1; }
