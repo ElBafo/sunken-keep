@@ -203,18 +203,18 @@
    }
   },
   "slime": {
-   "worldHeight": 0.55,
+   "worldHeight": 0.39,
    "worldHeightSource": "levels/monsters.json",
    "close": {
     "squares": 1,
     "px": [
-     144,
-     100
+     102,
+     71
     ],
-    "exactPx": 99.63,
+    "exactPx": 70.65,
     "quadWorld": [
-     1.584,
-     1.1
+     1.1206,
+     0.78
     ],
     "feetShifted": {},
     "rimLight": false
@@ -222,13 +222,13 @@
    "near": {
     "squares": 2,
     "px": [
-     79,
-     55
+     56,
+     39
     ],
-    "exactPx": 55.35,
+    "exactPx": 39.25,
     "quadWorld": [
-     1.58,
-     1.1
+     1.12,
+     0.78
     ],
     "feetShifted": {},
     "rimLight": false
@@ -236,13 +236,13 @@
    "mid": {
     "squares": 3,
     "px": [
-     55,
-     38
+     40,
+     27
     ],
-    "exactPx": 38.32,
+    "exactPx": 27.17,
     "quadWorld": [
-     1.5921,
-     1.1
+     1.1556,
+     0.78
     ],
     "feetShifted": {},
     "rimLight": false
@@ -250,13 +250,73 @@
    "far": {
     "squares": 4,
     "px": [
-     43,
-     29
+     31,
+     21
     ],
-    "exactPx": 29.3,
+    "exactPx": 20.78,
     "quadWorld": [
-     1.631,
-     1.1
+     1.1514,
+     0.78
+    ],
+    "feetShifted": {},
+    "rimLight": true
+   }
+  },
+  "slime_small": {
+   "worldHeight": 0.312,
+   "worldHeightSource": "floor1 v2 split (0.8 x slime)",
+   "close": {
+    "squares": 1,
+    "px": [
+     82,
+     57
+    ],
+    "exactPx": 56.52,
+    "quadWorld": [
+     0.8965,
+     0.624
+    ],
+    "feetShifted": {},
+    "rimLight": false
+   },
+   "near": {
+    "squares": 2,
+    "px": [
+     45,
+     31
+    ],
+    "exactPx": 31.4,
+    "quadWorld": [
+     0.896,
+     0.624
+    ],
+    "feetShifted": {},
+    "rimLight": false
+   },
+   "mid": {
+    "squares": 3,
+    "px": [
+     32,
+     22
+    ],
+    "exactPx": 21.74,
+    "quadWorld": [
+     0.9245,
+     0.624
+    ],
+    "feetShifted": {},
+    "rimLight": false
+   },
+   "far": {
+    "squares": 4,
+    "px": [
+     25,
+     17
+    ],
+    "exactPx": 16.62,
+    "quadWorld": [
+     0.9211,
+     0.624
     ],
     "feetShifted": {},
     "rimLight": false
