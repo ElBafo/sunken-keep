@@ -241,10 +241,15 @@ export class CombatEngine {
     };
   }
 
-  beginFight(monster: MonsterState, now: number): CombatEvent[] {
-    this.events = [];
-    if (this.gameOver) return [];
-    if (this.fight?.monsterId === monster.id) return [];
+  /**
+   * Start a fight without touching the event queue. Notice/chase paths must use
+   * this so earlier events in the same tick (monster_move, monster_near) survive.
+   * Alert + fight_start live only here so each chase ducks music and plays the
+   * alert once, from the monster's current square.
+   */
+  private startFight(monster: MonsterState, now: number): void {
+    if (this.gameOver) return;
+    if (this.fight?.monsterId === monster.id) return;
     if (this.fight) this.endFight(now);
     this.fight = { monsterId: monster.id, startedAt: now };
     monster.noticed = true;
@@ -252,6 +257,12 @@ export class CombatEngine {
     monster.windup = null;
     this.emit({ type: 'fight_start', monsterId: monster.id, kind: monster.kind });
     this.emit({ type: 'sfx', name: `${monster.kind}_alert`, x: monster.x, y: monster.y, combat: true });
+  }
+
+  /** Wrapper for bump / engage: isolate the start-fight batch and return it. */
+  beginFight(monster: MonsterState, now: number): CombatEvent[] {
+    this.events = [];
+    this.startFight(monster, now);
     return this.flush();
   }
 
@@ -761,10 +772,9 @@ export class CombatEngine {
       if (dist <= NOTICE_RANGE && this.hasLos(m.x, m.y, this.partyX, this.partyY)) {
         if (!m.noticed) {
           m.noticed = true;
-          this.emit({ type: 'sfx', name: `${m.kind}_alert`, x: m.x, y: m.y, combat: true });
           this.emit({ type: 'log', key: 'monster_near' });
         }
-        if (dist === 1 && !this.fight) this.beginFight(m, now);
+        if (dist === 1 && !this.fight) this.startFight(m, now);
       }
     }
     if (this.fight) return;
@@ -784,7 +794,7 @@ export class CombatEngine {
       m.x = step.x;
       m.y = step.y;
       this.emit({ type: 'monster_move', id: m.id, from, to: { x: m.x, y: m.y } });
-      if (manhattan(m.x, m.y, this.partyX, this.partyY) === 1) this.beginFight(m, now);
+      if (manhattan(m.x, m.y, this.partyX, this.partyY) === 1) this.startFight(m, now);
     }
   }
 

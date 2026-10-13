@@ -13,6 +13,8 @@ import {
   LANTERN_HEIGHT,
   LANTERN_INTENSITY,
   LANTERN_RADIUS_TILES,
+  PROP_LANTERN_INTENSITY,
+  PROP_LANTERN_RADIUS_TILES,
   LIGHT_FLICKER_AMPLITUDE,
   LIGHT_FLICKER_PERIOD_MS,
   CARRIED_TORCH_INTENSITY,
@@ -33,6 +35,7 @@ interface CachedFace {
   worldPos: Float32Array;
   colors: THREE.BufferAttribute;
   isDark: boolean;
+  isProp: boolean;
   nearSconce: boolean;
   tileX: number;
   tileY: number;
@@ -73,11 +76,20 @@ function smoothFalloff(distTiles: number, radius: number): number {
 }
 
 /**
- * Lantern / ember: full on the party's own square, then a steep quartic drop
- * so the middle of the next square is already near-ambient (oil ~1.5 tiles,
- * ember ~1.1). Walls and ceiling use 3D distance and fall off with height.
+ * Props-only oil lantern: wide quadratic 1−(d/r)². Peak stays on the party
+ * square; 1 tile is still most of the peak; the tail fades a bit past 2.
  */
-function partyFalloff(distTiles: number, radius: number, coreTiles = LANTERN_CORE_TILES): number {
+export function lanternFalloff(distTiles: number, radius: number): number {
+  if (radius <= 0 || distTiles >= radius) return 0;
+  const x = distTiles / radius;
+  return 1 - x * x;
+}
+
+/**
+ * Floors, walls, and carried torch: full on the party square, then a steep
+ * quartic drop so the middle of the next square is already near-ambient.
+ */
+export function partyFalloff(distTiles: number, radius: number, coreTiles = LANTERN_CORE_TILES): number {
   if (radius <= 0 || distTiles >= radius) return 0;
   const core = Math.min(coreTiles, radius * 0.45);
   if (distTiles <= core) return 1;
@@ -85,14 +97,23 @@ function partyFalloff(distTiles: number, radius: number, coreTiles = LANTERN_COR
   return t * t * t * t;
 }
 
-function partyDistTiles(wx: number, wy: number, wz: number, partyX: number, partyY: number): number {
+export function partyDistTiles(
+  wx: number,
+  wy: number,
+  wz: number,
+  partyX: number,
+  partyY: number,
+  opts?: { prop?: boolean }
+): number {
   const dx = wx / CELL_SIZE - partyX;
   const dz = wz / CELL_SIZE - partyY;
   const horiz = Math.sqrt(dx * dx + dz * dz);
-  // Floor disk: 2D reach. Walls and ceiling pay extra so they die past the puddle.
+  // Floor disk: 2D reach. Walls and ceiling pay +0.55 so they die with the
+  // puddle (main). Props skip that penalty and use 3D distance only.
   if (wy < 0.28) return horiz;
   const dy = (wy - LANTERN_HEIGHT) / CELL_SIZE;
-  return Math.sqrt(horiz * horiz + dy * dy) + 0.55;
+  const d = Math.sqrt(horiz * horiz + dy * dy);
+  return opts?.prop ? d : d + 0.55;
 }
 
 function parseBright(value: number): number {
@@ -241,6 +262,7 @@ export class VertexLightingManager {
         worldPos,
         colors: geometry.attributes.color as THREE.BufferAttribute,
         isDark,
+        isProp: !!obj.userData.lanternProp,
         nearSconce: this.nearAnySconce(tileX, tileY, radiusTiles),
         tileX,
         tileY
@@ -258,6 +280,7 @@ export class VertexLightingManager {
   private rebuildPartyReach() {
     const radius = Math.max(
       this.lanternSpec().radius,
+      this.oilFn() > 0 ? PROP_LANTERN_RADIUS_TILES : 0,
       this.carriedTorch ? CARRIED_TORCH_RADIUS_TILES : 0
     );
     this.partyCells = partyReach(this.floorData, this.partyX, this.partyY, radius);
@@ -320,6 +343,20 @@ export class VertexLightingManager {
     return (r + g + b) / 3;
   }
 
+  /** Shade a world-space point (desk tops, lamp stems) for tests and debug. */
+  sampleVertex(
+    wx: number,
+    wy: number,
+    wz: number,
+    tileX: number,
+    tileY: number,
+    isDark = false,
+    isProp = false
+  ): { rgb: [number, number, number]; luma: number } {
+    const rgb = this.shadeVertex(wx, wy, wz, tileX, tileY, isDark, 1, isProp);
+    return { rgb, luma: (rgb[0] + rgb[1] + rgb[2]) / 3 };
+  }
+
   /** Table fill only (no torch, lantern, or sunbeam) after ?bright=. */
   ambientBrightness(): number {
     const a = this.floorAmbient();
@@ -345,7 +382,8 @@ export class VertexLightingManager {
     tileX: number,
     tileY: number,
     isDark: boolean,
-    flick: number
+    flick: number,
+    isProp = false
   ): [number, number, number] {
     const ambient = this.floorAmbient();
     const rgb: [number, number, number] = [
@@ -355,9 +393,17 @@ export class VertexLightingManager {
     ];
 
     const lantern = this.lanternSpec();
-    const partyDist = partyDistTiles(wx, wy, wz, this.partyX, this.partyY);
+    const partyDist = partyDistTiles(wx, wy, wz, this.partyX, this.partyY, { prop: isProp });
     if (reachAt(this.partyCells, tileX, tileY) !== undefined) {
-      this.accum(rgb, lantern.intensity * partyFalloff(partyDist, lantern.radius), lantern.rgb);
+      if (isProp && this.oilFn() > 0) {
+        this.accum(
+          rgb,
+          PROP_LANTERN_INTENSITY * lanternFalloff(partyDist, PROP_LANTERN_RADIUS_TILES),
+          lantern.rgb
+        );
+      } else {
+        this.accum(rgb, lantern.intensity * partyFalloff(partyDist, lantern.radius), lantern.rgb);
+      }
       if (this.carriedTorch) {
         this.accum(
           rgb,
@@ -407,7 +453,8 @@ export class VertexLightingManager {
         face.tileX,
         face.tileY,
         face.isDark,
-        flick
+        flick,
+        face.isProp
       );
       colors.setXYZ(i, r, g, b);
     }

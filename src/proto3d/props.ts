@@ -96,6 +96,7 @@ export class PropBuilder {
     mesh.userData.lightX = x;
     mesh.userData.lightY = y;
     mesh.userData.kind = kind;
+    mesh.userData.lanternProp = true;
     mesh.userData.noPick = true;
     this.group.add(mesh);
   }

@@ -91,6 +91,13 @@ export const TORCH_INTENSITY = 1.45;
 /** Wren's lantern with oil — full on the party square, near-ambient by 1.5. */
 export const LANTERN_RADIUS_TILES = 1.5;
 export const LANTERN_INTENSITY = 0.64;
+/**
+ * Props-only lantern (desk, rack, beams). Soft 1−(d/r)² so furniture reads
+ * at 1 tile (~0.25) and still glows at 2 (~0.12). Floors and walls stay on
+ * the steep oil puddle above.
+ */
+export const PROP_LANTERN_RADIUS_TILES = 2.5;
+export const PROP_LANTERN_INTENSITY = 0.4;
 /** Ember-only lantern — dies just past the next square's near edge. */
 export const EMBER_RADIUS_TILES = 1.1;
 export const EMBER_INTENSITY = 0.4;
