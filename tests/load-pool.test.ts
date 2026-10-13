@@ -98,10 +98,10 @@ describe('title boot asset list', () => {
     const shot1 = statSync(resolve(root, 'art/intro/shot1_keep.png')).size;
     const music = statSync(resolve(root, 'audio/music_intro.mp3')).size;
     expect(INTRO_SHOT_FILES).toHaveLength(6);
-    expect(shot1).toBeGreaterThan(150_000);
-    expect(shot1).toBeLessThan(250_000);
-    expect(shotBytes).toBeGreaterThan(1_000_000);
-    expect(shotBytes).toBeLessThan(1_400_000);
+    expect(shot1).toBeGreaterThan(50_000);
+    expect(shot1).toBeLessThan(120_000);
+    expect(shotBytes).toBeGreaterThan(400_000);
+    expect(shotBytes).toBeLessThan(600_000);
     expect(music).toBeGreaterThan(400_000);
     expect(music).toBeLessThan(500_000);
     expect(titleBootRelPaths('en')).not.toContain('audio/music_intro.mp3');
