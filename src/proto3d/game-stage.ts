@@ -1,3 +1,5 @@
+import { fetchArrayBuffer } from './asset-cache';
+
 export const GAME_STAGE_W = 270;
 export const GAME_STAGE_H = 585;
 /** Viewports this compact (iPhone, browser Safari) use a fractional contain scale. */
@@ -41,4 +43,21 @@ export function fitGameStage(): { scale: number; left: number; top: number; widt
   stage.style.left = `${left}px`;
   stage.style.top = `${top}px`;
   return { scale, left, top, width, height };
+}
+
+/** Tile the letterbox from the shared asset cache so CSS never fetches a second copy. */
+export async function applyLetterboxStone(): Promise<void> {
+  const host = document.getElementById('game-letterbox');
+  if (!host || host.dataset.stone) return;
+  const base = typeof import.meta !== 'undefined' && import.meta.env ? import.meta.env.BASE_URL : '/';
+  const url = `${base}art/ui/layout585/stone_strip_tile.png`;
+  try {
+    const buf = await fetchArrayBuffer(url);
+    const obj = URL.createObjectURL(new Blob([buf]));
+    host.style.backgroundImage = `url("${obj}")`;
+    host.style.backgroundRepeat = 'repeat';
+    host.dataset.stone = '1';
+  } catch {
+    // Keep the solid fallback fill.
+  }
 }

@@ -329,6 +329,7 @@
  "vox_brannoc_hurt_1.ogg",
  "vox_brannoc_hurt_2.mp3",
  "vox_brannoc_hurt_2.ogg",
+ "vox_brannoc_talk.mp3",
  "vox_dural_1.mp3",
  "vox_dural_1.ogg",
  "vox_dural_2.mp3",
@@ -359,12 +360,14 @@
  "vox_ilsevar_hurt_1.ogg",
  "vox_ilsevar_hurt_2.mp3",
  "vox_ilsevar_hurt_2.ogg",
+ "vox_ilsevar_talk.mp3",
  "vox_mags_down.mp3",
  "vox_mags_down.ogg",
  "vox_mags_hurt_1.mp3",
  "vox_mags_hurt_1.ogg",
  "vox_mags_hurt_2.mp3",
  "vox_mags_hurt_2.ogg",
+ "vox_mags_talk.mp3",
  "vox_tam_1.mp3",
  "vox_tam_1.ogg",
  "vox_tam_2.mp3",
@@ -378,5 +381,6 @@
  "vox_wren_hurt_1.mp3",
  "vox_wren_hurt_1.ogg",
  "vox_wren_hurt_2.mp3",
- "vox_wren_hurt_2.ogg"
+ "vox_wren_hurt_2.ogg",
+ "vox_wren_talk.mp3"
 ]

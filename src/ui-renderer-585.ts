@@ -36,7 +36,6 @@ export class UIRenderer585 {
     }
     const baseUrl = '/sunken-keep/';
     assets.loadImage(`${baseUrl}art/ui/layout585/panel_585.png`);
-    assets.loadImage(`${baseUrl}art/ui/layout585/stone_strip_tile.png`);
     this.stoneStripTile = assets.loadImage(`${baseUrl}art/ui/layout585/stone_strip_tile.png`);
     for (const name of ['stone', 'shallow', 'deep']) {
       assets.loadImage(`${V380_PATH}/backdrop_${name}.png`);

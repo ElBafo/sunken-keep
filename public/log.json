@@ -217,8 +217,8 @@
  },
  {
   "key": "oil_pickup",
-  "text": "Oil flask. Wren's lantern drinks it.",
-  "when": "on picking up an oil flask"
+  "text": "Oil flask. Into the bag.",
+  "when": "on picking up an oil flask; it goes to the bag, use = tap flask then a hero"
  },
  {
   "key": "enter_lampkeeper",

@@ -4,7 +4,14 @@ export interface Act1TileExtras {
   stairs?: 'up' | 'down';       // matches src/types.ts on the overnight-build branch
   dialogue?: string;           // id in story/dialogue.json, fires once when you step on the tile
   then?: string;               // dialogue that fires right after the first one (f4_tam_cell -> f4_tide_wakes)
-  bark?: string;               // id in barks.json, once per save
+  bark?: string;               // id in barks.json (puzzle barks: puzzles_act1.json), once per save
+  barkIf?: { flag: string; value: boolean; bark: string }[]; // first match plays (escape lines)
+  log?: string;                // log.json key, fires once on first step
+  bumpLog?: string;            // log.json key when you bump the blocked tile
+  openLog?: string;            // log.json key when it opens
+  gate?: { opensWith: string }; // door that opens with an item (captain_key)
+  chestItems?: string[];       // item ids inside a chest, given in order when opened
+  readNote?: string;           // story note id (e.g. note_lampkeeper), tap the prop to read
   npc?: string;                // 'captain' | 'tam' (sprite on the tile)
   prop?: 'table' | 'bunk' | 'weapon_rack' | 'statue'; // blocks movement, drawn as furniture
   glassWater?: boolean;        // wall you can see through: standing water in a doorway

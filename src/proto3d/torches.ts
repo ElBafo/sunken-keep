@@ -13,6 +13,7 @@ import {
   TORCH_SNUFF_FPS,
   TORCH_TAP_GUARD_MS
 } from './constants';
+import { loadTextureCached } from './asset-cache';
 import { Sconce } from './types';
 
 export type TorchVisualState = 'lit' | 'dead' | 'capped';
@@ -98,42 +99,32 @@ export class TorchSystem {
   }
 
   async load(scene: THREE.Scene, sconces: Sconce[]) {
-    const loader = new THREE.TextureLoader();
     const baseUrl = import.meta.env.BASE_URL;
-    const loadTex = (path: string): Promise<THREE.Texture> =>
-      new Promise((resolve, reject) => {
-        loader.load(
-          `${baseUrl}${path}`,
-          (tex) => {
-            configureTex(tex);
-            resolve(tex);
-          },
-          undefined,
-          (err) => reject(new Error(`Failed to load torch texture ${path}: ${String(err)}`))
-        );
-      });
+    const loadTex = async (path: string): Promise<THREE.Texture> => {
+      const tex = await loadTextureCached(`${baseUrl}${path}`);
+      configureTex(tex);
+      return tex;
+    };
 
     const states: TorchVisualState[] = ['lit', 'dead', 'capped'];
-    const loaded = await Promise.all(
-      states.flatMap((state) => [
-        loadTex(`proto3d/tex3d/torch/bracket_${state}_side.png`),
-        loadTex(`proto3d/tex3d/torch/bracket_${state}_front.png`)
-      ])
-    );
+    const [bracketTex, flame, flare, snuff] = await Promise.all([
+      Promise.all(
+        states.flatMap((state) => [
+          loadTex(`proto3d/tex3d/torch/bracket_${state}_side.png`),
+          loadTex(`proto3d/tex3d/torch/bracket_${state}_front.png`)
+        ])
+      ),
+      Promise.all([1, 2, 3, 4].map((n) => loadTex(`proto3d/tex3d/torch/flame_calm_${n}.png`))),
+      Promise.all([1, 2, 3, 4, 5, 6].map((n) => loadTex(`proto3d/tex3d/torch/flare_${n}.png`))),
+      Promise.all([1, 2, 3, 4, 5].map((n) => loadTex(`proto3d/tex3d/torch/snuff_${n}.png`)))
+    ]);
     states.forEach((state, i) => {
-      this.brackets[state].side = loaded[i * 2];
-      this.brackets[state].front = loaded[i * 2 + 1];
+      this.brackets[state].side = bracketTex[i * 2];
+      this.brackets[state].front = bracketTex[i * 2 + 1];
     });
-
-    this.flameFrames = await Promise.all(
-      [1, 2, 3, 4].map((n) => loadTex(`proto3d/tex3d/torch/flame_calm_${n}.png`))
-    );
-    this.flareFrames = await Promise.all(
-      [1, 2, 3, 4, 5, 6].map((n) => loadTex(`proto3d/tex3d/torch/flare_${n}.png`))
-    );
-    this.snuffFrames = await Promise.all(
-      [1, 2, 3, 4, 5].map((n) => loadTex(`proto3d/tex3d/torch/snuff_${n}.png`))
-    );
+    this.flameFrames = flame;
+    this.flareFrames = flare;
+    this.snuffFrames = snuff;
 
     const w = SCONCE_WIDTH_TILES * CELL_SIZE;
     const h = SCONCE_HEIGHT_TILES * CELL_SIZE;

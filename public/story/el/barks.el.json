@@ -104,7 +104,7 @@
  {
   "trigger": "deep_water",
   "speaker": "ilsevar",
-  "text": "Ζεστό. Εσείς οι μαλακόπετσοι θα το λέγατε μπάνιο.",
+  "text": "Ζεστό. Εσείς τα κρυουλιάρικα θα το λέγατε μπάνιο.",
   "face": "neutral",
   "tier": "flavour"
  },
@@ -438,7 +438,7 @@
  {
   "trigger": "leech_latch",
   "speaker": "mags",
-  "text": "Είναι πάνω στο— μην κοιτάτε!",
+  "text": "Είναι πάνω στο... μην κοιτάτε!",
   "face": "shocked",
   "tier": "flavour"
  },
@@ -839,5 +839,35 @@
    "saved_tam": false
   },
   "act": 2
+ },
+ {
+  "trigger": "slime_blade_resist",
+  "speaker": "brannoc",
+  "text": "Σαν να κόβω χυλό!",
+  "face": "wince",
+  "listener": "ilsevar",
+  "listenerFace": "smirk",
+  "listenerText": "Οι λεπίδες δεν πιάνουν. Άσε με.",
+  "tier": "tutorial"
+ },
+ {
+  "trigger": "slime_blade_resist_2",
+  "speaker": "mags",
+  "text": "Κόλλησε το μαχαίρι μου. Πάλι.",
+  "face": "wince",
+  "listener": "ilsevar",
+  "listenerFace": "neutral",
+  "listenerText": "Κρύο, όχι ατσάλι. Πάτα το ραβδί μου.",
+  "tier": "tutorial"
+ },
+ {
+  "trigger": "first_sight_slime",
+  "speaker": "mags",
+  "text": "Αυτό... είναι πουτίγκα που κινείται;",
+  "face": "shocked",
+  "listener": "brannoc",
+  "listenerFace": "wince",
+  "listenerText": "Μην το φας. Σοβαρά.",
+  "tier": "story"
  }
 ]

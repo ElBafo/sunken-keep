@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { fetchJsonCached } from './asset-cache';
 import { CAMERA_FAR, CAMERA_FOV, CAMERA_NEAR, FOG_COLOR, FOG_FAR, FOG_NEAR } from './constants';
 
 // Enable Three.js color management for proper sRGB handling
@@ -192,8 +193,7 @@ export class PixelRenderer {
   async loadPalette() {
     try {
       const baseUrl = import.meta.env.BASE_URL;
-      const response = await fetch(`${baseUrl}proto3d/palette.json`);
-      const data = await response.json();
+      const data = await fetchJsonCached<{ colors?: string[] }>(`${baseUrl}proto3d/palette.json`);
       this.palette = data.colors || [];
       this.updatePaletteUniform();
     } catch (err) {

@@ -9,6 +9,7 @@ import {
   tileBedY
 } from './constants';
 import type { HitKind } from '../core/types';
+import { fetchJsonCached, loadTextureCached } from './asset-cache';
 import { createLimiter, mapPool, SPRITE_LOAD_CONCURRENCY } from './load-pool';
 import { FloorData, Tile } from './types';
 
@@ -411,22 +412,12 @@ export class SpriteManager {
   }
 
   private loadTex(path: string): Promise<THREE.Texture> {
-    const loader = new THREE.TextureLoader();
     const baseUrl = import.meta.env.BASE_URL;
-    return this.limitTex(
-      () =>
-        new Promise((resolve, reject) => {
-          loader.load(
-            `${baseUrl}${path}`,
-            (tex) => {
-              configureSpriteTexture(tex);
-              resolve(tex);
-            },
-            undefined,
-            (err) => reject(new Error(`Failed to load sprite texture ${path}: ${String(err)}`))
-          );
-        })
-    );
+    return this.limitTex(async () => {
+      const tex = await loadTextureCached(`${baseUrl}${path}`);
+      configureSpriteTexture(tex);
+      return tex;
+    });
   }
 
   /** Shared art + floor items. Monster frames stay deferred until `ensureMonsters`. */
@@ -785,9 +776,7 @@ export class SpriteManager {
 
   private async loadAnchors(baseUrl: string) {
     try {
-      const res = await fetch(`${baseUrl}art/dungeon/monster_anchor.json`);
-      if (!res.ok) return;
-      const json = (await res.json()) as {
+      const json = (await fetchJsonCached(`${baseUrl}art/dungeon/monster_anchor.json`)) as {
         files?: Record<string, { gapBelow?: number; topRow?: number; footRow?: number; imageW?: number; imageH?: number }>;
         canvas?: Partial<Record<LodName, [number, number]>>;
         distanceFrames?: {
@@ -834,9 +823,10 @@ export class SpriteManager {
 
   private async loadHeights(baseUrl: string) {
     try {
-      const res = await fetch(`${baseUrl}levels/monsters.json`);
-      if (!res.ok) return;
-      const json = (await res.json()) as Record<string, { size?: { worldHeight?: number } }>;
+      const json = (await fetchJsonCached(`${baseUrl}levels/monsters.json`)) as Record<
+        string,
+        { size?: { worldHeight?: number } }
+      >;
       for (const [id, raw] of Object.entries(json)) {
         if (id.startsWith('_') || !raw || typeof raw !== 'object') continue;
         const h = raw.size?.worldHeight;
@@ -1076,9 +1066,7 @@ export class SpriteManager {
 
   private async loadHitFx(baseUrl: string) {
     try {
-      const res = await fetch(`${baseUrl}art/fx/hits/hits.json`);
-      if (!res.ok) return;
-      const json = (await res.json()) as {
+      const json = (await fetchJsonCached(`${baseUrl}art/fx/hits/hits.json`)) as {
         effects?: Record<
           string,
           {

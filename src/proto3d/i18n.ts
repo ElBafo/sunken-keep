@@ -1,3 +1,6 @@
+import { fetchJsonCached } from './asset-cache';
+import type { BarkLine, BarkTier } from './bark-picker';
+
 /** Locale-aware story / UI text. English default; Greek via `?lang=el` or a saved setting. */
 
 export type Locale = 'en' | 'el';
@@ -73,7 +76,7 @@ function capitalizeLog(text: string): string {
 export class StoryText {
   locale: Locale = 'en';
   private logs = new Map<string, string>();
-  private barks = new Map<string, { text: string; speaker?: string }>();
+  private barks = new Map<string, BarkLine[]>();
   private names: Json = {};
   private ui: Json = {};
   private title: Json = {};
@@ -88,7 +91,7 @@ export class StoryText {
       this.fetchJson<Json>(this.url(base, 'ui_text.json', locale)),
       this.fetchJson<Json>(this.url(base, 'title_text.json', locale)),
       this.fetchJson<Json>(this.url(base, 'note_lampkeeper.json', locale)),
-      this.fetchJson<Array<{ trigger?: string; text?: string; speaker?: string }>>(this.url(base, 'barks.json', locale))
+      this.fetchJson<Array<Record<string, unknown>>>(this.url(base, 'barks.json', locale))
     ]);
     this.logs.clear();
     for (const entry of log ?? []) {
@@ -101,9 +104,24 @@ export class StoryText {
     }
     this.barks.clear();
     for (const entry of barks ?? []) {
-      if (entry?.trigger && typeof entry.text === 'string' && !this.barks.has(entry.trigger)) {
-        this.barks.set(entry.trigger, { text: entry.text, speaker: entry.speaker });
+      const trigger = typeof entry.trigger === 'string' ? entry.trigger : '';
+      const text = typeof entry.text === 'string' ? entry.text : '';
+      const speaker = typeof entry.speaker === 'string' ? entry.speaker : '';
+      if (!trigger || !text || !speaker) continue;
+      const line: BarkLine = { trigger, speaker, text };
+      if (typeof entry.face === 'string') line.face = entry.face;
+      if (typeof entry.listener === 'string') line.listener = entry.listener;
+      if (typeof entry.listenerFace === 'string') line.listenerFace = entry.listenerFace;
+      if (entry.tier === 'tutorial' || entry.tier === 'story' || entry.tier === 'flavour') {
+        line.tier = entry.tier as BarkTier;
       }
+      if (entry.condition && typeof entry.condition === 'object') {
+        line.condition = entry.condition as Record<string, boolean>;
+      }
+      if (typeof entry.act === 'number') line.act = entry.act;
+      const list = this.barks.get(trigger) ?? [];
+      list.push(line);
+      this.barks.set(trigger, list);
     }
     this.names = names ?? {};
     this.ui = ui ?? {};
@@ -126,9 +144,7 @@ export class StoryText {
 
   private async fetchJson<T>(url: string): Promise<T | null> {
     try {
-      const res = await fetch(url);
-      if (!res.ok) return null;
-      return (await res.json()) as T;
+      return await fetchJsonCached<T>(url);
     } catch {
       return null;
     }
@@ -141,11 +157,15 @@ export class StoryText {
   }
 
   bark(trigger: string): string {
-    return this.barks.get(trigger)?.text ?? '';
+    return this.barks.get(trigger)?.[0]?.text ?? '';
   }
 
-  barkEntry(trigger: string): { text: string; speaker?: string } | null {
-    return this.barks.get(trigger) ?? null;
+  barkEntry(trigger: string): BarkLine | null {
+    return this.barks.get(trigger)?.[0] ?? null;
+  }
+
+  barksFor(trigger: string): BarkLine[] {
+    return this.barks.get(trigger)?.slice() ?? [];
   }
 
   uiText(path: string, vars?: Record<string, string | number>): string {

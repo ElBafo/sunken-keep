@@ -55,7 +55,7 @@ export class DialogueSystem {
       currentNode: nodes[0].id,
     };
     this.onComplete = onComplete || null;
-    sound.play('bark');
+    sound.playSpeakerVoice(nodes[0].speaker);
     return true;
   }
 
@@ -83,7 +83,8 @@ export class DialogueSystem {
 
     if (node.next) {
       this.activeDialogue.currentNode = node.next;
-      sound.play('bark');
+      const next = this.getCurrentNode();
+      if (next) sound.playSpeakerVoice(next.speaker);
     } else {
       this.endDialogue();
     }
@@ -125,7 +126,8 @@ export class DialogueSystem {
     // Move to next node or end
     if (choice.next) {
       this.activeDialogue.currentNode = choice.next;
-      sound.play('bark');
+      const next = this.getCurrentNode();
+      if (next) sound.playSpeakerVoice(next.speaker);
     } else {
       this.endDialogue();
     }

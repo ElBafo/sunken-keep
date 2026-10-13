@@ -116,16 +116,16 @@ describe('caption timing from music currentTime', () => {
 });
 
 describe('floor 1 playable prefetch list', () => {
-  it('lists walls, floor 1 monsters, ambience, steps, torch, and combat, not intro/title', () => {
+  it('lists walls, floor 1 monsters, and before-play steps, not intro/title or streamed combat', () => {
     const paths = floor1PlayableRelPaths();
     expect(floor1MonsterKinds().sort()).toEqual(['bog_leeches', 'keep_rat', 'rust_crab', 'slime']);
     expect(paths.some((p) => p.includes('proto3d/tex3d/wall_plain'))).toBe(true);
     expect(paths.some((p) => p.includes('monsters_v2/keep_rat_idle_1_near.png'))).toBe(true);
-    expect(paths).toContain('audio/amb_flooded_halls_loop.mp3');
     expect(paths).toContain('audio/sfx_step_1.mp3');
-    expect(paths).toContain('audio/sfx_torch_loop.mp3');
-    expect(paths).toContain('audio/sfx_keep_rat_alert.mp3');
-    expect(paths).toContain('audio/sfx_slime_attack.mp3');
+    expect(paths).toContain('audio/sfx_lantern_loop.mp3');
+    expect(paths).toContain('audio/sfx_bump.mp3');
+    expect(paths).not.toContain('audio/amb_flooded_halls_loop.mp3');
+    expect(paths).not.toContain('audio/sfx_keep_rat_alert.mp3');
     expect(paths.some((p) => p.includes('art/intro/'))).toBe(false);
     expect(paths.some((p) => p.includes('music_intro'))).toBe(false);
     expect(paths.some((p) => p.includes('title_bg'))).toBe(false);

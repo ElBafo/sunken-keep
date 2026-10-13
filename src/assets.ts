@@ -1,3 +1,5 @@
+import { HERO_IDS } from './core/types';
+
 // Asset loader
 export class AssetLoader {
   private images = new Map<string, HTMLImageElement>();
@@ -147,6 +149,15 @@ export class SoundManager {
       sound.currentTime = 0;
       sound.play().catch(() => {});
     }
+  }
+
+  /** Once per bark / dialogue box. Heroes use vox_<hero>_talk; others get quiet bark. */
+  playSpeakerVoice(speaker: string, volume = 0.8) {
+    if ((HERO_IDS as readonly string[]).includes(speaker)) {
+      this.play(`vox_${speaker}_talk`, volume);
+      return;
+    }
+    this.play('bark', 0.4);
   }
   
   playLoop(event: string, volume: number = 1.0): HTMLAudioElement | null {

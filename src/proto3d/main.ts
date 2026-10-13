@@ -41,8 +41,11 @@ import {
   type SavedFloor
 } from './saves';
 import { TitleScreen, type TitleAction } from './title';
-import { FLOOR1_PLAY_AUDIO, floor1MonsterArtPaths, prefetchRelPaths } from './floor1-prefetch';
+import { beforePlayRelPaths } from './audio-groups';
+import { prefetchRelPaths } from './floor1-prefetch';
 import { IntroPlayer } from './intro';
+import { mountIntroSkip, type IntroSkipHandle } from './intro-skip';
+import { interactPropAt, tileBlocksPath } from './wall-props';
 import { SpeechBubble } from './bubble';
 import { StoryProgress } from './story-progress';
 import { saveLocale, type Locale } from './i18n';
@@ -55,15 +58,23 @@ import { Sconce, Tile } from './types';
 import { VertexLightingManager } from './vertex-lighting';
 import { WaterSystem } from './water';
 import { DarkFx } from './dark-fx';
-import { isFloorProp, PropBuilder } from './props';
+import { PropBuilder } from './props';
 import { resolveLocale, StoryText } from './i18n';
-import { fitGameStage } from './game-stage';
+import { applyLetterboxStone, fitGameStage } from './game-stage';
 import { loadLayout585 } from './layout585';
 import { PartyHud, type GearId, type HandSlot } from './party-hud';
 import type { HeroId } from '../constants';
 import { PartyBag } from './bag';
 import { InventoryUi } from './inventory-ui';
 import { canEquip, equipSfx, pickupSfx, preferredHand } from './items';
+import { fetchJsonCached } from './asset-cache';
+import {
+  asHeroId,
+  BarkDirector,
+  DEFAULT_BARK_RULES,
+  type BarkPartyMember,
+  type BarkRules
+} from './bark-picker';
 
 const FLOOR_NUMBER = 1;
 const FLOOR_SCONCE_DEFAULTS = floor1Sconces.map((s) => ({ ...s }));
@@ -121,7 +132,10 @@ class Game {
   private dialogue = new Map<string, string>();
   private floorStates: Record<string, SavedFloor> = {};
   private storyProgress = new StoryProgress();
+  private barkDirector = new BarkDirector();
+  private lastBarkFace: { speaker: string; face?: string; listener?: string; listenerFace?: string } | null = null;
   private playStartedAt = 0;
+  private combatAudioReady = false;
   private playAccMs = 0;
   private escapeRunActive = false;
   private phase: 'title' | 'intro' | 'play' = 'play';
@@ -129,6 +143,7 @@ class Game {
   private pendingStartSnapshot = false;
   private title!: TitleScreen;
   private intro: IntroPlayer | null = null;
+  private introSkip: IntroSkipHandle | null = null;
   private bubble: SpeechBubble | null = null;
   private loopStarted = false;
   private titleReady = false;
@@ -136,7 +151,6 @@ class Game {
   private playReady = false;
   private pendingTap = false;
   private skipIntroRequested = false;
-  private lastTapAt = 0;
   private worldBoot: Promise<void> = Promise.resolve();
   private stageFitWired = false;
   private newGameStarted = false;
@@ -175,18 +189,21 @@ class Game {
     this.skipTitle = params.get('test') === '1' && params.get('title') !== '1';
 
     this.fitStage();
+    void applyLetterboxStone();
     this.audioManager = new AudioManager(this.quality);
     this.setupTapToStart();
 
     const locale = resolveLocale(params, this.persist);
     document.documentElement.lang = locale;
     await this.story.load(locale);
+    await this.loadBarkRules();
     this.setTapStatus('loading');
     if (this.skipTitle) {
       this.storyProgress.startNewGame();
       this.pendingStartSnapshot = true;
     }
 
+    this.worldBoot = this.bootWorld(canvas, params);
     await this.bootTitleChrome();
     this.titleReady = true;
     if (!this.skipTitle) {
@@ -199,8 +216,6 @@ class Game {
       if (this.pendingTap) this.consumeTitleTap();
     }
     this.applyStoryLabels();
-
-    this.worldBoot = this.bootWorld(canvas, params);
     if (this.skipTitle) {
       await this.ensurePlayReady();
       this.setTapStatus('tap_to_start');
@@ -268,10 +283,15 @@ class Game {
     if (introCanvas) {
       this.intro = new IntroPlayer(introCanvas, this.story);
       this.intro.setTimeSource(() => this.audioManager.introCurrentTime());
-      introCanvas.addEventListener('pointerup', (e) => {
-        if (!e.isPrimary) return;
-        this.skipIntro();
-      });
+      const overlay = document.getElementById('intro-overlay');
+      if (overlay) {
+        this.introSkip = mountIntroSkip({
+          overlay,
+          story: this.story,
+          onSkip: () => this.skipIntro()
+        });
+        this.introSkip.hide();
+      }
     }
     if (titleCanvas) {
       this.title = new TitleScreen(titleCanvas, this.story, (action) => this.handleTitleAction(action));
@@ -341,48 +361,6 @@ class Game {
     this.atmosphere = new Atmosphere(this.quality);
     this.atmosphere.applyFog(this.renderer.scene, this.renderer.renderer);
 
-    this.sceneBuilder = new SceneBuilder();
-    await this.sceneBuilder.loadTextures();
-    this.sceneBuilder.buildScene(this.renderer.scene, floor1);
-
-    this.dressing = new Dressing();
-    this.water = new WaterSystem();
-    this.props = new PropBuilder();
-    await Promise.all([this.dressing.load(), this.water.load(), this.props.load()]);
-    await this.dressing.place(this.renderer.scene, floor1);
-    this.props.place(this.renderer.scene, floor1);
-
-    this.atmosphere.build(this.renderer.scene, floor1, this.dressing);
-    this.water.build(this.renderer.scene, floor1, floor1Sconces, this.dressing.marks.sunbeams);
-
-    this.player = new Player(this.renderer.camera, floor1);
-    const startX = params.has('x') ? Number(params.get('x')) : floor1.startX;
-    const startY = params.has('y') ? Number(params.get('y')) : floor1.startY;
-    const startDir = params.has('dir') ? Number(params.get('dir')) : floor1.startDir;
-    if (Number.isFinite(startX) && Number.isFinite(startY) && Number.isFinite(startDir)) {
-      this.player.setPosition(startX, startY, startDir);
-    }
-
-    this.vertexLighting = new VertexLightingManager(floor1, floor1Sconces, {
-      floor: parseAmbientFloor(params.get('ambientFloor'), 1),
-      bright: this.bright,
-      sunbeams: this.dressing.marks.sunbeams,
-      oil: () => this.oil
-    });
-    this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
-
-    this.torches = new TorchSystem(this.renderer.camera);
-    await this.torches.load(this.renderer.scene, floor1Sconces);
-    this.torches.setParty(this.player.x, this.player.y, this.player.dir);
-
-    this.vertexLighting.registerScene(this.renderer.scene);
-    this.vertexLighting.updateAllMeshes(this.renderer.scene);
-
-    this.spriteManager = new SpriteManager(this.renderer.camera);
-    await this.spriteManager.loadSprites(this.renderer.scene, floor1, { monsters: false });
-    void this.spriteManager.ensureMonsters(this.renderer.scene, floor1);
-    this.darkFx = new DarkFx();
-    await this.darkFx.load(this.renderer.scene, floor1, this.spriteManager);
     this.hud = new PartyHud(this.story, () => this.oil, layout, {
       onUse: (hero, hand) => this.handleHandTap(hero, hand),
       onLog: () => this.audioManager?.playUi('ui_log_line'),
@@ -400,11 +378,6 @@ class Game {
         mana: this.bag.countOf('potion_blue')
       })
     });
-    await this.initCombat(params);
-    this.loadLampNote();
-    this.updateOilHud();
-    await this.hud.load();
-    this.syncPartyHud();
     this.inventory = new InventoryUi(this.story, this.bag, layout.inventoryScreen, {
       equipment: () => this.equipmentState(),
       onUse: (index) => this.useBagSlot(index),
@@ -413,7 +386,57 @@ class Game {
       onClose: () => this.closeBag(),
       playUi: (name) => this.audioManager?.playUi(name)
     });
-    await this.inventory.load();
+    const hudReady = this.hud.load();
+    void this.inventory.load();
+    if (this.bubble) void this.bubble.load();
+
+    this.sceneBuilder = new SceneBuilder();
+    await this.sceneBuilder.loadTextures();
+    this.sceneBuilder.buildScene(this.renderer.scene, floor1);
+    void this.audioManager.loadBeforePlaySounds();
+
+    this.player = new Player(this.renderer.camera, floor1);
+    const startX = params.has('x') ? Number(params.get('x')) : floor1.startX;
+    const startY = params.has('y') ? Number(params.get('y')) : floor1.startY;
+    const startDir = params.has('dir') ? Number(params.get('dir')) : floor1.startDir;
+    if (Number.isFinite(startX) && Number.isFinite(startY) && Number.isFinite(startDir)) {
+      this.player.setPosition(startX, startY, startDir);
+    }
+
+    this.dressing = new Dressing();
+    this.water = new WaterSystem();
+    this.props = new PropBuilder();
+    this.spriteManager = new SpriteManager(this.renderer.camera);
+    this.torches = new TorchSystem(this.renderer.camera);
+    await Promise.all([
+      this.dressing.load().then(() => this.dressing.place(this.renderer.scene, floor1)),
+      this.water.load(),
+      this.props.load().then(() => this.props.place(this.renderer.scene, floor1)),
+      this.spriteManager.loadSprites(this.renderer.scene, floor1, { monsters: false }),
+      this.torches.load(this.renderer.scene, floor1Sconces),
+      this.initCombat(params),
+      hudReady
+    ]);
+
+    this.atmosphere.build(this.renderer.scene, floor1, this.dressing);
+    this.water.build(this.renderer.scene, floor1, floor1Sconces, this.dressing.marks.sunbeams);
+
+    this.vertexLighting = new VertexLightingManager(floor1, floor1Sconces, {
+      floor: parseAmbientFloor(params.get('ambientFloor'), 1),
+      bright: this.bright,
+      sunbeams: this.dressing.marks.sunbeams,
+      oil: () => this.oil
+    });
+    this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
+    this.torches.setParty(this.player.x, this.player.y, this.player.dir);
+    this.vertexLighting.registerScene(this.renderer.scene);
+    this.vertexLighting.updateAllMeshes(this.renderer.scene);
+
+    this.darkFx = new DarkFx();
+    void this.darkFx.load(this.renderer.scene, floor1, this.spriteManager);
+    this.loadLampNote();
+    this.updateOilHud();
+    this.syncPartyHud();
     this.snapshotLoot();
     this.snapshotTiles();
     this.wireTorchChoice();
@@ -438,8 +461,8 @@ class Game {
     });
 
     void this.title?.loadRest();
-    void this.audioManager.loadSounds(this.renderer.scene, floor1Sconces);
-    if (this.bubble) await this.bubble.load();
+    void this.audioManager.loadBeforePlaySounds(this.renderer.scene, floor1Sconces);
+    if (this.bubble) void this.bubble.load();
     this.updateDoorButton();
   }
 
@@ -451,19 +474,19 @@ class Game {
   }
 
   private beginTitleBackgroundLoads() {
-    this.intro?.preload();
-    void this.audioManager.loadIntroMusic();
+    this.intro?.preloadShot1();
     void this.title?.loadRest();
     this.beginFloor1BackgroundLoads();
   }
 
-  /** After intro preload is in flight: warm floor 1 art/audio without blocking title or intro. */
+  /** After intro shot 1 is in flight: do not steal the radio from world textures. */
   private beginFloor1BackgroundLoads() {
     if (this.floor1PrefetchStarted) return;
     this.floor1PrefetchStarted = true;
-    const extra = [...floor1MonsterArtPaths(), ...FLOOR1_PLAY_AUDIO.map(([, path]) => path)];
-    void prefetchRelPaths(extra, 4);
-    void this.audioManager.loadFloor1PlaySounds();
+    void this.worldBoot.then(() => {
+      void prefetchRelPaths(beforePlayRelPaths(), 8);
+      void this.audioManager.loadBeforePlaySounds();
+    });
   }
 
   private async ensureIntroStartReady() {
@@ -472,10 +495,15 @@ class Game {
 
   private async ensurePlayReady() {
     await this.worldBoot;
-    await this.spriteManager.ensureMonsters(this.renderer.scene, floor1);
+    await this.audioManager.loadBeforePlaySounds(this.renderer.scene, floor1Sconces);
     if (this.combat.monsters.length === 0) this.spawnFloorMonsters();
     else this.rebindMonsters();
     this.playReady = true;
+  }
+
+  private beginMonsterStreaming() {
+    if (!this.spriteManager || !this.renderer) return;
+    void this.spriteManager.ensureMonsters(this.renderer.scene, floor1).then(() => this.rebindMonsters());
   }
 
   private rebindMonsters() {
@@ -483,6 +511,16 @@ class Game {
       if (!this.spriteManager.spriteByMonsterId(m.id)) this.spriteManager.bindMonster(m.x, m.y, m.id);
       if (!m.alive) this.spriteManager.hideDeadMonsterId(m.id);
     }
+  }
+
+  /** Monsters stay asleep until first-fight audio is in (or the 4s cap). */
+  private isCombatAwake() {
+    if (this.combatAudioReady) return true;
+    if (this.audioManager.isFirstFightUnlocked()) {
+      this.combatAudioReady = true;
+      return true;
+    }
+    return false;
   }
 
   handleMove(result: MoveResult) {
@@ -502,7 +540,7 @@ class Game {
     if (result === 'busy') return;
     if (result === 'monster') {
       const { x, y } = this.player.facingPos(1);
-      this.applyEvents(this.combat.bump(x, y, this.nowSec()));
+      if (this.isCombatAwake()) this.applyEvents(this.combat.bump(x, y, this.nowSec()));
     }
     this.audioManager.playUi('bump');
   }
@@ -514,6 +552,7 @@ class Game {
       this.audioManager.playStep('step_water_deep');
       this.atmosphere.spawnStepSplash(x * CELL_SIZE, y * CELL_SIZE);
       if (this.storyProgress.fire('water_deep')) this.showMessage(this.storyLog('water_deep'));
+      this.speakBark('deep_water');
     } else if (tile.shallowWater) {
       this.audioManager.playStep('step_water_shallow');
       this.atmosphere.spawnStepSplash(x * CELL_SIZE, y * CELL_SIZE);
@@ -686,7 +725,7 @@ class Game {
     this.darkFx.hideItemAt(x, y);
     this.syncKeyFlag();
     this.audioManager.playUi(pickupSfx(id));
-    const key = `pickup_${id}`;
+    const key = id === 'oil_flask' ? 'oil_pickup' : `pickup_${id}`;
     const named = this.storyLog(key);
     this.showMessage(named || this.storyLog('pickup_item', { item: this.story.itemName(id) }));
     this.inventory?.redraw();
@@ -726,7 +765,9 @@ class Game {
 
   openBag() {
     if (this.inventory?.open) return;
-    this.inventory.show();
+    void this.inventory.load().then(() => {
+      if (this.phase === 'play') this.inventory.show();
+    });
   }
 
   closeBag() {
@@ -908,6 +949,7 @@ class Game {
     const goBody = document.getElementById('gameover-body');
     if (goBody) goBody.textContent = this.story.uiText('game_over.body');
     this.refreshGameOverButtons();
+    this.introSkip?.refresh();
   }
 
   private refreshGameOverButtons() {
@@ -927,8 +969,8 @@ class Game {
   private async initCombat(params: URLSearchParams) {
     const base = import.meta.env.BASE_URL;
     const [actions, monsters] = await Promise.all([
-      fetch(`${base}levels/actions.json`).then((r) => r.json()),
-      fetch(`${base}levels/monsters.json`).then((r) => r.json())
+      fetchJsonCached(`${base}levels/actions.json`),
+      fetchJsonCached(`${base}levels/monsters.json`)
     ]);
     const seedRaw = params.get('seed');
     const seed = seedRaw != null && seedRaw !== '' && Number.isFinite(Number(seedRaw)) ? Number(seedRaw) : Date.now() >>> 0;
@@ -938,14 +980,7 @@ class Game {
     this.combat.setChaseEnabled(!testMode || combatOn);
     this.combat.setOccupancy(
       openGrid(
-        (x, y) => {
-          const tile = floor1.tiles[y]?.[x];
-          if (!tile || tile.wall) return true;
-          if (tile.secret && !tile.secretOpen) return true;
-          if (tile.door && !tile.doorOpen) return true;
-          if (isFloorProp(tile)) return true;
-          return false;
-        },
+        (x, y) => tileBlocksPath(floor1.tiles[y]?.[x]),
         floor1.width,
         floor1.height,
         (x, y) => {
@@ -1221,8 +1256,15 @@ class Game {
   }
 
   readFacingDesk(): boolean {
-    const { x, y } = this.player.facingPos(1);
-    const tile = this.player.tileAt(x, y);
+    const hit = interactPropAt(
+      this.player.floorData.tiles,
+      this.player.floorData.width,
+      this.player.floorData.height,
+      this.player.x,
+      this.player.y,
+      this.player.dir
+    );
+    const tile = hit?.tile;
     if (!tile) return false;
     if (tile.prop !== 'desk' && !tile.readNote) return false;
     if (this.noteOpen) {
@@ -1259,7 +1301,7 @@ class Game {
     if (!sconce) return false;
     if (sconce.capped) {
       this.audioManager.playDoor('door_locked', sconce.x, sconce.y);
-      this.showPrompt(this.storyLog('torch_capped'));
+      this.showMessage(this.storyLog('torch_capped'));
       return true;
     }
     if (this.torches.isTapLocked(sconce)) return true;
@@ -1348,15 +1390,22 @@ class Game {
   }
 
   private handleFacingProp(): boolean {
-    const { x, y } = this.player.facingPos(1);
-    const tile = this.player.tileAt(x, y);
-    if (!tile || !isFloorProp(tile)) return false;
+    const hit = interactPropAt(
+      this.player.floorData.tiles,
+      this.player.floorData.width,
+      this.player.floorData.height,
+      this.player.x,
+      this.player.y,
+      this.player.dir
+    );
+    if (!hit) return false;
+    const { tile } = hit;
     if (tile.readNote || tile.prop === 'desk') return this.readFacingDesk();
     if (tile.bark) {
       if (this.speakBark(tile.bark)) return true;
     }
     if (tile.prop === 'lamp_capped') {
-      this.showPrompt(this.storyLog('torch_capped'));
+      this.showMessage(this.storyLog('torch_capped'));
       return true;
     }
     return true;
@@ -1758,15 +1807,50 @@ class Game {
     }
   }
 
+  private async loadBarkRules() {
+    try {
+      const raw = await fetchJsonCached<Partial<BarkRules>>(`${import.meta.env.BASE_URL}bark_rules.json`);
+      this.barkDirector.setRules({
+        flavour_gap_s: raw.flavour_gap_s ?? DEFAULT_BARK_RULES.flavour_gap_s,
+        flavour_min_interval_s: raw.flavour_min_interval_s ?? DEFAULT_BARK_RULES.flavour_min_interval_s,
+        min_gap_s: raw.min_gap_s ?? DEFAULT_BARK_RULES.min_gap_s
+      });
+    } catch {
+      this.barkDirector.setRules(DEFAULT_BARK_RULES);
+    }
+  }
+
+  private partyForBarks(): BarkPartyMember[] {
+    return HERO_IDS.map((id) => {
+      const hud = this.hud?.heroes[id];
+      const combat = this.combat?.heroes[id];
+      const hp = combat?.hp ?? hud?.hp ?? 1;
+      return { id, downed: !!(hud?.downed || hp <= 0), hp };
+    });
+  }
+
   private speakBark(trigger: string, forcedSpeaker?: HeroId) {
-    const entry = this.story.barkEntry(trigger);
-    const text = entry?.text || this.story.bark(trigger);
-    if (!text) return false;
-    const speaker = (forcedSpeaker || (entry?.speaker as HeroId) || 'brannoc') as HeroId;
-    const name = this.story.speakerName(speaker);
-    this.lastMessage = `${name}: ${text}`;
-    this.hud?.pushLog(`${name}: ${text}`);
-    this.bubble?.show(text, speaker, name);
+    const picked = this.barkDirector.pick(trigger, this.story.barksFor(trigger), {
+      nowMs: performance.now(),
+      party: this.partyForBarks(),
+      flags: this.flags,
+      act: 1,
+      forcedSpeaker,
+      skipRateLimits: !!forcedSpeaker
+    });
+    if (!picked) return false;
+    const speaker = asHeroId(picked.speaker);
+    const name = this.story.speakerName(picked.speaker);
+    this.lastMessage = `${name}: ${picked.text}`;
+    this.hud?.pushLog(`${name}: ${picked.text}`);
+    void this.bubble?.load().then(() => this.bubble?.show(picked.text, speaker, name));
+    this.lastBarkFace = {
+      speaker: picked.speaker,
+      face: picked.face,
+      listener: picked.listener,
+      listenerFace: picked.listenerFace
+    };
+    this.audioManager.playBarkVoice(picked.speaker);
     return true;
   }
 
@@ -1787,14 +1871,7 @@ class Game {
     this.spriteManager.resetItems(floor1);
     this.combat.setOccupancy(
       openGrid(
-        (ox, oy) => {
-          const t = floor1.tiles[oy]?.[ox];
-          if (!t || t.wall) return true;
-          if (t.secret && !t.secretOpen) return true;
-          if (t.door && !t.doorOpen) return true;
-          if (t.prop === 'beams_fallen' || t.prop === 'desk') return true;
-          return false;
-        },
+        (ox, oy) => tileBlocksPath(floor1.tiles[oy]?.[ox]),
         floor1.width,
         floor1.height,
         (ox, oy) => {
@@ -1805,7 +1882,7 @@ class Game {
     );
     this.vertexLighting.relight();
     if (this.storyProgress.fire('secret_found')) this.showMessage(this.storyLog('secret_found'));
-    this.speakBark('secret_wall', 'brannoc');
+    this.speakBark('secret_wall');
     return true;
   }
 
@@ -1815,6 +1892,7 @@ class Game {
     document.documentElement.lang = locale;
     this.title.story = this.story;
     this.intro?.applyLocale();
+    this.introSkip?.refresh();
     await this.title.ensureLogo();
     this.applyStoryLabels();
     this.title.refreshHint();
@@ -1848,16 +1926,7 @@ class Game {
     this.skipIntroRequested = false;
     this.pendingNewGameReset = true;
     this.pendingStartSnapshot = true;
-    void this.prefetchFloor();
     void this.runNewGame();
-  }
-
-  private prefetchFloor() {
-    void this.worldBoot.then(() => {
-      if (this.spriteManager && this.renderer) {
-        return this.spriteManager.ensureMonsters(this.renderer.scene, floor1);
-      }
-    });
   }
 
   private async applyNewGameReset() {
@@ -1870,6 +1939,8 @@ class Game {
     this.playAccMs = 0;
     this.playStartedAt = performance.now();
     this.storyProgress.startNewGame();
+    this.barkDirector.reset();
+    this.lastBarkFace = null;
     this.journalPages.clear();
     this.dialogue.clear();
     this.floorStates = {};
@@ -1893,6 +1964,8 @@ class Game {
         else this.hideTapOverlay();
       });
       overlay.classList.add('show');
+      this.introSkip?.refresh();
+      this.introSkip?.show();
       this.audioManager.crossfadeToIntro();
       this.intro.start();
     } else {
@@ -1904,6 +1977,7 @@ class Game {
     this.skipIntroRequested = true;
     if (!this.skipPlayAt) this.skipPlayAt = performance.now();
     this.intro?.skip();
+    this.introSkip?.hide();
     document.getElementById('intro-overlay')?.classList.remove('show');
     this.beginPlay();
   }
@@ -1918,9 +1992,12 @@ class Game {
     await this.withLoading(this.ensurePlayReady());
     await this.applyNewGameReset();
     if (this.skipPlayAt) this.skipToPlayableMs = Math.round(performance.now() - this.skipPlayAt);
+    this.audioManager.armFirstFightCap();
     this.phase = 'play';
     if (!this.playStartedAt) this.playStartedAt = performance.now();
     this.audioManager.markPlayStarted();
+    void this.audioManager.startPlayStreaming();
+    this.beginMonsterStreaming();
     if (this.storyProgress.fire('enter_floor1')) this.showMessage(this.storyLog('enter_floor1'));
     this.storyProgress.fire('f1_start');
     if (this.pendingStartSnapshot) {
@@ -1952,11 +2029,11 @@ class Game {
 
   private async loadFloorAudio() {
     try {
-      await this.audioManager.loadSounds(this.renderer.scene, floor1Sconces);
-      this.audioManager.attachDressing(this.renderer.scene, this.dressing.marks);
       this.audioManager.attachWaterPools(this.renderer.scene, floor1);
+      this.audioManager.attachDressing(this.renderer.scene, this.dressing.marks);
       this.audioManager.startNamedLoop('lamp_hooks', 11 * CELL_SIZE, 0.55, 9 * CELL_SIZE, 0.38, 'named');
       this.rebuildAudioFromState();
+      void this.audioManager.startPlayStreaming();
     } catch (err) {
       console.warn('Audio init failed', err);
       this.audioManager.startLanternLoop(this.oil > 0);
@@ -2003,7 +2080,11 @@ class Game {
         introMusic: this.audioManager.hasIntroMusic(),
         introStarted: this.intro?.hasStarted() ?? false,
         skipToPlayableMs: this.skipToPlayableMs,
-        floor1Prefetch: this.floor1PrefetchStarted
+        floor1Prefetch: this.floor1PrefetchStarted,
+        pendingBeforePlaySounds: this.audioManager.pendingBeforePlayStems(),
+        pendingFirstFightSounds: this.audioManager.pendingFirstFightStems(),
+        firstFightUnlocked: this.audioManager.isFirstFightUnlocked(),
+        playAgeMs: this.playStartedAt ? Math.round(performance.now() - this.playStartedAt) : null
       }),
       setPosition: (x: number, y: number, dir: number) => {
         this.cancelSwap();
@@ -2025,7 +2106,7 @@ class Game {
           this.player.y
         );
         this.audioManager?.updateListener(this.player.x, this.player.y, this.player.dir);
-        this.props?.layoutAdjacent(this.player.x, this.player.y, this.spriteManager.integerAdjacentScale());
+        this.props?.layoutAdjacent(this.player.x, this.player.y, this.spriteManager.integerAdjacentScale(), this.player.dir);
         this.updateDoorButton();
         this.renderer.render();
       },
@@ -2377,21 +2458,30 @@ class Game {
       setAdjacentScale: (n: number) => {
         this.spriteManager.setAdjacentScale(n);
         this.spriteManager.update(performance.now(), this.player.x, this.player.y, this.player.dir);
-        this.props.layoutAdjacent(this.player.x, this.player.y, this.spriteManager.integerAdjacentScale());
+        this.props.layoutAdjacent(this.player.x, this.player.y, this.spriteManager.integerAdjacentScale(), this.player.dir);
         this.renderer.render();
       },
       adjacentScale: () => this.spriteManager.integerAdjacentScale(),
       listenerPose: () => this.audioManager.listenerPose(),
       propTiles: () => {
-        const out: Array<{ x: number; y: number; prop: string }> = [];
+        const out: Array<{ x: number; y: number; prop: string; placement?: string; wall?: string }> = [];
         for (let y = 0; y < floor1.height; y++) {
           for (let x = 0; x < floor1.width; x++) {
-            const p = floor1.tiles[y][x].prop;
-            if (p) out.push({ x, y, prop: p });
+            const tile = floor1.tiles[y][x];
+            if (tile.prop) {
+              out.push({
+                x,
+                y,
+                prop: tile.prop,
+                placement: tile.propPlacement,
+                wall: tile.propWall
+              });
+            }
           }
         }
         return out;
       },
+      wallPropDraw: () => this.props.debugWallProps(),
       partySave: () => ({
         bag: this.bag.serialize(),
         equipment: this.equipmentState(),
@@ -2423,6 +2513,7 @@ class Game {
       openSecret: (x: number, y: number) => this.openSecretAt(x, y),
       secretOpen: (x: number, y: number) => !!this.player.tileAt(x, y)?.secretOpen,
       speakBark: (trigger: string, speaker?: HeroId) => this.speakBark(trigger, speaker),
+      lastBark: () => this.lastBarkFace,
       bubbleVisible: () => !!this.bubble?.visible,
       bubbleText: () => this.bubble?.displayText() ?? '',
       flags: () => [...this.flags],
@@ -2503,10 +2594,6 @@ class Game {
       titleVisible: () => !!document.getElementById('title-overlay')?.classList.contains('show'),
       introVisible: () => !!document.getElementById('intro-overlay')?.classList.contains('show'),
       startNewGame: () => this.startNewGame(),
-      dismissTap: () => {
-        if (this.skipTitle) this.consumePlayTap();
-        else this.consumeTitleTap();
-      },
       skipIntro: () => this.skipIntro(),
       setLocale: (locale: Locale) => this.setLocale(locale),
       showTitle: () => this.title.show('title'),
@@ -2519,6 +2606,7 @@ class Game {
       lanternLoop: () => this.audioManager.lanternLoop(),
       playLevelUp: (id: HeroId) => this.hud.playLevelUp(id),
       inCombat: () => !!this.combat?.fight,
+      combatAwake: () => this.isCombatAwake(),
       combatHeroes: () =>
         HERO_IDS.map((id) => {
           const h = this.combat.heroes[id];
@@ -2624,12 +2712,8 @@ class Game {
     const onTap = (_e: Event) => {
       this.audioManager.unlock();
       if (!overlayActive()) return;
-      const now = performance.now();
-      if (now - this.lastTapAt < 400) return;
-      this.lastTapAt = now;
       if (this.phase === 'intro') {
-        if (this.intro?.hasStarted()) this.skipIntro();
-        else this.flashTapFeedback();
+        this.flashTapFeedback();
         return;
       }
       if (this.skipTitle) {
@@ -2692,7 +2776,7 @@ class Game {
       this.updateDoorButton();
     }
 
-    if (this.combat && !this.combat.gameOver) {
+    if (this.combat && !this.combat.gameOver && this.isCombatAwake()) {
       this.applyEvents(this.combat.tick(this.nowSec()));
     }
 
@@ -2712,7 +2796,7 @@ class Game {
     this.water.update(now);
     this.atmosphere.update(dtSec, now, this.renderer.camera);
     this.audioManager.updateListener(this.player.x, this.player.y, this.player.dir);
-    this.props.layoutAdjacent(this.player.x, this.player.y, this.spriteManager.integerAdjacentScale());
+    this.props.layoutAdjacent(this.player.x, this.player.y, this.spriteManager.integerAdjacentScale(), this.player.dir);
     this.audioManager.update(now, this.player.x * CELL_SIZE, this.player.y * CELL_SIZE);
 
     this.torches.update(now, this.player.x, this.player.y, this.player.dir);

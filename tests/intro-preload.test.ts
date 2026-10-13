@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { resetAssetCache } from '../src/proto3d/asset-cache';
 import { IntroPlayer } from '../src/proto3d/intro';
 import type { StoryText } from '../src/proto3d/i18n';
 
@@ -12,11 +13,7 @@ class FakeImage {
   private _src = '';
   set src(value: string) {
     this._src = value;
-    const name = value.split('/').pop() ?? value;
-    const waiters = holds.get(name);
-    const fire = () => this.onload?.();
-    if (waiters) waiters.push({ resolve: fire });
-    else queueMicrotask(fire);
+    queueMicrotask(() => this.onload?.());
   }
   get src() {
     return this._src;
@@ -27,6 +24,34 @@ function release(name: string) {
   const waiters = holds.get(name) ?? [];
   holds.delete(name);
   for (const w of waiters) w.resolve();
+}
+
+function stubFetch() {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn((url: string) => {
+      const name = String(url).split('/').pop() ?? String(url);
+      return new Promise<Response>((resolve) => {
+        const fire = () =>
+          resolve(
+            new Response(new Uint8Array([137, 80, 78, 71]), {
+              status: 200,
+              headers: { 'Content-Type': name.endsWith('.json') ? 'application/json' : 'image/png' }
+            })
+          );
+        const waiters = holds.get(name);
+        if (waiters) waiters.push({ resolve: fire });
+        else queueMicrotask(fire);
+      });
+    })
+  );
+  if (typeof URL.createObjectURL !== 'function') {
+    vi.stubGlobal('URL', {
+      ...URL,
+      createObjectURL: () => 'blob:fake',
+      revokeObjectURL: () => undefined
+    });
+  }
 }
 
 function stubCanvas() {
@@ -40,6 +65,7 @@ function stubStory(): StoryText {
 describe('IntroPlayer preload', () => {
   afterEach(() => {
     holds.clear();
+    resetAssetCache();
     vi.unstubAllGlobals();
   });
 
@@ -47,6 +73,7 @@ describe('IntroPlayer preload', () => {
     holds.set('shot1_keep.png', []);
     holds.set('shot2_sinking.png', []);
     vi.stubGlobal('Image', FakeImage);
+    stubFetch();
     const intro = new IntroPlayer(stubCanvas(), stubStory());
     intro.preload();
     expect(intro.hasShot(0)).toBe(false);
@@ -65,6 +92,7 @@ describe('IntroPlayer preload', () => {
 
   it('start() is a no-op the second time', () => {
     vi.stubGlobal('Image', FakeImage);
+    stubFetch();
     const raf = vi.fn().mockReturnValue(1);
     vi.stubGlobal('requestAnimationFrame', raf);
     const intro = new IntroPlayer(stubCanvas(), stubStory());
@@ -77,6 +105,7 @@ describe('IntroPlayer preload', () => {
 
   it('skip before start still blocks a later start', () => {
     vi.stubGlobal('Image', FakeImage);
+    stubFetch();
     const raf = vi.fn().mockReturnValue(1);
     vi.stubGlobal('requestAnimationFrame', raf);
     vi.stubGlobal('cancelAnimationFrame', vi.fn());

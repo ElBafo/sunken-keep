@@ -10,6 +10,7 @@ type Proto3d = {
   tryMoveForward: () => { result: string; after: { x: number; y: number } };
   useHand: (id: string, hand: 'main' | 'off') => boolean;
   inCombat: () => boolean;
+  combatAwake: () => boolean;
   combatHeroes: () => Array<{ id: string; hp: number; maxHp: number; downed: boolean; level: number; xp: number }>;
   combatMonsters: () => Array<{ id: string; kind: string; x: number; y: number; hp: number; alive: boolean; windup: string | null }>;
   pendingPerks: () => Array<{ hero: string; level: number }>;
@@ -65,7 +66,11 @@ test('proto3d combat: block square, first swing, voices, perks, game over', asyn
     { timeout: 25000 }
   );
   await page.locator('#tap-to-start').tap();
-  await page.waitForTimeout(400);
+  await page.waitForFunction(
+    () => (window as unknown as { __proto3d?: { combatAwake?: () => boolean } }).__proto3d?.combatAwake?.() === true,
+    null,
+    { timeout: 8000 }
+  );
 
   const voicesOn = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.heroVoices());
   expect(voicesOn, 'HERO_VOICES is the single on-switch').toBe(true);

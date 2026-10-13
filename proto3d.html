@@ -32,7 +32,7 @@
       position: absolute;
       inset: 0;
       padding-top: env(safe-area-inset-top, 0);
-      background: #000 url('%BASE_URL%art/ui/layout585/stone_strip_tile.png') repeat;
+      background: #000;
       image-rendering: pixelated;
       image-rendering: -moz-crisp-edges;
       image-rendering: crisp-edges;
@@ -367,6 +367,29 @@
     #title-overlay.show,
     #intro-overlay.show { display: block; }
     #intro-overlay { z-index: 1600; }
+    .intro-skip {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      left: auto;
+      bottom: auto;
+      transform: none;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 10px 16px;
+      border: 1px solid #8a7348;
+      background: rgba(12, 10, 8, 0.85);
+      color: #e8d8a0;
+      font-family: monospace;
+      font-size: 14px;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      z-index: 2;
+    }
+    .intro-skip[hidden] { display: none; }
+    .intro-skip:active { transform: translateY(1px); }
     #title-stage,
     #intro-stage {
       position: relative;

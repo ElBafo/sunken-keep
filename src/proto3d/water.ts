@@ -7,6 +7,7 @@ import {
   WATER_SURFACE_Y,
   isWaterTile
 } from './constants';
+import { loadTextureCached } from './asset-cache';
 import { DressingMark } from './dressing';
 import { flipUVsX, floorFlipX, floorQuarterTurns, rotateUVs } from './texture-variants';
 import { FloorData, Sconce, Tile } from './types';
@@ -61,20 +62,12 @@ export class WaterSystem {
   private placeGlint: ((x: number, y: number, scale: number, phase: number) => void) | null = null;
 
   async load(): Promise<void> {
-    const loader = new THREE.TextureLoader();
     const baseUrl = import.meta.env.BASE_URL;
-    const load = (path: string, wrap: THREE.Wrapping): Promise<THREE.Texture> =>
-      new Promise((resolve, reject) => {
-        loader.load(
-          `${baseUrl}${path}`,
-          (tex) => {
-            configureMap(tex, wrap);
-            resolve(tex);
-          },
-          undefined,
-          reject
-        );
-      });
+    const load = async (path: string, wrap: THREE.Wrapping): Promise<THREE.Texture> => {
+      const tex = await loadTextureCached(`${baseUrl}${path}`);
+      configureMap(tex, wrap);
+      return tex;
+    };
 
     this.shallowMaps = await Promise.all(
       [1, 2, 3, 4].map((n) => load(`proto3d/tex3d/water/water_surface_${n}.png`, THREE.RepeatWrapping))

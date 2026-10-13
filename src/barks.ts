@@ -81,7 +81,7 @@ export function triggerBark(trigger: string, scriptedText?: string, scriptedSpea
   lastTriggerTime.set(trigger, now);
   lastBarkByTrigger.set(trigger, bark);
   
-  sound.play('bark');
+  sound.playSpeakerVoice(bark.speaker);
   resetIdleTimers();
 }
 
@@ -114,7 +114,7 @@ export function triggerScriptedBark(trigger: string) {
     duration: BARK_DURATION
   };
   
-  sound.play('bark');
+  sound.playSpeakerVoice(firstBark.speaker);
   resetIdleTimers();
   
   // Queue follow-up barks if any
@@ -142,7 +142,7 @@ export function triggerScriptedBark(trigger: string) {
           duration: BARK_DURATION
         };
         
-        sound.play('bark');
+        sound.playSpeakerVoice(bark.speaker);
       }, (index + 1) * (BARK_DURATION + 200));
     });
   }

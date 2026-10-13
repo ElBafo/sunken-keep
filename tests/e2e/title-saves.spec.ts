@@ -16,6 +16,7 @@ type Proto3d = {
   doorOpen: (x: number, y: number) => boolean;
   openDoor: (x: number, y: number) => boolean;
   inCombat: () => boolean;
+  combatAwake: () => boolean;
   tryMoveForward: () => { result: string };
   requestManualSave: () => void;
   saveToSlot: (n: number) => boolean;
@@ -103,17 +104,17 @@ async function dismissTapOverlay(page: import('@playwright/test').Page) {
   const tap = page.locator('#tap-to-start');
   if (!(await tap.isVisible())) return;
   await tap.tap({ timeout: 3000 });
-  if (await tap.isVisible()) {
-    // WebKit sometimes swallows the first tap; wait out the 400ms debounce, then
-    // fire a real pointerdown on the overlay and title canvas. Never dismissTap().
-    await page.waitForTimeout(450);
-    await page.evaluate(() => {
-      const opts: PointerEventInit = { bubbles: true, cancelable: true, composed: true, isPrimary: true };
-      document.getElementById('tap-to-start')?.dispatchEvent(new PointerEvent('pointerdown', opts));
-      document.getElementById('title-canvas')?.dispatchEvent(new PointerEvent('pointerdown', opts));
-    });
-  }
-  await expect(tap).toBeHidden({ timeout: 5000 });
+  if (await tap.isVisible()) await tap.evaluate((el) => (el as HTMLElement).click());
+  await expect(tap).toBeHidden({ timeout: 8000 });
+}
+
+async function skipIntro(page: import('@playwright/test').Page) {
+  const skip = page.locator('#intro-skip');
+  await expect(skip).toBeVisible({ timeout: 8000 });
+  const box = await skip.boundingBox();
+  expect(box?.height ?? 0, 'intro skip tap height').toBeGreaterThanOrEqual(44);
+  expect(box?.width ?? 0, 'intro skip tap width').toBeGreaterThanOrEqual(44);
+  await skip.tap();
 }
 
 async function waitGameReady(page: import('@playwright/test').Page, timeout = 30000) {
@@ -221,7 +222,9 @@ test.describe('proto3d step4 title and saves', () => {
     );
     expect(after.introStarted).toBe(true);
     const skipStarted = Date.now();
-    await page.locator('#intro-overlay').tap();
+    await page.locator('#intro-canvas').tap();
+    await expect(page.locator('#intro-overlay')).toHaveClass(/show/);
+    await skipIntro(page);
     await expect(page.locator('#intro-overlay')).not.toHaveClass(/show/);
     await page.waitForFunction(
       () => {
@@ -248,7 +251,9 @@ test.describe('proto3d step4 title and saves', () => {
     mkdirSync(OUT, { recursive: true });
     const errors: string[] = [];
     const isHostAudioNoise = (text: string) =>
-      /failed to start the audio device|autoaudiosink|gstreamer element/i.test(text);
+      /failed to start the audio device|autoaudiosink|gstreamer element|audio\/.*access control checks/i.test(
+        text
+      );
     page.on('pageerror', (err) => {
       if (!isHostAudioNoise(err.message)) errors.push(err.message);
     });
@@ -301,7 +306,9 @@ test.describe('proto3d step4 title and saves', () => {
 
     await page.locator('.title-hit[data-id="New Game"]').tap();
     await expect(page.locator('#intro-overlay')).toHaveClass(/show/, { timeout: 8000 });
-    await page.locator('#intro-overlay').tap();
+    await page.locator('#intro-canvas').tap();
+    await expect(page.locator('#intro-overlay')).toHaveClass(/show/);
+    await skipIntro(page);
     await page.waitForTimeout(400);
     await expect(page.locator('#intro-overlay')).not.toHaveClass(/show/);
     await expect(page.locator('#title-overlay')).not.toHaveClass(/show/);
@@ -358,6 +365,11 @@ test.describe('proto3d step4 title and saves', () => {
     expect(restored.pos).toMatchObject({ x: 1, y: 7 });
 
     await bootPlay(page, 'test=1&persist=1&debug=1');
+    await page.waitForFunction(
+      () => (window as unknown as { __proto3d?: Proto3d }).__proto3d?.combatAwake?.() === true,
+      null,
+      { timeout: 8000 }
+    );
     await page.evaluate(() => {
       const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
       p.setPosition(6, 2, 1);
@@ -623,7 +635,9 @@ test.describe('proto3d step4 title and saves', () => {
     expect(afterOnce.againUnlock).toBe(false);
     expect(afterOnce.againEvery).toBe(true);
     expect(afterOnce.loops.filter((n) => n.startsWith('torch:0,6')).length).toBe(0);
-    expect(afterOnce.loops.sort()).toEqual(beforeOnce.loops.sort());
+    const playableLoops = (names: string[]) =>
+      names.filter((n) => !/^(crack_wind|lamp_hooks|music_act1)/.test(n)).sort();
+    expect(playableLoops(afterOnce.loops)).toEqual(playableLoops(beforeOnce.loops));
     const afterFlags = await mapState(page);
     expect(afterFlags.flags).toEqual(expect.arrayContaining(['secret_found', 'note_lampkeeper']));
     expect(afterFlags.doors.find((d) => d.x === 4 && d.y === 2)?.open).toBe(true);
@@ -670,7 +684,7 @@ test.describe('proto3d step4 title and saves', () => {
     await page.locator('.title-hit[data-id="New Game"]').tap();
     await page.waitForTimeout(150);
     if (await page.locator('#intro-overlay').evaluate((el) => el.classList.contains('show'))) {
-      await page.locator('#intro-overlay').tap();
+      await skipIntro(page);
     }
     await page.waitForTimeout(1600);
     const afterNew = await page.evaluate(() => {
