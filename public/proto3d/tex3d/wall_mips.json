@@ -1,0 +1,80 @@
+{
+  "filter": "nearest",
+  "levels": [
+    128,
+    64,
+    32
+  ],
+  "textures": {
+    "wall_plain.png": {
+      "128": "wall_plain.png",
+      "64": "wall_plain_64.png",
+      "32": "wall_plain_32.png"
+    },
+    "wall_plain_2.png": {
+      "128": "wall_plain_2.png",
+      "64": "wall_plain_2_64.png",
+      "32": "wall_plain_2_32.png"
+    },
+    "wall_plain_3.png": {
+      "128": "wall_plain_3.png",
+      "64": "wall_plain_3_64.png",
+      "32": "wall_plain_3_32.png"
+    },
+    "wall_plain_4.png": {
+      "128": "wall_plain_4.png",
+      "64": "wall_plain_4_64.png",
+      "32": "wall_plain_4_32.png"
+    },
+    "wall_pilaster.png": {
+      "128": "wall_pilaster.png",
+      "64": "wall_pilaster_64.png",
+      "32": "wall_pilaster_32.png"
+    },
+    "wall_knot.png": {
+      "128": "wall_knot.png",
+      "64": "wall_knot_64.png",
+      "32": "wall_knot_32.png"
+    },
+    "wall_knot_2.png": {
+      "128": "wall_knot_2.png",
+      "64": "wall_knot_2_64.png",
+      "32": "wall_knot_2_32.png"
+    },
+    "wall_knot_3.png": {
+      "128": "wall_knot_3.png",
+      "64": "wall_knot_3_64.png",
+      "32": "wall_knot_3_32.png"
+    },
+    "wall_knot_4.png": {
+      "128": "wall_knot_4.png",
+      "64": "wall_knot_4_64.png",
+      "32": "wall_knot_4_32.png"
+    },
+    "door_locked.png": {
+      "128": "door_locked.png",
+      "64": "door_locked_64.png",
+      "32": "door_locked_32.png"
+    },
+    "door_open.png": {
+      "128": "door_open.png",
+      "64": "door_open_64.png",
+      "32": "door_open_32.png"
+    },
+    "door_panel.png": {
+      "128": "door_panel.png",
+      "64": "door_panel_64.png",
+      "32": "door_panel_32.png"
+    },
+    "secret_closed.png": {
+      "128": "secret_closed.png",
+      "64": "secret_closed_64.png",
+      "32": "secret_closed_32.png"
+    },
+    "secret_open.png": {
+      "128": "secret_open.png",
+      "64": "secret_open_64.png",
+      "32": "secret_open_32.png"
+    }
+  }
+}
