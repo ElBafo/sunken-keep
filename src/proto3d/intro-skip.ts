@@ -1,5 +1,22 @@
 export const INTRO_SKIP_MIN_TAP_PX = 44;
 
+/**
+ * Shared Skip-button / end-of-reel path: drop the intro and tap overlay and
+ * enter play. No extra tap.
+ */
+export function enterPlayFromIntro(opts: {
+  hideSkip(): void;
+  introOverlay: { classList: { remove(name: string): void } } | null;
+  tapToStart: { classList: { add(name: string): void } } | null;
+  alreadyPlaying: boolean;
+  beginPlay(): void;
+}): void {
+  opts.hideSkip();
+  opts.introOverlay?.classList.remove('show');
+  opts.tapToStart?.classList.add('hidden');
+  if (!opts.alreadyPlaying) opts.beginPlay();
+}
+
 export interface IntroSkipHandle {
   refresh(): void;
   show(): void;

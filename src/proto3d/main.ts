@@ -44,7 +44,7 @@ import { TitleScreen, type TitleAction } from './title';
 import { beforePlayRelPaths } from './audio-groups';
 import { prefetchRelPaths } from './floor1-prefetch';
 import { IntroPlayer } from './intro';
-import { mountIntroSkip, type IntroSkipHandle } from './intro-skip';
+import { enterPlayFromIntro, mountIntroSkip, type IntroSkipHandle } from './intro-skip';
 import { interactPropAt, tileBlocksPath } from './wall-props';
 import { SpeechBubble } from './bubble';
 import { StoryProgress } from './story-progress';
@@ -1980,10 +1980,13 @@ class Game {
     this.skipIntroRequested = true;
     if (!this.skipPlayAt) this.skipPlayAt = performance.now();
     this.intro?.skip();
-    this.introSkip?.hide();
-    document.getElementById('intro-overlay')?.classList.remove('show');
-    if (this.phase === 'play' || this.enteringPlay) return;
-    this.beginPlay();
+    enterPlayFromIntro({
+      hideSkip: () => this.introSkip?.hide(),
+      introOverlay: document.getElementById('intro-overlay'),
+      tapToStart: document.getElementById('tap-to-start'),
+      alreadyPlaying: this.phase === 'play' || this.enteringPlay,
+      beginPlay: () => this.beginPlay()
+    });
   }
 
   private beginPlay() {
