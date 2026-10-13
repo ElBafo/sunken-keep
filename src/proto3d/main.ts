@@ -41,6 +41,7 @@ import {
   type SavedFloor
 } from './saves';
 import { TitleScreen, type TitleAction } from './title';
+import { prefetchFloor1Playable } from './floor1-prefetch';
 import { IntroPlayer } from './intro';
 import { SpeechBubble } from './bubble';
 import { StoryProgress } from './story-progress';
@@ -141,6 +142,9 @@ class Game {
   private newGameStarted = false;
   private pendingNewGameReset = false;
   private enteringPlay = false;
+  private floor1PrefetchStarted = false;
+  private skipPlayAt = 0;
+  private skipToPlayableMs: number | null = null;
   currentSlot: number | null = null;
   private tileSnap: Array<{
     x: number;
@@ -263,6 +267,7 @@ class Game {
     if (bubbleCanvas) this.bubble = new SpeechBubble(bubbleCanvas);
     if (introCanvas) {
       this.intro = new IntroPlayer(introCanvas, this.story);
+      this.intro.setTimeSource(() => this.audioManager.introCurrentTime());
       introCanvas.addEventListener('pointerup', (e) => {
         if (!e.isPrimary) return;
         this.skipIntro();
@@ -375,6 +380,7 @@ class Game {
 
     this.spriteManager = new SpriteManager(this.renderer.camera);
     await this.spriteManager.loadSprites(this.renderer.scene, floor1, { monsters: false });
+    void this.spriteManager.ensureMonsters(this.renderer.scene, floor1);
     this.darkFx = new DarkFx();
     await this.darkFx.load(this.renderer.scene, floor1, this.spriteManager);
     this.hud = new PartyHud(this.story, () => this.oil, layout, {
@@ -448,6 +454,15 @@ class Game {
     this.intro?.preload();
     void this.audioManager.loadIntroMusic();
     void this.title?.loadRest();
+    this.beginFloor1BackgroundLoads();
+  }
+
+  /** After intro preload is in flight: warm floor 1 art/audio without blocking title or intro. */
+  private beginFloor1BackgroundLoads() {
+    if (this.floor1PrefetchStarted) return;
+    this.floor1PrefetchStarted = true;
+    void prefetchFloor1Playable();
+    void this.audioManager.loadFloor1PlaySounds();
   }
 
   private async ensureIntroStartReady() {
@@ -1798,6 +1813,7 @@ class Game {
     await this.story.load(locale);
     document.documentElement.lang = locale;
     this.title.story = this.story;
+    this.intro?.applyLocale();
     await this.title.ensureLogo();
     this.applyStoryLabels();
     this.title.refreshHint();
@@ -1885,6 +1901,7 @@ class Game {
 
   private skipIntro() {
     this.skipIntroRequested = true;
+    if (!this.skipPlayAt) this.skipPlayAt = performance.now();
     this.intro?.skip();
     document.getElementById('intro-overlay')?.classList.remove('show');
     this.beginPlay();
@@ -1899,6 +1916,7 @@ class Game {
     this.enteringPlay = true;
     await this.withLoading(this.ensurePlayReady());
     await this.applyNewGameReset();
+    if (this.skipPlayAt) this.skipToPlayableMs = Math.round(performance.now() - this.skipPlayAt);
     this.phase = 'play';
     if (!this.playStartedAt) this.playStartedAt = performance.now();
     this.audioManager.markPlayStarted();
@@ -1982,7 +2000,9 @@ class Game {
         monsters: this.spriteManager?.hasMonsters() ?? false,
         introShot1: this.intro?.hasShot(0) ?? false,
         introMusic: this.audioManager.hasIntroMusic(),
-        introStarted: this.intro?.hasStarted() ?? false
+        introStarted: this.intro?.hasStarted() ?? false,
+        skipToPlayableMs: this.skipToPlayableMs,
+        floor1Prefetch: this.floor1PrefetchStarted
       }),
       setPosition: (x: number, y: number, dir: number) => {
         this.cancelSwap();

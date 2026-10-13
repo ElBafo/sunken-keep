@@ -14,6 +14,8 @@ import {
 import { QUALITY_PRESETS, QualityLevel } from './quality';
 import { DressingMarks } from './dressing';
 import { TITLE_MENU_AUDIO } from './boot-assets';
+import { FLOOR1_PLAY_AUDIO } from './floor1-prefetch';
+import { mapPool, SPRITE_LOAD_CONCURRENCY } from './load-pool';
 import { FloorData, Sconce } from './types';
 
 const FAR_KEYS = ['far_draught', 'far_groan', 'far_pebbles', 'far_rumble'] as const;
@@ -54,7 +56,9 @@ export class AudioManager {
   private menuLoaded = false;
   private soundsPromise: Promise<void> | null = null;
   private introMusicPromise: Promise<void> | null = null;
+  private floor1PlayPromise: Promise<void> | null = null;
   private introStarted = false;
+  private introPlayContextAt = 0;
   private uiPool: THREE.Audio[] = [];
   private lanternSound: THREE.Audio | null = null;
   private lanternMode: 'oil' | 'ember' | 'off' = 'off';
@@ -156,17 +160,15 @@ export class AudioManager {
 
   private async loadFileList(loader: THREE.AudioLoader, files: ReadonlyArray<readonly [string, string]>) {
     const missing = files.filter(([name]) => !this.buffers.has(name));
-    const results = await Promise.all(
-      missing.map(async ([name, path]) => {
-        try {
-          const buf = await this.loadBuffer(loader, path);
-          return [name, buf] as const;
-        } catch (err) {
-          console.warn('Failed to load', path, err);
-          return null;
-        }
-      })
-    );
+    const results = await mapPool(missing, SPRITE_LOAD_CONCURRENCY, async ([name, path]) => {
+      try {
+        const buf = await this.loadBuffer(loader, path);
+        return [name, buf] as const;
+      } catch (err) {
+        console.warn('Failed to load', path, err);
+        return null;
+      }
+    });
     for (const pair of results) {
       if (pair) this.buffers.set(pair[0], pair[1]);
     }
@@ -217,6 +219,43 @@ export class AudioManager {
 
   hasIntroMusic(): boolean {
     return this.buffers.has('intro');
+  }
+
+  /**
+   * Intro music playback position in seconds (`HTMLMediaElement.currentTime` equivalent).
+   * Null when the bed is not playing so the intro can fall back to elapsed time.
+   */
+  introCurrentTime(): number | null {
+    const sound = this.introSound;
+    if (!sound?.isPlaying) return null;
+    const rec = sound as unknown as { _startedAt?: number; _progress?: number };
+    const startedAt = rec._startedAt ?? this.introPlayContextAt;
+    if (!Number.isFinite(startedAt)) return null;
+    const rate = sound.getPlaybackRate();
+    const progress = rec._progress ?? 0;
+    const offset = sound.offset ?? 0;
+    return Math.max(0, progress + offset + (sound.context.currentTime - startedAt) * rate);
+  }
+
+  /** Decode floor 1 playable audio in the background. Safe to call more than once. */
+  async loadFloor1PlaySounds() {
+    if (this.floor1PlayPromise) return this.floor1PlayPromise;
+    this.floor1PlayPromise = (async () => {
+      const loader = new THREE.AudioLoader();
+      await this.loadFileList(loader, FLOOR1_PLAY_AUDIO);
+      const amb = this.buffers.get('ambience');
+      if (amb && !this.ambientSound) {
+        this.ambientSound = new THREE.Audio(this.listener);
+        this.ambientSound.setBuffer(amb);
+        this.ambientSound.setLoop(true);
+        this.ambientSound.setVolume(0.32);
+      }
+    })();
+    try {
+      await this.floor1PlayPromise;
+    } catch {
+      this.floor1PlayPromise = null;
+    }
   }
 
   async loadSounds(scene: THREE.Scene, sconces: readonly Sconce[]) {
@@ -382,7 +421,7 @@ export class AudioManager {
     await this.loadFileList(loader, files);
 
     const amb = this.buffers.get('ambience');
-    if (amb) {
+    if (amb && !this.ambientSound) {
       this.ambientSound = new THREE.Audio(this.listener);
       this.ambientSound.setBuffer(amb);
       this.ambientSound.setLoop(true);
@@ -722,6 +761,7 @@ export class AudioManager {
     this.introSound.setVolume(0);
     try {
       this.introSound.play();
+      this.introPlayContextAt = this.introSound.context.currentTime;
     } catch {
       this.introStarted = false;
       return;

@@ -1,3 +1,4 @@
+import { drawFont5x7, wrapCaption, CAPTION_CHAR_PX, type FontGlyphs } from './font5x7';
 import { StoryText } from './i18n';
 
 interface IntroShot {
@@ -11,6 +12,18 @@ interface IntroCaption {
   text: string;
   start: number;
   end: number;
+}
+
+interface CaptionRow {
+  id?: string;
+  text?: string;
+  start?: number;
+  end?: number;
+}
+
+interface CaptionFile {
+  en?: CaptionRow[];
+  el?: CaptionRow[];
 }
 
 interface EyePos {
@@ -34,6 +47,26 @@ export const INTRO_IMAGE_FILES = [
 
 export const INTRO_SHOT_FILES = INTRO_IMAGE_FILES.slice(0, 6);
 
+export const INTRO_DURATION_SEC = 35;
+
+/** Keep the last shot when time is past the timeline instead of wrapping to shot 1. */
+export function introShotIndex(durations: readonly number[], time: number): number {
+  if (durations.length === 0) return 0;
+  let elapsed = 0;
+  for (let i = 0; i < durations.length; i++) {
+    if (time < elapsed + durations[i]) return i;
+    elapsed += durations[i];
+  }
+  return durations.length - 1;
+}
+
+export function captionTextAt(captions: readonly IntroCaption[], time: number): string {
+  for (const caption of captions) {
+    if (caption.text && time >= caption.start && time <= caption.end) return caption.text;
+  }
+  return '';
+}
+
 export class IntroPlayer {
   private width = 270;
   private height = 480;
@@ -43,6 +76,8 @@ export class IntroPlayer {
   private failed = new Set<string>();
   private shots: IntroShot[] = [];
   private captions: IntroCaption[] = [];
+  private captionFile: CaptionFile | null = null;
+  private captionsPromise: Promise<void> | null = null;
   private currentTime = 0;
   private lastTick = 0;
   private elapsedMs = 0;
@@ -51,6 +86,9 @@ export class IntroPlayer {
   private skipped = false;
   private waitingForShot = false;
   private needShot: ((waiting: boolean) => void) | null = null;
+  private timeSource: (() => number | null) | null = null;
+  private font: HTMLImageElement | null = null;
+  private fontGlyphs: FontGlyphs = {};
   private eyePositions: EyePos[] = [];
   private boatFrom = { x: 427, y: 560, scale: 1 };
   private boatTo = { x: 427, y: 345, scale: 0.5 };
@@ -62,15 +100,30 @@ export class IntroPlayer {
     this.story = story;
   }
 
-  /** Kick off every intro image. Safe to call more than once. */
+  /** Kick off every intro image, captions, and the 5×7 font. Safe to call more than once. */
   preload() {
     this.ensureTimeline();
     for (const name of INTRO_IMAGE_FILES) void this.loadImage(name);
+    void this.loadCaptions();
+    void this.loadFont();
+  }
+
+  /** Drive caption/shot time from intro music `currentTime`. Null falls back to elapsed. */
+  setTimeSource(source: (() => number | null) | null) {
+    this.timeSource = source;
+  }
+
+  applyLocale() {
+    this.applyCaptionRows();
   }
 
   async load() {
     this.preload();
-    await Promise.all(INTRO_IMAGE_FILES.map((name) => this.loadImage(name)));
+    await Promise.all([
+      ...INTRO_IMAGE_FILES.map((name) => this.loadImage(name)),
+      this.loadCaptions(),
+      this.loadFont()
+    ]);
   }
 
   hasShot(index: number): boolean {
@@ -139,12 +192,7 @@ export class IntroPlayer {
       { file: 'shot5_swamp.png', panX: [292, 292], duration: 5, effects: ['boat', 'fog'] },
       { file: 'shot6_gate.png', panX: [0, 584], duration: 6, effects: ['title'] }
     ];
-    this.captions = [
-      { text: this.story.log('intro_keep'), start: 7, end: 11.5 },
-      { text: this.story.log('intro_forges'), start: 13, end: 17.5 },
-      { text: this.story.log('intro_people'), start: 19.5, end: 23.5 },
-      { text: this.story.log('intro_fools'), start: 29, end: 32.5 }
-    ];
+    this.applyCaptionRows();
     this.eyePositions = [
       { x: 430, y: 272, scale: 1, openTime: 18.5 },
       { x: 338, y: 273, scale: 1, openTime: 19.1 },
@@ -178,12 +226,64 @@ export class IntroPlayer {
   }
 
   private shotIndexAt(time: number): number {
-    let elapsed = 0;
-    for (let i = 0; i < this.shots.length; i++) {
-      if (time < elapsed + this.shots[i].duration) return i;
-      elapsed += this.shots[i].duration;
+    return introShotIndex(
+      this.shots.map((s) => s.duration),
+      time
+    );
+  }
+
+  private loadCaptions(): Promise<void> {
+    if (this.captionsPromise) return this.captionsPromise;
+    const base = import.meta.env.BASE_URL;
+    this.captionsPromise = (async () => {
+      try {
+        const res = await fetch(`${base}story/intro_captions.json`);
+        if (!res.ok) return;
+        this.captionFile = (await res.json()) as CaptionFile;
+        this.applyCaptionRows();
+      } catch {
+        this.captionFile = this.captionFile ?? null;
+      }
+    })();
+    return this.captionsPromise;
+  }
+
+  private applyCaptionRows() {
+    const file = this.captionFile;
+    if (!file) {
+      this.captions = [];
+      return;
     }
-    return Math.max(0, this.shots.length - 1);
+    const locale = this.story.locale === 'el' ? 'el' : 'en';
+    const rows = file[locale] ?? file.en ?? [];
+    this.captions = rows
+      .filter((row) => typeof row.text === 'string' && typeof row.start === 'number' && typeof row.end === 'number')
+      .map((row) => ({ text: row.text as string, start: row.start as number, end: row.end as number }));
+  }
+
+  private loadFont(): Promise<void> {
+    const base = import.meta.env.BASE_URL;
+    return Promise.all([
+      new Promise<void>((resolve) => {
+        if (this.font) {
+          resolve();
+          return;
+        }
+        const img = new Image();
+        img.onload = () => {
+          this.font = img;
+          resolve();
+        };
+        img.onerror = () => resolve();
+        img.src = `${base}art/font/font_5x7.png`;
+      }),
+      fetch(`${base}art/font/font_5x7.json`)
+        .then((r) => r.json())
+        .then((meta: { glyphs?: FontGlyphs }) => {
+          this.fontGlyphs = meta.glyphs ?? {};
+        })
+        .catch(() => undefined)
+    ]).then(() => undefined);
   }
 
   private setWaiting(waiting: boolean) {
@@ -194,12 +294,15 @@ export class IntroPlayer {
 
   private update() {
     const now = performance.now();
-    if (!this.waitingForShot) {
+    const musicTime = this.timeSource?.();
+    if (musicTime != null && Number.isFinite(musicTime) && musicTime >= 0) {
+      this.currentTime = musicTime;
+    } else if (!this.waitingForShot) {
       this.elapsedMs += now - this.lastTick;
       this.currentTime = this.elapsedMs / 1000;
     }
     this.lastTick = now;
-    if (this.currentTime >= 35 || this.skipped) {
+    if (this.currentTime >= INTRO_DURATION_SEC || this.skipped) {
       this.finished = true;
       this.setWaiting(false);
       cancelAnimationFrame(this.raf);
@@ -222,25 +325,17 @@ export class IntroPlayer {
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, this.width, this.height);
 
+    const durations = this.shots.map((s) => s.duration);
+    const shotIndex = introShotIndex(durations, this.currentTime);
     let elapsed = 0;
-    let shotIndex = 0;
-    for (let i = 0; i < this.shots.length; i++) {
-      if (this.currentTime < elapsed + this.shots[i].duration) {
-        shotIndex = i;
-        break;
-      }
-      elapsed += this.shots[i].duration;
-    }
+    for (let i = 0; i < shotIndex; i++) elapsed += durations[i];
     const shot = this.shots[shotIndex];
     const shotTime = this.currentTime - elapsed;
-    const progress = Math.min(1, shotTime / shot.duration);
+    const progress = Math.min(1, shotTime / Math.max(0.001, shot.duration));
     this.renderShot(shot, progress, shotTime);
 
-    for (const caption of this.captions) {
-      if (caption.text && this.currentTime >= caption.start && this.currentTime <= caption.end) {
-        this.renderCaption(caption.text);
-      }
-    }
+    const text = captionTextAt(this.captions, this.currentTime);
+    if (text) this.renderCaption(text);
   }
 
   private renderShot(shot: IntroShot, progress: number, shotTime: number) {
@@ -350,12 +445,33 @@ export class IntroPlayer {
   }
 
   private renderCaption(text: string) {
+    const lines = wrapCaption(text);
+    if (!lines.length) return;
     const ctx = this.ctx;
+    const lineH = 10;
+    const pad = 6;
+    const barH = lines.length * lineH + pad;
+    const barY = this.height - barH - 8;
     ctx.fillStyle = 'rgba(0,0,0,0.75)';
-    ctx.fillRect(0, this.height - 48, this.width, 36);
-    ctx.fillStyle = '#fff';
-    ctx.font = '11px monospace';
-    ctx.textAlign = 'center';
-    ctx.fillText(text, this.width / 2, this.height - 26);
+    ctx.fillRect(0, barY, this.width, barH);
+    ctx.textAlign = 'left';
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const x = Math.floor((this.width - line.length * CAPTION_CHAR_PX) / 2);
+      const y = barY + 4 + i * lineH;
+      drawFont5x7(ctx, this.font, line, x, y, this.fontGlyphs, CAPTION_CHAR_PX, '#ffffff');
+    }
+  }
+
+  /** Test helper: one update using the music clock or elapsed timer. */
+  debugTick(): number {
+    this.ensureTimeline();
+    this.update();
+    return this.currentTime;
+  }
+
+  debugShotIndex(): number {
+    this.ensureTimeline();
+    return this.shotIndexAt(this.currentTime);
   }
 }
