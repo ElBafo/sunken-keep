@@ -26,7 +26,7 @@ export async function loadNearestMipTexture(baseUrl: string, filename: string): 
     MIPS.levels.map((lvl) => loadHtmlImage(`${baseUrl}proto3d/tex3d/${spec[String(lvl)]}`))
   );
   const tex = new THREE.Texture(imgs[0]);
-  tex.mipmaps = imgs;
+  tex.mipmaps = imgs as unknown as THREE.Texture['mipmaps'];
   tex.generateMipmaps = false;
   tex.minFilter = THREE.NearestMipmapNearestFilter;
   tex.magFilter = THREE.NearestFilter;

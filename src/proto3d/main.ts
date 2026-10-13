@@ -170,7 +170,7 @@ class Game {
   private caveInCrashed = false;
   private wantOpeningCaveIn = false;
   private oilDisplay = OIL_START;
-  private oilGlugTimers: ReturnType<typeof setTimeout>[] = [];
+  private oilGlugTimers: number[] = [];
   private worldBoot: Promise<void> = Promise.resolve();
   private stageFitWired = false;
   private newGameStarted = false;
@@ -915,7 +915,7 @@ class Game {
         this.hud?.draw(performance.now());
         this.updateOilHud();
       }, at * 1000);
-      this.oilGlugTimers.push(t);
+      this.oilGlugTimers.push(t as unknown as number);
     }
     this.showMessage(this.storyLog('oil_use', { n: plan.to, max: OIL_MAX }));
     this.inventory.redraw();

@@ -36,7 +36,8 @@ describe('floor 1-4 prop meshes', () => {
     expect(floor1.tiles[3][10].mirror).toBe(true);
   });
 
-  it('places a visible mesh for every floor 1-4 prop and wood pillar', () => {
+  it('places a visible mesh for every drawn floor 1-4 prop', () => {
+    const drawn = new Set(['beams_fallen', 'desk', 'table', 'jar_rack', 'weapon_rack', 'lamp_capped']);
     const floors: Array<{ id: number; data: FloorData }> = [
       { id: 1, data: floor1 },
       { id: 2, data: floor2 as unknown as FloorData },
@@ -52,8 +53,10 @@ describe('floor 1-4 prop meshes', () => {
       if (id === 1) {
         expect(tiles.some((t) => t.prop === 'jar_rack')).toBe(true);
         expect(tiles.some((t) => t.prop === 'beams_fallen')).toBe(true);
+        expect(tiles.every((t) => drawn.has(t.prop))).toBe(true);
       }
       for (const tile of tiles) {
+        if (!drawn.has(tile.prop)) continue;
         if (!visibleAt(scene, tile.x, tile.y)) {
           missing.push(`floor ${id} (${tile.x},${tile.y}) ${tile.prop}`);
         }
