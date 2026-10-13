@@ -394,16 +394,6 @@ class Game {
     this.sceneBuilder.buildScene(this.renderer.scene, floor1);
     void this.audioManager.loadBeforePlaySounds();
 
-    this.dressing = new Dressing();
-    this.water = new WaterSystem();
-    this.props = new PropBuilder();
-    await Promise.all([this.dressing.load(), this.water.load(), this.props.load()]);
-    await this.dressing.place(this.renderer.scene, floor1);
-    this.props.place(this.renderer.scene, floor1);
-
-    this.atmosphere.build(this.renderer.scene, floor1, this.dressing);
-    this.water.build(this.renderer.scene, floor1, floor1Sconces, this.dressing.marks.sunbeams);
-
     this.player = new Player(this.renderer.camera, floor1);
     const startX = params.has('x') ? Number(params.get('x')) : floor1.startX;
     const startY = params.has('y') ? Number(params.get('y')) : floor1.startY;
@@ -412,6 +402,24 @@ class Game {
       this.player.setPosition(startX, startY, startDir);
     }
 
+    this.dressing = new Dressing();
+    this.water = new WaterSystem();
+    this.props = new PropBuilder();
+    this.spriteManager = new SpriteManager(this.renderer.camera);
+    this.torches = new TorchSystem(this.renderer.camera);
+    await Promise.all([
+      this.dressing.load().then(() => this.dressing.place(this.renderer.scene, floor1)),
+      this.water.load(),
+      this.props.load().then(() => this.props.place(this.renderer.scene, floor1)),
+      this.spriteManager.loadSprites(this.renderer.scene, floor1, { monsters: false }),
+      this.torches.load(this.renderer.scene, floor1Sconces),
+      this.initCombat(params),
+      hudReady
+    ]);
+
+    this.atmosphere.build(this.renderer.scene, floor1, this.dressing);
+    this.water.build(this.renderer.scene, floor1, floor1Sconces, this.dressing.marks.sunbeams);
+
     this.vertexLighting = new VertexLightingManager(floor1, floor1Sconces, {
       floor: parseAmbientFloor(params.get('ambientFloor'), 1),
       bright: this.bright,
@@ -419,22 +427,14 @@ class Game {
       oil: () => this.oil
     });
     this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
-
-    this.torches = new TorchSystem(this.renderer.camera);
-    await this.torches.load(this.renderer.scene, floor1Sconces);
     this.torches.setParty(this.player.x, this.player.y, this.player.dir);
-
     this.vertexLighting.registerScene(this.renderer.scene);
     this.vertexLighting.updateAllMeshes(this.renderer.scene);
 
-    this.spriteManager = new SpriteManager(this.renderer.camera);
-    await this.spriteManager.loadSprites(this.renderer.scene, floor1, { monsters: false });
     this.darkFx = new DarkFx();
     void this.darkFx.load(this.renderer.scene, floor1, this.spriteManager);
-    await this.initCombat(params);
     this.loadLampNote();
     this.updateOilHud();
-    await hudReady;
     this.syncPartyHud();
     this.snapshotLoot();
     this.snapshotTiles();
