@@ -1,0 +1,66 @@
+import loadGroups from './audio-load-groups.json';
+
+export type AudioLoadGroup = 'title' | 'floor1' | 'later';
+
+const GROUPS = loadGroups as Record<AudioLoadGroup, string[]>;
+
+/** Extra buffer names the rest of the game already looks up. */
+const EXTRA_ALIASES: Record<string, readonly string[]> = {
+  music_menu_loop: ['menu'],
+  music_intro: ['intro'],
+  music_act1_loop: ['music_act1'],
+  amb_swamp_loop: ['ambience'],
+  sfx_torch_loop: ['torch'],
+  sfx_drip_1: ['drip1'],
+  sfx_drip_2: ['drip2'],
+  sfx_drip_3: ['drip3'],
+  sfx_drip_4: ['drip4'],
+  sfx_chain_sway_1: ['chain1'],
+  sfx_chain_sway_2: ['chain2'],
+  sfx_crack_wind_loop: ['crack_wind'],
+  sfx_banner_flutter: ['banner'],
+  sfx_bones_settle: ['bones'],
+  sfx_bog_leeches_idle_loop: ['leech_idle'],
+  sfx_water_lap_loop: ['water_lap'],
+  sfx_dark_presence_loop: ['dark_presence'],
+  sfx_lamp_hooks_loop: ['lamp_hooks'],
+  sfx_drowned_dwarf_alert: ['captain_dural_alert'],
+  sfx_drowned_dwarf_hurt: ['captain_dural_hurt'],
+  sfx_drowned_dwarf_death: ['captain_dural_death'],
+  sfx_hit_resist_1: ['hit_resist'],
+  sfx_hit_weak_1: ['hit_weak']
+};
+
+export function audioGroupStems(group: AudioLoadGroup): readonly string[] {
+  return GROUPS[group];
+}
+
+export function audioStemKeys(stem: string): string[] {
+  const keys: string[] = [];
+  let rest = stem;
+  if (rest.startsWith('sfx_')) rest = rest.slice(4);
+  else if (rest.startsWith('amb_')) rest = rest.slice(4);
+  keys.push(rest);
+  if (rest !== stem) keys.push(stem);
+  for (const extra of EXTRA_ALIASES[stem] ?? []) {
+    if (!keys.includes(extra)) keys.push(extra);
+  }
+  return keys;
+}
+
+export function audioStemPath(stem: string): string {
+  return `audio/${stem}.mp3`;
+}
+
+export function audioGroupRelPaths(group: AudioLoadGroup): string[] {
+  return audioGroupStems(group).map(audioStemPath);
+}
+
+export function audioGroupFiles(group: AudioLoadGroup): ReadonlyArray<readonly [string, string]> {
+  return audioGroupStems(group).map((stem) => [audioStemKeys(stem)[0], audioStemPath(stem)] as const);
+}
+
+/** Title bed + button voices. Intro music stays on its own preload. */
+export function titleMenuStems(): string[] {
+  return audioGroupStems('title').filter((stem) => stem !== 'music_intro');
+}

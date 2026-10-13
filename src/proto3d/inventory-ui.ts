@@ -279,6 +279,10 @@ export class InventoryUi {
       this.onDrink(this.selected, hero);
       return;
     }
+    if (entry.item === 'oil_flask' || entry.item === 'oil') {
+      this.onUse(this.selected);
+      return;
+    }
     if (equippable(entry.item)) {
       this.onEquip(this.selected, hero, slot);
       return;
@@ -472,7 +476,7 @@ export class InventoryUi {
         if (dest) this.drawFont(line, dest[0], dest[1], BODY_COLOUR);
       });
     }
-    if (slot && !this.pickHero) {
+    if (slot && !this.pickHero && usable(slot.item)) {
       const [hx, hy, hw] = this.layout.hintLine;
       const hint = this.story.uiText('bag.pick_hero');
       this.drawFont(hint.slice(0, Math.floor(hw / this.fontCellW)), hx, hy, NAME_COLOUR);

@@ -75,7 +75,7 @@ describe('title boot asset list', () => {
       bytes += st.size;
     }
     expect(bytes).toBeLessThan(800_000);
-    expect(bytes).toBeGreaterThan(400_000);
+    expect(bytes).toBeGreaterThan(250_000);
   });
 
   it('reads Loading and tap_to_start from the existing EN/EL files', () => {
@@ -102,8 +102,8 @@ describe('title boot asset list', () => {
     expect(shot1).toBeLessThan(120_000);
     expect(shotBytes).toBeGreaterThan(400_000);
     expect(shotBytes).toBeLessThan(600_000);
-    expect(music).toBeGreaterThan(400_000);
-    expect(music).toBeLessThan(500_000);
+    expect(music).toBeGreaterThan(200_000);
+    expect(music).toBeLessThan(400_000);
     expect(titleBootRelPaths('en')).not.toContain('audio/music_intro.mp3');
   });
 

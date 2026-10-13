@@ -7,6 +7,7 @@ import {
   cameraOffsetXZ
 } from './constants';
 import { FloorData, Tile } from './types';
+import { isBlockingProp } from './wall-props';
 
 const MOVE_DURATION = 180;
 
@@ -137,7 +138,7 @@ export class Player {
     } else if (tile.monster) {
       return 'monster';
     }
-    if (tile.prop) return 'wall';
+    if (isBlockingProp(tile)) return 'wall';
     return 'ok';
   }
 

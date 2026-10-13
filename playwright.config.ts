@@ -16,8 +16,16 @@ export default defineConfig({
   projects: [
     {
       name: 'webkit-iphone',
+      testIgnore: /skip-playable-4g/,
       use: {
         ...devices['iPhone 15'],
+      },
+    },
+    {
+      name: 'chromium-4g',
+      testMatch: /skip-playable-4g/,
+      use: {
+        ...devices['Desktop Chrome'],
       },
     },
   ],

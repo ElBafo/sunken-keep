@@ -8,7 +8,7 @@ const m = (monster: string, hp: number) => ({
   monsterMaxHp: hp
 });
 
-// Floor 1: Upper Halls 15×12 (from levels/floor1.ts)
+// Floor 1: Upper Halls 15×12 (from public/levels/floor1.ts)
 //   ###############
 //   #~=~#S..#.....#
 //   #~=~D.......F.#
@@ -35,26 +35,27 @@ export const floor1: FloorData = {
     ],
     [
       { wall: true }, { shallowWater: true }, { deepWater: true }, { shallowWater: true }, { wall: true },
-      { secret: true, carving: 'carving_secret', item: 'scroll' }, {}, {}, { wall: true }, {},
+      { secret: true, carving: 'carving_secret', item: 'journal_page', journalPage: 1 }, {}, {}, { wall: true }, {},
       m('keep_rat', 14), {}, {}, {}, { wall: true }
     ],
     [
       { wall: true }, { shallowWater: true }, { deepWater: true }, { shallowWater: true, ...m('bog_leeches', 12) },
       { door: true, doorLocked: true, carving: 'carving_door' }, {}, {}, m('slime', 40), {},
-      { bark: 'guard_hall_enter' }, {}, { daylight: true }, { prop: 'beams_fallen' }, {}, { wall: true }
+      { bark: 'guard_hall_enter' }, {}, { daylight: true },
+      { prop: 'beams_fallen', propPlacement: 'floor' }, {}, { wall: true }
     ],
     [
       { wall: true }, { shallowWater: true }, { deepWater: true }, { shallowWater: true }, { wall: true },
-      { ...m('rust_crab', 24), item: 'potion_red' }, { item: 'potion_red' }, {}, { wall: true }, {},
-      { prop: 'beams_fallen', mirror: true }, {}, {}, {}, { wall: true }
+      m('rust_crab', 24), { item: 'potion_red' }, {}, { wall: true }, {},
+      { prop: 'beams_fallen', propPlacement: 'floor' }, {}, {}, {}, { wall: true }
     ],
     [
       { wall: true }, { shallowWater: true }, { shallowWater: true }, { shallowWater: true }, { wall: true },
       { wall: true }, { wall: true }, { wall: true }, { wall: true }, {},
-      {}, {}, { prop: 'beams_fallen' }, { stairs: 'down' }, { wall: true }
+      {}, {}, { prop: 'beams_fallen', propPlacement: 'floor' }, { stairs: 'down' }, { wall: true }
     ],
     [
-      { wall: true }, {}, { item: 'key' }, {}, {},
+      { wall: true }, {}, { item: 'key' }, {}, { bark: 'pantry' },
       { item: 'potion_blue' }, {}, m('keep_rat', 14), { wall: true }, { wall: true },
       { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }
     ],
@@ -64,7 +65,7 @@ export const floor1: FloorData = {
       {}, {}, { wall: true }, { wall: true }, { wall: true }
     ],
     [
-      { wall: true }, {}, {}, {}, { wall: true },
+      { wall: true }, { bark: 'f1_start' }, {}, {}, { wall: true },
       { chest: true, chestItems: ['potion_red'] }, {}, { item: 'potion_green' }, { wall: true }, { wall: true },
       { wall: true }, {}, { wall: true }, { wall: true }, { wall: true }
     ],
@@ -76,12 +77,14 @@ export const floor1: FloorData = {
     [
       { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true },
       { wall: true }, { wall: true }, { wall: true }, { wall: true }, {},
-      {}, {}, { prop: 'desk', readNote: 'note_lampkeeper', bark: 'lampkeeper_note_read' },
-      { prop: 'lamp_capped', bark: 'lampkeeper_capped_lamp' }, { wall: true }
+      {}, {},
+      { prop: 'desk', readNote: 'note_lampkeeper', bark: 'lampkeeper_note_read', propPlacement: 'floor' },
+      { prop: 'lamp_capped', bark: 'lampkeeper_capped_lamp', propPlacement: 'wall', propWall: 'E' },
+      { wall: true }
     ],
     [
       { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true },
-      { wall: true }, { wall: true }, { wall: true }, { wall: true }, { prop: 'jar_rack' },
+      { wall: true }, { wall: true }, { wall: true }, { wall: true }, {},
       {}, {}, {}, {}, { wall: true }
     ],
     [

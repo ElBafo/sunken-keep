@@ -41,8 +41,11 @@ import {
   type SavedFloor
 } from './saves';
 import { TitleScreen, type TitleAction } from './title';
-import { FLOOR1_PLAY_AUDIO, floor1MonsterArtPaths, prefetchRelPaths } from './floor1-prefetch';
+import { audioGroupRelPaths } from './audio-groups';
+import { floor1MonsterArtPaths, prefetchRelPaths } from './floor1-prefetch';
 import { IntroPlayer } from './intro';
+import { mountIntroSkip, type IntroSkipHandle } from './intro-skip';
+import { interactPropAt, tileBlocksPath } from './wall-props';
 import { SpeechBubble } from './bubble';
 import { StoryProgress } from './story-progress';
 import { saveLocale, type Locale } from './i18n';
@@ -55,7 +58,7 @@ import { Sconce, Tile } from './types';
 import { VertexLightingManager } from './vertex-lighting';
 import { WaterSystem } from './water';
 import { DarkFx } from './dark-fx';
-import { isFloorProp, PropBuilder } from './props';
+import { PropBuilder } from './props';
 import { resolveLocale, StoryText } from './i18n';
 import { fitGameStage } from './game-stage';
 import { loadLayout585 } from './layout585';
@@ -129,6 +132,7 @@ class Game {
   private pendingStartSnapshot = false;
   private title!: TitleScreen;
   private intro: IntroPlayer | null = null;
+  private introSkip: IntroSkipHandle | null = null;
   private bubble: SpeechBubble | null = null;
   private loopStarted = false;
   private titleReady = false;
@@ -268,10 +272,15 @@ class Game {
     if (introCanvas) {
       this.intro = new IntroPlayer(introCanvas, this.story);
       this.intro.setTimeSource(() => this.audioManager.introCurrentTime());
-      introCanvas.addEventListener('pointerup', (e) => {
-        if (!e.isPrimary) return;
-        this.skipIntro();
-      });
+      const overlay = document.getElementById('intro-overlay');
+      if (overlay) {
+        this.introSkip = mountIntroSkip({
+          overlay,
+          story: this.story,
+          onSkip: () => this.skipIntro()
+        });
+        this.introSkip.hide();
+      }
     }
     if (titleCanvas) {
       this.title = new TitleScreen(titleCanvas, this.story, (action) => this.handleTitleAction(action));
@@ -438,7 +447,7 @@ class Game {
     });
 
     void this.title?.loadRest();
-    void this.audioManager.loadSounds(this.renderer.scene, floor1Sconces);
+    void this.audioManager.loadPlayableSounds(this.renderer.scene, floor1Sconces);
     if (this.bubble) await this.bubble.load();
     this.updateDoorButton();
   }
@@ -461,7 +470,7 @@ class Game {
   private beginFloor1BackgroundLoads() {
     if (this.floor1PrefetchStarted) return;
     this.floor1PrefetchStarted = true;
-    const extra = [...floor1MonsterArtPaths(), ...FLOOR1_PLAY_AUDIO.map(([, path]) => path)];
+    const extra = [...floor1MonsterArtPaths(), ...audioGroupRelPaths('floor1')];
     void prefetchRelPaths(extra, 4);
     void this.audioManager.loadFloor1PlaySounds();
   }
@@ -472,6 +481,7 @@ class Game {
 
   private async ensurePlayReady() {
     await this.worldBoot;
+    await this.audioManager.loadPlayableSounds(this.renderer.scene, floor1Sconces);
     await this.spriteManager.ensureMonsters(this.renderer.scene, floor1);
     if (this.combat.monsters.length === 0) this.spawnFloorMonsters();
     else this.rebindMonsters();
@@ -686,7 +696,7 @@ class Game {
     this.darkFx.hideItemAt(x, y);
     this.syncKeyFlag();
     this.audioManager.playUi(pickupSfx(id));
-    const key = `pickup_${id}`;
+    const key = id === 'oil_flask' ? 'oil_pickup' : `pickup_${id}`;
     const named = this.storyLog(key);
     this.showMessage(named || this.storyLog('pickup_item', { item: this.story.itemName(id) }));
     this.inventory?.redraw();
@@ -908,6 +918,7 @@ class Game {
     const goBody = document.getElementById('gameover-body');
     if (goBody) goBody.textContent = this.story.uiText('game_over.body');
     this.refreshGameOverButtons();
+    this.introSkip?.refresh();
   }
 
   private refreshGameOverButtons() {
@@ -938,14 +949,7 @@ class Game {
     this.combat.setChaseEnabled(!testMode || combatOn);
     this.combat.setOccupancy(
       openGrid(
-        (x, y) => {
-          const tile = floor1.tiles[y]?.[x];
-          if (!tile || tile.wall) return true;
-          if (tile.secret && !tile.secretOpen) return true;
-          if (tile.door && !tile.doorOpen) return true;
-          if (isFloorProp(tile)) return true;
-          return false;
-        },
+        (x, y) => tileBlocksPath(floor1.tiles[y]?.[x]),
         floor1.width,
         floor1.height,
         (x, y) => {
@@ -1221,8 +1225,15 @@ class Game {
   }
 
   readFacingDesk(): boolean {
-    const { x, y } = this.player.facingPos(1);
-    const tile = this.player.tileAt(x, y);
+    const hit = interactPropAt(
+      this.player.floorData.tiles,
+      this.player.floorData.width,
+      this.player.floorData.height,
+      this.player.x,
+      this.player.y,
+      this.player.dir
+    );
+    const tile = hit?.tile;
     if (!tile) return false;
     if (tile.prop !== 'desk' && !tile.readNote) return false;
     if (this.noteOpen) {
@@ -1348,9 +1359,16 @@ class Game {
   }
 
   private handleFacingProp(): boolean {
-    const { x, y } = this.player.facingPos(1);
-    const tile = this.player.tileAt(x, y);
-    if (!tile || !isFloorProp(tile)) return false;
+    const hit = interactPropAt(
+      this.player.floorData.tiles,
+      this.player.floorData.width,
+      this.player.floorData.height,
+      this.player.x,
+      this.player.y,
+      this.player.dir
+    );
+    if (!hit) return false;
+    const { tile } = hit;
     if (tile.readNote || tile.prop === 'desk') return this.readFacingDesk();
     if (tile.bark) {
       if (this.speakBark(tile.bark)) return true;
@@ -1787,14 +1805,7 @@ class Game {
     this.spriteManager.resetItems(floor1);
     this.combat.setOccupancy(
       openGrid(
-        (ox, oy) => {
-          const t = floor1.tiles[oy]?.[ox];
-          if (!t || t.wall) return true;
-          if (t.secret && !t.secretOpen) return true;
-          if (t.door && !t.doorOpen) return true;
-          if (t.prop === 'beams_fallen' || t.prop === 'desk') return true;
-          return false;
-        },
+        (ox, oy) => tileBlocksPath(floor1.tiles[oy]?.[ox]),
         floor1.width,
         floor1.height,
         (ox, oy) => {
@@ -1815,6 +1826,7 @@ class Game {
     document.documentElement.lang = locale;
     this.title.story = this.story;
     this.intro?.applyLocale();
+    this.introSkip?.refresh();
     await this.title.ensureLogo();
     this.applyStoryLabels();
     this.title.refreshHint();
@@ -1893,6 +1905,8 @@ class Game {
         else this.hideTapOverlay();
       });
       overlay.classList.add('show');
+      this.introSkip?.refresh();
+      this.introSkip?.show();
       this.audioManager.crossfadeToIntro();
       this.intro.start();
     } else {
@@ -1904,6 +1918,7 @@ class Game {
     this.skipIntroRequested = true;
     if (!this.skipPlayAt) this.skipPlayAt = performance.now();
     this.intro?.skip();
+    this.introSkip?.hide();
     document.getElementById('intro-overlay')?.classList.remove('show');
     this.beginPlay();
   }
@@ -1952,11 +1967,12 @@ class Game {
 
   private async loadFloorAudio() {
     try {
-      await this.audioManager.loadSounds(this.renderer.scene, floor1Sconces);
-      this.audioManager.attachDressing(this.renderer.scene, this.dressing.marks);
       this.audioManager.attachWaterPools(this.renderer.scene, floor1);
-      this.audioManager.startNamedLoop('lamp_hooks', 11 * CELL_SIZE, 0.55, 9 * CELL_SIZE, 0.38, 'named');
-      this.rebuildAudioFromState();
+      void this.audioManager.loadLaterSounds().then(() => {
+        this.audioManager.attachDressing(this.renderer.scene, this.dressing.marks);
+        this.audioManager.startNamedLoop('lamp_hooks', 11 * CELL_SIZE, 0.55, 9 * CELL_SIZE, 0.38, 'named');
+        this.rebuildAudioFromState();
+      });
     } catch (err) {
       console.warn('Audio init failed', err);
       this.audioManager.startLanternLoop(this.oil > 0);
@@ -2025,7 +2041,7 @@ class Game {
           this.player.y
         );
         this.audioManager?.updateListener(this.player.x, this.player.y, this.player.dir);
-        this.props?.layoutAdjacent(this.player.x, this.player.y, this.spriteManager.integerAdjacentScale());
+        this.props?.layoutAdjacent(this.player.x, this.player.y, this.spriteManager.integerAdjacentScale(), this.player.dir);
         this.updateDoorButton();
         this.renderer.render();
       },
@@ -2377,21 +2393,30 @@ class Game {
       setAdjacentScale: (n: number) => {
         this.spriteManager.setAdjacentScale(n);
         this.spriteManager.update(performance.now(), this.player.x, this.player.y, this.player.dir);
-        this.props.layoutAdjacent(this.player.x, this.player.y, this.spriteManager.integerAdjacentScale());
+        this.props.layoutAdjacent(this.player.x, this.player.y, this.spriteManager.integerAdjacentScale(), this.player.dir);
         this.renderer.render();
       },
       adjacentScale: () => this.spriteManager.integerAdjacentScale(),
       listenerPose: () => this.audioManager.listenerPose(),
       propTiles: () => {
-        const out: Array<{ x: number; y: number; prop: string }> = [];
+        const out: Array<{ x: number; y: number; prop: string; placement?: string; wall?: string }> = [];
         for (let y = 0; y < floor1.height; y++) {
           for (let x = 0; x < floor1.width; x++) {
-            const p = floor1.tiles[y][x].prop;
-            if (p) out.push({ x, y, prop: p });
+            const tile = floor1.tiles[y][x];
+            if (tile.prop) {
+              out.push({
+                x,
+                y,
+                prop: tile.prop,
+                placement: tile.propPlacement,
+                wall: tile.propWall
+              });
+            }
           }
         }
         return out;
       },
+      wallPropDraw: () => this.props.debugWallProps(),
       partySave: () => ({
         bag: this.bag.serialize(),
         equipment: this.equipmentState(),
@@ -2503,10 +2528,6 @@ class Game {
       titleVisible: () => !!document.getElementById('title-overlay')?.classList.contains('show'),
       introVisible: () => !!document.getElementById('intro-overlay')?.classList.contains('show'),
       startNewGame: () => this.startNewGame(),
-      dismissTap: () => {
-        if (this.skipTitle) this.consumePlayTap();
-        else this.consumeTitleTap();
-      },
       skipIntro: () => this.skipIntro(),
       setLocale: (locale: Locale) => this.setLocale(locale),
       showTitle: () => this.title.show('title'),
@@ -2628,8 +2649,7 @@ class Game {
       if (now - this.lastTapAt < 400) return;
       this.lastTapAt = now;
       if (this.phase === 'intro') {
-        if (this.intro?.hasStarted()) this.skipIntro();
-        else this.flashTapFeedback();
+        this.flashTapFeedback();
         return;
       }
       if (this.skipTitle) {
@@ -2712,7 +2732,7 @@ class Game {
     this.water.update(now);
     this.atmosphere.update(dtSec, now, this.renderer.camera);
     this.audioManager.updateListener(this.player.x, this.player.y, this.player.dir);
-    this.props.layoutAdjacent(this.player.x, this.player.y, this.spriteManager.integerAdjacentScale());
+    this.props.layoutAdjacent(this.player.x, this.player.y, this.spriteManager.integerAdjacentScale(), this.player.dir);
     this.audioManager.update(now, this.player.x * CELL_SIZE, this.player.y * CELL_SIZE);
 
     this.torches.update(now, this.player.x, this.player.y, this.player.dir);

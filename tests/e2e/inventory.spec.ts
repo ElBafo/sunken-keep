@@ -26,6 +26,7 @@ type Proto3d = {
   locale: () => string;
   getOil: () => number;
   setOil: (n: number) => void;
+  lanternLoop: () => { mode: string; playing: boolean };
   setHeroHp: (id: string, hp: number) => void;
   chestOpen: (x: number, y: number) => boolean;
   fillChest: (x: number, y: number, items: string[]) => boolean;
@@ -44,9 +45,10 @@ type Proto3d = {
   setAdjacentScale: (n: number) => void;
   adjacentScale: () => number;
   listenerPose: () => { x: number; y: number; z: number; rotationY: number };
-  propTiles: () => Array<{ x: number; y: number; prop: string }>;
+  propTiles: () => Array<{ x: number; y: number; prop: string; placement?: string; wall?: string }>;
   blockReason: (x: number, y: number) => string;
   interactFacingProp: () => boolean;
+  wallPropDraw?: () => Array<{ kind: string; x: number; y: number; visible: boolean; face: string; scaleY: number }>;
   noteOpen: () => boolean;
   doorOpen: (x: number, y: number) => boolean;
   partySave: () => { bag: unknown; equipment: unknown; oil: number };
@@ -171,15 +173,87 @@ test('proto3d step3 inventory: pickup, chest loot-all, bag, potions, key, oil, g
   expect(afterPotion.some((l) => /potion|heals|HP|φίλτρο|ζωή/i.test(l) || l.length > 0)).toBe(true);
   await page.screenshot({ path: `${OUT}/step3-potion-use.png`, fullPage: false });
 
-  // Oil flask
+  // Oil flask: pickup SFX, empty-area use, then a hero tap uses it for any hero
+  await page.evaluate(() => {
+    const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    proto.setPosition(6, 6, 0);
+    proto.pickupHere();
+  });
+  const afterPickup = await page.evaluate(() => {
+    const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    return { msg: proto.lastMessage(), ui: proto.lastUi(), oil: proto.getOil() };
+  });
+  expect(afterPickup.msg).toMatch(/Oil flask/i);
+  expect(afterPickup.ui).toContain('oil_pickup');
+
   await page.evaluate(() => {
     const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
     proto.setOil(2);
-    proto.giveItem('oil_flask', 1);
-    const i = proto.getBag().findIndex((s) => s.item === 'oil_flask');
-    proto.useBagSlot(i);
+    proto.openBag();
   });
+  const oilIndex = await page.evaluate(() => {
+    const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    return proto.getBag().findIndex((s) => s.item === 'oil_flask');
+  });
+  await page.locator(`.inv-slot[data-name="slot-${oilIndex}"]`).tap();
+  await page.locator('#inventory-canvas').tap();
+  await page.waitForTimeout(80);
   expect(await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.getOil())).toBe(3);
+  expect(await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.lastUi())).toContain(
+    'lantern_refill'
+  );
+
+  await page.evaluate(() => {
+    const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    proto.setOil(1);
+    proto.giveItem('oil_flask', 1);
+    proto.openBag();
+  });
+  const oilIndex2 = await page.evaluate(() => {
+    const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    return proto.getBag().findIndex((s) => s.item === 'oil_flask');
+  });
+  await page.locator(`.inv-slot[data-name="slot-${oilIndex2}"]`).tap();
+  await page.locator('.inv-hero[data-hero="brannoc"]').tap();
+  await page.waitForTimeout(80);
+  expect(await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.getOil())).toBe(2);
+
+  await page.evaluate(() => {
+    const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    proto.setOil(4);
+    proto.giveItem('oil_flask', 1);
+    proto.openBag();
+  });
+  const oilIndexFull = await page.evaluate(() => {
+    const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    return proto.getBag().findIndex((s) => s.item === 'oil_flask');
+  });
+  await page.locator(`.inv-slot[data-name="slot-${oilIndexFull}"]`).tap();
+  await page.locator('.inv-hero[data-hero="wren"]').tap();
+  await page.waitForTimeout(80);
+  const full = await page.evaluate(() => {
+    const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    return { oil: proto.getOil(), msg: proto.lastMessage(), ui: proto.lastUi() };
+  });
+  expect(full.oil).toBe(4);
+  expect(full.msg.toLowerCase()).toMatch(/full|full lantern|already/);
+  expect(full.ui).toContain('item_use_fail');
+  await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.closeBag());
+
+  const lanternSwap = await page.evaluate(() => {
+    const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    proto.setOil(0);
+    const ember = proto.lanternLoop();
+    proto.setOil(3);
+    const oil = proto.lanternLoop();
+    proto.setOil(0);
+    const emberAgain = proto.lanternLoop();
+    proto.setOil(2);
+    return { ember: ember.mode, oil: oil.mode, emberAgain: emberAgain.mode };
+  });
+  expect(lanternSwap.ember).toBe('ember');
+  expect(lanternSwap.oil).toBe('oil');
+  expect(lanternSwap.emberAgain).toBe('ember');
 
   // Key auto-uses on the locked door
   await page.evaluate(() => {
@@ -217,7 +291,7 @@ test('proto3d step3 inventory: pickup, chest loot-all, bag, potions, key, oil, g
   expect(listen.z).toBeCloseTo(2 * 2, 5);
   expect(listen.rotationY).toBeCloseTo(-Math.PI / 2, 5);
 
-  // Props: block from all four sides
+  // Floor props still block; wall props do not
   const props = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.propTiles());
   expect(props.some((t) => t.x === 13 && t.y === 9 && t.prop === 'lamp_capped')).toBe(true);
   expect(props.some((t) => t.x === 12 && t.y === 9 && t.prop === 'desk')).toBe(true);
@@ -228,15 +302,14 @@ test('proto3d step3 inventory: pickup, chest loot-all, bag, potions, key, oil, g
     { dx: -1, dy: 0, dir: 1 }
   ];
   for (const prop of props) {
+    const wall = prop.placement === 'wall';
+    const blocked = await page.evaluate(
+      ({ x, y }) => (window as unknown as { __proto3d: Proto3d }).__proto3d.blockReason(x, y),
+      { x: prop.x, y: prop.y }
+    );
+    expect(blocked, `${prop.prop} at ${prop.x},${prop.y}`).toBe(wall ? 'ok' : 'wall');
+    if (wall) continue;
     for (const a of approaches) {
-      const blocked = await page.evaluate(
-        ({ prop, a }) => {
-          const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-          return proto.blockReason(prop.x, prop.y);
-        },
-        { prop, a }
-      );
-      expect(blocked, `${prop.prop} at ${prop.x},${prop.y} fills its square`).toBe('wall');
       const nx = prop.x + a.dx;
       const ny = prop.y + a.dy;
       const neighbor = await page.evaluate(
@@ -257,10 +330,29 @@ test('proto3d step3 inventory: pickup, chest loot-all, bag, potions, key, oil, g
     }
   }
 
-  // Lamp tap squares
+  const ontoLamp = await page.evaluate(() => {
+    const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    proto.setPosition(13, 8, 2);
+    return proto.tryMoveForward();
+  });
+  expect(ontoLamp.result, 'walk onto wall-mounted lamp').toBe('ok');
+
+  const aroundBeam = await page.evaluate(() => {
+    const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    proto.setPosition(11, 2, 2);
+    const south = proto.tryMoveForward();
+    proto.setPosition(11, 2, 1);
+    const east = proto.tryMoveForward();
+    return { south: south.result, east: east.result, eastAfter: east.after };
+  });
+  expect(aroundBeam.south, 'guard hall path south of (11,2)').toBe('ok');
+  expect(aroundBeam.east, 'cannot walk through the beam').not.toBe('ok');
+
+  // Lamp tap squares, including own square facing propWall
   for (const pose of [
     { x: 13, y: 8, dir: 2 },
-    { x: 13, y: 10, dir: 0 }
+    { x: 13, y: 10, dir: 0 },
+    { x: 13, y: 9, dir: 1 }
   ]) {
     const ok = await page.evaluate(({ x, y, dir }) => {
       const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
@@ -271,6 +363,23 @@ test('proto3d step3 inventory: pickup, chest loot-all, bag, potions, key, oil, g
     const msg = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.lastMessage());
     expect(msg.length, 'lamp says something').toBeGreaterThan(0);
   }
+
+  const ownMiss = await page.evaluate(() => {
+    const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    proto.setPosition(13, 9, 0);
+    return proto.interactFacingProp();
+  });
+  expect(ownMiss, 'own square not facing the wall does not use the lamp').toBe(false);
+
+  const wallDraw = await page.evaluate(() => {
+    const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    proto.setPosition(13, 9, 1);
+    return proto.wallPropDraw?.() ?? [];
+  });
+  expect(wallDraw.find((d) => d.kind === 'lamp_capped')?.visible).toBe(false);
+  const flat = wallDraw.find((d) => d.kind === 'lamp_capped_wall');
+  expect(flat?.visible, 'wall-flat lamp on own square').toBe(true);
+  expect(flat?.scaleY, 'scaled to wall height').toBe(2);
 
   // Desk tap squares
   for (const pose of [

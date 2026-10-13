@@ -1,11 +1,10 @@
+import { audioStemPath, titleMenuStems } from './audio-groups';
 import type { Locale } from './i18n';
 
 /** Menu bed + the two title-button voices. Loaded with the title, not the dungeon. */
-export const TITLE_MENU_AUDIO: ReadonlyArray<readonly [string, string]> = [
-  ['menu', 'audio/music_menu_loop.mp3'],
-  ['ui_button', 'audio/sfx_ui_button.mp3'],
-  ['ui_button_denied', 'audio/sfx_ui_button_denied.mp3']
-];
+export const TITLE_MENU_AUDIO: ReadonlyArray<readonly [string, string]> = titleMenuStems().map(
+  (stem) => [stem.startsWith('sfx_') ? stem.slice(4) : stem === 'music_menu_loop' ? 'menu' : stem, audioStemPath(stem)] as const
+);
 
 export interface TitleEssentialLayout {
   bg: string;

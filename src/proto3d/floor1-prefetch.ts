@@ -1,3 +1,4 @@
+import { audioGroupFiles, audioGroupRelPaths } from './audio-groups';
 import { floor1 } from './floor-data';
 import { mapPool, SPRITE_LOAD_CONCURRENCY } from './load-pool';
 import { listedTex3dFiles, VARIANT_SURFACES, variantFilenames } from './texture-variants';
@@ -23,57 +24,8 @@ const WATER_BEDS = [
 
 const CUTOUT_TEX = ['door_open.png', 'door_panel.png', 'secret_closed.png', 'secret_open.png'];
 
-/** Ambience, steps, torch, and floor 1 combat — enough to leave Loading. */
-export const FLOOR1_PLAY_AUDIO: ReadonlyArray<readonly [string, string]> = [
-  ['ambience', 'audio/amb_flooded_halls_loop.mp3'],
-  ['step', 'audio/sfx_step.mp3'],
-  ['step_1', 'audio/sfx_step_1.mp3'],
-  ['step_2', 'audio/sfx_step_2.mp3'],
-  ['step_3', 'audio/sfx_step_3.mp3'],
-  ['step_4', 'audio/sfx_step_4.mp3'],
-  ['step_water_shallow', 'audio/sfx_step_water_shallow.mp3'],
-  ['step_water_shallow_1', 'audio/sfx_step_water_shallow_1.mp3'],
-  ['step_water_shallow_2', 'audio/sfx_step_water_shallow_2.mp3'],
-  ['step_water_shallow_3', 'audio/sfx_step_water_shallow_3.mp3'],
-  ['step_water_shallow_4', 'audio/sfx_step_water_shallow_4.mp3'],
-  ['step_water_deep', 'audio/sfx_step_water_deep.mp3'],
-  ['step_water_deep_1', 'audio/sfx_step_water_deep_1.mp3'],
-  ['step_water_deep_2', 'audio/sfx_step_water_deep_2.mp3'],
-  ['step_water_deep_3', 'audio/sfx_step_water_deep_3.mp3'],
-  ['step_water_deep_4', 'audio/sfx_step_water_deep_4.mp3'],
-  ['torch', 'audio/sfx_torch_loop.mp3'],
-  ['torch_ignite', 'audio/sfx_torch_ignite.mp3'],
-  ['torch_extinguish', 'audio/sfx_torch_extinguish.mp3'],
-  ['hit', 'audio/sfx_hit.mp3'],
-  ['hit_2', 'audio/sfx_hit_2.mp3'],
-  ['hit_3', 'audio/sfx_hit_3.mp3'],
-  ['act_miss', 'audio/sfx_act_miss.mp3'],
-  ['act_miss_2', 'audio/sfx_act_miss_2.mp3'],
-  ['act_miss_3', 'audio/sfx_act_miss_3.mp3'],
-  ['hurt', 'audio/sfx_hurt.mp3'],
-  ['hurt_2', 'audio/sfx_hurt_2.mp3'],
-  ['hurt_3', 'audio/sfx_hurt_3.mp3'],
-  ['hit_crit', 'audio/sfx_hit_crit.mp3'],
-  ['hit_crit_2', 'audio/sfx_hit_crit_2.mp3'],
-  ['hit_crit_3', 'audio/sfx_hit_crit_3.mp3'],
-  ['keep_rat_alert', 'audio/sfx_keep_rat_alert.mp3'],
-  ['keep_rat_attack', 'audio/sfx_keep_rat_attack.mp3'],
-  ['keep_rat_hurt', 'audio/sfx_keep_rat_hurt.mp3'],
-  ['keep_rat_death', 'audio/sfx_keep_rat_death.mp3'],
-  ['rust_crab_alert', 'audio/sfx_rust_crab_alert.mp3'],
-  ['rust_crab_attack', 'audio/sfx_rust_crab_attack.mp3'],
-  ['rust_crab_hurt', 'audio/sfx_rust_crab_hurt.mp3'],
-  ['rust_crab_death', 'audio/sfx_rust_crab_death.mp3'],
-  ['rust_crab_windup', 'audio/sfx_rust_crab_windup.mp3'],
-  ['slime_alert', 'audio/sfx_slime_alert.mp3'],
-  ['slime_attack', 'audio/sfx_slime_attack.mp3'],
-  ['slime_hurt', 'audio/sfx_slime_hurt.mp3'],
-  ['slime_death', 'audio/sfx_slime_death.mp3'],
-  ['bog_leeches_alert', 'audio/sfx_bog_leeches_alert.mp3'],
-  ['bog_leeches_attack', 'audio/sfx_bog_leeches_attack.mp3'],
-  ['bog_leeches_hurt', 'audio/sfx_bog_leeches_hurt.mp3'],
-  ['bog_leeches_death', 'audio/sfx_bog_leeches_death.mp3']
-];
+/** Title+floor1 audio that must decode before play. Later beds wait until the dungeon is up. */
+export const FLOOR1_PLAY_AUDIO = audioGroupFiles('floor1');
 
 export function floor1MonsterKinds(): string[] {
   const kinds = new Set<string>();
@@ -112,7 +64,7 @@ export function floor1MonsterArtPaths(): string[] {
 
 /** Walls, floor 1 monster frames, ambience, steps, torch, floor 1 combat. */
 export function floor1PlayableRelPaths(): string[] {
-  return [...floor1TexturePaths(), ...floor1MonsterArtPaths(), ...FLOOR1_PLAY_AUDIO.map(([, path]) => path)];
+  return [...floor1TexturePaths(), ...floor1MonsterArtPaths(), ...audioGroupRelPaths('floor1')];
 }
 
 /** Fetch into the HTTP cache. Never throws; limited in-flight requests. */

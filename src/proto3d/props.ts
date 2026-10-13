@@ -1,6 +1,14 @@
 import * as THREE from 'three';
 import { CELL_SIZE } from './constants';
 import { FloorData, Tile } from './types';
+import {
+  isBlockingProp,
+  isWallFace,
+  isWallProp,
+  wallPropPlanePose,
+  wallPropShowsFlat,
+  type PropWall
+} from './wall-props';
 
 const WOOD_COLOR = 0x3a2414;
 const LAMP_W = 0.16 * CELL_SIZE;
@@ -67,7 +75,7 @@ export class PropBuilder {
         if (tile.prop === 'beams_fallen') this.addBeams(x, y, !!tile.mirror);
         else if (tile.prop === 'desk') this.addDesk(x, y);
         else if (tile.prop === 'jar_rack') this.addRack(x, y);
-        else if (tile.prop === 'lamp_capped') this.addLamp(x, y, tile);
+        else if (tile.prop === 'lamp_capped') this.addLamp(x, y, tile, isWallFace(tile.propWall) ? tile.propWall : 'E');
       }
     }
   }
@@ -220,7 +228,7 @@ export class PropBuilder {
     this.tag(face, x, y, 'rack');
   }
 
-  private addLamp(x: number, y: number, _tile: Tile) {
+  private addLamp(x: number, y: number, _tile: Tile, face: PropWall) {
     if (!this.lampTex) return;
     const mat = new THREE.SpriteMaterial({
       map: this.lampTex,
@@ -248,30 +256,112 @@ export class PropBuilder {
     sprite.userData.kind = 'lamp_capped';
     sprite.userData.lightX = x;
     sprite.userData.lightY = y;
+    sprite.userData.gridX = x;
+    sprite.userData.gridY = y;
+    sprite.userData.propWall = face;
     sprite.userData.baseX = baseX;
     sprite.userData.baseY = baseY;
     sprite.userData.baseZ = baseZ;
     sprite.userData.baseW = LAMP_W;
     sprite.userData.baseH = LAMP_H;
     this.group.add(sprite);
+
+    const img = this.lampTex.image as { width?: number; height?: number } | undefined;
+    const pose = wallPropPlanePose(x, y, face, img?.width ?? 32, img?.height ?? 48);
+    const wallMat = new THREE.MeshBasicMaterial({
+      map: this.lampTex,
+      transparent: true,
+      alphaTest: 0.12,
+      toneMapped: false,
+      depthTest: true,
+      depthWrite: false,
+      side: THREE.FrontSide
+    });
+    const plane = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), wallMat);
+    plane.position.set(pose.x, pose.y, pose.z);
+    plane.rotation.y = pose.rotY;
+    plane.scale.set(pose.scaleX, pose.scaleY, 1);
+    plane.visible = false;
+    plane.frustumCulled = false;
+    plane.renderOrder = 8;
+    plane.userData.skipVertexLighting = true;
+    plane.userData.noPick = true;
+    plane.userData.kind = 'lamp_capped_wall';
+    plane.userData.lightX = x;
+    plane.userData.lightY = y;
+    plane.userData.gridX = x;
+    plane.userData.gridY = y;
+    plane.userData.propWall = face;
+    plane.userData.scaleX = pose.scaleX;
+    plane.userData.scaleY = pose.scaleY;
+    this.group.add(plane);
   }
 
-  /** Keep floor props at their square centre and a consistent world size. */
-  layoutAdjacent(_playerX: number, _playerY: number, _adjacentScale = 1) {
+  /** Billboard off the party's square; wall-flat when standing on it facing propWall. */
+  layoutAdjacent(playerX: number, playerY: number, _adjacentScale = 1, dir = 0) {
     this.group.traverse((obj) => {
-      if (obj.userData.kind !== 'lamp_capped') return;
-      const baseW = (obj.userData.baseW as number) ?? LAMP_W;
-      const baseH = (obj.userData.baseH as number) ?? LAMP_H;
-      obj.position.set(obj.userData.baseX, obj.userData.baseY, obj.userData.baseZ);
-      obj.scale.set(baseW, baseH, 1);
+      const kind = obj.userData.kind as string | undefined;
+      if (kind !== 'lamp_capped' && kind !== 'lamp_capped_wall') return;
+      const gx = obj.userData.gridX as number;
+      const gy = obj.userData.gridY as number;
+      const face = obj.userData.propWall as PropWall;
+      const onOwn = playerX === gx && playerY === gy;
+      const flat = wallPropShowsFlat(playerX, playerY, dir, gx, gy, face);
+      if (kind === 'lamp_capped') {
+        obj.visible = !onOwn;
+        if (!onOwn) {
+          const baseW = (obj.userData.baseW as number) ?? LAMP_W;
+          const baseH = (obj.userData.baseH as number) ?? LAMP_H;
+          obj.position.set(obj.userData.baseX, obj.userData.baseY, obj.userData.baseZ);
+          obj.scale.set(baseW, baseH, 1);
+        }
+        return;
+      }
+      obj.visible = flat;
     });
+  }
+
+  debugWallProps(): Array<{
+    kind: string;
+    x: number;
+    y: number;
+    visible: boolean;
+    face: string;
+    worldY: number;
+    scaleY: number;
+  }> {
+    const out: Array<{
+      kind: string;
+      x: number;
+      y: number;
+      visible: boolean;
+      face: string;
+      worldY: number;
+      scaleY: number;
+    }> = [];
+    this.group.traverse((obj) => {
+      const kind = obj.userData.kind as string | undefined;
+      if (kind !== 'lamp_capped' && kind !== 'lamp_capped_wall') return;
+      out.push({
+        kind,
+        x: obj.userData.gridX,
+        y: obj.userData.gridY,
+        visible: obj.visible,
+        face: obj.userData.propWall,
+        worldY: obj.position.y,
+        scaleY: obj.scale.y
+      });
+    });
+    return out;
   }
 }
 
 export function isFloorProp(tile: Tile | undefined): boolean {
-  return !!tile?.prop;
+  return isBlockingProp(tile);
 }
 
 export function blocksMovement(tile: Tile | undefined): boolean {
-  return isFloorProp(tile);
+  return isBlockingProp(tile);
 }
+
+export { isWallProp, isBlockingProp };

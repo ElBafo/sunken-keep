@@ -327,5 +327,8 @@
   "teaser_saved": "Tam is shivering, but walking. Below: the Homes.",
   "teaser_left": "Mags hasn't spoken since the cells. Below: the Homes.",
   "continue": "Continue"
+ },
+ "intro": {
+  "skip": "Skip"
  }
 }

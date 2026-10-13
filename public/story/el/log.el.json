@@ -217,8 +217,8 @@
  },
  {
   "key": "oil_pickup",
-  "text": "Φλασκί λάδι. Το λυχνάρι της Ρεν πίνει.",
-  "when": "on picking up an oil flask"
+  "text": "Φλασκί λάδι. Στον σάκο.",
+  "when": "on picking up an oil flask; it goes to the bag, use = tap flask then a hero"
  },
  {
   "key": "enter_lampkeeper",

@@ -15,6 +15,9 @@ import type { FloorData } from './types';
 //   #########.....#
 //   ###############
 // Notes:
+//   (1,7) start square; fires after enter_floor1
+//   (4,5) pantry doorway, first time in
+//   (5,7) pantry chest: a healing draught the cook hid
 //   (7,2) slime now guards the arch into the guard hall
 //   (8,6) hook clinks (sfx_lamp_hooks_loop) first heard here; dead torch above
 //   (9,2) guard hall: first time in, Ilsevar/Mags sunlight lines
@@ -33,15 +36,15 @@ export const floor1: FloorData = {
   startDir: 0,
   tiles: [
     [ { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true } ],
-    [ { wall: true }, { shallowWater: true }, { deepWater: true }, { shallowWater: true }, { wall: true }, { secret: true, carving: 'carving_secret', item: 'scroll' }, {  }, {  }, { wall: true }, {  }, { monster: 'keep_rat', monsterState: 'idle', monsterAnimTime: 0, monsterHp: 14, monsterMaxHp: 14 }, {  }, {  }, {  }, { wall: true } ],
-    [ { wall: true }, { shallowWater: true }, { deepWater: true }, { shallowWater: true, monster: 'bog_leeches', monsterState: 'idle', monsterAnimTime: 0, monsterHp: 12, monsterMaxHp: 12 }, { door: true, doorLocked: true, carving: 'carving_door' }, {  }, {  }, { monster: 'slime', monsterState: 'idle', monsterAnimTime: 0, monsterHp: 40, monsterMaxHp: 40 }, {  }, { bark: 'guard_hall_enter' }, {  }, { daylight: true }, { prop: 'beams_fallen' }, {  }, { wall: true } ],
-    [ { wall: true }, { shallowWater: true }, { deepWater: true }, { shallowWater: true }, { wall: true }, { monster: 'rust_crab', monsterState: 'idle', monsterAnimTime: 0, monsterHp: 24, monsterMaxHp: 24 }, { item: 'potion_red' }, {  }, { wall: true }, {  }, { prop: 'beams_fallen' }, {  }, {  }, {  }, { wall: true } ],
-    [ { wall: true }, { shallowWater: true }, { shallowWater: true }, { shallowWater: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, {  }, {  }, {  }, { prop: 'beams_fallen' }, { stairs: 'down' }, { wall: true } ],
-    [ { wall: true }, {  }, { item: 'key' }, {  }, {  }, { item: 'potion_blue' }, {  }, { monster: 'keep_rat', monsterState: 'idle', monsterAnimTime: 0, monsterHp: 14, monsterMaxHp: 14 }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true } ],
+    [ { wall: true }, { shallowWater: true }, { deepWater: true }, { shallowWater: true }, { wall: true }, { secret: true, carving: 'carving_secret', item: 'journal_page', journalPage: 1 }, {  }, {  }, { wall: true }, {  }, { monster: 'keep_rat', monsterState: 'idle', monsterAnimTime: 0, monsterHp: 14, monsterMaxHp: 14 }, {  }, {  }, {  }, { wall: true } ],
+    [ { wall: true }, { shallowWater: true }, { deepWater: true }, { shallowWater: true, monster: 'bog_leeches', monsterState: 'idle', monsterAnimTime: 0, monsterHp: 12, monsterMaxHp: 12 }, { door: true, doorLocked: true, carving: 'carving_door' }, {  }, {  }, { monster: 'slime', monsterState: 'idle', monsterAnimTime: 0, monsterHp: 40, monsterMaxHp: 40 }, {  }, { bark: 'guard_hall_enter' }, {  }, { daylight: true }, { prop: 'beams_fallen', propPlacement: 'floor' }, {  }, { wall: true } ],
+    [ { wall: true }, { shallowWater: true }, { deepWater: true }, { shallowWater: true }, { wall: true }, { monster: 'rust_crab', monsterState: 'idle', monsterAnimTime: 0, monsterHp: 24, monsterMaxHp: 24 }, { item: 'potion_red' }, {  }, { wall: true }, {  }, { prop: 'beams_fallen', propPlacement: 'floor' }, {  }, {  }, {  }, { wall: true } ],
+    [ { wall: true }, { shallowWater: true }, { shallowWater: true }, { shallowWater: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, {  }, {  }, {  }, { prop: 'beams_fallen', propPlacement: 'floor' }, { stairs: 'down' }, { wall: true } ],
+    [ { wall: true }, {  }, { item: 'key' }, {  }, { bark: 'pantry' }, { item: 'potion_blue' }, {  }, { monster: 'keep_rat', monsterState: 'idle', monsterAnimTime: 0, monsterHp: 14, monsterMaxHp: 14 }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true } ],
     [ { wall: true }, { carving: 'carving_start' }, {  }, {  }, { wall: true }, {  }, { item: 'oil_flask' }, {  }, { bark: 'lampkeeper_hooks_heard' }, {  }, {  }, {  }, { wall: true }, { wall: true }, { wall: true } ],
-    [ { wall: true }, {  }, {  }, {  }, { wall: true }, { chest: true, chestItems: ['potion_red'] }, {  }, { item: 'potion_green' }, { wall: true }, { wall: true }, { wall: true }, {  }, { wall: true }, { wall: true }, { wall: true } ],
+    [ { wall: true }, { bark: 'f1_start' }, {  }, {  }, { wall: true }, { chest: true, chestItems: ['potion_red'] }, {  }, { item: 'potion_green' }, { wall: true }, { wall: true }, { wall: true }, {  }, { wall: true }, { wall: true }, { wall: true } ],
     [ { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, {  }, {  }, { bark: 'lampkeeper_enter' }, { item: 'oil_flask' }, {  }, { wall: true } ],
-    [ { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, {  }, {  }, {  }, { prop: 'desk', readNote: 'note_lampkeeper', bark: 'lampkeeper_note_read' }, { prop: 'lamp_capped', bark: 'lampkeeper_capped_lamp' }, { wall: true } ],
+    [ { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, {  }, {  }, {  }, { prop: 'desk', readNote: 'note_lampkeeper', bark: 'lampkeeper_note_read', propPlacement: 'floor' }, { prop: 'lamp_capped', bark: 'lampkeeper_capped_lamp', propPlacement: 'wall', propWall: 'E' }, { wall: true } ],
     [ { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, {  }, {  }, {  }, {  }, {  }, { wall: true } ],
     [ { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true }, { wall: true } ]
   ]
