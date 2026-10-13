@@ -31,7 +31,8 @@ export const BEFORE_PLAY_STEMS = [
   'sfx_ui_log_line',
   'sfx_bark',
   'sfx_lantern_loop',
-  'sfx_lantern_ember_loop'
+  'sfx_lantern_ember_loop',
+  'sfx_cave_in'
 ] as const;
 
 /** Hit, rat attack/alert, miss, and hero hurts — decode these before the rest of first-fight. */

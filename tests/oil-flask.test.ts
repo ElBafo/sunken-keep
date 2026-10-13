@@ -41,6 +41,21 @@ describe('oil flask', () => {
     const main = readFileSync(resolve(__dirname, '../src/proto3d/main.ts'), 'utf8');
     expect(main).toContain('playOilFlask');
     expect(main).toContain('oil_full');
+    const notes = JSON.parse(readFileSync(resolve(__dirname, '../public/audio/audio.json'), 'utf8')) as {
+      notes: { oil_flask?: string };
+    };
+    expect(notes.notes.oil_flask).toMatch(/sfx_oil_flask/);
+  });
+
+  it('refuses a full lantern with a bag wiggle and no fail sting', () => {
+    const main = readFileSync(resolve(__dirname, '../src/proto3d/main.ts'), 'utf8');
+    const full = main.slice(main.indexOf("plan.kind === 'full'"), main.indexOf('if (!this.bag.takeAt'));
+    expect(full).toContain("storyLog('oil_full')");
+    expect(full).toContain('wiggleSlot');
+    expect(full).not.toContain('item_use_fail');
+    const inv = readFileSync(resolve(__dirname, '../src/proto3d/inventory-ui.ts'), 'utf8');
+    expect(inv).toContain('wiggleSlot');
+    expect(inv).toContain('slotWiggleX');
   });
 
   it('keeps Pell’s flask as the only oil on floor 1', () => {

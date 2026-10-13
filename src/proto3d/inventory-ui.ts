@@ -83,6 +83,10 @@ export class InventoryUi {
   private onDrink: (index: number, hero: HeroId) => void;
   private onClose: () => void;
   private playUi: (name: string) => void;
+  private wiggleIndex = -1;
+  private wiggleFrom = 0;
+  private wiggleUntil = 0;
+  private wiggleRaf = 0;
 
   constructor(
     story: StoryText,
@@ -348,6 +352,32 @@ export class InventoryUi {
     this.draw();
   }
 
+  /** A few pixels side to side for ~0.25s when the flask is refused at 4 bars. */
+  wiggleSlot(index: number) {
+    this.wiggleIndex = index;
+    this.wiggleFrom = performance.now();
+    this.wiggleUntil = this.wiggleFrom + 250;
+    if (this.wiggleRaf) cancelAnimationFrame(this.wiggleRaf);
+    const tick = () => {
+      this.draw();
+      if (performance.now() < this.wiggleUntil) this.wiggleRaf = requestAnimationFrame(tick);
+      else {
+        this.wiggleRaf = 0;
+        this.wiggleIndex = -1;
+        this.draw();
+      }
+    };
+    this.wiggleRaf = requestAnimationFrame(tick);
+  }
+
+  private slotWiggleX(index: number): number {
+    if (index !== this.wiggleIndex) return 0;
+    const now = performance.now();
+    if (now >= this.wiggleUntil) return 0;
+    const t = (now - this.wiggleFrom) / 250;
+    return Math.round(Math.sin(t * Math.PI * 6) * 3);
+  }
+
   private draw() {
     const ctx = this.ctx;
     ctx.imageSmoothingEnabled = false;
@@ -399,7 +429,7 @@ export class InventoryUi {
       const slot = this.bag.slots[i];
       if (!slot) return;
       const img = this.itemImage(slot.item);
-      if (img) drawSprite(ctx, img, x + 8, y + 8, ICON, ICON);
+      if (img) drawSprite(ctx, img, x + 8 + this.slotWiggleX(i), y + 8, ICON, ICON);
       const shown = Math.min(STACK_MAX, slot.count);
       if (shown >= 2) {
         const pos = this.layout.stackCount[i];

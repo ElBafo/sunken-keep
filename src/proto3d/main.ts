@@ -168,6 +168,7 @@ class Game {
   private caveIn = new CaveInDirector();
   private caveInBusy = false;
   private caveInStartedAt = 0;
+  private caveInClockStarted = false;
   private caveInCrashed = false;
   private wantOpeningCaveIn = false;
   private oilDisplay = OIL_START;
@@ -901,7 +902,7 @@ class Game {
     const plan = oilFlaskPlan(this.oil);
     if (plan.kind === 'full') {
       this.showPrompt(this.storyLog('oil_full'));
-      this.audioManager.playUi('item_use_fail');
+      this.inventory.wiggleSlot(index);
       return;
     }
     if (!this.bag.takeAt(index, 1)) return;
@@ -1271,6 +1272,7 @@ class Game {
     this.resetRubble();
     this.refreshOccupancy();
     this.caveInBusy = false;
+    this.caveInClockStarted = false;
     this.caveInCrashed = false;
     this.audioManager?.fadeGameOver(300);
     this.audioManager?.updateListener(this.player.x, this.player.y, this.player.dir);
@@ -1830,6 +1832,7 @@ class Game {
     this.clearOilGlugs();
     if (this.caveInBusy) {
       this.caveInBusy = false;
+      this.caveInClockStarted = false;
       this.audioManager?.fadeCaveIn(CAVE_IN_SKIP_FADE_SEC * 1000);
     }
   }
@@ -1873,9 +1876,8 @@ class Game {
     }
     this.caveIn.beginOpening(false);
     this.caveInBusy = true;
-    this.caveInStartedAt = performance.now();
+    this.caveInClockStarted = false;
     this.caveInCrashed = false;
-    this.audioManager.playCaveIn();
     this.player.startMove(spec.stepTo.x, spec.stepTo.y, this.player.dir);
   }
 
@@ -1898,6 +1900,7 @@ class Game {
     );
     this.audioManager.fadeCaveIn(CAVE_IN_SKIP_FADE_SEC * 1000);
     this.caveInBusy = false;
+    this.caveInClockStarted = true;
     this.caveInCrashed = true;
     this.flags.add(CAVE_IN_STATE);
     this.storyProgress.fire(CAVE_IN_STATE);
@@ -1913,7 +1916,19 @@ class Game {
 
   private updateCaveIn(now: number) {
     const spec = floor1CaveIn;
-    if (!this.caveInBusy) {
+    if (this.caveInBusy && !this.caveInClockStarted) {
+      if (
+        !this.player.isMoving &&
+        this.player.x === spec.stepTo.x &&
+        this.player.y === spec.stepTo.y
+      ) {
+        this.caveInClockStarted = true;
+        this.caveInStartedAt = now;
+        this.audioManager.playCaveIn();
+      }
+      return;
+    }
+    if (!this.caveInClockStarted) {
       if (this.caveInCrashed) {
         const t = (now - this.caveInStartedAt) / 1000 - CAVE_IN_CRASH_AT;
         this.sceneBuilder.setDustBurst(this.renderer.scene, spec.rubble.x, spec.rubble.y, dustBurstFrame(t));
@@ -1921,12 +1936,13 @@ class Game {
       return;
     }
     const elapsed = (now - this.caveInStartedAt) / 1000;
-    if (!this.caveInCrashed && caveInCrashed(elapsed)) {
+    if (this.caveInBusy && !this.caveInCrashed && caveInCrashed(elapsed)) {
       this.caveInCrashed = true;
       if (this.player.x !== spec.stepTo.x || this.player.y !== spec.stepTo.y || this.player.isMoving) {
         this.player.setPosition(spec.stepTo.x, spec.stepTo.y, this.player.dir);
       }
       this.applyRubble();
+      this.sceneBuilder.setDustBurst(this.renderer.scene, spec.rubble.x, spec.rubble.y, dustBurstFrame(0));
       this.player.startMove(spec.stepTo.x, spec.stepTo.y, spec.endDir, CAVE_IN_TURN_SEC * 1000, 'out');
     }
     if (this.caveInCrashed) {
@@ -1937,7 +1953,7 @@ class Game {
         dustBurstFrame(elapsed - CAVE_IN_CRASH_AT)
       );
     }
-    if (caveInFinished(elapsed)) this.finishCaveInControl();
+    if (this.caveInBusy && caveInFinished(elapsed)) this.finishCaveInControl();
   }
 
   private finishCaveInControl() {

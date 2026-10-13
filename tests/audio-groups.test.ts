@@ -49,6 +49,7 @@ describe('audio load groups', () => {
     expect(playable.has('audio/sfx_lantern_loop.mp3')).toBe(true);
     expect(playable.has('audio/sfx_bump.mp3')).toBe(true);
     expect(playable.has('audio/sfx_bark.mp3')).toBe(true);
+    expect(playable.has('audio/sfx_cave_in.mp3')).toBe(true);
     expect(playable.has('audio/amb_flooded_halls_loop.mp3')).toBe(false);
     expect(playable.has('audio/sfx_keep_rat_alert.mp3')).toBe(false);
     expect(later).not.toContain('audio/music_act1_loop.mp3');

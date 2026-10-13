@@ -89,5 +89,18 @@ describe('floor 1 cave-in', () => {
     expect(src).toContain('applyRubbleWall');
     expect(src).toContain('playCaveIn()');
     expect(src).toContain('opening_cavein_2');
+    expect(src).toContain('caveInClockStarted');
+    expect(src).toMatch(/!this\.player\.isMoving[\s\S]*playCaveIn\(\)/);
+    expect(src).toMatch(/caveInCrashed\(elapsed\)[\s\S]*applyRubble\(\)[\s\S]*dustBurstFrame\(0\)/);
+  });
+
+  it('plays sfx_cave_in, not far_rumble, and loads it before play', () => {
+    const audio = readFileSync(resolve(__dirname, '../src/proto3d/audio.ts'), 'utf8');
+    expect(audio).toContain("playUi('cave_in')");
+    expect(audio).not.toMatch(/playCaveIn[\s\S]*far_rumble/);
+    const stems = readFileSync(resolve(__dirname, '../src/proto3d/floor1-sounds.ts'), 'utf8');
+    expect(stems).toContain("'sfx_cave_in'");
+    const groups = readFileSync(resolve(__dirname, '../public/audio/audio_load_groups.json'), 'utf8');
+    expect(groups).toContain('sfx_cave_in');
   });
 });

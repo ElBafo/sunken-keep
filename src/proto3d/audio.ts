@@ -1052,7 +1052,7 @@ export class AudioManager {
   }
 
   playCaveIn() {
-    this.playUi('far_rumble');
+    this.playUi('cave_in');
   }
 
   fadeCaveIn(ms = 300) {
