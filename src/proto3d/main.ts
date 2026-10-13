@@ -41,7 +41,7 @@ import {
   type SavedFloor
 } from './saves';
 import { TitleScreen, type TitleAction } from './title';
-import { prefetchFloor1Playable } from './floor1-prefetch';
+import { FLOOR1_PLAY_AUDIO, floor1MonsterArtPaths, prefetchRelPaths } from './floor1-prefetch';
 import { IntroPlayer } from './intro';
 import { SpeechBubble } from './bubble';
 import { StoryProgress } from './story-progress';
@@ -461,7 +461,8 @@ class Game {
   private beginFloor1BackgroundLoads() {
     if (this.floor1PrefetchStarted) return;
     this.floor1PrefetchStarted = true;
-    void prefetchFloor1Playable();
+    const extra = [...floor1MonsterArtPaths(), ...FLOOR1_PLAY_AUDIO.map(([, path]) => path)];
+    void prefetchRelPaths(extra, 4);
     void this.audioManager.loadFloor1PlaySounds();
   }
 
@@ -2620,8 +2621,7 @@ class Game {
     const tapToStart = document.getElementById('tap-to-start')!;
     tapToStart.classList.remove('hidden');
     const overlayActive = () => !tapToStart.classList.contains('hidden');
-    const onTap = (e: Event) => {
-      if (e instanceof PointerEvent && e.type !== 'click' && e.isPrimary === false) return;
+    const onTap = (_e: Event) => {
       this.audioManager.unlock();
       if (!overlayActive()) return;
       const now = performance.now();

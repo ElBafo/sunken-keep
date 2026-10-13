@@ -103,11 +103,31 @@ async function dismissTapOverlay(page: import('@playwright/test').Page) {
   const tap = page.locator('#tap-to-start');
   if (!(await tap.isVisible())) return;
   await tap.tap({ timeout: 3000 });
+  if (await tap.isVisible()) {
+    // WebKit sometimes swallows the first tap; wait out the 400ms debounce, then
+    // fire a real pointerdown on the overlay and title canvas. Never dismissTap().
+    await page.waitForTimeout(450);
+    await page.evaluate(() => {
+      const opts: PointerEventInit = { bubbles: true, cancelable: true, composed: true, isPrimary: true };
+      document.getElementById('tap-to-start')?.dispatchEvent(new PointerEvent('pointerdown', opts));
+      document.getElementById('title-canvas')?.dispatchEvent(new PointerEvent('pointerdown', opts));
+    });
+  }
+  await expect(tap).toBeHidden({ timeout: 5000 });
 }
 
 async function waitGameReady(page: import('@playwright/test').Page, timeout = 30000) {
   await page.waitForFunction(
-    () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
+    () => {
+      const api = (
+        window as unknown as {
+          __proto3d?: { ready?: boolean; boot?: () => { tapPromptReady?: boolean; playReady?: boolean } };
+        }
+      ).__proto3d;
+      if (api?.ready !== true) return false;
+      const boot = api.boot?.();
+      return boot?.tapPromptReady === true || boot?.playReady === true;
+    },
     null,
     { timeout }
   );
@@ -217,6 +237,7 @@ test.describe('proto3d step4 title and saves', () => {
         .skipToPlayableMs ?? null
     );
     const wallMs = Date.now() - skipStarted;
+    console.log(`skip-to-playable: ${skipToPlayableMs}ms (wall ${wallMs}ms)`);
     expect(skipToPlayableMs, `skip-to-playable ${skipToPlayableMs}ms (wall ${wallMs}ms)`).not.toBeNull();
     expect(skipToPlayableMs ?? wallMs).toBeLessThan(15000);
   });
