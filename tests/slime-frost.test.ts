@@ -67,12 +67,13 @@ describe('slime frost data and bark flag', () => {
     expect(sprites).toContain("'slime_small'");
     expect(sprites).not.toMatch(/scale.*_frost|frost.*scaled/);
     expect(sprites).not.toMatch(/slimeFrostTex\.get\('slime:/);
-    expect(sprites).toMatch(/playSlimeFrostFlash[\s\S]*tintHost:\s*false/);
-    expect(sprites).not.toMatch(/playSlimeFrostFlash[\s\S]*tintHost:\s*true/);
-    expect(sprites).toMatch(/playSlimeFrostFlash[\s\S]*frostAmount\s*=\s*0/);
-    expect(sprites).toMatch(/playSlimeFrostFlash[\s\S]*NormalBlending/);
-    expect(sprites).toMatch(/playSlimeFrostFlash[\s\S]*opacity\s*=\s*1/);
-    expect(sprites).not.toMatch(/playSlimeFrostFlash[\s\S]*AdditiveBlending/);
+    const frostFn = sprites.slice(sprites.indexOf('private playSlimeFrostFlash'));
+    expect(frostFn).toMatch(/tintHost:\s*false/);
+    expect(frostFn).not.toMatch(/tintHost:\s*true/);
+    expect(frostFn).toContain('frostAmount = 0');
+    expect(frostFn).toContain('NormalBlending');
+    expect(frostFn).toContain('opacity = 1');
+    expect(frostFn).not.toContain('AdditiveBlending');
     const atlas = readFileSync(resolve(__dirname, '../public/art/atlas/monsters.json'), 'utf8');
     for (const lod of ['close', 'near', 'mid', 'far']) {
       expect(atlas).toContain(`slime_small_idle_1_${lod}_frost.png`);
