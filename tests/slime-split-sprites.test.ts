@@ -42,4 +42,11 @@ describe('slimeling split / death / LOD', () => {
     expect(sprites).toContain('lodSets?.mid');
     expect(sprites).toContain('lodSets?.far');
   });
+
+  it('keeps monster bodies visible across the 1-4 square LOD range', () => {
+    const dark = readFileSync(resolve(__dirname, '../src/proto3d/dark-fx.ts'), 'utf8');
+    expect(dark).toContain('cheb <= 4');
+    expect(sprites).toContain('syncLiveMonsters');
+    expect(sprites).toContain('object.visible = true');
+  });
 });

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   LOOP_START_FALLBACK_S,
   LOOP_START_MAX_S,
+  LOOP_START_MIN_S,
   LOOP_START_THRESHOLD,
   applyBufferLoopPoints,
   detectLoopStartSec,
@@ -29,39 +30,50 @@ describe('WebKit MP3 loop padding', () => {
     expect(audioLoopLength('music_act1')).toBeUndefined();
   });
 
-  it('uses the first sample above 1e-4, not a louder threshold', () => {
+  it('uses 1e-3 so decoder noise at 6-9 ms is ignored', () => {
     const rate = 44100;
     const samples = new Array(rate).fill(0);
-    const soft = Math.floor(rate * 0.01);
-    samples[soft] = 2e-4;
-    samples[soft + 10] = 0.9;
-    const start = detectLoopStartSec(fakeBuffer(samples, rate), 0.5);
-    expect(LOOP_START_THRESHOLD).toBe(1e-4);
-    expect(start).toBeCloseTo(soft / rate, 6);
+    samples[Math.floor(rate * 0.008)] = 2e-4;
+    expect(LOOP_START_THRESHOLD).toBe(1e-3);
+    expect(detectLoopStartSec(fakeBuffer(samples, rate), 0.5)).toBe(LOOP_START_FALLBACK_S);
   });
 
-  it('falls back to 0.025057 s when start is past 60 ms', () => {
+  it('falls back when the detected start is under 20 ms or past 60 ms', () => {
     const rate = 44100;
-    const samples = new Array(rate).fill(0);
-    samples[Math.floor(rate * 0.08)] = 0.5;
-    expect(detectLoopStartSec(fakeBuffer(samples, rate), 0.5)).toBe(LOOP_START_FALLBACK_S);
+    const early = new Array(rate).fill(0);
+    early[Math.floor(rate * 0.01)] = 0.5;
+    expect(detectLoopStartSec(fakeBuffer(early, rate), 0.5)).toBe(LOOP_START_FALLBACK_S);
+    const late = new Array(rate).fill(0);
+    late[Math.floor(rate * 0.08)] = 0.5;
+    expect(detectLoopStartSec(fakeBuffer(late, rate), 0.5)).toBe(LOOP_START_FALLBACK_S);
+    expect(LOOP_START_MIN_S).toBe(0.02);
     expect(LOOP_START_MAX_S).toBe(0.06);
     expect(LOOP_START_FALLBACK_S).toBe(0.025057);
+  });
+
+  it('keeps a start in the 20-60 ms window', () => {
+    const rate = 44100;
+    const samples = new Array(rate * 2).fill(0);
+    const at = Math.floor(rate * 0.03);
+    samples[at] = 0.5;
+    expect(detectLoopStartSec(fakeBuffer(samples, rate), 0.5)).toBeCloseTo(0.03, 4);
   });
 
   it('falls back when remaining duration is shorter than the loop length', () => {
     const rate = 44100;
     const samples = new Array(Math.floor(rate * 0.2)).fill(0);
-    samples[10] = 0.5;
+    samples[Math.floor(rate * 0.03)] = 0.5;
     expect(detectLoopStartSec(fakeBuffer(samples, rate), 5)).toBe(LOOP_START_FALLBACK_S);
   });
 
   it('sets loopEnd = loopStart + true length', () => {
     const rate = 44100;
-    const samples = new Array(rate * 6).fill(0.2);
+    const samples = new Array(rate * 6).fill(0);
+    samples[Math.floor(rate * 0.03)] = 0.2;
     const src = { loop: false, loopStart: 0, loopEnd: 0 };
     applyBufferLoopPoints(src, fakeBuffer(samples, rate), 5);
     expect(src.loop).toBe(true);
+    expect(src.loopStart).toBeCloseTo(0.03, 4);
     expect(src.loopEnd).toBeCloseTo(src.loopStart + 5, 6);
   });
 });

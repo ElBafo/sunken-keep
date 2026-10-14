@@ -775,6 +775,32 @@ describe('slime split', () => {
     expect(left.nextAttackAt).toBeCloseTo(10 + (rules.monsters.slime_small.interval ?? 2.5), 5);
   });
 
+  it('re-applies the 1.25s slimeling stagger when combat resumes', () => {
+    const e = new CombatEngine(rules, {
+      d20: () => 20,
+      int: (a: number, b: number) => a,
+      next: () => 0,
+      pick: <T>(xs: T[]) => xs[0],
+      chance: () => false
+    } as unknown as Rng);
+    const m = e.spawnMonster('slime', 2, 0, undefined, { split: true });
+    e.setPartyPos(1, 0, 1);
+    e.beginFight(m, 0);
+    m.hp = 35;
+    e.useHand('brannoc', 'main', 10);
+    const left = e.livingMonsters().find((k) => k.pairSlot === 'left')!;
+    const right = e.livingMonsters().find((k) => k.pairSlot === 'right')!;
+    e.setPartyPos(0, 0, 1);
+    e.tick(12);
+    expect(e.inCombat()).toBe(false);
+    left.nextAttackAt = 12.1;
+    right.nextAttackAt = 12.5;
+    e.setPartyPos(1, 0, 1);
+    e.beginFight(left, 20);
+    expect(right.nextAttackAt - left.nextAttackAt).toBeCloseTo(1.25, 5);
+    expect(left.nextAttackAt).toBeCloseTo(20.5, 5);
+  });
+
   it('keeps the hit log and frost resist flash when that hit splits the slime', () => {
     const e = new CombatEngine(rules, {
       d20: () => 18,
@@ -793,6 +819,23 @@ describe('slime split', () => {
     expect(ev.some((x) => x.type === 'hit_type' && x.kind === 'resist')).toBe(true);
     expect(ev.some((x) => x.type === 'sfx' && x.name === 'hit_resist')).toBe(true);
     expect(ev.some((x) => x.type === 'log' && x.key === 'slime_frost_resist')).toBe(true);
+  });
+
+  it('skips the hurt anim on a killing blow so death can show immediately', () => {
+    const e = new CombatEngine(rules, {
+      d20: () => 20,
+      int: (a: number, b: number) => a,
+      next: () => 0,
+      pick: <T>(xs: T[]) => xs[0],
+      chance: () => false
+    } as unknown as Rng);
+    const m = e.spawnMonster('keep_rat', 2, 0);
+    e.setPartyPos(1, 0, 1);
+    e.beginFight(m, 0);
+    m.hp = 1;
+    const ev = e.useHand('brannoc', 'main', 1);
+    expect(ev.some((x) => x.type === 'monster_anim' && x.anim === 'hurt')).toBe(false);
+    expect(ev.some((x) => x.type === 'monster_anim' && x.anim === 'death')).toBe(true);
   });
 });
 

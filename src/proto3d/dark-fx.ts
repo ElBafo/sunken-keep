@@ -286,11 +286,13 @@ export class DarkFx {
         }
         continue;
       }
-      const adjacent = Math.abs(eye.x - partyX) + Math.abs(eye.y - partyY) <= 1;
-      const lit = !!host.forceLit || adjacent || lighting.isSquareLit(eye.x, eye.y);
-      sprites.setLitVisible(eye.x, eye.y, 'monster', lit);
-      eye.sprite.visible = !lit;
-      if (lit) {
+      const cheb = Math.max(Math.abs(eye.x - partyX), Math.abs(eye.y - partyY));
+      // near/mid/far LOD frames are authored for 2/3/4 squares — keep the body
+      // drawn in that range even when the oil puddle has already gone ambient.
+      const showBody = !!host.forceLit || cheb <= 4 || lighting.isSquareLit(eye.x, eye.y);
+      sprites.setLitVisible(eye.x, eye.y, 'monster', showBody);
+      eye.sprite.visible = !showBody;
+      if (showBody) {
         if (eye.presenceId) {
           audio.stopNamedLoop(eye.presenceId);
           eye.presenceId = null;

@@ -1,7 +1,9 @@
-/** First sample above this is the authored start (gurgle opens soft). */
-export const LOOP_START_THRESHOLD = 1e-4;
+/** First sample above this is the authored start. 1e-4 catches decoder noise. */
+export const LOOP_START_THRESHOLD = 1e-3;
 /** WebKit MP3 encoder padding when detection fails. */
 export const LOOP_START_FALLBACK_S = 0.025057;
+/** Detected start earlier than this is treated as decoder noise. */
+export const LOOP_START_MIN_S = 0.02;
 /** Detected start past this is treated as encoder junk. */
 export const LOOP_START_MAX_S = 0.06;
 
@@ -13,7 +15,7 @@ export type LoopSampleBuffer = {
   getChannelData: (channel: number) => ArrayLike<number>;
 };
 
-/** First sample with abs > 1e-4, or the 25.057 ms fallback. */
+/** First sample with abs > 1e-3, or the 25.057 ms fallback. */
 export function detectLoopStartSec(buffer: LoopSampleBuffer, loopLength: number): number {
   const channels = buffer.numberOfChannels;
   const count = buffer.length;
@@ -27,7 +29,11 @@ export function detectLoopStartSec(buffer: LoopSampleBuffer, loopLength: number)
     }
   }
   const start = first < 0 ? 0 : first / buffer.sampleRate;
-  if (start > LOOP_START_MAX_S || buffer.duration - start < loopLength) {
+  if (
+    start < LOOP_START_MIN_S ||
+    start > LOOP_START_MAX_S ||
+    buffer.duration - start < loopLength
+  ) {
     return LOOP_START_FALLBACK_S;
   }
   return start;

@@ -206,6 +206,13 @@ export class CombatEngine {
     return true;
   }
 
+  /** Debug / tests: apply pending splits after an out-of-band HP change. */
+  flushSplits(now: number): CombatEvent[] {
+    this.events = [];
+    for (const m of [...this.monsters]) this.maybeSplit(m, now);
+    return this.flush();
+  }
+
   clearMonsters() {
     this.monsters = [];
     this.fight = null;
@@ -296,7 +303,7 @@ export class CombatEngine {
     if (this.fight) this.endFight(now);
     this.fight = { monsterId: monster.id, startedAt: now };
     monster.noticed = true;
-    monster.nextAttackAt = now + FIRST_SWING_SEC;
+    this.staggerPairTimers(monster, now, FIRST_SWING_SEC);
     monster.windup = null;
     this.emit({ type: 'fight_start', monsterId: monster.id, kind: monster.kind });
     this.emit({ type: 'sfx', name: `${monster.kind}_alert`, x: monster.x, y: monster.y, combat: true });
@@ -716,7 +723,7 @@ export class CombatEngine {
     dmg = Math.max(1, Math.floor(dmg * mul));
     target.hp -= dmg;
     const kind = this.hitKind(crit, mul);
-    if (kind !== 'resist') this.emit({ type: 'monster_anim', id: target.id, anim: 'hurt' });
+    if (kind !== 'resist' && target.hp > 0) this.emit({ type: 'monster_anim', id: target.id, anim: 'hurt' });
     this.emit({
       type: 'sfx',
       name: `${target.kind}_hurt`,
@@ -814,12 +821,33 @@ export class CombatEngine {
   private fightGroup(): MonsterState[] {
     const primary = this.fightMonster();
     if (!primary) return [];
-    if (primary.pairId) {
+    return this.matesOf(primary);
+  }
+
+  private matesOf(m: MonsterState): MonsterState[] {
+    if (m.pairId) {
       return this.livingMonsters()
-        .filter((m) => m.pairId === primary.pairId)
+        .filter((o) => o.pairId === m.pairId)
         .sort((a, b) => Number(a.pairSlot !== 'left') - Number(b.pairSlot !== 'left'));
     }
-    return [primary];
+    const here = this.monstersAt(m.x, m.y);
+    return here.length ? here : [m];
+  }
+
+  /** Re-apply the 1.25 s slimeling gap whenever a pair enters / re-enters combat. */
+  private staggerPairTimers(primary: MonsterState, now: number, firstDelay: number) {
+    const group = this.matesOf(primary);
+    if (group.length < 2) {
+      primary.nextAttackAt = now + firstDelay;
+      return;
+    }
+    const left = group.find((m) => m.pairSlot === 'left') ?? group[0];
+    const right = group.find((m) => m !== left) ?? group[1];
+    left.nextAttackAt = now + firstDelay;
+    right.nextAttackAt = left.nextAttackAt + SLIME_SMALL_STAGGER_SEC;
+    for (const extra of group) {
+      if (extra !== left && extra !== right) extra.nextAttackAt = now + firstDelay;
+    }
   }
 
   tick(now: number): CombatEvent[] {

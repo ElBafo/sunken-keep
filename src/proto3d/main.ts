@@ -178,6 +178,7 @@ class Game {
   private worldBoot: Promise<void> = Promise.resolve();
   private stageFitWired = false;
   private newGameStarted = false;
+  private monsterSync: Promise<void> = Promise.resolve();
   private pendingNewGameReset = false;
   private enteringPlay = false;
   private floor1PrefetchStarted = false;
@@ -537,10 +538,7 @@ class Game {
   }
 
   private rebindMonsters() {
-    for (const m of this.combat.monsters) {
-      if (!this.spriteManager.spriteByMonsterId(m.id)) this.spriteManager.bindMonster(m.x, m.y, m.id);
-      if (!m.alive) this.spriteManager.hideDeadMonsterId(m.id);
-    }
+    this.monsterSync = this.spriteManager.syncLiveMonsters(this.renderer.scene, this.combat.monsters);
   }
 
   /** Monsters stay asleep until first-fight audio is in (or the 4s cap). */
@@ -1127,14 +1125,16 @@ class Game {
           break;
         case 'slime_split':
           this.spriteManager.disposeMonsterId(e.from);
-          for (const kid of e.kids) {
-            this.spriteManager.blockFloorSpawn(kid.x, kid.y);
-            void this.spriteManager.addLiveMonster(this.renderer.scene, kid.kind, kid.x, kid.y, kid.id, 0, {
-              pairSlot: kid.slot,
-              pairId: e.from
-            });
-            this.audioManager?.setSlimelingPan(kid.id, SLIME_SMALL_PAN[kid.slot]);
-          }
+          this.monsterSync = (async () => {
+            for (const kid of e.kids) {
+              this.spriteManager.blockFloorSpawn(kid.x, kid.y);
+              await this.spriteManager.addLiveMonster(this.renderer.scene, kid.kind, kid.x, kid.y, kid.id, 0, {
+                pairSlot: kid.slot,
+                pairId: e.from
+              });
+              this.audioManager?.setSlimelingPan(kid.id, SLIME_SMALL_PAN[kid.slot]);
+            }
+          })();
           this.syncSlimeAudio();
           break;
         case 'hero':
@@ -1792,15 +1792,7 @@ class Game {
     for (const hero of save.party ?? []) this.combat.applyHero(hero);
     this.combat.restoreMonsters(floor?.monsters ?? []);
     this.spriteManager.resetMonsters(floor1);
-    for (const m of this.combat.monsters) {
-      const sprite =
-        this.spriteManager.sprites.find((s) => s.kind === 'monster' && s.monsterKind === m.kind && !s.monsterId) ??
-        this.spriteManager.sprites.find((s) => s.kind === 'monster' && s.monsterKind === m.kind);
-      if (!sprite) continue;
-      sprite.monsterId = m.id;
-      this.spriteManager.moveMonsterId(m.id, m.x, m.y);
-      if (!m.alive) this.spriteManager.hideDeadMonsterId(m.id);
-    }
+    this.monsterSync = this.spriteManager.syncLiveMonsters(this.renderer.scene, this.combat.monsters);
     for (const id of HERO_IDS) {
       const h = this.combat.heroes[id];
       this.hud.setHand(id, 'main', h.equipment.main as GearId);
@@ -2421,7 +2413,12 @@ class Game {
           currentFrame: s.currentFrame,
           lod: s.currentLod ?? null,
           lods: s.lodSets ? Object.keys(s.lodSets) : [],
-          v2: !!s.v2
+          v2: !!s.v2,
+          hidden: !!s.hidden,
+          disposed: !!s.disposed,
+          anim: s.anim,
+          monsterId: s.monsterId,
+          pairSlot: s.pairSlot ?? null
         })),
       spriteScreen: (kind: 'monster' | 'item', x: number, y: number) => {
         this.spriteManager.layoutBillboards(this.player.x, this.player.y, this.player.dir);
@@ -2780,10 +2777,11 @@ class Game {
         if (ok) this.currentSlot = slot;
         return ok;
       },
-      loadFromSlot: (slot: number) => {
+      loadFromSlot: async (slot: number) => {
         const data = loadSlot(slot);
         if (!data || data === 'corrupt') return false;
         this.applySave(data);
+        await this.monsterSync;
         return true;
       },
       requestManualSave: () => this.requestManualSave(),
@@ -2921,8 +2919,23 @@ class Game {
           y: m.y,
           hp: m.hp,
           alive: m.alive,
-          windup: m.windup?.kind ?? null
+          windup: m.windup?.kind ?? null,
+          pairSlot: m.pairSlot ?? null,
+          nextAttackAt: m.nextAttackAt
         })),
+      setMonsterHp: (id: string, hp: number) => {
+        const m = this.combat.monsters.find((x) => x.id === id);
+        if (!m) return false;
+        m.hp = hp;
+        this.applyEvents(this.combat.flushSplits(this.nowSec()));
+        return true;
+      },
+      playMonsterAnim: (id: string, anim: 'idle' | 'attack' | 'hurt' | 'death' | 'windup') => {
+        this.spriteManager.playAnimId(id, anim, performance.now());
+        const s = this.spriteManager.spriteByMonsterId(id);
+        return s ? { anim: s.anim, frame: s.currentFrame } : null;
+      },
+      whenMonstersSynced: () => this.monsterSync,
       pendingPerks: () => this.combat.pendingPerks.slice(),
       perkHooks: () => this.perkHooks.slice(),
       perkScreenOpen: () => this.perkScreenOpen,
