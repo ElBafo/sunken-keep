@@ -179,6 +179,7 @@ class Game {
   private stageFitWired = false;
   private newGameStarted = false;
   private monsterSync: Promise<void> = Promise.resolve();
+  private lastBarkTrigger: string | null = null;
   private pendingNewGameReset = false;
   private enteringPlay = false;
   private floor1PrefetchStarted = false;
@@ -538,7 +539,18 @@ class Game {
   }
 
   private rebindMonsters() {
-    this.monsterSync = this.spriteManager.syncLiveMonsters(this.renderer.scene, this.combat.monsters);
+    this.enqueueMonsterWork(async () => {
+      await this.spriteManager.syncLiveMonsters(this.renderer.scene, this.combat.monsters);
+      this.darkFx.syncEyes(this.renderer.scene, this.spriteManager, this.combat.monsters, this.audioManager);
+    });
+  }
+
+  private enqueueMonsterWork(work: () => Promise<unknown>) {
+    this.monsterSync = Promise.resolve(this.monsterSync)
+      .catch(() => undefined)
+      .then(work)
+      .then(() => undefined);
+    return this.monsterSync;
   }
 
   /** Monsters stay asleep until first-fight audio is in (or the 4s cap). */
@@ -1111,11 +1123,11 @@ class Game {
           break;
         case 'monster_move':
           this.spriteManager.moveMonsterId(e.id, e.to.x, e.to.y);
-          this.darkFx.moveEye(e.from.x, e.from.y, e.to.x, e.to.y, this.audioManager);
+          this.darkFx.moveEyeById(e.id, e.from.x, e.from.y, e.to.x, e.to.y, this.audioManager);
           break;
         case 'monster_dead':
           this.spriteManager.playAnimId(e.id, 'death', nowMs);
-          this.darkFx.hideEye(e.x, e.y, this.audioManager);
+          this.darkFx.removeEyeById(e.id, this.audioManager);
           this.audioManager?.stopWindup(e.id);
           {
             const survivor = this.spriteManager.beginPairSlide(e.id, nowMs);
@@ -1124,18 +1136,41 @@ class Game {
           this.syncSlimeAudio();
           break;
         case 'slime_split':
-          this.spriteManager.disposeMonsterId(e.from);
-          this.monsterSync = (async () => {
-            for (const kid of e.kids) {
-              this.spriteManager.blockFloorSpawn(kid.x, kid.y);
-              await this.spriteManager.addLiveMonster(this.renderer.scene, kid.kind, kid.x, kid.y, kid.id, 0, {
-                pairSlot: kid.slot,
-                pairId: e.from
-              });
-              this.audioManager?.setSlimelingPan(kid.id, SLIME_SMALL_PAN[kid.slot]);
+          {
+            const tile = e.kids[0];
+            if (tile) {
+              this.spriteManager.blockFloorSpawn(tile.x, tile.y);
+              this.spriteManager.detachFloorMonsterAt(tile.x, tile.y, 'slime');
             }
-          })();
-          this.syncSlimeAudio();
+            this.spriteManager.disposeMonsterId(e.from);
+            this.darkFx.removeEyeById(e.from, this.audioManager);
+            this.enqueueMonsterWork(async () => {
+              for (const kid of e.kids) {
+                this.spriteManager.blockFloorSpawn(kid.x, kid.y);
+                const sprite = await this.spriteManager.addLiveMonster(
+                  this.renderer.scene,
+                  kid.kind,
+                  kid.x,
+                  kid.y,
+                  kid.id,
+                  0,
+                  {
+                    pairSlot: kid.slot,
+                    pairId: e.from
+                  }
+                );
+                if (sprite) this.darkFx.addEyeForHost(this.renderer.scene, sprite);
+                this.audioManager?.setSlimelingPan(kid.id, SLIME_SMALL_PAN[kid.slot]);
+              }
+              this.darkFx.syncEyes(
+                this.renderer.scene,
+                this.spriteManager,
+                this.combat.monsters,
+                this.audioManager
+              );
+            });
+            this.syncSlimeAudio();
+          }
           break;
         case 'hero':
         case 'hero_revive':
@@ -1792,7 +1827,8 @@ class Game {
     for (const hero of save.party ?? []) this.combat.applyHero(hero);
     this.combat.restoreMonsters(floor?.monsters ?? []);
     this.spriteManager.resetMonsters(floor1);
-    this.monsterSync = this.spriteManager.syncLiveMonsters(this.renderer.scene, this.combat.monsters);
+    this.darkFx.resetEyes(this.audioManager);
+    this.rebindMonsters();
     for (const id of HERO_IDS) {
       const h = this.combat.heroes[id];
       this.hud.setHand(id, 'main', h.equipment.main as GearId);
@@ -2084,7 +2120,18 @@ class Game {
       skipRateLimits: !!forcedSpeaker
     });
     if (!picked) return false;
+    this.lastBarkTrigger = trigger;
     return this.deliverBark(picked);
+  }
+
+  private fireSlimeReveal() {
+    for (const s of this.spriteManager.sprites) {
+      if (s.kind !== 'monster' || s.monsterKind !== 'slime') continue;
+      if (s.hidden || s.disposed || !s.object.visible) continue;
+      if (!this.storyProgress.fire('slime_reveal')) return;
+      this.speakBark('slime_reveal');
+      return;
+    }
   }
 
   private flushBarks(nowMs: number) {
@@ -2206,6 +2253,7 @@ class Game {
     this.storyProgress.startNewGame();
     this.barkDirector.reset();
     this.lastBarkFace = null;
+    this.lastBarkTrigger = null;
     this.journalPages.clear();
     this.dialogue.clear();
     this.floorStates = {};
@@ -2383,6 +2431,7 @@ class Game {
           this.player.x,
           this.player.y
         );
+        this.fireSlimeReveal();
         this.audioManager?.updateListener(this.player.x, this.player.y, this.player.dir);
         this.props?.layoutAdjacent(this.player.x, this.player.y, this.spriteManager.integerAdjacentScale(), this.player.dir);
         this.updateDoorButton();
@@ -2798,6 +2847,7 @@ class Game {
       secretOpen: (x: number, y: number) => !!this.player.tileAt(x, y)?.secretOpen,
       speakBark: (trigger: string, speaker?: HeroId) => this.speakBark(trigger, speaker),
       lastBark: () => this.lastBarkFace,
+      lastBarkTrigger: () => this.lastBarkTrigger,
       bubbleVisible: () => !!this.bubble?.visible,
       bubbleText: () => this.bubble?.displayText() ?? '',
       flags: () => [...this.flags],
@@ -3117,6 +3167,7 @@ class Game {
     this.torches.update(now, this.player.x, this.player.y, this.player.dir);
     this.spriteManager.update(now, this.player.x, this.player.y, this.player.dir);
     this.darkFx.update(now, this.vertexLighting, this.spriteManager, this.audioManager, this.player.x, this.player.y);
+    this.fireSlimeReveal();
     this.vertexLighting.setFlickerTime(now);
     this.hud?.draw(now);
     this.updateCaveIn(now);

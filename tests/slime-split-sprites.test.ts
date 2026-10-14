@@ -3,27 +3,35 @@ import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
 import { monsterLodName } from '../src/proto3d/sprites';
 import { SLIME_PAIR_OFFSET_FRAC } from '../src/core/slime-pair';
+import { eyeLiftFor, monsterBodyVisible } from '../src/proto3d/dark-fx';
 
 const sprites = readFileSync(resolve(__dirname, '../src/proto3d/sprites.ts'), 'utf8');
 const main = readFileSync(resolve(__dirname, '../src/proto3d/main.ts'), 'utf8');
+const dark = readFileSync(resolve(__dirname, '../src/proto3d/dark-fx.ts'), 'utf8');
 
 describe('slimeling split / death / LOD', () => {
-  it('disposes the big slime render object on split and blocks a late floor re-add', () => {
+  it('disposes the big slime on split, blocks a late floor re-add, and retires the id', () => {
     const split = main.slice(main.indexOf("case 'slime_split'"), main.indexOf("case 'hero'"));
     expect(split).toContain('disposeMonsterId(e.from)');
     expect(split).toContain('blockFloorSpawn');
+    expect(split).toContain('detachFloorMonsterAt');
     expect(split).toContain('addLiveMonster');
+    expect(split).toContain('addEyeForHost');
     expect(sprites).toContain('disposeMonsterId');
+    expect(sprites).toContain('retiredMonsterIds');
+    expect(sprites).toContain('dropDuplicateMonsterSprites');
     expect(sprites).toContain('floorSpawnBlocked');
     expect(sprites).toContain('removeFromParent');
     expect(sprites).toContain('liveAdded');
   });
 
-  it('does not let lantern updates reshow a hidden or disposed monster', () => {
+  it('does not let lantern updates or death anim reshow a disposed monster', () => {
     const fn = sprites.slice(sprites.indexOf('setLitVisible'), sprites.indexOf('private loadTex'));
     expect(fn).toContain('sprite.hidden');
     expect(fn).toContain('sprite.disposed');
     expect(fn).toContain('sprite.object.visible = false');
+    expect(sprites).toMatch(/if \(s\.disposed\) return/);
+    expect(sprites).not.toMatch(/anim === 'death'[\s\S]{0,80}s\.disposed = false/);
   });
 
   it('keeps death over hurt/idle, then detaches after the last death frame', () => {
@@ -43,10 +51,23 @@ describe('slimeling split / death / LOD', () => {
     expect(sprites).toContain('lodSets?.far');
   });
 
-  it('keeps monster bodies visible across the 1-4 square LOD range', () => {
-    const dark = readFileSync(resolve(__dirname, '../src/proto3d/dark-fx.ts'), 'utf8');
-    expect(dark).toContain('cheb <= 4');
-    expect(sprites).toContain('syncLiveMonsters');
-    expect(sprites).toContain('object.visible = true');
+  it('draws a body only when lit or adjacent — not every monster within 4 squares', () => {
+    expect(dark).not.toContain('cheb <= 4');
+    expect(monsterBodyVisible({ adjacent: false, squareLit: false })).toBe(false);
+    expect(monsterBodyVisible({ adjacent: true, squareLit: false })).toBe(true);
+    expect(monsterBodyVisible({ adjacent: false, squareLit: true })).toBe(true);
+    expect(monsterBodyVisible({ adjacent: false, squareLit: false, forceLit: true })).toBe(true);
+    expect(main).toContain('fireSlimeReveal');
+    expect(main).toContain("speakBark('slime_reveal')");
+  });
+
+  it('lifts eyes from monster height and splits one pair per slimeling', () => {
+    expect(eyeLiftFor('slime', 0.39)).toBeCloseTo(0.273, 3);
+    expect(eyeLiftFor('slime_small', 0.312)).toBeCloseTo(0.2184, 3);
+    expect(eyeLiftFor('keep_rat', 0.25)).toBe(0.15);
+    expect(dark).toContain('addEyeForHost');
+    expect(dark).toContain('removeEyeById');
+    expect(dark).toContain('syncEyes');
+    expect(dark).toContain('host.object.position.x');
   });
 });

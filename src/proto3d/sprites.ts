@@ -324,6 +324,7 @@ export class SpriteManager {
   private monstersReady = false;
   private monsterLoad: Promise<void> | null = null;
   private floorSpawnBlocked = new Set<string>();
+  private retiredMonsterIds = new Set<string>();
   adjacentScale = 1;
 
   constructor(camera: THREE.Camera) {
@@ -1010,6 +1011,7 @@ export class SpriteManager {
   }
 
   bindMonster(x: number, y: number, id: string, kind?: string) {
+    if (this.retiredMonsterIds.has(id)) return;
     const s = this.sprites.find(
       (s) =>
         s.kind === 'monster' &&
@@ -1073,8 +1075,8 @@ export class SpriteManager {
     s.material.needsUpdate = true;
     if (anim === 'death') {
       s.dying = true;
+      if (s.disposed) return;
       s.hidden = false;
-      s.disposed = false;
       s.object.visible = true;
     }
   }
@@ -1107,10 +1109,42 @@ export class SpriteManager {
 
   /** Remove the render object immediately (split leftover). */
   disposeMonsterId(id: string) {
-    const s = this.spriteByMonsterId(id);
-    if (!s) return;
-    this.blockFloorSpawn(s.x, s.y);
-    this.detachMonster(s);
+    this.retiredMonsterIds.add(id);
+    const matches = this.sprites.filter((s) => s.kind === 'monster' && s.monsterId === id);
+    if (matches[0]) this.blockFloorSpawn(matches[0].x, matches[0].y);
+    for (const s of matches) this.detachMonster(s);
+    this.dropDuplicateMonsterSprites(id);
+  }
+
+  /** Floor-map leftovers at a split tile (unbound or retired parent). */
+  detachFloorMonsterAt(x: number, y: number, kind: string) {
+    this.blockFloorSpawn(x, y);
+    for (const s of this.sprites) {
+      if (s.kind !== 'monster' || s.x !== x || s.y !== y) continue;
+      if (s.monsterKind !== kind) continue;
+      if (s.liveAdded) continue;
+      if (!s.monsterId || this.retiredMonsterIds.has(s.monsterId)) this.detachMonster(s);
+    }
+  }
+
+  private dropDuplicateMonsterSprites(id?: string) {
+    const seen = new Map<string, SpriteInfo>();
+    const drop: SpriteInfo[] = [];
+    for (const s of this.sprites) {
+      if (s.kind !== 'monster' || !s.monsterId) continue;
+      if (id && s.monsterId !== id) continue;
+      const prev = seen.get(s.monsterId);
+      if (!prev) {
+        seen.set(s.monsterId, s);
+        continue;
+      }
+      const prefer = !s.disposed && prev.disposed ? s : prev;
+      const extra = prefer === s ? prev : s;
+      this.detachMonster(extra);
+      seen.set(s.monsterId, prefer);
+      drop.push(extra);
+    }
+    if (drop.length) this.sprites = this.sprites.filter((s) => !drop.includes(s));
   }
 
   private finishDeath(sprite: SpriteInfo) {
@@ -1135,6 +1169,9 @@ export class SpriteManager {
     feetY = 0,
     pair?: { pairSlot: SlimePairSlot; pairId: string }
   ) {
+    if (this.retiredMonsterIds.has(id)) return null;
+    const existing = this.spriteByMonsterId(id);
+    if (existing) return existing.disposed ? null : existing;
     const v2 = this.v2Px.has(kind);
     const folder = v2 ? V2_FOLDER : V1_FOLDER;
     const lodSets: NonNullable<SpriteInfo['lodSets']> = {};
@@ -1219,13 +1256,17 @@ export class SpriteManager {
     feetY = 0
   ) {
     this.scene = scene;
-    const livingIds = new Set(monsters.filter((m) => m.alive).map((m) => m.id));
+    const livingIds = new Set(
+      monsters.filter((m) => m.alive && !this.retiredMonsterIds.has(m.id)).map((m) => m.id)
+    );
     for (const m of monsters) {
-      if (!m.alive) continue;
+      if (!m.alive || this.retiredMonsterIds.has(m.id)) continue;
       let s = this.spriteByMonsterId(m.id);
+      if (s?.disposed) s = undefined;
       if (!s) {
         this.bindMonster(m.x, m.y, m.id, m.kind);
         s = this.spriteByMonsterId(m.id);
+        if (s?.disposed) s = undefined;
       }
       if (!s) {
         this.blockFloorSpawn(m.x, m.y);
@@ -1245,17 +1286,19 @@ export class SpriteManager {
       this.moveMonsterId(m.id, m.x, m.y);
     }
     for (const m of monsters) {
-      if (!m.alive) this.hideDeadMonsterId(m.id);
+      if (!m.alive || this.retiredMonsterIds.has(m.id)) this.hideDeadMonsterId(m.id);
     }
     for (const s of [...this.sprites]) {
       if (s.kind !== 'monster') continue;
       if (s.monsterId && livingIds.has(s.monsterId)) continue;
       this.detachMonster(s);
     }
+    this.dropDuplicateMonsterSprites();
   }
 
   resetMonsters(floor: FloorData) {
     this.floorSpawnBlocked.clear();
+    this.retiredMonsterIds.clear();
     const dropped: SpriteInfo[] = [];
     for (const s of this.sprites) {
       if (s.kind !== 'monster') continue;

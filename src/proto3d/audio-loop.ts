@@ -1,11 +1,7 @@
-/** First sample above this is the authored start. 1e-4 catches decoder noise. */
-export const LOOP_START_THRESHOLD = 1e-3;
-/** WebKit MP3 encoder padding when detection fails. */
-export const LOOP_START_FALLBACK_S = 0.025057;
-/** Detected start earlier than this is treated as decoder noise. */
-export const LOOP_START_MIN_S = 0.02;
-/** Detected start past this is treated as encoder junk. */
-export const LOOP_START_MAX_S = 0.06;
+/** WebKit MP3 encoder padding. Always used; sample scanning clicks on these loops. */
+export const LOOP_START_S = 0.025057;
+/** @deprecated Use LOOP_START_S. Kept so older tests/imports keep working. */
+export const LOOP_START_FALLBACK_S = LOOP_START_S;
 
 export type LoopSampleBuffer = {
   length: number;
@@ -15,37 +11,17 @@ export type LoopSampleBuffer = {
   getChannelData: (channel: number) => ArrayLike<number>;
 };
 
-/** First sample with abs > 1e-3, or the 25.057 ms fallback. */
-export function detectLoopStartSec(buffer: LoopSampleBuffer, loopLength: number): number {
-  const channels = buffer.numberOfChannels;
-  const count = buffer.length;
-  let first = -1;
-  outer: for (let i = 0; i < count; i++) {
-    for (let c = 0; c < channels; c++) {
-      if (Math.abs(buffer.getChannelData(c)[i]) > LOOP_START_THRESHOLD) {
-        first = i;
-        break outer;
-      }
-    }
-  }
-  const start = first < 0 ? 0 : first / buffer.sampleRate;
-  if (
-    start < LOOP_START_MIN_S ||
-    start > LOOP_START_MAX_S ||
-    buffer.duration - start < loopLength
-  ) {
-    return LOOP_START_FALLBACK_S;
-  }
-  return start;
+/** Fixed encoder padding. Detection is dropped — gurgle read 24.989 ms and clicked. */
+export function detectLoopStartSec(_buffer: LoopSampleBuffer, _loopLength: number): number {
+  return LOOP_START_S;
 }
 
 export function applyBufferLoopPoints(
   src: { loop: boolean; loopStart: number; loopEnd: number },
-  buffer: LoopSampleBuffer,
+  _buffer: LoopSampleBuffer,
   loopLength: number
 ) {
-  const start = detectLoopStartSec(buffer, loopLength);
   src.loop = true;
-  src.loopStart = start;
-  src.loopEnd = start + loopLength;
+  src.loopStart = LOOP_START_S;
+  src.loopEnd = LOOP_START_S + loopLength;
 }

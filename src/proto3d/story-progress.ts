@@ -71,6 +71,7 @@ export const ONCE_TRIGGERS: TriggerDef[] = [
   { id: 'first_sight_rust_crab', type: 'bark', once: true },
   { id: 'first_sight_bog_leeches', type: 'bark', once: true },
   { id: 'first_sight_drowned_dwarf', type: 'bark', once: true },
+  { id: 'slime_reveal', type: 'bark', once: true },
   { id: 'tut_hand', type: 'bark', once: true },
   { id: 'tut_front', type: 'bark', once: true },
   { id: 'tut_sheet', type: 'bark', once: true },
