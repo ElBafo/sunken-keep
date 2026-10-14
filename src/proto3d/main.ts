@@ -1126,8 +1126,9 @@ class Game {
           this.syncSlimeAudio();
           break;
         case 'slime_split':
-          this.spriteManager.hideDeadMonsterId(e.from);
+          this.spriteManager.disposeMonsterId(e.from);
           for (const kid of e.kids) {
+            this.spriteManager.blockFloorSpawn(kid.x, kid.y);
             void this.spriteManager.addLiveMonster(this.renderer.scene, kid.kind, kid.x, kid.y, kid.id, 0, {
               pairSlot: kid.slot,
               pairId: e.from

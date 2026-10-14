@@ -91,6 +91,13 @@ describe('floor 1 cave-in', () => {
     expect(src).toContain('maybeStartCaveIn');
     expect(src).toContain('leaveGameScreen()');
     expect(src).toContain('applyRubbleWall');
+    const builder = readFileSync(resolve(__dirname, '../src/proto3d/scene-builder.ts'), 'utf8');
+    expect(builder).toContain('makeRubbleGeometry');
+    expect(builder).toContain('buildWallFace');
+    expect(builder).toContain('lightGround');
+    const lighting = readFileSync(resolve(__dirname, '../src/proto3d/vertex-lighting.ts'), 'utf8');
+    expect(lighting).toContain('lightTileOf');
+    expect(lighting).toContain('lightGround');
     expect(src).toContain('playCaveIn()');
     expect(src).toContain('opening_cavein_2');
     expect(src).toContain('caveInClockStarted');

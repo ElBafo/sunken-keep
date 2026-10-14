@@ -27,7 +27,7 @@ import {
   TORCH_INTENSITY
 } from './constants';
 import { DressingMark } from './dressing';
-import { LightReach, partyReach, reachAt, sconceOrigin, sconceReach } from './light-grid';
+import { isLightPassable, LightReach, partyReach, reachAt, sconceOrigin, sconceReach } from './light-grid';
 import { FloorData, Sconce } from './types';
 
 interface CachedFace {
@@ -39,6 +39,7 @@ interface CachedFace {
   nearSconce: boolean;
   tileX: number;
   tileY: number;
+  lightGround: boolean;
 }
 
 interface SconceWorld {
@@ -195,14 +196,9 @@ export class VertexLightingManager {
     this.rebuildSconceWorld();
     const radiusTiles = SCONCE_RADIUS_TILES + 1;
     for (const face of this.faces) {
-      const tileX =
-        typeof face.mesh.userData.lightX === 'number'
-          ? face.mesh.userData.lightX
-          : Math.round(face.mesh.position.x / CELL_SIZE);
-      const tileY =
-        typeof face.mesh.userData.lightY === 'number'
-          ? face.mesh.userData.lightY
-          : Math.round(face.mesh.position.z / CELL_SIZE);
+      const { tileX, tileY } = this.lightTileOf(face.mesh);
+      face.tileX = tileX;
+      face.tileY = tileY;
       face.nearSconce = this.nearAnySconce(tileX, tileY, radiusTiles);
     }
     this.updateAllMeshes();
@@ -255,14 +251,7 @@ export class VertexLightingManager {
         worldPos[i * 3 + 2] = v.z;
       }
 
-      const tileX =
-        typeof obj.userData.lightX === 'number'
-          ? obj.userData.lightX
-          : Math.round(obj.position.x / CELL_SIZE);
-      const tileY =
-        typeof obj.userData.lightY === 'number'
-          ? obj.userData.lightY
-          : Math.round(obj.position.z / CELL_SIZE);
+      const { tileX, tileY } = this.lightTileOf(obj);
       const tile = this.floorData.tiles[tileY]?.[tileX];
       const isDark = tile?.floorNDark || false;
 
@@ -274,7 +263,8 @@ export class VertexLightingManager {
         isProp: !!obj.userData.lanternProp,
         nearSconce: this.nearAnySconce(tileX, tileY, radiusTiles),
         tileX,
-        tileY
+        tileY,
+        lightGround: !!obj.userData.lightGround || !!obj.userData.rubble
       });
     });
   }
@@ -451,14 +441,40 @@ export class VertexLightingManager {
     ];
   }
 
+  private lightTileOf(obj: THREE.Object3D): { tileX: number; tileY: number } {
+    let tileX =
+      typeof obj.userData.lightX === 'number'
+        ? obj.userData.lightX
+        : Math.round(obj.position.x / CELL_SIZE);
+    let tileY =
+      typeof obj.userData.lightY === 'number'
+        ? obj.userData.lightY
+        : Math.round(obj.position.z / CELL_SIZE);
+    if (!isLightPassable(this.floorData.tiles[tileY]?.[tileX])) {
+      const face = obj.userData.face as keyof typeof FACE_INTO_ROOM | undefined;
+      const into = face ? FACE_INTO_ROOM[face] : undefined;
+      if (into) {
+        const nx = (typeof obj.userData.cellX === 'number' ? obj.userData.cellX : tileX) + into.nx;
+        const ny = (typeof obj.userData.cellY === 'number' ? obj.userData.cellY : tileY) + into.nz;
+        if (isLightPassable(this.floorData.tiles[ny]?.[nx])) {
+          tileX = nx;
+          tileY = ny;
+        }
+      }
+    }
+    return { tileX, tileY };
+  }
+
   private bakeFace(face: CachedFace, flick: number) {
     const { worldPos, colors } = face;
     const n = colors.count;
+    const groundX = face.tileX * CELL_SIZE;
+    const groundZ = face.tileY * CELL_SIZE;
     for (let i = 0; i < n; i++) {
       const [r, g, b] = this.shadeVertex(
-        worldPos[i * 3],
-        worldPos[i * 3 + 1],
-        worldPos[i * 3 + 2],
+        face.lightGround ? groundX : worldPos[i * 3],
+        face.lightGround ? 0.08 : worldPos[i * 3 + 1],
+        face.lightGround ? groundZ : worldPos[i * 3 + 2],
         face.tileX,
         face.tileY,
         face.isDark,

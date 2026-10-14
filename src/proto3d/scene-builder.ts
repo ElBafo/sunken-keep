@@ -7,7 +7,7 @@ import {
   tileBedY
 } from './constants';
 import { DoorSystem } from './doors';
-import { makeWallGeometry, wallMidY } from './geometry';
+import { makeRubbleGeometry, makeWallGeometry, wallMidY } from './geometry';
 import { loadSpriteTexture } from './atlas';
 import { loadTextureCached } from './asset-cache';
 import { mapPool, SPRITE_LOAD_CONCURRENCY } from './load-pool';
@@ -49,6 +49,7 @@ export class SceneBuilder {
   private dustFrames: THREE.Texture[] = [];
   private rubbleMeshes: THREE.Mesh[] = [];
   private dustSprite: THREE.Sprite | null = null;
+  private worldGroup: THREE.Group | null = null;
   doors = new DoorSystem();
 
   async loadTextures(): Promise<void> {
@@ -210,6 +211,7 @@ export class SceneBuilder {
 
   buildScene(scene: THREE.Scene, floorData: FloorData) {
     const group = new THREE.Group();
+    this.worldGroup = group;
     this.buildFloorAndCeiling(group, floorData);
     this.buildWalls(group, floorData);
     scene.add(group);
@@ -299,7 +301,8 @@ export class SceneBuilder {
     dx: number,
     dz: number,
     face: 'N' | 'E' | 'S' | 'W',
-    tile: Tile
+    tile: Tile,
+    opts?: { texture?: THREE.Texture; rubble?: boolean }
   ) {
     const nx = x + dx;
     const nz = y + dz;
@@ -326,10 +329,10 @@ export class SceneBuilder {
       return;
     }
 
-    let texture: THREE.Texture = this.pick('wall_plain', x, y, face);
+    let texture: THREE.Texture = opts?.texture ?? this.pick('wall_plain', x, y, face);
     let cutout = false;
 
-    if (tile.secret) {
+    if (!opts?.texture && tile.secret) {
       if (tile.secretOpen) {
         texture = this.secretOpen!;
         cutout = true;
@@ -338,7 +341,7 @@ export class SceneBuilder {
       }
     }
 
-    const geo = makeWallGeometry();
+    const geo = opts?.rubble ? makeRubbleGeometry() : makeWallGeometry();
     const mat = new THREE.MeshBasicMaterial({
       map: texture,
       vertexColors: true,
@@ -366,10 +369,15 @@ export class SceneBuilder {
     wall.userData.lightX = nx;
     wall.userData.lightY = nz;
     wall.userData.face = face;
-    wall.userData.kind = tile.secret ? 'secret' : 'wall';
+    wall.userData.kind = tile.secret && !opts?.rubble ? 'secret' : 'wall';
     wall.userData.cellX = x;
     wall.userData.cellY = y;
+    if (opts?.rubble) {
+      wall.userData.rubble = true;
+      wall.userData.lightGround = true;
+    }
     group.add(wall);
+    return wall;
   }
 
   applyRubbleWall(scene: THREE.Scene, floorData: FloorData, x: number, y: number) {
@@ -377,11 +385,15 @@ export class SceneBuilder {
     if (!tile) return;
     tile.wall = true;
     this.clearRubble();
-    const group = new THREE.Group();
-    group.name = 'cave-in-rubble';
+    const group = this.worldGroup ?? new THREE.Group();
+    if (!this.worldGroup) {
+      group.name = 'cave-in-rubble';
+      scene.add(group);
+    }
     const tex = this.rubbleTex ?? this.pick('wall_plain', x, y, 'W');
     const wx = x * CELL_SIZE;
     const wz = y * CELL_SIZE;
+    const { tiles, width, height } = floorData;
     const faces: Array<{ dx: number; dz: number; face: 'N' | 'E' | 'S' | 'W' }> = [
       { dx: 0, dz: -1, face: 'N' },
       { dx: 1, dz: 0, face: 'E' },
@@ -389,42 +401,13 @@ export class SceneBuilder {
       { dx: -1, dz: 0, face: 'W' }
     ];
     for (const { dx, dz, face } of faces) {
-      const nx = x + dx;
-      const nz = y + dz;
-      const neighbor = floorData.tiles[nz]?.[nx];
-      if (!neighbor || occludesWallFace(neighbor)) continue;
-      const geo = makeWallGeometry();
-      const mat = new THREE.MeshBasicMaterial({
-        map: tex,
-        vertexColors: true,
-        side: THREE.DoubleSide
+      const mesh = this.buildWallFace(group, tiles, x, y, width, height, wx, wz, dx, dz, face, tile, {
+        texture: tex,
+        rubble: true
       });
-      const wall = new THREE.Mesh(geo, mat);
-      const midY = wallMidY();
-      if (face === 'N') {
-        wall.position.set(wx, midY, wz - CELL_SIZE / 2);
-        wall.rotation.y = 0;
-      } else if (face === 'E') {
-        wall.position.set(wx + CELL_SIZE / 2, midY, wz);
-        wall.rotation.y = Math.PI / 2;
-      } else if (face === 'S') {
-        wall.position.set(wx, midY, wz + CELL_SIZE / 2);
-        wall.rotation.y = Math.PI;
-      } else {
-        wall.position.set(wx - CELL_SIZE / 2, midY, wz);
-        wall.rotation.y = -Math.PI / 2;
-      }
-      wall.userData.lightX = nx;
-      wall.userData.lightY = nz;
-      wall.userData.face = face;
-      wall.userData.kind = 'wall';
-      wall.userData.rubble = true;
-      wall.userData.cellX = x;
-      wall.userData.cellY = y;
-      group.add(wall);
-      this.rubbleMeshes.push(wall);
+      if (mesh) this.rubbleMeshes.push(mesh);
     }
-    scene.add(group);
+    group.updateMatrixWorld(true);
   }
 
   setDustBurst(scene: THREE.Scene, x: number, y: number, frame: number | null) {

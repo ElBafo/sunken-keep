@@ -11,6 +11,9 @@ describe('slime buffer-source loops', () => {
     const audio = readFileSync(resolve(__dirname, '../src/proto3d/audio.ts'), 'utf8');
     expect(audio).toContain('createBufferSource');
     expect(audio).toMatch(/\.loop\s*=\s*true/);
+    expect(audio).toContain('loopStart');
+    expect(audio).toContain('loopEnd');
+    expect(audio).toContain('applyBufferLoopPoints');
     expect(audio).toContain('sfx_slime_gurgle_loop');
     expect(audio).toContain('music_slime_battle');
     expect(audio).not.toContain('HTMLAudioElement');

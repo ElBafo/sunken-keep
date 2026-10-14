@@ -25,7 +25,10 @@
   "chest": "sfx_chest",
   "scroll": "sfx_scroll",
   "slime_hurt": "sfx_slime_hurt",
-  "slime_gurgle_loop": "sfx_slime_gurgle_loop",
+  "slime_gurgle_loop": {
+   "file": "sfx_slime_gurgle_loop",
+   "loop": 5
+  },
   "slime_small_alert": "sfx_slime_small_alert",
   "slime_small_attack": "sfx_slime_small_attack",
   "slime_small_hurt": "sfx_slime_small_hurt",
@@ -313,7 +316,7 @@
   },
   "music_slime_battle": {
    "file": "music_slime_battle_loop",
-   "loop": true,
+   "loop": 24,
    "length_s": 24,
    "volume": 0.4
   }

@@ -8,9 +8,10 @@ import {
   FIRST_FIGHT_STEMS
 } from './floor1-sounds';
 
-type MusicEntry = { file?: string };
+type MusicEntry = { file?: string; loop?: boolean | number; length_s?: number };
+type SfxEntry = string | string[] | { file?: string; loop?: number };
 type AudioRegistry = {
-  sfx?: Record<string, string | string[]>;
+  sfx?: Record<string, SfxEntry>;
   music?: Record<string, MusicEntry>;
 };
 
@@ -71,14 +72,44 @@ export function audioStemKeys(stem: string): string[] {
   return keys;
 }
 
+function sfxFile(entry: SfxEntry | undefined): string | undefined {
+  if (typeof entry === 'string') return entry;
+  if (Array.isArray(entry)) return entry[0];
+  if (entry && typeof entry.file === 'string') return entry.file;
+  return undefined;
+}
+
 /** Registry key → on-disk stem. `music.music_slime_battle` → `music_slime_battle_loop`. */
 export function audioFileStem(stem: string): string {
   const music = REGISTRY.music?.[stem] ?? REGISTRY.music?.[stem.replace(/^music_/, '')];
   if (music?.file) return music.file;
   const sfxKey = stem.startsWith('sfx_') ? stem.slice(4) : stem;
-  const sfx = REGISTRY.sfx?.[sfxKey] ?? REGISTRY.sfx?.[stem];
-  if (typeof sfx === 'string') return sfx;
+  const file = sfxFile(REGISTRY.sfx?.[sfxKey] ?? REGISTRY.sfx?.[stem]);
+  if (file) return file;
   return stem;
+}
+
+function numericLoop(entry: MusicEntry | SfxEntry | undefined): number | undefined {
+  if (!entry || typeof entry === 'string' || Array.isArray(entry)) return undefined;
+  return typeof entry.loop === 'number' ? entry.loop : undefined;
+}
+
+/** True loop length (seconds) from the registry `loop` field, if present. */
+export function audioLoopLength(name: string): number | undefined {
+  const keys = [
+    name,
+    name.replace(/^music\./, ''),
+    name.replace(/^sfx_/, ''),
+    name.replace(/^music_/, ''),
+    `music_${name.replace(/^music\./, '').replace(/^music_/, '')}`
+  ];
+  for (const key of keys) {
+    const fromMusic = numericLoop(REGISTRY.music?.[key]);
+    if (fromMusic != null) return fromMusic;
+    const fromSfx = numericLoop(REGISTRY.sfx?.[key]);
+    if (fromSfx != null) return fromSfx;
+  }
+  return undefined;
 }
 
 export function audioStemPath(stem: string): string {

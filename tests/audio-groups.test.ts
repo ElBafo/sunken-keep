@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest';
 import {
   act1MusicStem,
   audioFileStem,
+  audioLoopLength,
   audioGroupRelPaths,
   audioGroupStems,
   audioStemKeys,
@@ -36,6 +37,9 @@ describe('audio load groups', () => {
     expect(audioStemKeys('music_act1_loop')).toContain('music_act1');
     expect(audioStemKeys('sfx_bark')).toContain('bark');
     expect(audioFileStem('music_slime_battle')).toBe('music_slime_battle_loop');
+    expect(audioFileStem('sfx_slime_gurgle_loop')).toBe('sfx_slime_gurgle_loop');
+    expect(audioLoopLength('music_slime_battle')).toBe(24);
+    expect(audioLoopLength('slime_gurgle_loop')).toBe(5);
     expect(audioStemPath('music_slime_battle')).toBe('audio/music_slime_battle_loop.mp3');
     expect(audioStemPath('sting_slime_lair')).toBe('audio/sting_slime_lair.mp3');
     expect(audioStemKeys('music_slime_battle')).toContain('music.music_slime_battle');

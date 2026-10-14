@@ -16,6 +16,7 @@ import { DressingMarks } from './dressing';
 import {
   act1MusicStem,
   audioGroupStems,
+  audioLoopLength,
   audioStemKeys,
   audioStemPath,
   beforePlayStems,
@@ -29,6 +30,7 @@ import { ACT1_MUSIC_FADE_MS, FIRST_FIGHT_CAP_MS } from './floor1-sounds';
 import { HERO_IDS } from '../core/types';
 import { isSlimeKind } from '../core/slime-frost';
 import { SLIME_SMALL_SFX_GAP_MS, slimeSmallPitchRate } from '../core/slime-pair';
+import { applyBufferLoopPoints, detectLoopStartSec } from './audio-loop';
 import { loadAudioCached } from './asset-cache';
 import { mapPool, SPRITE_LOAD_CONCURRENCY } from './load-pool';
 import { FloorData, Sconce } from './types';
@@ -51,6 +53,7 @@ export class AudioManager {
   listenerRig: THREE.Object3D;
   quality: QualityLevel;
   private buffers = new Map<string, AudioBuffer>();
+  private loopPoints = new WeakMap<AudioBuffer, { start: number; end: number }>();
   private uiSound: THREE.Audio | null = null;
   private ambientSound: THREE.Audio | null = null;
   private musicSound: THREE.Audio | null = null;
@@ -234,6 +237,11 @@ export class AudioManager {
   }
 
   private registerBuffer(stem: string, buf: AudioBuffer) {
+    const loopLen = audioLoopLength(stem);
+    if (loopLen != null && !this.loopPoints.has(buf)) {
+      const start = detectLoopStartSec(buf, loopLen);
+      this.loopPoints.set(buf, { start, end: start + loopLen });
+    }
     for (const key of audioStemKeys(stem)) {
       if (!this.buffers.has(key)) this.buffers.set(key, buf);
     }
@@ -1111,6 +1119,14 @@ export class AudioManager {
     const nextSrc = ctx.createBufferSource();
     nextSrc.buffer = buf;
     nextSrc.loop = true;
+    const points = this.loopPoints.get(buf);
+    if (points) {
+      nextSrc.loopStart = points.start;
+      nextSrc.loopEnd = points.end;
+    } else {
+      const loopLen = names.map(audioLoopLength).find((n): n is number => n != null);
+      if (loopLen != null) applyBufferLoopPoints(nextSrc, buf, loopLen);
+    }
     nextSrc.connect(nextGain);
     try {
       nextSrc.start();
