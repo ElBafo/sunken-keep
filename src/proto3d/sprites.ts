@@ -13,6 +13,7 @@ import { isSlimeKind, slimeFrostFramePath } from '../core/slime-frost';
 import {
   SLIME_PAIR_OFFSET_FRAC,
   SLIME_PAIR_SLIDE_MS,
+  livingPairVisual,
   slimePairSideSign,
   type SlimePairSlot
 } from '../core/slime-pair';
@@ -1270,17 +1271,19 @@ export class SpriteManager {
       }
       if (!s) {
         this.blockFloorSpawn(m.x, m.y);
+        const visual = livingPairVisual(m, monsters);
         const pair =
-          m.pairSlot && m.pairId ? { pairSlot: m.pairSlot, pairId: m.pairId } : undefined;
+          visual.pairSlot && m.pairId ? { pairSlot: visual.pairSlot, pairId: m.pairId } : undefined;
         s = (await this.addLiveMonster(scene, m.kind, m.x, m.y, m.id, feetY, pair)) ?? undefined;
       }
       if (!s) continue;
       s.hidden = false;
       s.disposed = false;
       s.dying = false;
-      s.pairSlot = m.pairSlot;
+      const visual = livingPairVisual(m, monsters);
+      s.pairSlot = visual.pairSlot;
       s.pairId = m.pairId;
-      s.pairSlide = m.pairSlot ? 1 : 0;
+      s.pairSlide = visual.pairSlide;
       s.object.visible = true;
       if (this.scene && !s.object.parent) this.scene.add(s.object);
       this.moveMonsterId(m.id, m.x, m.y);

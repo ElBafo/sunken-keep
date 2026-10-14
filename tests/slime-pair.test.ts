@@ -7,6 +7,7 @@ import {
   SLIME_SMALL_PAN,
   SLIME_SMALL_SFX_GAP_MS,
   SLIME_SMALL_STAGGER_SEC,
+  livingPairVisual,
   slimePairShiftPx,
   slimeSmallPitchRate
 } from '../src/core/slime-pair';
@@ -19,6 +20,20 @@ describe('slimeling pair layout and voices', () => {
     expect(Math.round(slimePairShiftPx('mid'))).toBe(18);
     expect(Math.round(slimePairShiftPx('far'))).toBe(14);
     expect(SLIME_SMALL_FRAME_W.close).toBe(82);
+  });
+
+  it('centres and unflips a lone survivor (restore / after mate death)', () => {
+    const left = { id: 'slime_small-11', pairSlot: 'left' as const, pairId: 'slime-7' };
+    const right = { id: 'slime_small-12', pairSlot: 'right' as const, pairId: 'slime-7', alive: false };
+    expect(livingPairVisual(left, [left, right])).toEqual({ pairSlot: undefined, pairSlide: 0 });
+    expect(livingPairVisual(left, [left, { ...right, alive: true }])).toEqual({
+      pairSlot: 'left',
+      pairSlide: 1
+    });
+    const main = readFileSync(resolve(__dirname, '../src/proto3d/main.ts'), 'utf8');
+    expect(main).toContain('syncSlimelingPans');
+    expect(main).toContain('livingPairVisual');
+    expect(main).toContain('setSlimelingPan(m.id, visual.pairSlot ? SLIME_SMALL_PAN[visual.pairSlot] : 0)');
   });
 
   it('staggers the second timer by 1.25s and pans left/right', () => {

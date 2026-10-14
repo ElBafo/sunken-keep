@@ -703,6 +703,10 @@ export class AudioManager {
     this.slimelingPan.set(id, pan);
   }
 
+  slimelingPanOf(id: string): number {
+    return this.slimelingPan.get(id) ?? 0;
+  }
+
   clearSlimelingPan(id?: string) {
     if (id) this.slimelingPan.delete(id);
     else this.slimelingPan.clear();

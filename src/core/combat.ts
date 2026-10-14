@@ -570,6 +570,14 @@ export class CombatEngine {
     return this.flush();
   }
 
+  debugKillId(id: string, now: number): CombatEvent[] {
+    this.events = [];
+    const m = this.monsters.find((mm) => mm.alive && mm.id === id);
+    if (!m) return [];
+    this.killMonster(m, now);
+    return this.flush();
+  }
+
   useHand(heroId: HeroId, hand: HandSlot, now: number, itemOverride?: string): CombatEvent[] {
     this.events = [];
     const hero = this.heroes[heroId];

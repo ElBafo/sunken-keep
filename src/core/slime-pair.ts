@@ -27,6 +27,19 @@ export function slimePairSideSign(slot: SlimePairSlot | null | undefined): numbe
   return 0;
 }
 
+/** Offset/flip only while the other slimeling of the pair is still alive. */
+export function livingPairVisual(
+  self: { id: string; pairSlot?: SlimePairSlot | null; pairId?: string | null },
+  roster: Array<{ id: string; alive?: boolean; pairId?: string | null }>
+): { pairSlot: SlimePairSlot | undefined; pairSlide: number } {
+  const mateAlive = !!(
+    self.pairId &&
+    roster.some((o) => o.alive !== false && o.id !== self.id && o.pairId === self.pairId)
+  );
+  if (self.pairSlot && mateAlive) return { pairSlot: self.pairSlot, pairSlide: 1 };
+  return { pairSlot: undefined, pairSlide: 0 };
+}
+
 export function slimeSmallPitchRate(semitone: number): number {
   return 2 ** (semitone / 12);
 }

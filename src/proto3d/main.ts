@@ -18,7 +18,7 @@ import {
 } from './constants';
 import { CombatEngine, HERO_IDS, openGrid, parseRules, Rng, type CombatEvent } from '../core';
 import { isSlimeKind, takeSlimeFrostBark } from '../core/slime-frost';
-import { SLIME_SMALL_PAN } from '../core/slime-pair';
+import { livingPairVisual, SLIME_SMALL_PAN } from '../core/slime-pair';
 import { Dressing } from './dressing';
 import {
   CaveInDirector,
@@ -542,6 +542,7 @@ class Game {
     this.enqueueMonsterWork(async () => {
       await this.spriteManager.syncLiveMonsters(this.renderer.scene, this.combat.monsters);
       this.darkFx.syncEyes(this.renderer.scene, this.spriteManager, this.combat.monsters, this.audioManager);
+      this.syncSlimelingPans();
     });
   }
 
@@ -1144,6 +1145,7 @@ class Game {
             }
             this.spriteManager.disposeMonsterId(e.from);
             this.darkFx.removeEyeById(e.from, this.audioManager);
+            if (tile) this.darkFx.removeFloorEyes('slime', tile.x, tile.y, this.audioManager);
             this.enqueueMonsterWork(async () => {
               for (const kid of e.kids) {
                 this.spriteManager.blockFloorSpawn(kid.x, kid.y);
@@ -1168,6 +1170,7 @@ class Game {
                 this.combat.monsters,
                 this.audioManager
               );
+              this.syncSlimelingPans();
             });
             this.syncSlimeAudio();
           }
@@ -2032,6 +2035,7 @@ class Game {
       carriedTorch: !!this.hud.carriedTorch()?.lit
     });
     this.syncSlimeAudio();
+    this.syncSlimelingPans();
   }
 
   canAutosave(): boolean {
@@ -2160,6 +2164,15 @@ class Game {
       .filter((m) => isSlimeKind(m.kind) && m.alive)
       .map((m) => ({ kind: m.kind, x: m.x, y: m.y }));
     this.audioManager?.syncSlimeLoops(slimes, !!this.combat.fight);
+  }
+
+  private syncSlimelingPans() {
+    this.audioManager?.clearSlimelingPan();
+    for (const m of this.combat.monsters) {
+      if (m.kind !== 'slime_small' || !m.alive) continue;
+      const visual = livingPairVisual(m, this.combat.monsters);
+      this.audioManager?.setSlimelingPan(m.id, visual.pairSlot ? SLIME_SMALL_PAN[visual.pairSlot] : 0);
+    }
   }
 
   private fireTileBark(x: number, y: number) {
@@ -2548,6 +2561,10 @@ class Game {
         this.spriteManager.hideMonster(x, y);
         this.spriteManager.layoutBillboards(this.player.x, this.player.y, this.player.dir);
         this.renderer.render();
+      },
+      killMonsterId: (id: string) => {
+        this.applyEvents(this.combat.debugKillId(id, this.nowSec()));
+        return !this.combat.monsters.some((m) => m.id === id && m.alive);
       },
       showMonster: (x: number, y: number) => {
         for (const s of this.spriteManager.sprites) {
@@ -2986,6 +3003,7 @@ class Game {
         return s ? { anim: s.anim, frame: s.currentFrame } : null;
       },
       whenMonstersSynced: () => this.monsterSync,
+      slimelingPan: (id: string) => this.audioManager.slimelingPanOf(id),
       pendingPerks: () => this.combat.pendingPerks.slice(),
       perkHooks: () => this.perkHooks.slice(),
       perkScreenOpen: () => this.perkScreenOpen,

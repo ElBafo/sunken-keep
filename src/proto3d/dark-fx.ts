@@ -300,8 +300,19 @@ export class DarkFx {
     for (const eye of this.eyes) {
       if (eye.monsterId !== id) continue;
       this.hideOne(eye, audio);
-      if (eye.liveAdded) drop.push(eye);
-      else eye.monsterId = undefined;
+      drop.push(eye);
+    }
+    this.dropEyes(drop);
+  }
+
+  /** Drop leftover floor eyes (split parent) so they do not linger unlinked. */
+  removeFloorEyes(kind: string, x: number, y: number, audio?: AudioManager) {
+    const drop: EyeSlot[] = [];
+    for (const eye of this.eyes) {
+      if (eye.monster !== kind || eye.x !== x || eye.y !== y) continue;
+      if (eye.liveAdded) continue;
+      this.hideOne(eye, audio);
+      drop.push(eye);
     }
     this.dropEyes(drop);
   }
@@ -361,14 +372,16 @@ export class DarkFx {
     audio?: AudioManager
   ) {
     const living = monsters.filter((m) => m.alive);
-    const livingIds = new Set(living.map((m) => m.id));
     const drop: EyeSlot[] = [];
     for (const eye of this.eyes) {
-      if (eye.monsterId && !livingIds.has(eye.monsterId)) {
-        this.hideOne(eye, audio);
-        if (eye.liveAdded) drop.push(eye);
-        else eye.monsterId = undefined;
-      }
+      const hasHost = living.some(
+        (m) =>
+          (eye.monsterId && m.id === eye.monsterId) ||
+          (!eye.monsterId && m.kind === eye.monster && m.x === eye.x && m.y === eye.y)
+      );
+      if (hasHost) continue;
+      this.hideOne(eye, audio);
+      drop.push(eye);
     }
     this.dropEyes(drop);
     for (const m of living) {

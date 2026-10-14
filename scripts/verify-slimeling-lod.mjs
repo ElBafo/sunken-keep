@@ -121,6 +121,54 @@ console.log('RAT', JSON.stringify(rat));
 await page.screenshot({ path: `${OUT}/keep-rat-from-10-3.png` });
 if (rat.visible) throw new Error('keep_rat-1 was drawn from (10,3)');
 
+const slimeEyes = await page.evaluate(() =>
+  window.__proto3d.darkFx().eyes.filter((e) => e.monster === 'slime')
+);
+console.log('PARENT_EYES', JSON.stringify(slimeEyes));
+if (slimeEyes.length) throw new Error(`parent slime eyes still listed: ${JSON.stringify(slimeEyes)}`);
+
+const survivor = await page.evaluate(async () => {
+  const proto = window.__proto3d;
+  const kid = proto.combatMonsters().find((m) => m.kind === 'slime_small' && m.alive);
+  proto.killMonsterId?.(kid.id);
+  await proto.whenMonstersSynced();
+  const live = proto.combatMonsters().find((m) => m.kind === 'slime_small' && m.alive);
+  proto.setPosition(live.x, live.y - 1, 2);
+  proto.saveToSlot(3);
+  return { killed: kid.id, live: live.id };
+});
+console.log('SURVIVOR_SAVE', JSON.stringify(survivor));
+await page.reload({ waitUntil: 'domcontentloaded' });
+await boot();
+const restored = await page.evaluate(async () => {
+  const proto = window.__proto3d;
+  await proto.loadFromSlot(3);
+  await proto.whenMonstersSynced();
+  const kids = proto.combatMonsters().filter((m) => m.kind === 'slime_small' && m.alive);
+  const kid = kids[0];
+  if (kid) proto.setPosition(kid.x, kid.y - 1, 2);
+  const sprite = proto.sprites().find((s) => s.monsterId === kid.id);
+  const eyes = proto.darkFx().eyes.filter((e) => e.monster === 'slime_small');
+  return {
+    kids: kids.length,
+    pairSlot: sprite?.pairSlot ?? null,
+    worldX: sprite?.worldX,
+    pan: proto.slimelingPan?.(kid.id),
+    eyes: eyes.map((e) => ({ id: e.monsterId, worldX: e.worldX, visible: e.visible })),
+    parentEyes: proto.darkFx().eyes.filter((e) => e.monster === 'slime')
+  };
+});
+console.log('SURVIVOR_RESTORE', JSON.stringify(restored));
+await page.screenshot({ path: `${OUT}/slimeling-survivor-restore.png` });
+if (restored.kids !== 1) throw new Error('expected one living slimeling after load');
+if (restored.pairSlot) throw new Error(`survivor still slotted ${restored.pairSlot}`);
+if (Math.abs((restored.worldX ?? 0) - 38) > 0.02) throw new Error(`survivor not centred: ${restored.worldX}`);
+if (restored.pan !== 0) throw new Error(`survivor pan ${restored.pan}, expected 0`);
+if (restored.eyes.some((e) => Math.abs((e.worldX ?? 0) - 38) > 0.02)) {
+  throw new Error(`survivor eyes not centred: ${JSON.stringify(restored.eyes)}`);
+}
+if (restored.parentEyes.length) throw new Error('parent slime eye returned after load');
+
 if (errors.length) console.log('PAGE_ERRORS', errors);
 console.log('OK');
 await browser.close();

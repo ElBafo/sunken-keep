@@ -17,6 +17,8 @@ describe('slimeling split / death / LOD', () => {
     expect(split).toContain('detachFloorMonsterAt');
     expect(split).toContain('addLiveMonster');
     expect(split).toContain('addEyeForHost');
+    expect(split).toContain('removeFloorEyes');
+    expect(split).toContain("removeFloorEyes('slime'");
     expect(sprites).toContain('disposeMonsterId');
     expect(sprites).toContain('retiredMonsterIds');
     expect(sprites).toContain('dropDuplicateMonsterSprites');
@@ -67,7 +69,15 @@ describe('slimeling split / death / LOD', () => {
     expect(eyeLiftFor('keep_rat', 0.25)).toBe(0.15);
     expect(dark).toContain('addEyeForHost');
     expect(dark).toContain('removeEyeById');
+    expect(dark).toContain('removeFloorEyes');
     expect(dark).toContain('syncEyes');
     expect(dark).toContain('host.object.position.x');
+    expect(dark).not.toMatch(/else eye\.monsterId = undefined/);
+  });
+
+  it('restores a lone slimeling centred, unflipped, with pan 0', () => {
+    expect(sprites).toContain('livingPairVisual');
+    expect(main).toContain('syncSlimelingPans');
+    expect(main).toContain('visual.pairSlot ? SLIME_SMALL_PAN[visual.pairSlot] : 0');
   });
 });
