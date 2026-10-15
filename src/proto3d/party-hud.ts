@@ -425,6 +425,14 @@ export class PartyHud {
       e.stopPropagation();
       onTap();
     });
+    if (onTap) {
+      // One event path: pointerup opens. Eat the iOS/WebKit compatibility click
+      // so it cannot retarget onto an overlay backdrop and dismiss it.
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+    }
     btn.addEventListener('pointercancel', clearPress);
     btn.addEventListener('pointerleave', clearPress);
     host.appendChild(btn);

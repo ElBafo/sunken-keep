@@ -1,8 +1,12 @@
 import type { StoryText } from './i18n';
 import type { LayoutMode } from './phone-layout';
 
+/** Ignore backdrop taps that are the browser's synthetic click after a touch open. */
+export const BACKDROP_CLOSE_GUARD_MS = 300;
+
 export class SettingsMenu {
   open = false;
+  private ignoreBackdropUntil = 0;
   private host: HTMLElement | null = null;
   private titleEl: HTMLElement | null = null;
   private labelEl: HTMLElement | null = null;
@@ -54,9 +58,8 @@ export class SettingsMenu {
       e.stopPropagation();
       this.hide();
     });
-    this.host.addEventListener('click', (e) => {
-      if (e.target === this.host) this.hide();
-    });
+    this.host.addEventListener('click', (e) => this.onBackdropClick(e));
+    this.host.addEventListener('pointerup', (e) => this.onBackdropClick(e));
     this.refreshLabels();
     this.refreshChoice();
   }
@@ -93,11 +96,22 @@ export class SettingsMenu {
     this.refreshChoice();
   }
 
+  private onBackdropClick(e: Event) {
+    if (e.target !== this.host) return;
+    if (performance.now() < this.ignoreBackdropUntil) {
+      e.preventDefault();
+      e.stopPropagation();
+      return;
+    }
+    this.hide();
+  }
+
   show() {
     this.mount();
     this.refreshLabels();
     this.refreshChoice();
     this.open = true;
+    this.ignoreBackdropUntil = performance.now() + BACKDROP_CLOSE_GUARD_MS;
     this.host?.removeAttribute('hidden');
     this.host?.classList.add('show');
     document.body.classList.add('settings-open');
