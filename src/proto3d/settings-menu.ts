@@ -98,8 +98,8 @@ export class SettingsMenu {
     this.refreshLabels();
     this.refreshChoice();
     this.open = true;
-    this.host?.classList.add('show');
     this.host?.removeAttribute('hidden');
+    this.host?.classList.add('show');
     document.body.classList.add('settings-open');
     this.playUi('ui_menu_open');
   }

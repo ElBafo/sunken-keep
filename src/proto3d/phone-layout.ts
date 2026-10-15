@@ -115,18 +115,28 @@ export function hudScaleFor(availW: number, availH: number): { scale: number; in
   return { scale: Math.max(0.5, overlayScale), integer: false, overlay: true };
 }
 
+/** Content box inside a border-box that already includes `pad` in clientWidth/Height. */
+export function contentBox(borderW: number, borderH: number, pad: SafeInsets): {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+} {
+  return {
+    x: pad.left,
+    y: pad.top,
+    w: Math.max(1, borderW - pad.left - pad.right),
+    h: Math.max(1, borderH - pad.top - pad.bottom)
+  };
+}
+
 export function measureEdgeLayout(
   cssW: number,
   cssH: number,
   safe: SafeInsets,
   dpr = 3
 ): EdgeLayoutMeasure {
-  const content = {
-    x: safe.left,
-    y: safe.top,
-    w: Math.max(1, cssW - safe.left - safe.right),
-    h: Math.max(1, cssH - safe.top - safe.bottom)
-  };
+  const content = contentBox(cssW, cssH, safe);
   const { scale, integer, overlay } = hudScaleFor(content.w, content.h);
   const hudW = Math.round(PANEL_DESIGN_W * scale);
   const hudH = Math.round(PANEL_DESIGN_H * scale);

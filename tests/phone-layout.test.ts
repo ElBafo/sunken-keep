@@ -3,6 +3,7 @@ import { resolve } from 'path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { gameStageScale, isCompactViewport } from '../src/proto3d/game-stage';
 import {
+  contentBox,
   hudScaleFor,
   IPHONE15,
   iphone15LandscapeEdge,
@@ -123,6 +124,11 @@ describe('iPhone 15 edge layout metrics', () => {
 });
 
 describe('measureEdgeLayout stays in the safe content box', () => {
+  it('subtracts safe-area padding from the letterbox client box', () => {
+    expect(contentBox(393, 852, IPHONE15.portraitSafe)).toEqual({ x: 0, y: 59, w: 393, h: 759 });
+    expect(contentBox(852, 393, IPHONE15.landscapeSafe)).toEqual({ x: 59, y: 0, w: 734, h: 372 });
+  });
+
   it('never places the HUD outside the content box', () => {
     const m = measureEdgeLayout(393, 852, IPHONE15.portraitSafe, 3);
     expect(m.hud.x).toBeGreaterThanOrEqual(m.content.x);

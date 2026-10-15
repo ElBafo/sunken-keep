@@ -3200,6 +3200,7 @@ class Game {
       layoutMode: () => getLayoutMode(),
       setLayoutMode: (mode: LayoutMode) => this.setLayoutMode(mode),
       settingsOpen: () => this.settingsMenu?.open === true,
+      toggleSettings: () => this.settingsMenu.toggle(),
       tryMoveForward: () => {
         const before = { x: this.player.x, y: this.player.y };
         const result = this.player.moveForward();

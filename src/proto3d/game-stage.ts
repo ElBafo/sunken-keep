@@ -1,6 +1,7 @@
 import { cropSpriteBlobUrl, loadSpriteImage } from './atlas';
 import {
   applyLayoutMode,
+  contentBox,
   getLayoutMode,
   hudScaleFor,
   PANEL_DESIGN_H,
@@ -78,8 +79,18 @@ function fitEdgeStage(): StageFit | null {
   const host = document.getElementById('game-letterbox') ?? document.body;
   if (!stage) return null;
 
-  const availW = Math.max(1, host.clientWidth);
-  const availH = Math.max(1, host.clientHeight);
+  const cs = getComputedStyle(host);
+  const pad = {
+    top: parseFloat(cs.paddingTop) || 0,
+    right: parseFloat(cs.paddingRight) || 0,
+    bottom: parseFloat(cs.paddingBottom) || 0,
+    left: parseFloat(cs.paddingLeft) || 0
+  };
+  // clientWidth/Height include padding; the stage is absolutely positioned
+  // against the padding edge, so it must sit inside the insets.
+  const content = contentBox(host.clientWidth, host.clientHeight, pad);
+  const availW = content.w;
+  const availH = content.h;
   const { scale: hudScale, overlay } = hudScaleFor(availW, availH);
   const hudW = Math.round(PANEL_DESIGN_W * hudScale);
   const hudH = Math.round(PANEL_DESIGN_H * hudScale);
@@ -87,8 +98,8 @@ function fitEdgeStage(): StageFit | null {
 
   stage.style.width = `${availW}px`;
   stage.style.height = `${availH}px`;
-  stage.style.left = '0px';
-  stage.style.top = '0px';
+  stage.style.left = `${Math.round(pad.left)}px`;
+  stage.style.top = `${Math.round(pad.top)}px`;
   stage.style.transform = 'none';
   stage.style.transformOrigin = 'top left';
   stage.style.imageRendering = 'pixelated';
@@ -137,7 +148,14 @@ function fitEdgeStage(): StageFit | null {
     containDesignBox(document.getElementById(id), GAME_STAGE_W, GAME_STAGE_H, availW, availH);
   }
 
-  return { scale: hudScale, left: 0, top: 0, width: availW, height: availH, mode: 'edge' };
+  return {
+    scale: hudScale,
+    left: Math.round(pad.left),
+    top: Math.round(pad.top),
+    width: availW,
+    height: availH,
+    mode: 'edge'
+  };
 }
 
 function containDesignBox(
