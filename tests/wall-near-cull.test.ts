@@ -166,8 +166,8 @@ function tapLampFromDesk(
   const lines = barks.filter((l) => l.trigger === hit.tile.bark);
   const bark = director.pick(hit.tile.bark!, lines, { nowMs, party, flags: new Set() });
   if (bark) return { kind: 'bark', speaker: bark.speaker, text: bark.text };
-  const sealed = log.find((l) => l.key === 'torch_capped')!;
-  return { kind: 'log', key: 'torch_capped', text: sealed.text };
+  const sealed = log.find((l) => l.key === 'lamp_sealed')!;
+  return { kind: 'log', key: 'lamp_sealed', text: sealed.text };
 }
 
 describe('shared wall-mount near-plane cull', () => {
@@ -214,8 +214,8 @@ describe('shared wall-mount near-plane cull', () => {
     const later = tapLampFromDesk(director, 100);
     expect(later.kind).toBe('log');
     if (later.kind !== 'log') return;
-    expect(later.key).toBe('torch_capped');
-    expect(later.text).toBe('Sealed. It\'ll take forge-fire to open.');
+    expect(later.key).toBe('lamp_sealed');
+    expect(later.text).toBe('Pell\'s lamp. Sealed tight. Not yet.');
   });
 
   it('keeps the jar rack visible from its own square facing west, not at rest generally hidden', () => {
@@ -334,7 +334,7 @@ describe('shared wall-mount near-plane cull', () => {
     const fn = main.slice(main.indexOf('private handleFacingProp'), main.indexOf('private wireTorchChoice'));
     expect(fn).toContain('interactPropAt');
     expect(fn).toContain("tile.prop === 'lamp_capped'");
-    expect(fn).toContain("this.storyLog('torch_capped')");
+    expect(fn).toContain("this.storyLog('lamp_sealed')");
     expect(fn).not.toMatch(/NearCull|group\.visible|objectNearPlaneCulled/);
   });
 });
