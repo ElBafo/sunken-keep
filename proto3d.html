@@ -472,33 +472,35 @@
     }
     #note-overlay {
       position: absolute;
-      left: 50%;
-      top: 18%;
-      transform: translate(-50%, 0);
-      width: 238px;
-      background: rgba(18, 14, 10, 0.92);
-      border: 1px solid #8a7348;
-      color: #e8e0d0;
-      font-family: monospace;
-      padding: 12px 14px 14px;
-      z-index: 280;
-      opacity: 0;
+      inset: 0;
+      z-index: 400;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(8, 6, 4, 0.62);
       pointer-events: none;
-      transition: opacity 0.15s;
+      touch-action: none;
     }
-    #note-overlay.show { opacity: 1; }
-    #note-title {
-      font-size: 13px;
-      letter-spacing: 0.06em;
-      color: #d4b56a;
-      margin-bottom: 12px;
+    #note-overlay.show {
+      display: flex;
+      pointer-events: auto;
     }
+    #note-canvas {
+      display: block;
+      width: 92%;
+      height: auto;
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+    }
+    #note-title,
     #note-text {
-      font-size: 14px;
-      line-height: 1.6;
-      letter-spacing: 0.02em;
-      word-spacing: 0.2em;
-      white-space: pre-wrap;
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
     }
   </style>
 </head>
@@ -526,10 +528,6 @@
         <canvas id="inventory-canvas"></canvas>
       </div>
       <div id="message-toast"></div>
-      <div id="note-overlay">
-        <div id="note-title"></div>
-        <div id="note-text"></div>
-      </div>
       <div id="oil-readout"></div>
       <div id="fps-counter">FPS: --</div>
       <div id="title-overlay">
@@ -544,6 +542,11 @@
           <canvas id="intro-canvas" width="270" height="480"></canvas>
         </div>
       </div>
+    </div>
+    <div id="note-overlay">
+      <canvas id="note-canvas" width="240" height="320"></canvas>
+      <div id="note-title"></div>
+      <div id="note-text"></div>
     </div>
   </div>
   <div id="gameover">

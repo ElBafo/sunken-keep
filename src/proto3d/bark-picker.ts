@@ -54,6 +54,8 @@ export interface BarkPickContext {
   forcedSpeaker?: string;
   /** Debug / explicit speaker: still never steal another hero's line, but skip flavour gaps. */
   skipRateLimits?: boolean;
+  /** Reader open: queue story/tutorial, drop flavour, do not play. */
+  held?: boolean;
 }
 
 export function lineId(line: BarkLine): string {
@@ -200,6 +202,12 @@ export class BarkDirector {
     const notLast = candidates.filter((l) => lineId(l) !== this.lastLineId);
     const pickFrom = notLast.length ? notLast : candidates;
     const chosen = pickRandom(pickFrom, this.rng);
+
+    if (ctx.held) {
+      if (tier === 'flavour') return null;
+      this.enqueueStory(chosen);
+      return null;
+    }
 
     if (tier !== 'flavour' && (speaking || this.storyQueue.length > 0)) {
       this.enqueueStory(chosen);

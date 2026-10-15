@@ -5,6 +5,7 @@ export interface BagEntry {
   item: string;
   count: number;
   from?: { hero: HeroId; hand: HandSlot };
+  journalPage?: number;
 }
 
 export interface PartySaveState {
@@ -38,7 +39,7 @@ export class PartyBag {
   }
 
   /** Add items. Returns how many were stored. */
-  add(id: string, count = 1, from?: BagEntry['from']): number {
+  add(id: string, count = 1, from?: BagEntry['from'], meta?: { journalPage?: number }): number {
     const item = normalizeItemId(id);
     let left = count;
     if (isStackable(item)) {
@@ -53,7 +54,9 @@ export class PartyBag {
     }
     while (left > 0 && this.slots.length < BAG_SLOTS) {
       const take = isStackable(item) ? Math.min(STACK_MAX, left) : 1;
-      this.slots.push({ item, count: take, from });
+      const entry: BagEntry = { item, count: take, from };
+      if (item === 'journal_page') entry.journalPage = meta?.journalPage ?? 1;
+      this.slots.push(entry);
       left -= take;
     }
     return count - left;

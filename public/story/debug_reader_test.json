@@ -1,0 +1,9 @@
+{
+  "_comment": "DEBUG ONLY. Load behind a test/debug flag; never place on any map. Covers every Greek accented and diaeresis capital, lowercase ΐ ΰ, «» and enough lines (24) to force scrolling.",
+  "id": "debug_reader_test",
+  "title": { "en": "Font Test Page", "el": "Σελίδα Δοκιμής" },
+  "body": {
+    "en": "Line 01: \"Quotes\" and 'apostrophes' check.\nLine 02: Brannoc says «hello» in Greek.\nLine 03: Numbers 0123456789.\nLine 04: Punctuation . , ; : ! ? - ( )\nLine 05: The quick brown fox jumps.\nLine 06: Over the lazy slimeling.\nLine 07: Mags wants dessert. Again.\nLine 08: Wren is behind you.\nLine 09: No, further behind.\nLine 10: Ilsevar hisses politely.\nLine 11: Scroll test continues.\nLine 12: Keep going.\nLine 13: Halfway there.\nLine 14: Still scrolling.\nLine 15: This is line fifteen.\nLine 16: Past the first page now.\nLine 17: If you can read this,\nLine 18: scrolling works.\nLine 19: Almost done.\nLine 20: Twenty lines.\nLine 21: Twenty-one.\nLine 22: Twenty-two.\nLine 23: Penultimate line.\nLine 24: End of test page.",
+    "el": "Γραμμή 01: Άλογο, Έλα, Ήλιος, Ίδιο.\nΓραμμή 02: Όχι, Ύπνος, Ώρα.\nΓραμμή 03: Διαλυτικά: Ϊ Ϋ ϊ ϋ.\nΓραμμή 04: Τόνος+διαλυτικά: ΐ ΰ.\nΓραμμή 05: Ο Μπράνοκ λέει «γεια».\nΓραμμή 06: «Μέσα» «σε» «εισαγωγικά».\nΓραμμή 07: Αριθμοί 0123456789.\nΓραμμή 08: Σημεία . , ; : ! - ( )\nΓραμμή 09: Ερωτηματικό; (ελληνικό)\nΓραμμή 10: Η Γλιτσούλα σε κοιτάει.\nΓραμμή 11: Ίσως πεινάει. Ίσως όχι.\nΓραμμή 12: Η Μαγκς θέλει γλυκό.\nΓραμμή 13: Πάλι.\nΓραμμή 14: Η Ρεν είναι πίσω σου.\nΓραμμή 15: Όχι, πιο πίσω.\nΓραμμή 16: Ο Ίλσεβαρ σφυρίζει.\nΓραμμή 17: Συνεχίζουμε το κύλισμα.\nΓραμμή 18: Αν το διαβάζεις αυτό,\nΓραμμή 19: η κύλιση δουλεύει.\nΓραμμή 20: Είκοσι γραμμές.\nΓραμμή 21: Ένα ακόμα: Ά Έ Ή Ί Ό Ύ Ώ.\nΓραμμή 22: Κεφαλαία: ΑΡΧΑΙΟ ΚΑΣΤΡΟ.\nΓραμμή 23: Προτελευταία γραμμή.\nΓραμμή 24: Τέλος σελίδας δοκιμής."
+  }
+}

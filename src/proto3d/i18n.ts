@@ -1,5 +1,6 @@
 import { fetchJsonCached } from './asset-cache';
 import type { BarkLine, BarkTier } from './bark-picker';
+import { isReadable, journalIntroKey, type ReadableDoc } from './items';
 
 /** Locale-aware story / UI text. English default; Greek via `?lang=el` or a saved setting. */
 
@@ -81,16 +82,18 @@ export class StoryText {
   private ui: Json = {};
   private title: Json = {};
   private note: Json = {};
+  private journal: Json = {};
 
   async load(locale: Locale = 'en') {
     this.locale = locale;
     const base = import.meta.env.BASE_URL;
-    const [log, names, ui, title, note, barks] = await Promise.all([
+    const [log, names, ui, title, note, journal, barks] = await Promise.all([
       this.fetchJson<LogEntry[]>(this.url(base, 'log.json', locale)),
       this.fetchJson<Json>(this.url(base, 'names.json', locale)),
       this.fetchJson<Json>(this.url(base, 'ui_text.json', locale)),
       this.fetchJson<Json>(this.url(base, 'title_text.json', locale)),
       this.fetchJson<Json>(this.url(base, 'note_lampkeeper.json', locale)),
+      this.fetchJson<Json>(this.url(base, 'journal_act1.json', locale)),
       this.fetchJson<Array<Record<string, unknown>>>(this.url(base, 'barks.json', locale))
     ]);
     this.logs.clear();
@@ -127,6 +130,7 @@ export class StoryText {
     this.ui = ui ?? {};
     this.title = title ?? {};
     this.note = note ?? {};
+    this.journal = journal ?? {};
   }
 
   /**
@@ -183,6 +187,37 @@ export class StoryText {
 
   noteText(): string {
     return typeof this.note.text === 'string' ? this.note.text : '';
+  }
+
+  journalLines(page: number): string[] {
+    const pages = this.journal.pages;
+    if (!pages || typeof pages !== 'object') return [];
+    const entry = (pages as Json)[String(page)];
+    if (!entry || typeof entry !== 'object') return [];
+    const lines = (entry as Json).lines;
+    if (!Array.isArray(lines)) return [];
+    return lines.filter((l): l is string => typeof l === 'string');
+  }
+
+  lampkeeperNote(): ReadableDoc {
+    return {
+      kind: 'note',
+      id: 'note_lampkeeper',
+      title: this.noteTitle(),
+      text: this.noteText()
+    };
+  }
+
+  readableItem(item: string, journalPage?: number): ReadableDoc | null {
+    if (!isReadable(item)) return null;
+    const page = journalPage && journalPage > 0 ? journalPage : 1;
+    const intro = this.log(journalIntroKey(page));
+    return {
+      kind: 'journal',
+      id: `journal_page_${page}`,
+      title: intro || this.itemName(item),
+      text: this.journalLines(page).join('\n')
+    };
   }
 
   titleText(path: string, vars?: Record<string, string | number>): string {

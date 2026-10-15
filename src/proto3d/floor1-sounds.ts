@@ -30,6 +30,7 @@ export const BEFORE_PLAY_STEMS = [
   'sfx_ui_turn',
   'sfx_ui_log_line',
   'sfx_bark',
+  'sfx_scroll',
   'sfx_lantern_loop',
   'sfx_lantern_ember_loop',
   'sfx_cave_in'

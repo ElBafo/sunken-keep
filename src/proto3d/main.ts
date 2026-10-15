@@ -80,7 +80,23 @@ import { PartyHud, type GearId, type HandSlot } from './party-hud';
 import type { HeroId } from '../constants';
 import { PartyBag } from './bag';
 import { InventoryUi } from './inventory-ui';
-import { canEquip, equipSfx, pickupSfx, preferredHand } from './items';
+import {
+  canEquip,
+  equipSfx,
+  isReadable,
+  isSilentLogKey,
+  journalIntroKey,
+  journalTriggerId,
+  NOTE_SCROLL_SFX,
+  pickupSfx,
+  preferredHand
+} from './items';
+import {
+  DEBUG_READER_NOTE_PATH,
+  debugReaderRequested,
+  NoteReader,
+  type DebugReaderNote
+} from './note-reader';
 import { atlasFallbackPaths, coveredSingleFileLoads, ensureAtlases, recordedPngRelPaths } from './atlas';
 import { fetchJsonCached } from './asset-cache';
 import {
@@ -91,6 +107,7 @@ import {
   type BarkPartyMember,
   type BarkRules
 } from './bark-picker';
+import { GameClock } from './reader-pause';
 
 const FLOOR_NUMBER = 1;
 const FLOOR_SCONCE_DEFAULTS = floor1Sconces.map((s) => ({ ...s }));
@@ -124,6 +141,7 @@ class Game {
   private swapTimer: ReturnType<typeof setTimeout> | null = null;
   bag = new PartyBag();
   inventory!: InventoryUi;
+  noteReader!: NoteReader;
   private pendingPotion: 'potion_red' | 'potion_blue' | 'potion_green' | null = null;
   private lootSnap: Array<{ x: number; y: number; item?: string; chest?: boolean; chestItems?: string[]; chestOpen?: boolean }> = [];
   lastMessage = '';
@@ -133,6 +151,9 @@ class Game {
   private flankTimer: ReturnType<typeof setTimeout> | null = null;
   lampNote = { title: '', text: '' };
   noteOpen = false;
+  private wantDebugReader = false;
+  private gameClock = new GameClock();
+  private heldCombatLogs: string[] = [];
   interactCount = 0;
   messageTimer = 0;
 
@@ -213,6 +234,7 @@ class Game {
     this.oil = loadProgress(floor1Sconces, this.persist && params.get('test') === '1');
     persistStorage();
     this.skipTitle = params.get('test') === '1' && params.get('title') !== '1';
+    this.wantDebugReader = debugReaderRequested(params);
 
     this.fitStage();
     void applyLetterboxStone();
@@ -417,9 +439,11 @@ class Game {
       onClose: () => this.closeBag(),
       playUi: (name) => this.audioManager?.playUi(name)
     });
+    this.noteReader = new NoteReader(() => this.hideNote());
     const atlases = ensureAtlases();
     const hudReady = this.hud.load();
     void this.inventory.load();
+    void this.noteReader.load();
     if (this.bubble) void this.bubble.load();
 
     this.sceneBuilder = new SceneBuilder();
@@ -621,10 +645,10 @@ class Game {
     btn.classList.toggle('visible', !!this.doorAhead());
   }
 
-  showMessage(text: string, prompt = false) {
+  showMessage(text: string, prompt = false, opts?: { silent?: boolean }) {
     if (!text) return;
     this.lastMessage = text;
-    this.hud?.pushLog(text);
+    this.hud?.pushLog(text, opts);
     if (!prompt) return;
     const el = document.getElementById('message-toast');
     if (!el) return;
@@ -760,7 +784,8 @@ class Game {
     if (tile.chest && !tile.chestOpen) return this.lootChest(x, y, tile);
     if (!tile.item) return false;
     const id = tile.item === 'oil' ? 'oil_flask' : tile.item;
-    const added = this.bag.add(id);
+    const meta = id === 'journal_page' ? { journalPage: tile.journalPage ?? 1 } : undefined;
+    const added = this.bag.add(id, 1, undefined, meta);
     if (!added) {
       this.showPrompt(this.storyLog('bag_full'));
       this.audioManager.playUi('item_use_fail');
@@ -771,7 +796,7 @@ class Game {
     this.darkFx.hideItemAt(x, y);
     this.syncKeyFlag();
     this.audioManager.playUi(pickupSfx(id));
-    const key = id === 'oil_flask' ? 'oil_pickup' : `pickup_${id}`;
+    const key = id === 'oil_flask' ? 'oil_pickup' : id === 'journal_page' ? 'pickup_scroll' : `pickup_${id}`;
     const named = this.storyLog(key);
     this.showMessage(named || this.storyLog('pickup_item', { item: this.story.itemName(id) }));
     this.inventory?.redraw();
@@ -819,6 +844,7 @@ class Game {
   closeBag() {
     if (!this.inventory?.open) return;
     this.clearPotionPick();
+    this.hideNote();
     this.inventory.hide();
   }
 
@@ -855,6 +881,10 @@ class Game {
         this.drinkBagSlot(this.inventory.selected, hero);
         return;
       }
+      if (slot && isReadable(slot.item)) {
+        this.useBagSlot(this.inventory.selected);
+        return;
+      }
       if (this.inventory.equipPick) this.equipBagSlot(this.inventory.selected, hero);
     }
   }
@@ -887,6 +917,10 @@ class Game {
   useBagSlot(index: number) {
     const slot = this.bag.slots[index];
     if (!slot) return;
+    if (isReadable(slot.item)) {
+      this.readBagSlot(index);
+      return;
+    }
     if (slot.item === 'potion_red' || slot.item === 'potion_blue' || slot.item === 'potion_green') {
       this.beginPotionPick(slot.item);
       return;
@@ -1026,8 +1060,12 @@ class Game {
     if (goFloor) goFloor.textContent = this.story.uiText('game_over.load_floor', { n: FLOOR_NUMBER });
   }
 
-  private nowSec() {
-    return performance.now() / 1000;
+  private nowMs(wall = performance.now()) {
+    return this.gameClock.nowMs(wall);
+  }
+
+  private nowSec(wall = performance.now()) {
+    return this.gameClock.nowSec(wall);
   }
 
   private async initCombat(params: URLSearchParams) {
@@ -1074,7 +1112,7 @@ class Game {
     for (const id of HERO_IDS) {
       this.hud.syncHero(id, this.combat.heroes[id]);
     }
-    this.hud.draw(performance.now());
+    this.hud.draw(this.nowMs());
   }
 
   private logVars(vars?: Record<string, string | number>) {
@@ -1089,8 +1127,21 @@ class Game {
   private combatLog(key: string, vars?: Record<string, string | number>) {
     const text = this.story.log(key, this.logVars(vars));
     if (!text) return;
+    if (this.noteOpen) {
+      this.heldCombatLogs.push(text);
+      return;
+    }
     this.lastMessage = text;
     this.hud?.pushLog(text);
+  }
+
+  private flushHeldCombatLogs() {
+    const held = this.heldCombatLogs;
+    this.heldCombatLogs = [];
+    for (const text of held) {
+      this.lastMessage = text;
+      this.hud?.pushLog(text);
+    }
   }
 
   private applyEvents(events: CombatEvent[]) {
@@ -1347,23 +1398,66 @@ class Game {
     this.lampNote.text = this.story.noteText();
   }
 
-  showNote() {
-    const text = this.lampNote.text;
-    this.lastMessage = text;
-    const overlay = document.getElementById('note-overlay');
+  private async openDebugReaderNote() {
+    const base = import.meta.env.BASE_URL;
+    try {
+      await this.noteReader?.load();
+      const doc = await fetchJsonCached<DebugReaderNote>(`${base}${DEBUG_READER_NOTE_PATH}`);
+      if (!doc?.title || !doc?.body) return;
+      const loc = this.story.locale === 'el' ? 'el' : 'en';
+      const title = doc.title[loc] || doc.title.en;
+      const text = doc.body[loc] || doc.body.en;
+      this.showNote(title, text);
+    } catch {
+      // Debug-only path; ignore a missing fixture.
+    }
+  }
+
+  showNote(title?: string, text?: string) {
+    const docTitle = title ?? this.lampNote.title;
+    const docText = text ?? this.lampNote.text;
+    this.lampNote = { title: docTitle, text: docText };
+    this.lastMessage = docText;
     const titleEl = document.getElementById('note-title');
     const textEl = document.getElementById('note-text');
-    if (titleEl) titleEl.textContent = this.lampNote.title;
-    if (textEl) textEl.textContent = text.replace(/\. /g, '.\n');
-    if (overlay) overlay.classList.add('show');
+    if (titleEl) titleEl.textContent = docTitle;
+    if (textEl) textEl.textContent = docText;
+    this.noteReader?.show(docTitle, docText);
+    document.getElementById('note-overlay')?.classList.add('show');
     document.getElementById('message-toast')?.classList.remove('show');
     this.noteOpen = true;
-    this.messageTimer = performance.now() + 6000;
+    this.gameClock.pause();
+    this.audioManager?.setReaderOpen(true);
+    this.audioManager?.playUi(NOTE_SCROLL_SFX);
   }
 
   hideNote() {
+    const wasOpen = this.noteOpen;
+    this.noteReader?.hide();
     document.getElementById('note-overlay')?.classList.remove('show');
     this.noteOpen = false;
+    if (!wasOpen) return;
+    this.gameClock.resume();
+    this.audioManager?.setReaderOpen(false);
+    this.flushHeldCombatLogs();
+    this.flushBarks(performance.now());
+  }
+
+  private readBagSlot(index: number) {
+    const slot = this.bag.slots[index];
+    if (!slot || !isReadable(slot.item)) return;
+    const doc = this.story.readableItem(slot.item, slot.journalPage);
+    if (!doc) return;
+    if (doc.kind === 'journal') {
+      const page = slot.journalPage && slot.journalPage > 0 ? slot.journalPage : 1;
+      const introKey = journalIntroKey(page);
+      if (this.storyProgress.fire(introKey)) {
+        this.showMessage(this.storyLog(introKey), false, { silent: isSilentLogKey(introKey) });
+      }
+      this.storyProgress.fire(journalTriggerId(page));
+      this.rememberStoryKey(journalTriggerId(page));
+    }
+    this.showNote(doc.title, doc.text);
   }
 
   readFacingDesk(): boolean {
@@ -1386,8 +1480,8 @@ class Game {
     this.storyProgress.fire('note_lampkeeper');
     this.flags.add('note_lampkeeper');
     this.rememberStoryKey('note_lampkeeper');
-    this.rememberStoryKey('journal_page_1');
-    this.showNote();
+    const doc = this.story.lampkeeperNote();
+    this.showNote(doc.title, doc.text);
     return true;
   }
 
@@ -1469,6 +1563,11 @@ class Game {
       return;
     }
     this.interactCount += 1;
+    if (this.noteOpen) {
+      this.hideNote();
+      this.messageTimer = 0;
+      return;
+    }
     if (this.inventory?.open) {
       if (this.inventory.selected >= 0) {
         this.useBagSlot(this.inventory.selected);
@@ -1701,6 +1800,7 @@ class Game {
   }
 
   useHand(hero: HeroId, hand: HandSlot): boolean {
+    if (this.noteOpen) return false;
     if (!this.combat || this.combat.gameOver) return false;
     this.syncEquipmentToCombat();
     const before = this.hud.handTapCount;
@@ -2121,7 +2221,8 @@ class Game {
       flags: this.flags,
       act: 1,
       forcedSpeaker,
-      skipRateLimits: !!forcedSpeaker
+      skipRateLimits: !!forcedSpeaker,
+      held: this.noteOpen
     });
     if (!picked) return false;
     this.lastBarkTrigger = trigger;
@@ -2139,6 +2240,7 @@ class Game {
   }
 
   private flushBarks(nowMs: number) {
+    if (this.noteOpen) return;
     const picked = this.barkDirector.flush(nowMs);
     if (picked) this.deliverBark(picked);
   }
@@ -2335,6 +2437,7 @@ class Game {
       this.pendingStartSnapshot = false;
     }
     this.audioManager.crossfadeToAct1();
+    if (this.wantDebugReader) void this.openDebugReaderNote();
     if (this.wantOpeningCaveIn) {
       this.wantOpeningCaveIn = false;
       this.maybeStartCaveIn(this.skipTitle);
@@ -2717,6 +2820,8 @@ class Game {
       partyState: () => this.combat.partyState(),
       lastNote: () => this.lampNote,
       noteOpen: () => this.noteOpen,
+      noteScroll: () => this.noteReader?.scroll ?? 0,
+      noteMaxScroll: () => this.noteReader?.maxScroll() ?? 0,
       getOil: () => this.oil,
       setOil: (n: number) => this.setOil(n),
       getBright: () => this.bright,
@@ -2774,8 +2879,8 @@ class Game {
       carriedTorch: () => this.hud.carriedTorch(),
       hasCarriedTorchLight: () => this.vertexLighting.hasCarriedTorch(),
       getBag: () => this.bag.serialize(),
-      giveItem: (id: string, n = 1) => {
-        this.bag.add(id, n);
+      giveItem: (id: string, n = 1, journalPage?: number) => {
+        this.bag.add(id, n, undefined, journalPage != null ? { journalPage } : undefined);
         this.syncKeyFlag();
         this.inventory?.redraw();
       },
@@ -3143,34 +3248,37 @@ class Game {
       return;
     }
 
-    const prevX = this.player.x;
-    const prevY = this.player.y;
-    this.player.update(deltaTime);
+    const paused = this.noteOpen || this.gameClock.paused;
+    if (!paused) {
+      const prevX = this.player.x;
+      const prevY = this.player.y;
+      this.player.update(deltaTime);
 
-    if (this.combat) {
-      this.combat.setPartyPos(this.player.x, this.player.y, this.player.dir);
-    }
+      if (this.combat) {
+        this.combat.setPartyPos(this.player.x, this.player.y, this.player.dir);
+      }
 
-    if (this.player.x !== prevX || this.player.y !== prevY) {
-      this.combat?.noteStep(this.nowSec());
-      this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
-      this.vertexLighting.updateAllMeshes(this.renderer.scene);
-      this.audioManager.checkBones(this.player.x, this.player.y);
-      this.updateDoorButton();
-    }
+      if (this.player.x !== prevX || this.player.y !== prevY) {
+        this.combat?.noteStep(this.nowSec());
+        this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
+        this.vertexLighting.updateAllMeshes(this.renderer.scene);
+        this.audioManager.checkBones(this.player.x, this.player.y);
+        this.updateDoorButton();
+      }
 
-    if (this.combat && !this.combat.gameOver && this.isCombatAwake()) {
-      this.applyEvents(this.combat.tick(this.nowSec()));
-    }
+      if (this.combat && !this.combat.gameOver && this.isCombatAwake()) {
+        this.applyEvents(this.combat.tick(this.nowSec()));
+      }
 
-    if (this.pendingUnlock && now >= this.doorUnlockTimer) {
-      const { x, y } = this.pendingUnlock;
-      this.pendingUnlock = null;
-      const visual = this.sceneBuilder.doors.get(x, y);
-      if (visual) {
-        this.sceneBuilder.doors.startSlide(visual, true, now);
-        this.audioManager.playDoor('door_open', x, y);
-        this.vertexLighting.relight();
+      if (this.pendingUnlock && now >= this.doorUnlockTimer) {
+        const { x, y } = this.pendingUnlock;
+        this.pendingUnlock = null;
+        const visual = this.sceneBuilder.doors.get(x, y);
+        if (visual) {
+          this.sceneBuilder.doors.startSlide(visual, true, now);
+          this.audioManager.playDoor('door_open', x, y);
+          this.vertexLighting.relight();
+        }
       }
     }
 
@@ -3185,15 +3293,16 @@ class Game {
     this.torches.update(now, this.player.x, this.player.y, this.player.dir);
     this.spriteManager.update(now, this.player.x, this.player.y, this.player.dir);
     this.darkFx.update(now, this.vertexLighting, this.spriteManager, this.audioManager, this.player.x, this.player.y);
-    this.fireSlimeReveal();
     this.vertexLighting.setFlickerTime(now);
-    this.hud?.draw(now);
-    this.updateCaveIn(now);
+    this.hud?.draw(this.nowMs());
+    if (!paused) {
+      this.fireSlimeReveal();
+      this.updateCaveIn(now);
+    }
 
     if (this.messageTimer && now >= this.messageTimer) {
       this.messageTimer = 0;
       document.getElementById('message-toast')?.classList.remove('show');
-      this.hideNote();
     }
 
     this.renderer.render();
