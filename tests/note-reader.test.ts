@@ -31,6 +31,10 @@ import {
   NOTE_PAGE_H,
   NOTE_PAGE_W,
   NOTE_VIEWPORT_RATIO,
+  PARCHMENT_META_PATH,
+  PARCHMENT_PAGE_PATH,
+  parchmentColours,
+  parchmentMargins,
   noteOverlayRect,
   noteVisibleRange,
   wrapNoteText,
@@ -124,8 +128,10 @@ describe('pixel font coverage', () => {
     expect(fontMeta.glyphs['»']).toEqual({ x: 48, y: 100 });
     expect(fontMeta.glyphs['ά']).toBeTruthy();
     expect(fontMeta.glyphs['Ό']).toMatchObject({ x: 32, y: 110, w: 7, advance: 8 });
+    expect(fontMeta.glyphs['Ά']).toMatchObject({ x: 0, y: 110, w: 7, advance: 8 });
     expect(glyphAdvance('Ά', fontMeta.glyphs)).toBe(8);
     expect(glyphAdvance('Α', fontMeta.glyphs)).toBe(6);
+    expect(measureFontWidth('ΆΑ', fontMeta.glyphs)).toBe(14);
     expect(missingFontGlyphs(sample, fontMeta.glyphs)).toEqual([]);
   });
 
@@ -179,12 +185,36 @@ describe('note reader layout', () => {
     expect(desktop.w / desktop.h).toBeCloseTo(NOTE_PAGE_W / NOTE_PAGE_H, 2);
   });
 
-  it('draws a procedural parchment panel instead of item_journal_page_near.png', () => {
+  it('draws parchment_page.png with parchment.json margins and colours, not the 9-slice', () => {
+    const parchment = readJson<{
+      page: string;
+      pageSize: [number, number];
+      textArea: { left: number; right: number; top: number; bottom: number };
+      textColours: { body: string; title: string };
+    }>(PARCHMENT_META_PATH);
+    expect(PARCHMENT_PAGE_PATH).toBe('art/ui/reader/parchment_page.png');
+    expect(parchment.page).toBe('parchment_page.png');
+    expect(parchment.pageSize).toEqual([NOTE_PAGE_W, NOTE_PAGE_H]);
+    expect(parchmentMargins(parchment)).toEqual({
+      left: NOTE_MARGIN_LEFT,
+      right: NOTE_MARGIN_RIGHT,
+      top: NOTE_MARGIN_TOP,
+      bottom: NOTE_MARGIN_BOTTOM
+    });
+    expect(parchmentColours(parchment)).toEqual({
+      title: parchment.textColours.title,
+      body: parchment.textColours.body
+    });
+    const laid = layoutNote('Title', 'Body', fontMeta.glyphs, parchment);
+    expect(laid.textRect.x).toBe(parchment.textArea.left);
+    expect(laid.textRect.y).toBe(parchment.textArea.top);
     expect(typeof drawParchmentPanel).toBe('function');
     expect(noteReaderSrc).toContain('export function drawParchmentPanel');
+    expect(noteReaderSrc).toContain('PARCHMENT_PAGE_PATH');
+    expect(noteReaderSrc).toContain('imageSmoothingEnabled = false');
+    expect(noteReaderSrc).not.toContain('parchment_9slice');
     expect(noteReaderSrc).not.toContain('item_journal_page');
     expect(htmlSrc).toMatch(/#note-overlay[\s\S]*rgba\(8,\s*6,\s*4/);
-    expect(htmlSrc.indexOf('id="note-overlay"')).toBeGreaterThan(htmlSrc.indexOf('</div>\n    <div id="note-overlay">') - 1);
     expect(htmlSrc).toMatch(/<div id="game-stage">[\s\S]*<\/div>\s*<div id="note-overlay">/);
   });
 });

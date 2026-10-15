@@ -21,17 +21,42 @@ export const NOTE_ADVANCE = 6;
 export const NOTE_LINE_H = 10 * NOTE_FONT_SCALE;
 export const DEBUG_READER_NOTE_PATH = 'story/debug_reader_test.json';
 export const DEBUG_READER_QUERY = 'debug=reader';
+export const PARCHMENT_META_PATH = 'art/ui/reader/parchment.json';
+export const PARCHMENT_PAGE_PATH = 'art/ui/reader/parchment_page.png';
 
-const TITLE_COLOUR = '#5a1810';
-const BODY_COLOUR = '#3a2418';
+const DEFAULT_TITLE_COLOUR = '#5a1810';
+const DEFAULT_BODY_COLOUR = '#3a2418';
 const SHADOW = { colour: '#cbb892', dx: 2, dy: 2 };
+const PARCHMENT_FALLBACK_FILL = '#e2d2ac';
 
-const PARCHMENT_FILL = '#e6d4a8';
-const PARCHMENT_FILL_INNER = '#eedbb4';
-const PARCHMENT_EDGE = '#6b3418';
-const PARCHMENT_EDGE_DARK = '#3d1c0a';
-const PARCHMENT_GRAIN_DARK = 'rgba(90, 48, 18, 0.08)';
-const PARCHMENT_GRAIN_LIGHT = 'rgba(255, 244, 214, 0.07)';
+export interface ParchmentMeta {
+  page?: string;
+  pageSize?: [number, number];
+  textArea?: { left: number; right: number; top: number; bottom: number; note?: string };
+  textColours?: { body: string; title: string };
+}
+
+export function parchmentMargins(meta?: ParchmentMeta | null): {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+} {
+  const t = meta?.textArea;
+  return {
+    left: t?.left ?? NOTE_MARGIN_LEFT,
+    right: t?.right ?? NOTE_MARGIN_RIGHT,
+    top: t?.top ?? NOTE_MARGIN_TOP,
+    bottom: t?.bottom ?? NOTE_MARGIN_BOTTOM
+  };
+}
+
+export function parchmentColours(meta?: ParchmentMeta | null): { title: string; body: string } {
+  return {
+    title: meta?.textColours?.title ?? DEFAULT_TITLE_COLOUR,
+    body: meta?.textColours?.body ?? DEFAULT_BODY_COLOUR
+  };
+}
 
 export interface NotePageRect {
   x: number;
@@ -87,68 +112,24 @@ export function noteOverlayRect(viewW: number, viewH: number): NotePageRect {
   };
 }
 
-function hash2(x: number, y: number): number {
-  let n = Math.imul(x * 374761393 + y * 668265263, 1);
-  n = Math.imul(n ^ (n >>> 13), 1274126177);
-  return ((n >>> 0) % 1000) / 1000;
-}
-
-function jog(x: number, y: number): number {
-  return ((x * 47 + y * 31) % 5) - 2;
-}
-
 /**
- * Warm parchment with a burnt edge, slightly ragged corners, and grain.
- * Swap this function for a painted asset later without touching layout or text.
+ * Draw the painted full-page parchment (`parchment_page.png`), never the 9-slice.
+ * Isolated so the sheet can be swapped without touching layout or text.
  */
-export function drawParchmentPanel(ctx: CanvasRenderingContext2D, rect: NotePageRect): void {
+export function drawParchmentPanel(
+  ctx: CanvasRenderingContext2D,
+  rect: NotePageRect,
+  image?: HTMLImageElement | null
+): void {
   const { x, y, w, h } = rect;
-  if (w < 8 || h < 8) return;
-  ctx.save();
-  ctx.beginPath();
-  ctx.moveTo(x + 4 + jog(x, y), y + 1);
-  for (let i = 10; i < w - 4; i += 9) {
-    ctx.lineTo(x + i, y + Math.max(0, jog(x + i, y)));
+  if (w < 1 || h < 1) return;
+  ctx.imageSmoothingEnabled = false;
+  if (image && image.width > 0 && image.height > 0) {
+    ctx.drawImage(image, 0, 0, image.width, image.height, x, y, w, h);
+    return;
   }
-  ctx.lineTo(x + w - 2, y + 3 + jog(x + w, y));
-  for (let i = 12; i < h - 4; i += 11) {
-    ctx.lineTo(x + w - 1 + Math.min(1, jog(x + w, y + i)), y + i);
-  }
-  ctx.lineTo(x + w - 4, y + h - 1);
-  for (let i = w - 12; i > 4; i -= 8) {
-    ctx.lineTo(x + i, y + h - 1 - Math.max(0, jog(x + i, y + h)));
-  }
-  ctx.lineTo(x + 2, y + h - 3);
-  for (let i = h - 14; i > 6; i -= 10) {
-    ctx.lineTo(x + Math.max(0, jog(x, y + i)), y + i);
-  }
-  ctx.closePath();
-  ctx.fillStyle = PARCHMENT_FILL;
-  ctx.fill();
-  ctx.strokeStyle = PARCHMENT_EDGE_DARK;
-  ctx.lineWidth = 5;
-  ctx.stroke();
-  ctx.strokeStyle = PARCHMENT_EDGE;
-  ctx.lineWidth = 2;
-  ctx.stroke();
-  ctx.save();
-  ctx.clip();
-  ctx.fillStyle = PARCHMENT_FILL_INNER;
-  ctx.fillRect(x + 5, y + 5, w - 10, h - 10);
-  for (let j = 0; j < h; j++) {
-    for (let i = 0; i < w; i++) {
-      const n = hash2(x + i, y + j);
-      if (n < 0.07) {
-        ctx.fillStyle = PARCHMENT_GRAIN_DARK;
-        ctx.fillRect(x + i, y + j, 1, 1);
-      } else if (n > 0.93) {
-        ctx.fillStyle = PARCHMENT_GRAIN_LIGHT;
-        ctx.fillRect(x + i, y + j, 1, 1);
-      }
-    }
-  }
-  ctx.restore();
-  ctx.restore();
+  ctx.fillStyle = PARCHMENT_FALLBACK_FILL;
+  ctx.fillRect(x, y, w, h);
 }
 
 export function wrapNoteText(text: string, maxPx: number, glyphs?: FontGlyphs): string[] {
@@ -165,13 +146,16 @@ export function wrapNoteText(text: string, maxPx: number, glyphs?: FontGlyphs): 
   return out;
 }
 
-export function layoutNote(title: string, body: string, glyphs?: FontGlyphs): NoteLayout {
-  const page: NotePageRect = { x: 0, y: 0, w: NOTE_PAGE_W, h: NOTE_PAGE_H };
+export function layoutNote(title: string, body: string, glyphs?: FontGlyphs, meta?: ParchmentMeta | null): NoteLayout {
+  const margin = parchmentMargins(meta);
+  const pageW = meta?.pageSize?.[0] ?? NOTE_PAGE_W;
+  const pageH = meta?.pageSize?.[1] ?? NOTE_PAGE_H;
+  const page: NotePageRect = { x: 0, y: 0, w: pageW, h: pageH };
   const textRect: NotePageRect = {
-    x: page.x + NOTE_MARGIN_LEFT,
-    y: page.y + NOTE_MARGIN_TOP,
-    w: page.w - NOTE_MARGIN_LEFT - NOTE_MARGIN_RIGHT,
-    h: page.h - NOTE_MARGIN_TOP - NOTE_MARGIN_BOTTOM
+    x: page.x + margin.left,
+    y: page.y + margin.top,
+    w: page.w - margin.left - margin.right,
+    h: page.h - margin.top - margin.bottom
   };
   const maxPx = Math.max(24, textRect.w);
   const titleLines = wrapNoteText(title, maxPx, glyphs);
@@ -251,6 +235,8 @@ export class NoteReader {
   private ctx: CanvasRenderingContext2D | null = null;
   private fontImg: HTMLImageElement | null = null;
   private fontGlyphs: FontGlyphs = {};
+  private parchmentImg: HTMLImageElement | null = null;
+  private parchmentMeta: ParchmentMeta | null = null;
   private title = '';
   private text = '';
   private layout: NoteLayout | null = null;
@@ -275,16 +261,20 @@ export class NoteReader {
       this.canvas.height = NOTE_PAGE_H;
       this.ctx = this.canvas.getContext('2d');
     }
-    const [fontImg, fontMeta] = await Promise.all([
+    const [fontImg, fontMeta, parchmentImg, parchmentMeta] = await Promise.all([
       loadHtmlImage(`${base}art/font/font_5x7.png`).catch(() => null),
-      fetchJsonCached<{ glyphs?: FontGlyphs }>(`${base}art/font/font_5x7.json`).catch(() => null)
+      fetchJsonCached<{ glyphs?: FontGlyphs }>(`${base}art/font/font_5x7.json`).catch(() => null),
+      loadHtmlImage(`${base}${PARCHMENT_PAGE_PATH}`).catch(() => null),
+      fetchJsonCached<ParchmentMeta>(`${base}${PARCHMENT_META_PATH}`).catch(() => null)
     ]);
     this.fontImg = fontImg;
     if (fontMeta?.glyphs) this.fontGlyphs = fontMeta.glyphs;
+    this.parchmentImg = parchmentImg;
+    if (parchmentMeta) this.parchmentMeta = parchmentMeta;
     this.mount();
     this.syncOverlaySize();
     if (this.open) {
-      this.layout = layoutNote(this.title, this.text, this.fontGlyphs);
+      this.layout = layoutNote(this.title, this.text, this.fontGlyphs, this.parchmentMeta);
       this.draw();
     }
   }
@@ -318,7 +308,7 @@ export class NoteReader {
   show(title: string, text: string) {
     this.title = title;
     this.text = text;
-    this.layout = layoutNote(title, text, this.fontGlyphs);
+    this.layout = layoutNote(title, text, this.fontGlyphs, this.parchmentMeta);
     this.scroll = 0;
     this.open = true;
     this.host?.classList.add('show');
@@ -374,12 +364,13 @@ export class NoteReader {
     const ctx = this.ctx;
     const canvas = this.canvas;
     if (!ctx || !canvas) return;
-    const layout = this.layout ?? layoutNote(this.title, this.text, this.fontGlyphs);
+    const layout = this.layout ?? layoutNote(this.title, this.text, this.fontGlyphs, this.parchmentMeta);
     this.layout = layout;
     ctx.imageSmoothingEnabled = false;
-    ctx.clearRect(0, 0, NOTE_PAGE_W, NOTE_PAGE_H);
+    ctx.clearRect(0, 0, layout.page.w, layout.page.h);
     const { page, textRect, titleLines, lines } = layout;
-    drawParchmentPanel(ctx, page);
+    const colours = parchmentColours(this.parchmentMeta);
+    drawParchmentPanel(ctx, page, this.parchmentImg);
     const { scroll } = clampNoteScroll(this.scroll, lines.length, layout.visible, layout.lineH);
     this.scroll = scroll;
     ctx.save();
@@ -389,7 +380,7 @@ export class NoteReader {
     lines.forEach((line, i) => {
       const y = textRect.y + i * layout.lineH - scroll;
       if (y + layout.lineH < textRect.y || y > textRect.y + textRect.h) return;
-      const colour = i < titleLines.length ? TITLE_COLOUR : BODY_COLOUR;
+      const colour = i < titleLines.length ? colours.title : colours.body;
       drawFont5x7(
         ctx,
         this.fontImg,
