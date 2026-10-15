@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import {
   CELL_SIZE,
+  DARK_LIGHT_THRESHOLD,
+  FACE_SEGMENTS,
   LANTERN_INTENSITY,
   LANTERN_RADIUS_TILES,
   PROP_LANTERN_INTENSITY,
@@ -198,6 +202,68 @@ describe('lantern: steep floors, soft props', () => {
       const top = sample(1.6);
       expect(Math.abs(mid - bottom), `height hole beside party at y=${py}`).toBeLessThan(0.12);
       expect(Math.abs(mid - top), `top vs mid at y=${py}`).toBeLessThan(0.12);
+    }
+  });
+
+  it('QA wall at (4,5) has no lantern-torch valley toward the (6,4) S sconce', () => {
+    expect(FACE_SEGMENTS).toBeGreaterThanOrEqual(8);
+    const lighting = new VertexLightingManager(floor1, floor1Sconces, {
+      floor: 1,
+      bright: 1,
+      oil: () => 2
+    });
+    lighting.setPartyPosition(4, 5);
+    const wz = 5 * CELL_SIZE - CELL_SIZE / 2;
+    const lumas: number[] = [];
+    for (let i = 0; i <= 20; i++) {
+      const x = 4 + i * 0.1;
+      const tileX = Math.floor(x + 1e-6);
+      lumas.push(lighting.sampleVertex(x * CELL_SIZE, 0.88, wz, tileX, 5, false, false, true).luma);
+    }
+    expect(lumas[0], 'lantern on the near wall').toBeGreaterThan(0.2);
+    expect(lumas[lumas.length - 1], 'torch under the (6,4) sconce').toBeGreaterThan(0.7);
+    let worstDip = 0;
+    for (let i = 1; i < lumas.length - 1; i++) {
+      const left = Math.max(...lumas.slice(0, i));
+      const right = Math.max(...lumas.slice(i + 1));
+      worstDip = Math.max(worstDip, Math.min(left, right) - lumas[i]);
+    }
+    expect(worstDip, `lantern-torch wall dip ${worstDip.toFixed(3)}`).toBeLessThanOrEqual(0.04);
+  });
+
+  it('keeps gameplay tile-light on max() so no floor-1 square flips dark/lit', () => {
+    const src = readFileSync(resolve(__dirname, '../src/proto3d/vertex-lighting.ts'), 'utf8');
+    const gameplay = src.slice(src.indexOf('sourceLight(tileX'), src.indexOf('isSquareLit'));
+    expect(gameplay).toContain('Math.max(maxW');
+    expect(gameplay).not.toContain('screenAccum');
+    expect(src).toContain('screenAccum');
+
+    const lighting = new VertexLightingManager(floor1, floor1Sconces, {
+      floor: 1,
+      bright: 1,
+      oil: () => 2
+    });
+    const expectedLit: Record<string, string> = {
+      '4,5': '2,1|3,1|2,2|3,2|3,3|1,4|1,5|2,5|4,5|5,5|6,5|7,5|1,6|2,6|5,6|6,6|7,6|1,7|2,7',
+      '1,7': '2,1|3,1|2,2|3,2|3,3|1,4|1,5|2,5|4,5|5,5|6,5|7,5|1,6|2,6|5,6|6,6|7,6|1,7|2,7',
+      '19,5': '2,1|3,1|2,2|3,2|3,3|1,4|1,5|2,5|4,5|5,5|6,5|7,5|19,5|1,6|2,6|5,6|6,6|7,6|1,7|2,7',
+      '19,6': '2,1|3,1|2,2|3,2|3,3|1,4|1,5|2,5|4,5|5,5|6,5|7,5|1,6|2,6|5,6|6,6|7,6|19,6|1,7|2,7',
+      '11,9': '2,1|3,1|2,2|3,2|3,3|1,4|1,5|2,5|4,5|5,5|6,5|7,5|1,6|2,6|5,6|6,6|7,6|1,7|2,7|11,9',
+      '3,14': '2,1|3,1|2,2|3,2|3,3|1,4|1,5|2,5|4,5|5,5|6,5|7,5|1,6|2,6|5,6|6,6|7,6|1,7|2,7|3,14'
+    };
+    for (const [pose, want] of Object.entries(expectedLit)) {
+      const [px, py] = pose.split(',').map(Number);
+      lighting.setPartyPosition(px, py);
+      const lit: string[] = [];
+      for (let y = 0; y < floor1.height; y++) {
+        for (let x = 0; x < floor1.width; x++) {
+          const w = lighting.sourceLight(x, y);
+          expect(lighting.isSquareLit(x, y)).toBe(w >= DARK_LIGHT_THRESHOLD);
+          if (w >= DARK_LIGHT_THRESHOLD) lit.push(`${x},${y}`);
+        }
+      }
+      expect(lit.join('|'), `gameplay lit set from (${pose})`).toBe(want);
+      expect(lighting.isSquareLit(19, 7), `lair body square stays unlit from (${pose})`).toBe(false);
     }
   });
 

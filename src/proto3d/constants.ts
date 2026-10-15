@@ -164,7 +164,8 @@ export const SWAP_ARM_MS = 3000;
 export const HERO_VOICES = true;
 export const HERO_HURT_VOICE_GAP = 0.6;
 /** 585-layout sizes live in art/ui/layout585/layout585.json (view, oilBar, hands, log). */
-export const FACE_SEGMENTS = 4;
+/** Wall/floor/ceiling quads. 8 keeps lantern↔torch seams from banding. */
+export const FACE_SEGMENTS = 8;
 export const CUTOUT_ALPHA_TEST = 0.5;
 
 /** Unit normal into the room and Y-rotation so a PlaneGeometry faces that way. */
