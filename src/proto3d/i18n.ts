@@ -29,14 +29,31 @@ export function saveLocale(locale: Locale) {
   }
 }
 
-/** Reload lamp-note copy after a locale change; redraw if the reader is open. */
-export function refreshLampNoteAfterLocaleChange(opts: {
-  noteOpen: boolean;
-  loadLampNote: () => void;
-  showNote: () => void;
-}): void {
-  opts.loadLampNote();
-  if (opts.noteOpen) opts.showNote();
+/** Which document the parchment reader is showing, so a locale switch can reload it. */
+export type OpenNoteRef =
+  | { kind: 'lampkeeper' }
+  | { kind: 'journal'; page: number }
+  | { kind: 'debug'; title: { en: string; el: string }; body: { en: string; el: string } };
+
+export function copyForOpenNote(
+  locale: Locale,
+  ref: OpenNoteRef | null,
+  story: {
+    lampkeeperNote(): { title: string; text: string };
+    readableItem(item: string, page?: number): { title: string; text: string } | null;
+  }
+): { title: string; text: string } | null {
+  if (!ref) return null;
+  if (ref.kind === 'debug') {
+    const loc = locale === 'el' ? 'el' : 'en';
+    return { title: ref.title[loc] || ref.title.en, text: ref.body[loc] || ref.body.en };
+  }
+  if (ref.kind === 'journal') {
+    const doc = story.readableItem('journal_page', ref.page);
+    return doc ? { title: doc.title, text: doc.text } : null;
+  }
+  const doc = story.lampkeeperNote();
+  return { title: doc.title, text: doc.text };
 }
 
 export function loadSavedLocale(): Locale | null {

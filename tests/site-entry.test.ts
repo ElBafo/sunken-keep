@@ -17,6 +17,7 @@ describe('site root serves the 3D game', () => {
     expect(index).not.toContain('src="/src/main.ts"');
     expect(index).toContain('id="tap-to-start"');
     expect(index).toContain('id="render-canvas"');
+    expect(index).toContain('id="note-canvas"');
     expect(index).toContain('href="%BASE_URL%manifest.json"');
     expect(index).toMatch(/apple-touch-icon[^>]+icon_drowning_180\.png/);
   });
