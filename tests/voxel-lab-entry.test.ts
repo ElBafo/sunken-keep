@@ -14,6 +14,7 @@ describe('voxel-lab is a standalone Vite page', () => {
     expect(html).not.toContain('src="/src/proto3d/main.ts"');
     expect(html).toContain('id="lab-canvas"');
     expect(html).toContain('id="btn-shadows"');
+    expect(html).toContain('id="btn-lantern"');
     expect(html).toContain('id="btn-mode"');
     expect(html).toContain('id="btn-fwd"');
     expect(html).toContain('id="btn-back"');

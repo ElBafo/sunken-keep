@@ -30,6 +30,16 @@ export const LAMP_COLOR = 0xffc070;
 export const LAMP_INTENSITY = 11;
 export const LAMP_DISTANCE = 11;
 
+/** Wren's held lantern — warm, 1.5-tile pool, ±3% over 3.5 s (game constants). */
+export const LANTERN_COLOR = 0xead1a3;
+export const LANTERN_INTENSITY = 5.5;
+export const LANTERN_DISTANCE = 1.5 * CELL;
+export const LANTERN_FLICKER = 0.03;
+export const LANTERN_FLICKER_MS = 3500;
+/** Camera-local: +X right, +Y up, −Z forward. Slightly below eye, right hand. */
+export const LANTERN_HOLD: readonly [number, number, number] = [0.16, -0.07, -0.22];
+export const LANTERN_SHADOW_MAP = 128;
+
 export const MAT_DRY = 0;
 export const MAT_WET = 1;
 export const MAT_MOSS = 2;

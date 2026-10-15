@@ -8,6 +8,13 @@ import {
   LAMP_COLOR,
   LAMP_DISTANCE,
   LAMP_INTENSITY,
+  LANTERN_COLOR,
+  LANTERN_DISTANCE,
+  LANTERN_FLICKER,
+  LANTERN_FLICKER_MS,
+  LANTERN_HOLD,
+  LANTERN_INTENSITY,
+  LANTERN_SHADOW_MAP,
   LOOK_SENS,
   MOVE_MS,
   PITCH_MAX,
@@ -29,9 +36,11 @@ type LabApi = {
   triangles: number;
   quads: number;
   shadows: boolean;
+  lantern: boolean;
   mode: 'voxel' | 'flat';
   lampLit: boolean;
   setShadows: (on: boolean) => void;
+  setLantern: (on: boolean) => void;
   setMode: (mode: 'voxel' | 'flat') => void;
   setLamp: (on: boolean) => void;
 };
@@ -48,6 +57,7 @@ async function boot(): Promise<void> {
   const canvas = document.getElementById('lab-canvas') as HTMLCanvasElement;
   const statsEl = document.getElementById('stats')!;
   const btnShadows = document.getElementById('btn-shadows') as HTMLButtonElement;
+  const btnLantern = document.getElementById('btn-lantern') as HTMLButtonElement;
   const btnMode = document.getElementById('btn-mode') as HTMLButtonElement;
   const btnFwd = document.getElementById('btn-fwd') as HTMLButtonElement;
   const btnBack = document.getElementById('btn-back') as HTMLButtonElement;
@@ -106,6 +116,17 @@ async function boot(): Promise<void> {
   lampLight.shadow.radius = 2;
   scene.add(lampLight);
 
+  const lanternLight = new THREE.PointLight(LANTERN_COLOR, LANTERN_INTENSITY, LANTERN_DISTANCE, 2);
+  lanternLight.position.set(LANTERN_HOLD[0], LANTERN_HOLD[1], LANTERN_HOLD[2]);
+  lanternLight.castShadow = true;
+  lanternLight.shadow.mapSize.set(LANTERN_SHADOW_MAP, LANTERN_SHADOW_MAP);
+  lanternLight.shadow.camera.near = 0.08;
+  lanternLight.shadow.camera.far = LANTERN_DISTANCE;
+  lanternLight.shadow.bias = -0.004;
+  lanternLight.shadow.radius = 2;
+  camera.add(lanternLight);
+  scene.add(camera);
+
   loading.textContent = 'Meshing voxels…';
   const room = await buildRoom();
   const flames = await loadFlameTextures();
@@ -130,6 +151,7 @@ async function boot(): Promise<void> {
   let pitch = -0.04;
   let moving = false;
   let shadowsOn = true;
+  let lanternOn = true;
   let mode: 'voxel' | 'flat' = 'voxel';
   let lampLit = false;
 
@@ -159,8 +181,17 @@ async function boot(): Promise<void> {
     torchA.castShadow = on;
     torchB.castShadow = on;
     lampLight.castShadow = on && lampLit;
+    lanternLight.castShadow = on && lanternOn;
     btnShadows.textContent = on ? 'Shadows on' : 'Shadows off';
     btnShadows.setAttribute('aria-pressed', on ? 'true' : 'false');
+  };
+
+  const setLantern = (on: boolean): void => {
+    lanternOn = on;
+    lanternLight.intensity = on ? LANTERN_INTENSITY : 0;
+    lanternLight.castShadow = on && shadowsOn;
+    btnLantern.textContent = on ? 'Lantern on' : 'Lantern off';
+    btnLantern.setAttribute('aria-pressed', on ? 'true' : 'false');
   };
 
   const setMode = (next: 'voxel' | 'flat'): void => {
@@ -184,6 +215,10 @@ async function boot(): Promise<void> {
   btnShadows.addEventListener('click', (e) => {
     e.stopPropagation();
     setShadows(!shadowsOn);
+  });
+  btnLantern.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setLantern(!lanternOn);
   });
   btnMode.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -291,6 +326,7 @@ async function boot(): Promise<void> {
   });
 
   setShadows(true);
+  setLantern(true);
   setMode('voxel');
   setLamp(false);
 
@@ -306,11 +342,16 @@ async function boot(): Promise<void> {
     triangles: room.stats.triangles,
     quads: room.stats.quads,
     shadows: true,
+    lantern: true,
     mode: 'voxel',
     lampLit: false,
     setShadows: (on) => {
       setShadows(on);
       api.shadows = on;
+    },
+    setLantern: (on) => {
+      setLantern(on);
+      api.lantern = on;
     },
     setMode: (m) => {
       setMode(m);
@@ -334,6 +375,7 @@ async function boot(): Promise<void> {
       fpsT = now;
       api.fps = fps;
       api.shadows = shadowsOn;
+      api.lantern = lanternOn;
       api.mode = mode;
       api.lampLit = lampLit;
       statsEl.textContent = `${fps} fps  ·  ${room.stats.voxels.toLocaleString()} voxels  ·  ${room.stats.triangles.toLocaleString()} tris`;
@@ -345,6 +387,10 @@ async function boot(): Promise<void> {
     if (lampLit) {
       lampLight.intensity =
         LAMP_INTENSITY * (1 + 0.03 * Math.sin(t * 2.4) + 0.02 * Math.sin(t * 7.1));
+    }
+    if (lanternOn) {
+      lanternLight.intensity =
+        LANTERN_INTENSITY * (1 + LANTERN_FLICKER * Math.sin((now / LANTERN_FLICKER_MS) * Math.PI * 2));
     }
 
     if (now - flameT > 200) {
