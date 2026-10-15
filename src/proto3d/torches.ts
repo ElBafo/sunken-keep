@@ -90,6 +90,7 @@ export function torchBracketPoses(s: Sconce): {
   const { nx, nz } = FACE_INTO_ROOM[s.face];
   const wallX = s.x * CELL_SIZE + nx * (CELL_SIZE / 2);
   const wallZ = s.y * CELL_SIZE + nz * (CELL_SIZE / 2);
+  const w = SCONCE_WIDTH_TILES * CELL_SIZE;
   const h = SCONCE_HEIGHT_TILES * CELL_SIZE;
   const inset = WALL_MOUNT_INSET;
   const flameH = 0.3125 * CELL_SIZE;
@@ -97,7 +98,8 @@ export function torchBracketPoses(s: Sconce): {
   const x = wallX + nx * inset;
   const z = wallZ + nz * inset;
   return {
-    side: { x, y: midY, z },
+    // Perpendicular profile: back edge on the wall, center half a sprite out.
+    side: { x: wallX + nx * (w / 2), y: midY, z: wallZ + nz * (w / 2) },
     front: { x, y: midY, z },
     flame: { x, y: midY + h / 2 - flameH / 2, z }
   };
@@ -183,6 +185,7 @@ export class TorchSystem {
       const side = new THREE.Mesh(new THREE.PlaneGeometry(w, h), sideMat);
       side.position.set(poses.side.x, poses.side.y, poses.side.z);
       side.rotation.y = rotY - Math.PI / 2;
+      side.frustumCulled = false;
       side.renderOrder = 2;
       side.userData.isSconce = true;
       side.userData.skipVertexLighting = true;
@@ -195,6 +198,7 @@ export class TorchSystem {
       const front = new THREE.Mesh(new THREE.PlaneGeometry(w, h), frontMat);
       front.position.set(poses.front.x, poses.front.y, poses.front.z);
       front.rotation.y = rotY;
+      front.frustumCulled = false;
       front.renderOrder = 2;
       front.userData.isSconce = true;
       front.userData.skipVertexLighting = true;
@@ -206,6 +210,7 @@ export class TorchSystem {
       const flameMat = cutoutMat(this.flameFrames[0], true);
       const flame = new THREE.Mesh(new THREE.PlaneGeometry(w, flameH), flameMat);
       flame.position.set(poses.flame.x, poses.flame.y, poses.flame.z);
+      flame.frustumCulled = false;
       flame.renderOrder = 3;
       flame.userData.skipVertexLighting = true;
       flame.userData.isSconce = true;

@@ -9,6 +9,7 @@ import {
   CELL_SIZE,
   FACE_INTO_ROOM,
   SCONCE_NEAR_CULL,
+  SCONCE_WIDTH_TILES,
   WALL_MOUNT_INSET,
   WALL_MOUNT_NEAR_CULL,
   hideWallProp,
@@ -63,13 +64,16 @@ describe('sconce near-plane bracket cull', () => {
       const wallX = s.x * CELL_SIZE + nx * (CELL_SIZE / 2);
       const wallZ = s.y * CELL_SIZE + nz * (CELL_SIZE / 2);
 
+      const w = SCONCE_WIDTH_TILES * CELL_SIZE;
       expect(poses.front.x, `front x ${s.x},${s.y} ${s.face}`).toBeCloseTo(wall.x, 5);
       expect(poses.front.z, `front z ${s.x},${s.y} ${s.face}`).toBeCloseTo(wall.z, 5);
-      expect(poses.side.x, 'side piece anchored on the wall').toBeCloseTo(poses.front.x, 5);
-      expect(poses.side.z).toBeCloseTo(poses.front.z, 5);
       expect(poses.flame.x).toBeCloseTo(poses.front.x, 5);
       expect(poses.flame.z).toBeCloseTo(poses.front.z, 5);
       expect(Math.hypot(poses.front.x - wallX, poses.front.z - wallZ)).toBeCloseTo(WALL_MOUNT_INSET, 5);
+      expect(
+        Math.hypot(poses.side.x - wallX, poses.side.z - wallZ),
+        'side piece back-anchored on the wall'
+      ).toBeCloseTo(w / 2, 5);
     }
   });
 
@@ -77,7 +81,7 @@ describe('sconce near-plane bracket cull', () => {
     expect(unlit.face).toBe('W');
     expect(unlit.lit).toBe(false);
     const poses = torchBracketPoses(unlit);
-    expect(poses.side.x).toBeCloseTo(poses.front.x, 5);
+    expect(Math.abs(poses.side.x - poses.front.x)).toBeLessThan(CELL_SIZE / 4);
   });
 
   it('culls the unlit bracket as the camera arrives on its wall (QA: (2,6,3) then back)', () => {
@@ -158,6 +162,7 @@ describe('sconce near-plane bracket cull', () => {
     expect(hidden).toContain('objectNearPlaneCulled');
     expect(hidden).not.toContain('hideWallProp');
     expect(src).not.toMatch(/hideWallProp\(/);
+    expect(src).toContain('frustumCulled = false');
   });
 
   it(`uses a cull distance past CAMERA_NEAR (${CAMERA_NEAR}) so a 0.5-wide bracket cannot straddle the clip plane`, () => {
