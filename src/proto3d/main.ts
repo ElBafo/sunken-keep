@@ -2607,7 +2607,7 @@ class Game {
         this.syncCarriedLight();
         this.torches.setParty(this.player.x, this.player.y, this.player.dir);
         this.torches.update(performance.now(), this.player.x, this.player.y, this.player.dir);
-        this.dressing.update(performance.now(), this.player.x, this.player.y, this.player.dir);
+        this.dressing.update(performance.now(), this.player.x, this.player.y, this.player.dir, this.player.camera);
         this.spriteManager.update(performance.now(), this.player.x, this.player.y, this.player.dir);
         this.darkFx.update(
           performance.now(),
@@ -2619,7 +2619,13 @@ class Game {
         );
         this.fireSlimeReveal();
         this.audioManager?.updateListener(this.player.x, this.player.y, this.player.dir);
-        this.props?.layoutAdjacent(this.player.x, this.player.y, this.spriteManager.integerAdjacentScale(), this.player.dir);
+        this.props?.layoutAdjacent(
+          this.player.x,
+          this.player.y,
+          this.spriteManager.integerAdjacentScale(),
+          this.player.dir,
+          this.player.camera
+        );
         this.updateDoorButton();
         this.renderer.render();
       },
@@ -2982,7 +2988,13 @@ class Game {
       setAdjacentScale: (n: number) => {
         this.spriteManager.setAdjacentScale(n);
         this.spriteManager.update(performance.now(), this.player.x, this.player.y, this.player.dir);
-        this.props.layoutAdjacent(this.player.x, this.player.y, this.spriteManager.integerAdjacentScale(), this.player.dir);
+        this.props.layoutAdjacent(
+          this.player.x,
+          this.player.y,
+          this.spriteManager.integerAdjacentScale(),
+          this.player.dir,
+          this.player.camera
+        );
         this.renderer.render();
       },
       adjacentScale: () => this.spriteManager.integerAdjacentScale(),
@@ -3357,11 +3369,17 @@ class Game {
     }
 
     this.sceneBuilder.doors.update(now);
-    this.dressing.update(now, this.player.x, this.player.y, this.player.dir);
+    this.dressing.update(now, this.player.x, this.player.y, this.player.dir, this.player.camera);
     this.water.update(now);
     this.atmosphere.update(dtSec, now, this.renderer.camera);
     this.audioManager.updateListener(this.player.x, this.player.y, this.player.dir);
-    this.props.layoutAdjacent(this.player.x, this.player.y, this.spriteManager.integerAdjacentScale(), this.player.dir);
+    this.props.layoutAdjacent(
+      this.player.x,
+      this.player.y,
+      this.spriteManager.integerAdjacentScale(),
+      this.player.dir,
+      this.player.camera
+    );
     this.audioManager.update(now, this.player.x * CELL_SIZE, this.player.y * CELL_SIZE);
 
     this.torches.update(now, this.player.x, this.player.y, this.player.dir);

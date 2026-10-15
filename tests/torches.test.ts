@@ -5,6 +5,7 @@ import {
   CAMERA_NEAR,
   CAMERA_VIEW,
   SCONCE_NEAR_CULL,
+  WALL_MOUNT_NEAR_CULL,
   hideWallProp
 } from '../src/proto3d/constants';
 import { floor1, floor1Sconces } from '../src/proto3d/floor-data';
@@ -81,5 +82,6 @@ describe('sconce near-plane bracket cull', () => {
   it(`uses a cull distance past CAMERA_NEAR (${CAMERA_NEAR}) so a 0.5-wide bracket cannot straddle the clip plane`, () => {
     expect(SCONCE_NEAR_CULL).toBeGreaterThan(CAMERA_NEAR);
     expect(SCONCE_NEAR_CULL).toBeGreaterThanOrEqual(0.5);
+    expect(SCONCE_NEAR_CULL).toBe(WALL_MOUNT_NEAR_CULL);
   });
 });

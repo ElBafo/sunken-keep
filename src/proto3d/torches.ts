@@ -8,7 +8,6 @@ import {
   SCONCE_ANIM_FPS,
   SCONCE_FRONT_OFFSET_TILES,
   SCONCE_HEIGHT_TILES,
-  SCONCE_NEAR_CULL,
   SCONCE_WIDTH_TILES,
   TORCH_IGNITE_FLARE_MS,
   TORCH_SNUFF_FPS,
@@ -16,6 +15,7 @@ import {
 } from './constants';
 import { loadSpriteTexture } from './atlas';
 import { Sconce } from './types';
+import { cameraSpaceDepth, nearPlaneCulled, objectNearPlaneCulled } from './wall-near-cull';
 
 export type TorchVisualState = 'lit' | 'dead' | 'capped';
 
@@ -106,17 +106,14 @@ export function torchBracketPoses(s: Sconce): {
   };
 }
 
-const _view = new THREE.Vector3();
-
 /** Camera-space depth (positive in front). Three.js cameras look down −Z. */
 export function sconceCameraDepth(wx: number, wy: number, wz: number, camera: THREE.Camera): number {
-  _view.set(wx, wy, wz).applyMatrix4(camera.matrixWorldInverse);
-  return -_view.z;
+  return cameraSpaceDepth(wx, wy, wz, camera);
 }
 
 /** True when a sconce mesh would clip the near plane or sit behind the eye. */
 export function sconceCulledByNearPlane(depth: number): boolean {
-  return depth < SCONCE_NEAR_CULL;
+  return nearPlaneCulled(depth);
 }
 
 /** Hide the whole sconce (bracket + flame) once any mesh hits the near plane. */
@@ -320,7 +317,7 @@ export class TorchSystem {
     if (hideWallProp(visual.sconce.x, visual.sconce.y, visual.sconce.face, this.partyX, this.partyY, this.partyDir)) {
       return true;
     }
-    return sconceCulledByCamera(visual.sconce, this.camera);
+    return objectNearPlaneCulled(visual.group, this.camera);
   }
 
   snapshot() {

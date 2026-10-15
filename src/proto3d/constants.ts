@@ -15,12 +15,14 @@ export const CAMERA_FOV = cameraSpec.fov;
 export const CAMERA_NEAR = cameraSpec.near;
 export const CAMERA_FAR = cameraSpec.far;
 /**
- * Hide the whole sconce (side/front bracket + flame) closer than this
- * camera-space depth. Backing into a wall-mounted bracket (lit or unlit)
- * puts the side plane on the near clip — one frame of huge blocky pixels.
- * Flame-only Euclidean hiding did not cover the bracket.
+ * Hide a wall-mounted object (sconce, wall prop, decal, …) when any of its
+ * drawn meshes sits closer than this camera-space depth. Backing into a
+ * DoubleSide plane puts it on the near clip — one frame of huge pixels.
+ * Visual only: never mute torch loops or other audio.
  */
-export const SCONCE_NEAR_CULL = CAMERA_NEAR + 0.5;
+export const WALL_MOUNT_NEAR_CULL = CAMERA_NEAR + 0.5;
+/** @alias WALL_MOUNT_NEAR_CULL — kept for sconce tests and earlier call sites. */
+export const SCONCE_NEAR_CULL = WALL_MOUNT_NEAR_CULL;
 /** Logical 3D view size in pixels [width, height]. */
 export const CAMERA_VIEW = cameraSpec.view as [number, number];
 /** Visual-only: draw monsters this many tiles toward the party from square centre. */
