@@ -4,14 +4,14 @@ import {
   CUTOUT_ALPHA_TEST,
   FACE_INTO_ROOM,
   FLARE_ANIM_FPS,
-  hideWallProp,
   SCONCE_ANIM_FPS,
   SCONCE_FRONT_OFFSET_TILES,
   SCONCE_HEIGHT_TILES,
   SCONCE_WIDTH_TILES,
   TORCH_IGNITE_FLARE_MS,
   TORCH_SNUFF_FPS,
-  TORCH_TAP_GUARD_MS
+  TORCH_TAP_GUARD_MS,
+  WALL_MOUNT_INSET
 } from './constants';
 import { loadSpriteTexture } from './atlas';
 import { Sconce } from './types';
@@ -90,19 +90,16 @@ export function torchBracketPoses(s: Sconce): {
   const { nx, nz } = FACE_INTO_ROOM[s.face];
   const wallX = s.x * CELL_SIZE + nx * (CELL_SIZE / 2);
   const wallZ = s.y * CELL_SIZE + nz * (CELL_SIZE / 2);
-  const w = SCONCE_WIDTH_TILES * CELL_SIZE;
   const h = SCONCE_HEIGHT_TILES * CELL_SIZE;
-  const frontOff = SCONCE_FRONT_OFFSET_TILES * CELL_SIZE;
+  const inset = WALL_MOUNT_INSET;
   const flameH = 0.3125 * CELL_SIZE;
   const midY = CELL_SIZE / 2;
+  const x = wallX + nx * inset;
+  const z = wallZ + nz * inset;
   return {
-    side: { x: wallX + nx * (w / 2), y: midY, z: wallZ + nz * (w / 2) },
-    front: { x: wallX + nx * frontOff, y: midY, z: wallZ + nz * frontOff },
-    flame: {
-      x: wallX + nx * frontOff,
-      y: midY + h / 2 - flameH / 2,
-      z: wallZ + nz * frontOff
-    }
+    side: { x, y: midY, z },
+    front: { x, y: midY, z },
+    flame: { x, y: midY + h / 2 - flameH / 2, z }
   };
 }
 
@@ -138,9 +135,6 @@ export class TorchSystem {
   private snuffFrames: THREE.Texture[] = [];
   private camera: THREE.Camera;
   private look = new THREE.Vector3();
-  private partyX = 0;
-  private partyY = 0;
-  private partyDir = 0;
 
   constructor(camera: THREE.Camera) {
     this.camera = camera;
@@ -175,22 +169,19 @@ export class TorchSystem {
 
     const w = SCONCE_WIDTH_TILES * CELL_SIZE;
     const h = SCONCE_HEIGHT_TILES * CELL_SIZE;
-    const frontOff = SCONCE_FRONT_OFFSET_TILES * CELL_SIZE;
     const flameH = 0.3125 * CELL_SIZE;
-    const midY = CELL_SIZE / 2;
 
     for (const sconce of sconces) {
       const state = torchState(sconce);
-      const { nx, nz, rotY } = FACE_INTO_ROOM[sconce.face];
-      const wallX = sconce.x * CELL_SIZE + nx * (CELL_SIZE / 2);
-      const wallZ = sconce.y * CELL_SIZE + nz * (CELL_SIZE / 2);
+      const { rotY } = FACE_INTO_ROOM[sconce.face];
+      const poses = torchBracketPoses(sconce);
 
       const group = new THREE.Group();
       group.position.set(0, 0, 0);
 
       const sideMat = cutoutMat(this.brackets[state].side!, true);
       const side = new THREE.Mesh(new THREE.PlaneGeometry(w, h), sideMat);
-      side.position.set(wallX + nx * (w / 2), midY, wallZ + nz * (w / 2));
+      side.position.set(poses.side.x, poses.side.y, poses.side.z);
       side.rotation.y = rotY - Math.PI / 2;
       side.renderOrder = 2;
       side.userData.isSconce = true;
@@ -202,7 +193,7 @@ export class TorchSystem {
 
       const frontMat = cutoutMat(this.brackets[state].front!, true);
       const front = new THREE.Mesh(new THREE.PlaneGeometry(w, h), frontMat);
-      front.position.set(wallX + nx * frontOff, midY, wallZ + nz * frontOff);
+      front.position.set(poses.front.x, poses.front.y, poses.front.z);
       front.rotation.y = rotY;
       front.renderOrder = 2;
       front.userData.isSconce = true;
@@ -214,7 +205,7 @@ export class TorchSystem {
 
       const flameMat = cutoutMat(this.flameFrames[0], true);
       const flame = new THREE.Mesh(new THREE.PlaneGeometry(w, flameH), flameMat);
-      flame.position.set(wallX + nx * frontOff, midY + h / 2 - flameH / 2, wallZ + nz * frontOff);
+      flame.position.set(poses.flame.x, poses.flame.y, poses.flame.z);
       flame.renderOrder = 3;
       flame.userData.skipVertexLighting = true;
       flame.userData.isSconce = true;
@@ -314,9 +305,8 @@ export class TorchSystem {
   }
 
   private sconceHidden(visual: TorchVisual): boolean {
-    if (hideWallProp(visual.sconce.x, visual.sconce.y, visual.sconce.face, this.partyX, this.partyY, this.partyDir)) {
-      return true;
-    }
+    // Near-band only. At rest in the room / adjacent square the side-wall
+    // bracket must stay up (grid-own-square hide is for dressing, not sconces).
     return objectNearPlaneCulled(visual.group, this.camera);
   }
 
@@ -361,10 +351,8 @@ export class TorchSystem {
     return null;
   }
 
-  setParty(x: number, y: number, dir: number) {
-    this.partyX = x;
-    this.partyY = y;
-    this.partyDir = dir;
+  setParty(_x: number, _y: number, _dir: number) {
+    // Hide is camera near-band only; grid pose is unused.
   }
 
   update(now: number, partyX?: number, partyY?: number, dir?: number) {

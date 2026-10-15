@@ -77,7 +77,13 @@ export const MIRROR_BAKED_SCONCE_LEAN = false;
 export const SCONCE_WIDTH_TILES = 0.25;
 export const SCONCE_HEIGHT_TILES = 0.5;
 export const SCONCE_WALL_OFFSET_TILES = 0.015;
-/** Front bracket / flame sit this far off the wall (artist spec). */
+/**
+ * Flush wall-mount inset (world units): just enough to beat z-fighting.
+ * Shared by sconces and wallPropPlanePose. Light/audio still use
+ * SCONCE_FRONT_OFFSET_TILES so gameplay pools stay put.
+ */
+export const WALL_MOUNT_INSET = Math.max(SCONCE_WALL_OFFSET_TILES * CELL_SIZE, 0.08);
+/** Light / audio origin in front of the wall (artist spec). Visual meshes sit at WALL_MOUNT_INSET. */
 export const SCONCE_FRONT_OFFSET_TILES = 0.14;
 /** Calm flame sprites (flame_calm_1..4). */
 export const SCONCE_ANIM_FPS = 5;

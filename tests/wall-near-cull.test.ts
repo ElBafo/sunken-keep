@@ -275,6 +275,25 @@ describe('shared wall-mount near-plane cull', () => {
     }
   });
 
+  it('keeps a side-wall sconce visible at rest in its room and the adjacent corridor square', () => {
+    const lit = floor1Sconces.find((s) => s.x === 0 && s.y === 6)!;
+    const group = makeSconceGroup(lit);
+    for (const [x, y, dir] of [
+      [1, 6, 0],
+      [1, 6, 2],
+      [1, 7, 0]
+    ] as const) {
+      const player = makePlayer(x, y, dir);
+      group.visible = true;
+      applyWallMountNearCull(group, player.camera);
+      expect(
+        objectNearPlaneCulled(group, player.camera),
+        `near-cull at rest (${x},${y}) dir ${dir}`
+      ).toBe(false);
+      expect(group.visible, `hidden at rest (${x},${y}) dir ${dir}`).toBe(true);
+    }
+  });
+
   it('culls sconces with the same helper while backing into the unlit (4,6) W bracket', () => {
     const unlit = floor1Sconces.find((s) => s.x === 4 && s.y === 6)!;
     const group = makeSconceGroup(unlit);
