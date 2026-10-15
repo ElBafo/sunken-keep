@@ -1407,7 +1407,6 @@ class Game {
     document.getElementById('message-toast')?.classList.remove('show');
     this.noteOpen = true;
     this.audioManager?.playUi(NOTE_SCROLL_SFX);
-    this.messageTimer = performance.now() + 6000;
   }
 
   hideNote() {
@@ -3268,7 +3267,6 @@ class Game {
     if (this.messageTimer && now >= this.messageTimer) {
       this.messageTimer = 0;
       document.getElementById('message-toast')?.classList.remove('show');
-      this.hideNote();
     }
 
     this.renderer.render();

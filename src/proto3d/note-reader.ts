@@ -83,8 +83,7 @@ export interface DebugReaderNote {
 }
 
 export function debugReaderRequested(params: URLSearchParams): boolean {
-  const debug = params.get('debug');
-  return debug === 'reader' || params.get('reader') === '1';
+  return params.get('debug') === 'reader';
 }
 
 export function debugReaderUrl(base = '/sunken-keep/proto3d.html', locale?: 'en' | 'el'): string {
@@ -130,6 +129,55 @@ export function drawParchmentPanel(
   }
   ctx.fillStyle = PARCHMENT_FALLBACK_FILL;
   ctx.fillRect(x, y, w, h);
+}
+
+/** Cover the outer margins with parchment so clipped glyphs cannot bleed into the border. */
+export function drawParchmentMargins(
+  ctx: CanvasRenderingContext2D,
+  rect: NotePageRect,
+  image: HTMLImageElement | null | undefined,
+  margins: { left: number; right: number; top: number; bottom: number }
+): void {
+  const { x, y, w, h } = rect;
+  const { left, right, top, bottom } = margins;
+  ctx.imageSmoothingEnabled = false;
+  const midH = Math.max(0, h - top - bottom);
+  if (image && image.width > 0 && image.height > 0) {
+    const sx = image.width / w;
+    const sy = image.height / h;
+    ctx.drawImage(image, 0, 0, image.width, top * sy, x, y, w, top);
+    ctx.drawImage(
+      image,
+      0,
+      image.height - bottom * sy,
+      image.width,
+      bottom * sy,
+      x,
+      y + h - bottom,
+      w,
+      bottom
+    );
+    if (midH > 0) {
+      ctx.drawImage(image, 0, top * sy, left * sx, midH * sy, x, y + top, left, midH);
+      ctx.drawImage(
+        image,
+        image.width - right * sx,
+        top * sy,
+        right * sx,
+        midH * sy,
+        x + w - right,
+        y + top,
+        right,
+        midH
+      );
+    }
+    return;
+  }
+  ctx.fillStyle = PARCHMENT_FALLBACK_FILL;
+  ctx.fillRect(x, y, w, top);
+  ctx.fillRect(x, y + h - bottom, w, bottom);
+  ctx.fillRect(x, y + top, left, midH);
+  ctx.fillRect(x + w - right, y + top, right, midH);
 }
 
 export function wrapNoteText(text: string, maxPx: number, glyphs?: FontGlyphs): string[] {
@@ -401,12 +449,7 @@ export class NoteReader {
     this.scroll = scroll;
     ctx.save();
     ctx.beginPath();
-    ctx.rect(
-      Math.ceil(textRect.x),
-      Math.ceil(textRect.y),
-      Math.floor(textRect.w),
-      Math.floor(textRect.h)
-    );
+    ctx.rect(textRect.x, textRect.y, textRect.w, textRect.h);
     ctx.clip();
     lines.forEach((line, i) => {
       const clip = noteLineClip(i, scroll, textRect, layout.lineH);
@@ -426,5 +469,6 @@ export class NoteReader {
       );
     });
     ctx.restore();
+    drawParchmentMargins(ctx, page, this.parchmentImg, parchmentMargins(this.parchmentMeta));
   }
 }

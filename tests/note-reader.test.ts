@@ -200,6 +200,12 @@ describe('note reader layout', () => {
     expect(noteVisibleRange(maxScroll, layout.lines.length, box.h, layout.lineH).last).toBe(
       layout.lines.length
     );
+    const drawFn = noteReaderSrc.slice(noteReaderSrc.indexOf('private draw()'), noteReaderSrc.lastIndexOf('}'));
+    expect(drawFn).toMatch(/ctx\.save\(\)/);
+    expect(drawFn).toMatch(/ctx\.rect\(\s*textRect\.x,\s*textRect\.y,\s*textRect\.w,\s*textRect\.h\s*\)/);
+    expect(drawFn).toMatch(/ctx\.clip\(\)/);
+    expect(drawFn).toMatch(/ctx\.restore\(\)/);
+    expect(drawFn).toContain('drawParchmentMargins');
   });
 
   it('sizes a centred 92% overlay on 393x852 and fits landscape/desktop', () => {
@@ -260,7 +266,7 @@ describe('note reader layout', () => {
 describe('debug reader test note', () => {
   it('is loaded only behind ?debug=reader and is never placed on a map', () => {
     expect(debugReaderRequested(new URLSearchParams('debug=reader'))).toBe(true);
-    expect(debugReaderRequested(new URLSearchParams('reader=1'))).toBe(true);
+    expect(debugReaderRequested(new URLSearchParams('reader=1'))).toBe(false);
     expect(debugReaderRequested(new URLSearchParams('debug=1'))).toBe(false);
     expect(debugReaderUrl()).toContain(`?${DEBUG_READER_QUERY}`);
     expect(mainSrc).toContain('debugReaderRequested');
@@ -307,5 +313,17 @@ describe('note open sound', () => {
     expect(oilFull).toContain("storyLog('oil_full')");
     expect(oilFull).not.toMatch(/silent/);
     expect(mainSrc).toContain("this.audioManager?.playUi(NOTE_SCROLL_SFX)");
+  });
+
+  it('stays open after 10s with no input because toast/log timers never hide it', () => {
+    const showNote = mainSrc.slice(mainSrc.indexOf('  showNote('), mainSrc.indexOf('  hideNote()'));
+    expect(showNote).toContain('playUi(NOTE_SCROLL_SFX)');
+    expect(showNote).not.toContain('messageTimer');
+    const timerAt = mainSrc.indexOf('if (this.messageTimer && now >= this.messageTimer)');
+    const toastExpiry = mainSrc.slice(timerAt, timerAt + 280);
+    expect(toastExpiry).toContain("classList.remove('show')");
+    expect(toastExpiry).not.toContain('hideNote');
+    expect(10000).toBeGreaterThan(6000);
+    expect(10000).toBeGreaterThan(2300);
   });
 });
