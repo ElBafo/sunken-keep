@@ -14,6 +14,13 @@ export const CAMERA_PITCH = (cameraSpec.pitchDeg * Math.PI) / 180;
 export const CAMERA_FOV = cameraSpec.fov;
 export const CAMERA_NEAR = cameraSpec.near;
 export const CAMERA_FAR = cameraSpec.far;
+/**
+ * Hide the whole sconce (side/front bracket + flame) closer than this
+ * camera-space depth. Backing into a wall-mounted bracket (lit or unlit)
+ * puts the side plane on the near clip — one frame of huge blocky pixels.
+ * Flame-only Euclidean hiding did not cover the bracket.
+ */
+export const SCONCE_NEAR_CULL = CAMERA_NEAR + 0.5;
 /** Logical 3D view size in pixels [width, height]. */
 export const CAMERA_VIEW = cameraSpec.view as [number, number];
 /** Visual-only: draw monsters this many tiles toward the party from square centre. */

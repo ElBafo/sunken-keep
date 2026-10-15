@@ -164,7 +164,7 @@ describe('lantern: steep floors, soft props', () => {
       oil: () => 2
     });
     const ambient = lighting.ambientBrightness();
-    expect(ambient).toBeCloseTo(0.0585, 3);
+    expect(ambient).toBeCloseTo(0.05848, 5);
 
     for (const [px, py] of [
       [19, 5],
@@ -178,7 +178,26 @@ describe('lantern: steep floors, soft props', () => {
       expect(
         lighting.calculateBrightness(19, 8, false),
         `(19,8) stays ambient from (${px},${py})`
-      ).toBeCloseTo(0.0585, 3);
+      ).toBeCloseTo(0.05848, 5);
+    }
+  });
+
+  it('torch-lit west wall has no mid-wall height hole while stepping north', () => {
+    const lighting = new VertexLightingManager(floor1, floor1Sconces, {
+      floor: 1,
+      bright: 1,
+      oil: () => 2
+    });
+    const wallX = 1 * CELL_SIZE - CELL_SIZE / 2;
+    for (const py of [7, 6, 5]) {
+      lighting.setPartyPosition(1, py);
+      const sample = (wy: number) =>
+        lighting.sampleVertex(wallX, wy, py * CELL_SIZE, 1, py, false, false, true).luma;
+      const bottom = sample(0.2);
+      const mid = sample(0.88);
+      const top = sample(1.6);
+      expect(Math.abs(mid - bottom), `height hole beside party at y=${py}`).toBeLessThan(0.12);
+      expect(Math.abs(mid - top), `top vs mid at y=${py}`).toBeLessThan(0.12);
     }
   });
 

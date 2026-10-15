@@ -8,6 +8,7 @@ import {
   SCONCE_ANIM_FPS,
   SCONCE_FRONT_OFFSET_TILES,
   SCONCE_HEIGHT_TILES,
+  SCONCE_NEAR_CULL,
   SCONCE_WIDTH_TILES,
   TORCH_IGNITE_FLARE_MS,
   TORCH_SNUFF_FPS,
@@ -21,6 +22,8 @@ export type TorchVisualState = 'lit' | 'dead' | 'capped';
 interface TorchVisual {
   sconce: Sconce;
   group: THREE.Group;
+  side: THREE.Mesh;
+  front: THREE.Mesh;
   sideMat: THREE.MeshBasicMaterial;
   frontMat: THREE.MeshBasicMaterial;
   flame: THREE.Mesh;
@@ -76,6 +79,54 @@ export function torchWorldPos(s: Sconce): { x: number; y: number; z: number } {
     y: CELL_SIZE / 2 + 0.1 * CELL_SIZE,
     z: s.y * CELL_SIZE + nz * dist
   };
+}
+
+/** World poses for the three sconce meshes (matches TorchSystem.load). */
+export function torchBracketPoses(s: Sconce): {
+  side: { x: number; y: number; z: number };
+  front: { x: number; y: number; z: number };
+  flame: { x: number; y: number; z: number };
+} {
+  const { nx, nz } = FACE_INTO_ROOM[s.face];
+  const wallX = s.x * CELL_SIZE + nx * (CELL_SIZE / 2);
+  const wallZ = s.y * CELL_SIZE + nz * (CELL_SIZE / 2);
+  const w = SCONCE_WIDTH_TILES * CELL_SIZE;
+  const h = SCONCE_HEIGHT_TILES * CELL_SIZE;
+  const frontOff = SCONCE_FRONT_OFFSET_TILES * CELL_SIZE;
+  const flameH = 0.3125 * CELL_SIZE;
+  const midY = CELL_SIZE / 2;
+  return {
+    side: { x: wallX + nx * (w / 2), y: midY, z: wallZ + nz * (w / 2) },
+    front: { x: wallX + nx * frontOff, y: midY, z: wallZ + nz * frontOff },
+    flame: {
+      x: wallX + nx * frontOff,
+      y: midY + h / 2 - flameH / 2,
+      z: wallZ + nz * frontOff
+    }
+  };
+}
+
+const _view = new THREE.Vector3();
+
+/** Camera-space depth (positive in front). Three.js cameras look down −Z. */
+export function sconceCameraDepth(wx: number, wy: number, wz: number, camera: THREE.Camera): number {
+  _view.set(wx, wy, wz).applyMatrix4(camera.matrixWorldInverse);
+  return -_view.z;
+}
+
+/** True when a sconce mesh would clip the near plane or sit behind the eye. */
+export function sconceCulledByNearPlane(depth: number): boolean {
+  return depth < SCONCE_NEAR_CULL;
+}
+
+/** Hide the whole sconce (bracket + flame) once any mesh hits the near plane. */
+export function sconceCulledByCamera(s: Sconce, camera: THREE.Camera): boolean {
+  const poses = torchBracketPoses(s);
+  return (
+    sconceCulledByNearPlane(sconceCameraDepth(poses.side.x, poses.side.y, poses.side.z, camera)) ||
+    sconceCulledByNearPlane(sconceCameraDepth(poses.front.x, poses.front.y, poses.front.z, camera)) ||
+    sconceCulledByNearPlane(sconceCameraDepth(poses.flame.x, poses.flame.y, poses.flame.z, camera))
+  );
 }
 
 export class TorchSystem {
@@ -179,6 +230,8 @@ export class TorchSystem {
       this.visuals.push({
         sconce,
         group,
+        side,
+        front,
         sideMat,
         frontMat,
         flame,
@@ -263,9 +316,16 @@ export class TorchSystem {
     return visual.snuffing || visual.lighting || now < visual.tapLockedUntil;
   }
 
+  private sconceHidden(visual: TorchVisual): boolean {
+    if (hideWallProp(visual.sconce.x, visual.sconce.y, visual.sconce.face, this.partyX, this.partyY, this.partyDir)) {
+      return true;
+    }
+    return sconceCulledByCamera(visual.sconce, this.camera);
+  }
+
   snapshot() {
     return this.visuals.map((v) => {
-      const hide = hideWallProp(v.sconce.x, v.sconce.y, v.sconce.face, this.partyX, this.partyY, this.partyDir);
+      const hide = this.sconceHidden(v);
       return {
         x: v.sconce.x,
         y: v.sconce.y,
@@ -316,19 +376,11 @@ export class TorchSystem {
     }
     const cam = this.camera.position;
     for (const visual of this.visuals) {
-      const hide = hideWallProp(
-        visual.sconce.x,
-        visual.sconce.y,
-        visual.sconce.face,
-        this.partyX,
-        this.partyY,
-        this.partyDir
-      );
+      const hide = this.sconceHidden(visual);
       visual.group.visible = !hide;
       const dx = cam.x - visual.flame.position.x;
       const dz = cam.z - visual.flame.position.z;
-      const nearCam = Math.hypot(dx, dz) < 0.8;
-      const showFlame = !hide && (visual.sconce.lit || visual.lighting || visual.snuffing) && !nearCam;
+      const showFlame = !hide && (visual.sconce.lit || visual.lighting || visual.snuffing);
       visual.flame.visible = showFlame;
       if (!showFlame && !visual.snuffing && !visual.lighting) continue;
       this.look.set(dx, 0, dz);
