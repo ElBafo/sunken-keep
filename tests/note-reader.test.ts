@@ -39,7 +39,7 @@ function logText(log: Array<{ key: string; text?: string }>, key: string): strin
 describe('floor 1 readable items', () => {
   it('lists the secret journal page and Pell\'s desk note', () => {
     const { pickups, props } = floorReadableEntries(floor1);
-    expect(pickups).toEqual([{ x: 5, y: 1, item: 'journal_page', journalPage: 1 }]);
+    expect(pickups).toEqual([{ x: 4, y: 13, item: 'journal_page', journalPage: 1 }]);
     expect(isReadable(pickups[0].item)).toBe(true);
     expect(usesHeroTarget(pickups[0].item)).toBe(false);
     expect(props).toEqual([{ x: 12, y: 9, readNote: 'note_lampkeeper', prop: 'desk' }]);
