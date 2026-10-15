@@ -330,5 +330,10 @@
  },
  "intro": {
   "skip": "Παράλειψη"
+ },
+ "stairs": {
+  "_about": "Toast when stepping onto a down-stairs square that does not leave the floor yet. _short is the 41-char HUD log.",
+  "floor2_soon": "Οι σκάλες κατεβαίνουν στο σκοτάδι... Ο όροφος 2 έρχεται σύντομα.",
+  "floor2_soon_short": "Σκάλες στο σκοτάδι. Όροφος 2 σύντομα."
  }
 }
