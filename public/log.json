@@ -246,6 +246,12 @@
     "when": "on tapping a capped torch"
   },
   {
+    "key": "lamp_sealed",
+    "text": "Pell's lamp. Sealed tight. Not yet.",
+    "silent": true,
+    "when": "on tapping Pell's capped lamp after the story bark has played"
+  },
+  {
     "key": "torch_relit",
     "text": "The torch catches. The dark backs off.",
     "when": "on relighting a dead torch (1 oil)"

@@ -298,7 +298,7 @@ export function journalIntroKey(page: number): string {
 
 /** Journal intro lines write to the HUD but must not tick ui_log_line. */
 export function isSilentLogKey(key: string): boolean {
-  return key === 'read_journal' || key === 'journal_f2';
+  return key === 'read_journal' || key === 'journal_f2' || key === 'lamp_sealed';
 }
 
 export function journalTriggerId(page: number): string {

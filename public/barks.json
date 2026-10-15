@@ -735,7 +735,7 @@
     "speaker": "brannoc",
     "text": "He capped the last one himself. Brave little thief.",
     "face": "smirk",
-    "tier": "flavour"
+    "tier": "story"
   },
   {
     "trigger": "guard_hall_enter",

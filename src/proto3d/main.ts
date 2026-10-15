@@ -1627,13 +1627,23 @@ class Game {
     if (!hit) return false;
     const { tile } = hit;
     if (tile.readNote || tile.prop === 'desk') return this.readFacingDesk();
+    if (tile.prop === 'lamp_capped') return this.handleCappedLamp(tile);
     if (tile.bark) {
       if (this.speakBark(tile.bark)) return true;
     }
-    if (tile.prop === 'lamp_capped') {
-      this.showMessage(this.storyLog('torch_capped'));
+    return true;
+  }
+
+  /** First tap: story bark. Later taps: silent lamp_sealed log, never torch_capped. */
+  private handleCappedLamp(tile: Tile): boolean {
+    const barkId = typeof tile.bark === 'string' ? tile.bark : 'lampkeeper_capped_lamp';
+    if (this.storyProgress.fire(barkId)) {
+      this.speakBark(barkId);
       return true;
     }
+    this.showMessage(this.storyLog('lamp_sealed'), false, {
+      silent: this.story.logIsSilent('lamp_sealed') || isSilentLogKey('lamp_sealed')
+    });
     return true;
   }
 

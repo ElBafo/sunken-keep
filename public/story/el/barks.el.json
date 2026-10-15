@@ -735,7 +735,7 @@
     "speaker": "brannoc",
     "text": "Το τελευταίο το σφράγισε μόνος του. Γενναίος κλεφτάκος.",
     "face": "smirk",
-    "tier": "flavour"
+    "tier": "story"
   },
   {
     "trigger": "guard_hall_enter",

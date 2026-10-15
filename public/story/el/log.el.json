@@ -246,6 +246,12 @@
     "when": "on tapping a capped torch"
   },
   {
+    "key": "lamp_sealed",
+    "text": "Η λάμπα του Πελ. Σφραγισμένη. Όχι ακόμα.",
+    "silent": true,
+    "when": "on tapping Pell's capped lamp after the story bark has played"
+  },
+  {
     "key": "torch_relit",
     "text": "Η δάδα πιάνει. Το σκοτάδι κάνει πίσω.",
     "when": "on relighting a dead torch (1 oil)"

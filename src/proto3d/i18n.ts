@@ -71,6 +71,8 @@ export interface LogEntry {
   text: string;
   when?: string;
   lines?: string[];
+  /** Skip ui_log_line for this entry only. */
+  silent?: boolean;
 }
 
 type Json = Record<string, unknown>;
@@ -104,6 +106,7 @@ function capitalizeLog(text: string): string {
 export class StoryText {
   locale: Locale = 'en';
   private logs = new Map<string, string>();
+  private logSilent = new Set<string>();
   private barks = new Map<string, BarkLine[]>();
   private names: Json = {};
   private ui: Json = {};
@@ -124,6 +127,7 @@ export class StoryText {
       this.fetchJson<Array<Record<string, unknown>>>(this.url(base, 'barks.json', locale))
     ]);
     this.logs.clear();
+    this.logSilent.clear();
     for (const entry of log ?? []) {
       if (!entry?.key) continue;
       if (typeof entry.text === 'string') {
@@ -131,6 +135,7 @@ export class StoryText {
       } else if (Array.isArray(entry.lines) && entry.lines.length) {
         this.logs.set(entry.key, entry.lines.join('\n'));
       }
+      if (entry.silent) this.logSilent.add(entry.key);
     }
     this.barks.clear();
     for (const entry of barks ?? []) {
@@ -185,6 +190,10 @@ export class StoryText {
     const raw = this.logs.get(key);
     if (!raw) return '';
     return capitalizeLog(fill(raw, vars));
+  }
+
+  logIsSilent(key: string): boolean {
+    return this.logSilent.has(key);
   }
 
   bark(trigger: string): string {
