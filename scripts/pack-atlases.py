@@ -1,3 +1,7 @@
+# Packs from the pngquant singles under public/. Those singles drifted in #23,
+# so a blind re-pack rewrites unchanged sheet frames (panel_585, bones,
+# ceiling_crack, tally_marks, …). Prefer stamping new frames onto main's
+# existing sheets instead of re-running this for a one-off add.
 import os,json,glob,sys
 from PIL import Image
 P='public/'; title=[l.strip() for l in open('scripts/atlas-floor1-capture.txt')]
@@ -7,7 +11,7 @@ groups={'monsters':sorted(os.path.relpath(f,P) for f in glob.glob(P+'art/dungeon
  'props':[f for f in title if f.startswith(('art/dungeon/','art/fx/hits/','proto3d/tex3d/torch/'))],
  # water_edge / water_line stay single files (RepeatWrapping). Wall / water tiles too.
  # fx: dark-fx eyes/glints/stairs_glow + non-tiling atmo props.
- 'fx':[f for f in title if (f.startswith('proto3d/atmo/') and not f.endswith(('water_edge.png','water_line.png'))) or f.startswith('proto3d/fx/dark/')]}
+ 'fx':[f for f in title if (f.startswith('proto3d/atmo/') and not f.endswith(('water_edge.png','water_line.png'))) or f.startswith('proto3d/fx/')]}
 PAD=2; MAX=2048; out={}
 def pack(files,W):
     items=sorted(files,key=lambda f:(-Image.open(P+f).size[1],f)); pl={}; x=y=rowh=0; maxw=0

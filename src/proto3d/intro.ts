@@ -98,6 +98,7 @@ export class IntroPlayer {
   private onFinished: (() => void) | null = null;
   private finishNotified = false;
   private timeSource: (() => number | null) | null = null;
+  private audioState: (() => string | null) | null = null;
   private wallStartMs = 0;
   private wallClockOn = false;
   private lastMusicTime: number | null = null;
@@ -134,6 +135,27 @@ export class IntroPlayer {
   /** Drive caption/shot time from intro music `currentTime`. Null falls back to elapsed. */
   setTimeSource(source: (() => number | null) | null) {
     this.timeSource = source;
+  }
+
+  /** AudioContext.state. Suspended audio pauses the reel; stall-skip needs running. */
+  setAudioState(source: (() => string | null) | null) {
+    this.audioState = source;
+  }
+
+  private isAudioSuspended(): boolean {
+    try {
+      return this.audioState?.() === 'suspended';
+    } catch {
+      return false;
+    }
+  }
+
+  private isAudioRunning(): boolean {
+    try {
+      return this.audioState?.() === 'running';
+    } catch {
+      return false;
+    }
   }
 
   applyLocale() {
@@ -340,6 +362,11 @@ export class IntroPlayer {
 
   private update() {
     const now = performance.now();
+    if (this.isAudioSuspended()) {
+      this.wallStartMs += now - this.lastTick;
+      this.lastTick = now;
+      return;
+    }
     const wallSec = this.wallClockOn ? (now - this.wallStartMs) / 1000 : 0;
     const musicTime = this.musicSample();
     if (musicTime != null) {
@@ -359,7 +386,10 @@ export class IntroPlayer {
     const musicDone = musicTime != null && musicTime >= INTRO_DURATION_SEC;
     const musicStopped = this.sawMusicAdvance && musicTime == null;
     const musicStalled =
-      this.sawMusicAdvance && musicTime != null && now - this.lastMusicChangeMs >= INTRO_STALL_MS;
+      (!this.audioState || this.isAudioRunning()) &&
+      this.sawMusicAdvance &&
+      musicTime != null &&
+      now - this.lastMusicChangeMs >= INTRO_STALL_MS;
     if (this.skipped || wallDone || musicDone || musicStopped || musicStalled) {
       this.markFinished(true);
       return;

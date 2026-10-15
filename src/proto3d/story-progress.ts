@@ -71,6 +71,7 @@ export const ONCE_TRIGGERS: TriggerDef[] = [
   { id: 'first_sight_rust_crab', type: 'bark', once: true },
   { id: 'first_sight_bog_leeches', type: 'bark', once: true },
   { id: 'first_sight_drowned_dwarf', type: 'bark', once: true },
+  { id: 'slime_reveal', type: 'bark', once: true },
   { id: 'tut_hand', type: 'bark', once: true },
   { id: 'tut_front', type: 'bark', once: true },
   { id: 'tut_sheet', type: 'bark', once: true },
@@ -84,7 +85,10 @@ export const ONCE_TRIGGERS: TriggerDef[] = [
   { id: 'tam_left', type: 'bark', once: true },
   { id: 'frogcatcher_drowned', type: 'bark', once: true },
   { id: 'water_rising', type: 'log', once: true },
-  { id: 'act1_end', type: 'log', once: true }
+  { id: 'act1_end', type: 'log', once: true },
+  { id: 'opening_cavein', type: 'bark', once: true },
+  { id: 'opening_cavein_2', type: 'bark', once: true },
+  { id: 'cave_in_done', type: 'log', once: true }
 ];
 
 export const ONCE_TRIGGER_IDS = ONCE_TRIGGERS.map((t) => t.id);

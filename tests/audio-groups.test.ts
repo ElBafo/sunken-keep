@@ -3,9 +3,12 @@ import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
 import {
   act1MusicStem,
+  audioFileStem,
+  audioLoopLength,
   audioGroupRelPaths,
   audioGroupStems,
   audioStemKeys,
+  audioStemPath,
   beforePlayRelPaths,
   firstFightPriorityStems,
   firstFightRestStems,
@@ -33,6 +36,13 @@ describe('audio load groups', () => {
     expect(audioStemKeys('music_menu_loop')).toContain('menu');
     expect(audioStemKeys('music_act1_loop')).toContain('music_act1');
     expect(audioStemKeys('sfx_bark')).toContain('bark');
+    expect(audioFileStem('music_slime_battle')).toBe('music_slime_battle_loop');
+    expect(audioFileStem('sfx_slime_gurgle_loop')).toBe('sfx_slime_gurgle_loop');
+    expect(audioLoopLength('music_slime_battle')).toBe(24);
+    expect(audioLoopLength('slime_gurgle_loop')).toBe(5);
+    expect(audioStemPath('music_slime_battle')).toBe('audio/music_slime_battle_loop.mp3');
+    expect(audioStemPath('sting_slime_lair')).toBe('audio/sting_slime_lair.mp3');
+    expect(audioStemKeys('music_slime_battle')).toContain('music.music_slime_battle');
     expect(audioStemKeys('vox_brannoc_talk')).toContain('vox_brannoc_talk');
   });
 
@@ -49,6 +59,7 @@ describe('audio load groups', () => {
     expect(playable.has('audio/sfx_lantern_loop.mp3')).toBe(true);
     expect(playable.has('audio/sfx_bump.mp3')).toBe(true);
     expect(playable.has('audio/sfx_bark.mp3')).toBe(true);
+    expect(playable.has('audio/sfx_cave_in.mp3')).toBe(true);
     expect(playable.has('audio/amb_flooded_halls_loop.mp3')).toBe(false);
     expect(playable.has('audio/sfx_keep_rat_alert.mp3')).toBe(false);
     expect(later).not.toContain('audio/music_act1_loop.mp3');

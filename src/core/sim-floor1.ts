@@ -31,7 +31,7 @@ export function simulateFloor1(actions: unknown, monsters: unknown, seed: number
 
   for (const kind of FLOOR1_FIGHTS) {
     engine.clearMonsters();
-    const m = engine.spawnMonster(kind, 2, 0);
+    const m = engine.spawnMonster(kind, 2, 0, undefined, kind === 'slime' ? { split: true } : undefined);
     engine.setPartyPos(1, 0, 1);
     const fightStart = now;
     engine.beginFight(m, now);

@@ -2,7 +2,7 @@
  "image": "art/atlas/fx.png",
  "size": {
   "w": 500,
-  "h": 932
+  "h": 1222
  },
  "padding": 2,
  "extrude": 1,
@@ -372,6 +372,42 @@
    "y": 790,
    "w": 32,
    "h": 16
+  },
+  "proto3d/fx/dust_burst_1.png": {
+   "x": 2,
+   "y": 934,
+   "w": 160,
+   "h": 140
+  },
+  "proto3d/fx/dust_burst_2.png": {
+   "x": 166,
+   "y": 934,
+   "w": 160,
+   "h": 140
+  },
+  "proto3d/fx/dust_burst_3.png": {
+   "x": 330,
+   "y": 934,
+   "w": 160,
+   "h": 140
+  },
+  "proto3d/fx/dust_burst_4.png": {
+   "x": 2,
+   "y": 1078,
+   "w": 160,
+   "h": 140
+  },
+  "proto3d/fx/dust_burst_5.png": {
+   "x": 166,
+   "y": 1078,
+   "w": 160,
+   "h": 140
+  },
+  "proto3d/fx/dust_burst_6.png": {
+   "x": 330,
+   "y": 1078,
+   "w": 160,
+   "h": 140
   }
  }
 }

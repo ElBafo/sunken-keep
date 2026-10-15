@@ -144,7 +144,7 @@
     "name": "Oil flask",
     "short": "Oil",
     "desc": "Dwarves kept it like other folk keep wine.",
-    "effect": "+1 oil for Wren's lantern (max 4)."
+    "effect": "+2 oil for Wren's lantern (max 4)."
    },
    "torch": {
     "name": "Torch",

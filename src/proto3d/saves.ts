@@ -32,6 +32,10 @@ export interface SavedMonster {
   hp: number;
   maxHp: number;
   alive: boolean;
+  split?: boolean;
+  splitDone?: boolean;
+  pairSlot?: 'left' | 'right';
+  pairId?: string;
 }
 
 export interface SavedSconce {
@@ -272,6 +276,10 @@ export function snapshotMonster(m: MonsterState): SavedMonster {
     y: m.y,
     hp: m.hp,
     maxHp: m.maxHp,
-    alive: m.alive
+    alive: m.alive,
+    split: m.split,
+    splitDone: m.splitDone,
+    pairSlot: m.pairSlot,
+    pairId: m.pairId
   };
 }

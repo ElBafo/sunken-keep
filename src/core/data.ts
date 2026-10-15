@@ -83,6 +83,9 @@ function parseBehavior(kind: string, raw: Record<string, unknown>): MonsterBehav
     const bonus = detail.match(/frost\s*\+(\d+)%/i);
     behavior.frostBonus = bonus ? Number(bonus[1]) / 100 : 0.25;
   }
+  if (typeof b.frostMul === 'number' && Number.isFinite(b.frostMul)) {
+    behavior.frostMul = b.frostMul;
+  }
   if (habit === 'web') {
     behavior.chance = parseChance(detail) ?? 0.25;
     behavior.duration = parseDuration(detail) ?? 3;

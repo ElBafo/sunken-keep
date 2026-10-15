@@ -25,6 +25,14 @@
   "chest": "sfx_chest",
   "scroll": "sfx_scroll",
   "slime_hurt": "sfx_slime_hurt",
+  "slime_gurgle_loop": {
+   "file": "sfx_slime_gurgle_loop",
+   "loop": 5
+  },
+  "slime_small_alert": "sfx_slime_small_alert",
+  "slime_small_attack": "sfx_slime_small_attack",
+  "slime_small_hurt": "sfx_slime_small_hurt",
+  "slime_small_death": "sfx_slime_small_death",
   "drowned_dwarf_hurt": "sfx_drowned_dwarf_hurt",
   "tide_spawn_hurt": "sfx_tide_spawn_hurt",
   "tide_spawn_song_loop": "sfx_tide_spawn_song_loop",
@@ -133,6 +141,8 @@
   "water_lap_loop": "sfx_water_lap_loop",
   "oil_pickup": "sfx_oil_pickup",
   "lantern_refill": "sfx_lantern_refill",
+  "oil_flask": "sfx_oil_flask",
+  "cave_in": "sfx_cave_in",
   "lantern_ember_loop": "sfx_lantern_ember_loop",
   "oil_empty": "sfx_oil_empty",
   "dark_presence_loop": "sfx_dark_presence_loop",
@@ -230,7 +240,8 @@
   "vox_brannoc_talk": "vox_brannoc_talk",
   "vox_mags_talk": "vox_mags_talk",
   "vox_wren_talk": "vox_wren_talk",
-  "vox_ilsevar_talk": "vox_ilsevar_talk"
+  "vox_ilsevar_talk": "vox_ilsevar_talk",
+  "slime_split": "sfx_slime_split"
  },
  "music": {
   "intro": {
@@ -296,6 +307,18 @@
    "loop": true,
    "length_s": 64,
    "volume": 0.3
+  },
+  "sting_slime_lair": {
+   "file": "sting_slime_lair",
+   "loop": false,
+   "length_s": 2.8,
+   "volume": 0.8
+  },
+  "music_slime_battle": {
+   "file": "music_slime_battle_loop",
+   "loop": 24,
+   "length_s": 24,
+   "volume": 0.4
   }
  },
  "formats": [
@@ -308,6 +331,7 @@
   "hurt": "Party member taking damage; 'hit' is the party striking an enemy.",
   "monsters": "{monster}_alert when it notices the party, _attack when it strikes, _death on kill. Names match Pixelartie's sprite prefixes.",
   "tide_spawn_song_loop": "Loop quietly while a tide spawn is within ~3 squares, louder when closer. Goes with Ilsevar's 'It's singing' line.",
+  "slime_gurgle_loop": "Web Audio buffer-source loop (loop=true) while a slime or slimeling is alive. File is sfx_slime_gurgle_loop (5.04s).",
   "ambience": "amb_flooded_halls for all indoor floors; amb_swamp only for outdoor scenes (intro shot 5).",
   "leech_latch": "For a latched leech draining health, repeat bog_leeches_attack at low volume each drain tick.",
   "ui": "ui_button for any panel press (incl. attack before the hit sound), ui_button_denied for a hero who can't act yet, ui_turn on turning left/right, ui_log_line very quietly when a new log line appears.",
@@ -334,7 +358,9 @@
   "voices": "Wordless character voices (work in English and Greek). On each conversation line, play a random vox_<npc>_1..4 (not the same one twice in a row) when the line appears, non-positional, volume 0.7. Hobb: quick chirpy chatter. Tam: weak and breathy. Dural: deep and gruff. Hessa: hollow, calm, echoing. npc ids match Levie's npc field (e.g. npc: 'hobb').",
   "water_lap_loop": "Positional loop on flooded squares (one per pool, at its centre), ~2 square range, volume 0.35. Footsteps on water squares already exist: sfx_step_water_shallow / sfx_step_water_deep instead of sfx_step.",
   "steps": "Steps v2 (Loukas: still loud, water sounded like paper). Soft, low and dull now: no high end, soft attack. Pick a random variant _1.._4 each step, never the same twice in a row, with playbackRate 0.95-1.05. Files are made to sit at Gamie's 60%-quieter step volume (0.4); don't cut further. Shallow = short wet slosh, deep = heavier, lower wade.",
-  "oil": "Oil and torch lighting. Flask pickup: sfx_oil_pickup (clay, not glass, unlike sfx_potion); when it tops up the lantern, sfx_lantern_refill. Lighting a dead torch: sfx_torch_ignite then that torch's sfx_torch_loop for good. Tapping a capped torch: sfx_door_locked. Oil hits zero: sfx_oil_empty, then swap sfx_lantern_loop for sfx_lantern_ember_loop (quiet, 0.3) until refilled. Floor 5+: when a lit torch draws a creature, play sfx_tide_sigh quietly from that torch's direction.",
+  "oil": "Oil and torch lighting. Flask pickup: sfx_oil_pickup (clay, not glass, unlike sfx_potion); when it tops up the lantern, sfx_oil_flask (see notes.oil_flask). Lighting a dead torch: sfx_torch_ignite then that torch's sfx_torch_loop for good. Tapping a capped torch: sfx_door_locked. Oil hits zero: sfx_oil_empty, then swap sfx_lantern_loop for sfx_lantern_ember_loop (quiet, 0.3) until refilled. Floor 5+: when a lit torch draws a creature, play sfx_tide_sigh quietly from that torch's direction.",
+  "oil_flask": "sfx_oil_flask (0.62 s, about -20 LUFS, non-positional): using an oil flask on Wren's lantern. Two glugs, onsets 0.050 s and 0.350 s (measured after MP3 encoding, within 1 ms); light gauge segment 1 on the first and segment 2 on the second. At 3 bars only one segment fills: play it and fade out over 0.05 s from 0.28 s, so only the first glug is heard. At 4 bars the flask is refused: no sound, show log oil_full. This replaces sfx_lantern_refill for flask use.",
+  "cave_in": "sfx_cave_in (4.0 s, about -18 LUFS, play at 1.0, non-positional): opening cave-in. Start it when the party's first step ends; rumble builds 0-1.2 s, the stone crash lands at 1.20 s (sync the bang/shake and the camera turn's start to it), rocks settle to 3.0 s, dust trickle to 4.0 s. Skip-tap: let it keep playing (or fade over 0.3 s), never cut it hard. MUST be loaded before play starts: it is in the pre-play set.",
   "true_dark": "Floor 3+ (and the deep-dark test switch). For a monster waiting outside the light (where Pixelartie's eye glints show), loop sfx_dark_presence_loop from its square, positional, quiet (0.3), stopping once light reaches it and its normal alert plays. sfx_glint once, quietly, the first time a key/lever glint comes into view in the dark. In true dark also drop the Act 1 music to ~0.15 and the halls ambience by ~3 dB, so the player hears the dark rather than the score.",
   "lamp_hooks_loop": "Floor 1 lamp-keeper's room: loop from the hook rail, positional, audible ~4 squares away so it carries down the black corridor (volume 0.5). Fire Storie's lampkeeper_hooks_heard on the first square where it becomes audible. Pell's note: reuse sfx_scroll on tap. Guard hall sunbeam: sfx_crack_wind_loop; fallen beams: one sfx_far_pebbles when first entering.",
   "torch_hand": "Party panel round. Wall torch Take: sfx_torch_take (stop that bracket's torch_loop, start a quiet non-positional torch_loop at 0.2 while carried). Snuff: sfx_torch_extinguish. Torch in hand tap: sfx_act_torch, then sfx_hit or sfx_act_miss as usual. Back into an empty bracket: sfx_torch_place (positional loop resumes there). Dropped into water: sfx_torch_dunk, stop the carried loop.",
@@ -344,6 +370,7 @@
   "windups": "Monster attack telegraphs. Play <monster>_windup when the visual tell starts (crab claw-raise, dwarf overhead wind-up, Dural's flash); the attack lands at its end: rust_crab and drowned_dwarf 1.0 s, dural 1.3 s, then play the attack sound (dural uses drowned_dwarf_attack until it has its own). Positional from the monster, combat priority, never ducked or voice-stolen. If the monster is interrupted or dies, stop the wind-up at once.",
   "hero_voices": "Wordless party hero voices (work in English and Greek). Not positional (party sounds), Effects bus, combat priority. Hero takes damage: play a random vox_<hero>_hurt_variants entry, never the same one twice in a row for that hero, alongside the usual sfx_hurt; at most one hero hurt voice every 0.6 s across the whole party (drop extras, don't queue); optional: skip it for chip damage under 2 HP. Hero hits 0 HP: play vox_<hero>_down layered with sfx_hero_down (start together; the down voice is never skipped by the 0.6 s limit). Brannoc: low, gruff, creaky. Wren: warm mid voice. Ilsevar: calm, dry, with a throat rattle and a hiss. Mags: high, quick, bright. Hurts about -20 LUFS, downs about -19 LUFS, play at 1.0. hero ids match names.json (brannoc, wren, ilsevar, mags).",
   "hit_types": "Damage-type hits (teach the slime lesson). When the target resists the attack's damage type (e.g. slime vs blades), play a random hit_resist_variants entry instead of hit; when the target is weak to it (e.g. slime vs Ilsevar's frost wand), play a random hit_weak_variants entry instead of hit. A natural 20 still overrides both with hit_crit. Same rule as the other combat variants: random, never the same one twice in a row, playbackRate 0.95-1.05. Positional from the monster, combat priority. Resist ~0.36 s, about -22 LUFS (dull wet thunk, sits under hit on purpose); weak ~0.52 s, about -19 LUFS (bright icy crack + shatter).",
-  "hero_talk": "vox_<hero>_talk: short neutral wordless voice when a hero speaks a bark or their dialogue box opens (replaces sfx_bark for hero speakers; keep sfx_bark for non-hero bubbles). Once per bubble, not per letter; not positional; about -21 LUFS, play at 1.0 (barks can use ~0.8). Never use vox_*_hurt for speech."
+  "hero_talk": "vox_<hero>_talk: short neutral wordless voice when a hero speaks a bark or their dialogue box opens (replaces sfx_bark for hero speakers; keep sfx_bark for non-hero bubbles). Once per bubble, not per letter; not positional; about -21 LUFS, play at 1.0 (barks can use ~0.8). Never use vox_*_hurt for speech.",
+  "floor1_v2": "Floor 1 v2. slime_split: once when the slime splits at half HP. slime_small_*: the two small slimes (alert/attack/hurt/death), positional like slime_*. slime_spit_windup (0.95 s): play when the acid-spit tell starts; spit lands at its end, then slime_attack; stop at once if interrupted/dies; combat priority, never ducked. sfx_slime_gurgle_loop (5 s): positional loop on the slime's square, ~3 square range, volume ~0.5, starts audible along the trail. sting_slime_lair: once at the lair door (19,5), duck music_act1 to 0.12 first. music_slime_battle: replaces music_act1 during the slime fight (1 s crossfade), loops at 24 s; on victory fade out 2 s and fade music_act1 back in over 4 s. All about -20 LUFS (gurgle -26, sting -18, battle -19.5)."
  }
 }

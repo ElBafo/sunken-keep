@@ -27,12 +27,14 @@ describe('wall vs floor props', () => {
     expect(lamp.propWall).toBe('E');
   });
 
-  it('keeps desk, jar rack, and guard-hall beams as blocking floor props', () => {
+  it('keeps desk and guard-hall beams as blocking floor props; jar rack hangs on the west wall', () => {
     expect(isBlockingProp(desk)).toBe(true);
     expect(isWallProp(desk)).toBe(false);
     expect(isBlockingProp(beam)).toBe(true);
     expect(rack.prop).toBe('jar_rack');
-    expect(isBlockingProp(rack)).toBe(true);
+    expect(isWallProp(rack)).toBe(true);
+    expect(isBlockingProp(rack)).toBe(false);
+    expect(rack.propWall).toBe('W');
     expect(mirrored.prop).toBe('beams_fallen');
     expect(mirrored.mirror).toBe(true);
   });
@@ -44,7 +46,7 @@ describe('wall vs floor props', () => {
     expect(player.blockReason(10, 3)).toBe('wall');
     expect(player.blockReason(12, 4)).toBe('wall');
     expect(player.blockReason(12, 9)).toBe('wall');
-    expect(player.blockReason(9, 10)).toBe('wall');
+    expect(player.blockReason(9, 10)).toBe('ok');
   });
 
   it('interacts from the adjacent square facing it and from its own square facing E only', () => {

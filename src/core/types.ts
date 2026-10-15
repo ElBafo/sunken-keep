@@ -47,6 +47,7 @@ export interface MonsterBehavior {
   halfDamage?: string[];
   fullDamage?: string[];
   frostBonus?: number;
+  frostMul?: number;
   phaseHpFrac?: number;
   block?: 'halve' | 'negate';
   stationary?: boolean;
@@ -122,6 +123,10 @@ export interface MonsterState {
   missNext: boolean;
   alive: boolean;
   deadAt: number;
+  split?: boolean;
+  splitDone?: boolean;
+  pairSlot?: 'left' | 'right';
+  pairId?: string;
 }
 
 export interface FightState {
@@ -154,7 +159,12 @@ export type CombatEvent =
   | { type: 'shield_up'; hero: HeroId; until: number }
   | { type: 'leech_latch'; hero: HeroId }
   | { type: 'leech_off'; hero: HeroId }
-  | { type: 'web'; hero: HeroId; until: number };
+  | { type: 'web'; hero: HeroId; until: number }
+  | {
+      type: 'slime_split';
+      from: string;
+      kids: Array<{ id: string; x: number; y: number; kind: string; slot: 'left' | 'right' }>;
+    };
 
 export interface Occupancy {
   walkable(x: number, y: number): boolean;

@@ -1,4 +1,5 @@
 import loadGroups from './audio-load-groups.json';
+import audioRegistry from '../../public/audio/audio.json';
 import {
   ACT1_MUSIC_STEM,
   BEFORE_PLAY_STEMS,
@@ -6,6 +7,15 @@ import {
   FIRST_FIGHT_REST_STEMS,
   FIRST_FIGHT_STEMS
 } from './floor1-sounds';
+
+type MusicEntry = { file?: string; loop?: boolean | number; length_s?: number };
+type SfxEntry = string | string[] | { file?: string; loop?: number };
+type AudioRegistry = {
+  sfx?: Record<string, SfxEntry>;
+  music?: Record<string, MusicEntry>;
+};
+
+const REGISTRY = audioRegistry as AudioRegistry;
 
 export type AudioLoadGroup = 'title' | 'floor1' | 'later';
 
@@ -35,7 +45,14 @@ const EXTRA_ALIASES: Record<string, readonly string[]> = {
   sfx_drowned_dwarf_hurt: ['captain_dural_hurt'],
   sfx_drowned_dwarf_death: ['captain_dural_death'],
   sfx_hit_resist_1: ['hit_resist'],
-  sfx_hit_weak_1: ['hit_weak']
+  sfx_hit_weak_1: ['hit_weak'],
+  sfx_slime_gurgle_loop: ['slime_gurgle_loop'],
+  music_slime_battle: ['slime_battle', 'music.music_slime_battle'],
+  sting_slime_lair: ['music.sting_slime_lair'],
+  sfx_slime_small_alert: ['slime_small_alert'],
+  sfx_slime_small_attack: ['slime_small_attack'],
+  sfx_slime_small_hurt: ['slime_small_hurt'],
+  sfx_slime_small_death: ['slime_small_death']
 };
 
 export function audioGroupStems(group: AudioLoadGroup): readonly string[] {
@@ -55,8 +72,48 @@ export function audioStemKeys(stem: string): string[] {
   return keys;
 }
 
+function sfxFile(entry: SfxEntry | undefined): string | undefined {
+  if (typeof entry === 'string') return entry;
+  if (Array.isArray(entry)) return entry[0];
+  if (entry && typeof entry.file === 'string') return entry.file;
+  return undefined;
+}
+
+/** Registry key → on-disk stem. `music.music_slime_battle` → `music_slime_battle_loop`. */
+export function audioFileStem(stem: string): string {
+  const music = REGISTRY.music?.[stem] ?? REGISTRY.music?.[stem.replace(/^music_/, '')];
+  if (music?.file) return music.file;
+  const sfxKey = stem.startsWith('sfx_') ? stem.slice(4) : stem;
+  const file = sfxFile(REGISTRY.sfx?.[sfxKey] ?? REGISTRY.sfx?.[stem]);
+  if (file) return file;
+  return stem;
+}
+
+function numericLoop(entry: MusicEntry | SfxEntry | undefined): number | undefined {
+  if (!entry || typeof entry === 'string' || Array.isArray(entry)) return undefined;
+  return typeof entry.loop === 'number' ? entry.loop : undefined;
+}
+
+/** True loop length (seconds) from the registry `loop` field, if present. */
+export function audioLoopLength(name: string): number | undefined {
+  const keys = [
+    name,
+    name.replace(/^music\./, ''),
+    name.replace(/^sfx_/, ''),
+    name.replace(/^music_/, ''),
+    `music_${name.replace(/^music\./, '').replace(/^music_/, '')}`
+  ];
+  for (const key of keys) {
+    const fromMusic = numericLoop(REGISTRY.music?.[key]);
+    if (fromMusic != null) return fromMusic;
+    const fromSfx = numericLoop(REGISTRY.sfx?.[key]);
+    if (fromSfx != null) return fromSfx;
+  }
+  return undefined;
+}
+
 export function audioStemPath(stem: string): string {
-  return `audio/${stem}.mp3`;
+  return `audio/${audioFileStem(stem)}.mp3`;
 }
 
 export function audioGroupRelPaths(group: AudioLoadGroup): string[] {

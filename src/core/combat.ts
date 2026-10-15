@@ -22,6 +22,8 @@ import {
   WINDUP_SOUND,
   WINDUP_SOUND_SEC
 } from './types';
+import { isSlimeKind } from './slime-frost';
+import { SLIME_SMALL_STAGGER_SEC, type SlimePairSlot } from './slime-pair';
 
 const DIRS: Array<[number, number]> = [
   [0, -1],
@@ -146,7 +148,13 @@ export class CombatEngine {
     void now;
   }
 
-  spawnMonster(kind: string, x: number, y: number, hp?: number): MonsterState {
+  spawnMonster(
+    kind: string,
+    x: number,
+    y: number,
+    hp?: number,
+    extra?: { split?: boolean; pairSlot?: SlimePairSlot; pairId?: string }
+  ): MonsterState {
     const def = this.data.monsters[kind];
     const max = hp ?? def?.hp ?? 1;
     const m: MonsterState = {
@@ -162,10 +170,47 @@ export class CombatEngine {
       windup: null,
       missNext: false,
       alive: true,
-      deadAt: 0
+      deadAt: 0,
+      split: extra?.split,
+      splitDone: false,
+      pairSlot: extra?.pairSlot,
+      pairId: extra?.pairId
     };
     this.monsters.push(m);
     return m;
+  }
+
+  maybeSplit(m: MonsterState, now: number): boolean {
+    if (!m.split || m.splitDone || !m.alive || m.hp <= 0) return false;
+    if (m.hp > m.maxHp / 2) return false;
+    m.splitDone = true;
+    const hpEach = Math.max(1, Math.ceil(m.hp / 2));
+    m.hp = 0;
+    m.alive = false;
+    m.deadAt = now;
+    const a = this.spawnMonster('slime_small', m.x, m.y, hpEach, { pairSlot: 'left', pairId: m.id });
+    const b = this.spawnMonster('slime_small', m.x, m.y, hpEach, { pairSlot: 'right', pairId: m.id });
+    const interval = this.def('slime_small')?.interval ?? 2.5;
+    a.nextAttackAt = now + interval;
+    b.nextAttackAt = now + interval + SLIME_SMALL_STAGGER_SEC;
+    if (this.fight?.monsterId === m.id) this.fight.monsterId = a.id;
+    this.emit({ type: 'monster_dead', id: m.id, x: m.x, y: m.y, kind: m.kind });
+    this.emit({
+      type: 'slime_split',
+      from: m.id,
+      kids: [
+        { id: a.id, x: a.x, y: a.y, kind: a.kind, slot: 'left' },
+        { id: b.id, x: b.x, y: b.y, kind: b.kind, slot: 'right' }
+      ]
+    });
+    return true;
+  }
+
+  /** Debug / tests: apply pending splits after an out-of-band HP change. */
+  flushSplits(now: number): CombatEvent[] {
+    this.events = [];
+    for (const m of [...this.monsters]) this.maybeSplit(m, now);
+    return this.flush();
   }
 
   clearMonsters() {
@@ -173,8 +218,13 @@ export class CombatEngine {
     this.fight = null;
   }
 
+  monstersAt(x: number, y: number): MonsterState[] {
+    return this.monsters.filter((m) => m.alive && m.x === x && m.y === y);
+  }
+
   monsterAt(x: number, y: number): MonsterState | undefined {
-    return this.monsters.find((m) => m.alive && m.x === x && m.y === y);
+    const here = this.monstersAt(x, y);
+    return here.find((m) => m.pairSlot === 'left') ?? here[0];
   }
 
   livingMonsters(): MonsterState[] {
@@ -253,7 +303,7 @@ export class CombatEngine {
     if (this.fight) this.endFight(now);
     this.fight = { monsterId: monster.id, startedAt: now };
     monster.noticed = true;
-    monster.nextAttackAt = now + FIRST_SWING_SEC;
+    this.staggerPairTimers(monster, now, FIRST_SWING_SEC);
     monster.windup = null;
     this.emit({ type: 'fight_start', monsterId: monster.id, kind: monster.kind });
     this.emit({ type: 'sfx', name: `${monster.kind}_alert`, x: monster.x, y: monster.y, combat: true });
@@ -347,7 +397,10 @@ export class CombatEngine {
     const b = this.def(kind)?.behavior;
     if (!b || b.habit !== 'resist_blades') return 1;
     const dtype = damageType(item);
-    if (dtype === 'frost' || item === 'scroll' || item === 'wand') return 1 + (b.frostBonus ?? 0.25);
+    if (dtype === 'frost' || item === 'scroll' || item === 'wand') {
+      if (typeof b.frostMul === 'number') return b.frostMul;
+      return 1 + (b.frostBonus ?? 0.25);
+    }
     if (dtype === 'blade' || dtype === 'pierce' || b.halfDamage?.includes(item)) return 0.5;
     return 1;
   }
@@ -451,7 +504,16 @@ export class CombatEngine {
       if (h.latched && m.kind === 'bog_leeches') this.clearLatch(h);
     }
     this.grantXp(m.maxHp, now);
-    if (this.fight?.monsterId === m.id) this.endFight(now);
+    if (this.fight?.monsterId === m.id) {
+      const mate = this.pairMate(m);
+      if (mate) this.fight.monsterId = mate.id;
+      else this.endFight(now);
+    }
+  }
+
+  private pairMate(m: MonsterState): MonsterState | undefined {
+    if (!m.pairId) return this.monstersAt(m.x, m.y).find((o) => o.id !== m.id);
+    return this.livingMonsters().find((o) => o.pairId === m.pairId && o.id !== m.id);
   }
 
   debugLatch(id: HeroId, turns = 3) {
@@ -503,6 +565,14 @@ export class CombatEngine {
   debugKillAt(x: number, y: number, now: number): CombatEvent[] {
     this.events = [];
     const m = this.monsters.find((mm) => mm.alive && mm.x === x && mm.y === y);
+    if (!m) return [];
+    this.killMonster(m, now);
+    return this.flush();
+  }
+
+  debugKillId(id: string, now: number): CombatEvent[] {
+    this.events = [];
+    const m = this.monsters.find((mm) => mm.alive && mm.id === id);
     if (!m) return [];
     this.killMonster(m, now);
     return this.flush();
@@ -661,8 +731,15 @@ export class CombatEngine {
     dmg = Math.max(1, Math.floor(dmg * mul));
     target.hp -= dmg;
     const kind = this.hitKind(crit, mul);
-    if (kind !== 'resist') this.emit({ type: 'monster_anim', id: target.id, anim: 'hurt' });
-    this.emit({ type: 'sfx', name: `${target.kind}_hurt`, x: target.x, y: target.y, combat: true });
+    if (kind !== 'resist' && target.hp > 0) this.emit({ type: 'monster_anim', id: target.id, anim: 'hurt' });
+    this.emit({
+      type: 'sfx',
+      name: `${target.kind}_hurt`,
+      x: target.x,
+      y: target.y,
+      combat: true,
+      id: target.id
+    });
     this.emit({
       type: 'hit_type',
       kind,
@@ -681,6 +758,14 @@ export class CombatEngine {
       this.emit({ type: 'log', key: 'hit', vars: { hero: heroId, monster: target.kind, n: dmg } });
     }
     this.emit({ type: 'sfx', name: this.hitSfx(kind), x: target.x, y: target.y, combat: true });
+    if (
+      kind === 'resist' &&
+      isSlimeKind(target.kind) &&
+      (damageType(item) === 'frost' || item === 'scroll' || item === 'wand')
+    ) {
+      this.emit({ type: 'log', key: 'slime_frost_resist', vars: { monster: target.kind } });
+    }
+    if (this.maybeSplit(target, now)) return this.flush();
 
     if (damageType(item) === 'fire') {
       for (const id of HERO_IDS) {
@@ -741,6 +826,38 @@ export class CombatEngine {
     return this.monsters.find((m) => m.id === this.fight!.monsterId && m.alive);
   }
 
+  private fightGroup(): MonsterState[] {
+    const primary = this.fightMonster();
+    if (!primary) return [];
+    return this.matesOf(primary);
+  }
+
+  private matesOf(m: MonsterState): MonsterState[] {
+    if (m.pairId) {
+      return this.livingMonsters()
+        .filter((o) => o.pairId === m.pairId)
+        .sort((a, b) => Number(a.pairSlot !== 'left') - Number(b.pairSlot !== 'left'));
+    }
+    const here = this.monstersAt(m.x, m.y);
+    return here.length ? here : [m];
+  }
+
+  /** Re-apply the 1.25 s slimeling gap whenever a pair enters / re-enters combat. */
+  private staggerPairTimers(primary: MonsterState, now: number, firstDelay: number) {
+    const group = this.matesOf(primary);
+    if (group.length < 2) {
+      primary.nextAttackAt = now + firstDelay;
+      return;
+    }
+    const left = group.find((m) => m.pairSlot === 'left') ?? group[0];
+    const right = group.find((m) => m !== left) ?? group[1];
+    left.nextAttackAt = now + firstDelay;
+    right.nextAttackAt = left.nextAttackAt + SLIME_SMALL_STAGGER_SEC;
+    for (const extra of group) {
+      if (extra !== left && extra !== right) extra.nextAttackAt = now + firstDelay;
+    }
+  }
+
   tick(now: number): CombatEvent[] {
     this.events = [];
     if (this.gameOver) return this.flush();
@@ -750,9 +867,9 @@ export class CombatEngine {
 
     if (this.chaseEnabled) this.tickNotice(now);
 
-    const foe = this.fightMonster();
-    if (this.fight && !foe) this.endFight(now);
-    if (foe) this.tickFight(foe, now);
+    const foes = this.fightGroup();
+    if (this.fight && !foes.length) this.endFight(now);
+    for (const foe of foes) this.tickFight(foe, now);
 
     for (const h of Object.values(this.heroes)) {
       if (h.latched && !this.livingMonsters().some((m) => m.kind === 'bog_leeches')) this.clearLatch(h);
@@ -874,7 +991,7 @@ export class CombatEngine {
     }
     const attackSfx = m.kind === 'captain_dural' ? 'drowned_dwarf_attack' : `${m.kind}_attack`;
     this.emit({ type: 'monster_anim', id: m.id, anim: 'attack' });
-    this.emit({ type: 'sfx', name: attackSfx, x: m.x, y: m.y, combat: true });
+    this.emit({ type: 'sfx', name: attackSfx, x: m.x, y: m.y, combat: true, id: m.id });
 
     if (kind === 'cleave') {
       const [lo, hi] = def.behavior.specialDamage ?? def.damage;
@@ -1028,7 +1145,19 @@ export class CombatEngine {
   }
 
   restoreMonsters(
-    list: Array<{ id: string; kind: string; x: number; y: number; hp: number; maxHp: number; alive: boolean }>
+    list: Array<{
+      id: string;
+      kind: string;
+      x: number;
+      y: number;
+      hp: number;
+      maxHp: number;
+      alive: boolean;
+      split?: boolean;
+      splitDone?: boolean;
+      pairSlot?: 'left' | 'right';
+      pairId?: string;
+    }>
   ) {
     this.monsters = [];
     this.fight = null;
@@ -1050,7 +1179,11 @@ export class CombatEngine {
         windup: null,
         missNext: false,
         alive: s.alive,
-        deadAt: s.alive ? 0 : 1
+        deadAt: s.alive ? 0 : 1,
+        split: s.split,
+        splitDone: !!s.splitDone,
+        pairSlot: s.pairSlot,
+        pairId: s.pairId
       });
     }
     this.nextId = maxId + 1;

@@ -1,0 +1,189 @@
+{
+  "_note": "Front-two melee rule. Target: floor 1 costs about 25 of the party's 129 HP before potions; the slime fight lasts about 10s and is the one where shield or lantern matters.",
+  "bog_leeches": {
+    "floor": 1,
+    "hp": 12,
+    "damage": [
+      1,
+      3
+    ],
+    "latch": {
+      "chance": 0.25,
+      "drainPerTurn": 1,
+      "turns": 3,
+      "sound": "sfx_bog_leeches_attack (quiet)"
+    },
+    "ac": 8,
+    "interval": 2.0,
+    "behavior": {
+      "habit": "latch",
+      "tell": "none, they just cling",
+      "counter": "green potion pulls them off; fire damage makes them let go",
+      "stationary": true,
+      "stationary_note": "stay in their water; only fight when the party is next to them"
+    },
+    "size": {
+      "worldHeight": 0.15
+    }
+  },
+  "keep_rat": {
+    "floor": 1,
+    "hp": 14,
+    "damage": [
+      2,
+      4
+    ],
+    "ac": 10,
+    "interval": 2.0,
+    "behavior": {
+      "habit": "dart",
+      "detail": "every 3rd attack bites a random back-row hero instead of the front",
+      "tell": "rat squeaks and ducks low first",
+      "counter": "kill it first; Mags's speed"
+    },
+    "size": {
+      "worldHeight": 0.25
+    }
+  },
+  "rust_crab": {
+    "floor": 1,
+    "hp": 24,
+    "damage": [
+      2,
+      5
+    ],
+    "_armor": "helm shell is its high AC",
+    "ac": 15,
+    "interval": 2.5,
+    "behavior": {
+      "habit": "wind_up",
+      "detail": "every 3rd attack: 1.0s claw-raise, then a pinch for 5-8",
+      "tell": "claws rise + sfx wind-up",
+      "counter": "Brannoc's shield block during the wind-up halves it",
+      "specialDamage": [
+        5,
+        8
+      ]
+    },
+    "size": {
+      "worldHeight": 0.35
+    }
+  },
+  "slime": {
+    "floor": 1,
+    "hp": 70,
+    "damage": [
+      4,
+      8
+    ],
+    "_role": "toughest thing on floor 1",
+    "ac": 11,
+    "interval": 2.5,
+    "behavior": {
+      "habit": "resist_blades",
+      "detail": "axe and dagger deal half damage; mace deals full; frost deals half (it slides off the slime)",
+      "tell": "blades sink in with a wet thunk",
+      "counter": "the mace (blunt hits do full damage), Wren swapping forward",
+      "stationary": true,
+      "stationary_note": "never chases; it blocks the arch to the guard hall so the crab and slime are separate fights",
+      "frostMul": 0.5
+    },
+    "size": {
+      "worldHeight": 0.39
+    }
+  },
+  "slime_small": {
+    "floor": 1,
+    "hp": 20,
+    "damage": [
+      2,
+      5
+    ],
+    "ac": 11,
+    "interval": 2.5,
+    "_role": "half-HP split of the v2 slime; inherits the big slime's resistances",
+    "behavior": {
+      "habit": "resist_blades",
+      "detail": "axe and dagger deal half damage; mace deals full; frost deals half (it slides off the slime)",
+      "stationary": true,
+      "frostMul": 0.5
+    },
+    "size": {
+      "worldHeight": 0.312
+    }
+  },
+  "drowned_dwarf": {
+    "floor": 3,
+    "hp": 35,
+    "damage": [
+      5,
+      10
+    ],
+    "ac": 14,
+    "interval": 3.0,
+    "_note": "slow, hits hard; first one triggers Brannoc's crest bark. Some patrol (see patrol on the tile).",
+    "behavior": {
+      "habit": "wind_up",
+      "detail": "every 3rd attack: 1.2s overhead slam for 8-12",
+      "tell": "hammer raised overhead + sfx",
+      "counter": "shield block, or pocket sand cancels it"
+    },
+    "size": {
+      "worldHeight": 0.6
+    }
+  },
+  "tide_spawn": {
+    "floor": 5,
+    "hp": 30,
+    "damage": [
+      4,
+      9
+    ],
+    "_note": "moved to Act 2 (Homes); keeps the song loop and Ilsevar's 'It's singing.'",
+    "size": {
+      "worldHeight": 0.85
+    }
+  },
+  "cellar_spider": {
+    "floor": 2,
+    "hp": 20,
+    "damage": [
+      2,
+      5
+    ],
+    "ac": 12,
+    "interval": 1.5,
+    "_note": "new for floor 2, fast and fragile; needs art from Pixelartie",
+    "behavior": {
+      "habit": "web",
+      "detail": "25% on hit: webs a front hero, who can't act for 3s",
+      "tell": "web over the hero's portrait",
+      "counter": "tap Mags's dagger on the webbed hero's portrait to cut them free instantly"
+    },
+    "size": {
+      "worldHeight": 0.3
+    }
+  },
+  "captain_dural": {
+    "floor": 4,
+    "hp": 60,
+    "damage": [
+      6,
+      11
+    ],
+    "ac": 16,
+    "interval": 3.0,
+    "boss": true,
+    "_note": "only fights if f4_captain ends in a fight; drops captain_key flavour item + potion_red",
+    "behavior": {
+      "habit": "boss_two_phase",
+      "detail": "phase 1: plain sword hits. Below 50% HP: every 3rd attack is a 1.5s telegraphed cleave hitting both front heroes for 6-11",
+      "tell": "blade flash + sfx",
+      "counter": "shield wall (or block) and heal timing"
+    },
+    "size": {
+      "worldHeight": 0.68
+    }
+  },
+  "_size_note": "size.worldHeight = monster height as a fraction of wall height (Levie). Dwarves are about 0.6 of a keep wall; Brannoc is the scale reference."
+}

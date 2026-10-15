@@ -16,6 +16,7 @@ import { DressingMarks } from './dressing';
 import {
   act1MusicStem,
   audioGroupStems,
+  audioLoopLength,
   audioStemKeys,
   audioStemPath,
   beforePlayStems,
@@ -27,6 +28,9 @@ import {
 } from './audio-groups';
 import { ACT1_MUSIC_FADE_MS, FIRST_FIGHT_CAP_MS } from './floor1-sounds';
 import { HERO_IDS } from '../core/types';
+import { isSlimeKind } from '../core/slime-frost';
+import { SLIME_SMALL_SFX_GAP_MS, slimeSmallPitchRate } from '../core/slime-pair';
+import { applyBufferLoopPoints, detectLoopStartSec } from './audio-loop';
 import { loadAudioCached } from './asset-cache';
 import { mapPool, SPRITE_LOAD_CONCURRENCY } from './load-pool';
 import { FloorData, Sconce } from './types';
@@ -49,6 +53,7 @@ export class AudioManager {
   listenerRig: THREE.Object3D;
   quality: QualityLevel;
   private buffers = new Map<string, AudioBuffer>();
+  private loopPoints = new WeakMap<AudioBuffer, { start: number; end: number }>();
   private uiSound: THREE.Audio | null = null;
   private ambientSound: THREE.Audio | null = null;
   private musicSound: THREE.Audio | null = null;
@@ -120,6 +125,13 @@ export class AudioManager {
   private resumeWired = false;
   private gameOverSound: THREE.Audio | null = null;
   private fading = new WeakSet<THREE.Audio>();
+  private slimeGurgleSrc: AudioBufferSourceNode | null = null;
+  private slimeGurgleGain: GainNode | null = null;
+  private slimeBattleSrc: AudioBufferSourceNode | null = null;
+  private slimeBattleGain: GainNode | null = null;
+  private slimelingPan = new Map<string, number>();
+  private lastSlimelingSfxAt = Number.NEGATIVE_INFINITY;
+  private preStingSilence = false;
 
   constructor(quality: QualityLevel) {
     this.listener = new THREE.AudioListener();
@@ -225,6 +237,11 @@ export class AudioManager {
   }
 
   private registerBuffer(stem: string, buf: AudioBuffer) {
+    const loopLen = audioLoopLength(stem);
+    if (loopLen != null && !this.loopPoints.has(buf)) {
+      const start = detectLoopStartSec(buf, loopLen);
+      this.loopPoints.set(buf, { start, end: start + loopLen });
+    }
     for (const key of audioStemKeys(stem)) {
       if (!this.buffers.has(key)) this.buffers.set(key, buf);
     }
@@ -423,6 +440,7 @@ export class AudioManager {
   }
 
   private ensureAct1Music() {
+    if (this.preStingSilence) return;
     const music = this.buffers.get('music_act1');
     if (music && !this.musicSound) {
       this.musicSound = new THREE.Audio(this.listener);
@@ -442,6 +460,7 @@ export class AudioManager {
   }
 
   private startAmbienceIfReady() {
+    if (this.preStingSilence) return;
     this.ensureAmbientSound();
     if (!this.playStarted || !this.ambientSound || this.ambientSound.isPlaying) return;
     this.ambientSound.setVolume(0);
@@ -680,9 +699,26 @@ export class AudioManager {
     hit_weak: ['hit_weak', 'hit_weak_2']
   };
 
+  setSlimelingPan(id: string, pan: number) {
+    this.slimelingPan.set(id, pan);
+  }
+
+  slimelingPanOf(id: string): number {
+    return this.slimelingPan.get(id) ?? 0;
+  }
+
+  clearSlimelingPan(id?: string) {
+    if (id) this.slimelingPan.delete(id);
+    else this.slimelingPan.clear();
+  }
+
   playCombat(name: string, volume = 1, x?: number, y?: number, id?: string) {
     const family = this.combatFamilies[name];
     const pick = family ? this.pickVariant(name, family) : name;
+    if (this.isSlimelingStem(name) || (id && this.slimelingPan.has(id))) {
+      this.playSlimeling(pick, volume, id);
+      return;
+    }
     const rate = 0.95 + Math.random() * 0.1;
     if (name.endsWith('_windup')) {
       const key = id ?? name;
@@ -711,6 +747,43 @@ export class AudioManager {
       return;
     }
     this.playUi(pick, volume, rate);
+  }
+
+  private isSlimelingStem(name: string): boolean {
+    return name.startsWith('slime_small_') || name.startsWith('sfx_slime_small_');
+  }
+
+  private playSlimeling(name: string, volume: number, id?: string) {
+    const buf = this.buffers.get(name) ?? this.buffers.get(`sfx_${name}`);
+    if (!buf) return;
+    const now = performance.now();
+    const wait = Math.max(0, this.lastSlimelingSfxAt + SLIME_SMALL_SFX_GAP_MS - now);
+    this.lastSlimelingSfxAt = now + wait;
+    const pan = id != null ? (this.slimelingPan.get(id) ?? 0) : 0;
+    const semitone = Math.random() * 2 - 1;
+    const start = () => this.startSlimelingVoice(buf, volume, pan, slimeSmallPitchRate(semitone));
+    if (wait > 0) setTimeout(start, wait);
+    else start();
+  }
+
+  private startSlimelingVoice(buf: AudioBuffer, volume: number, pan: number, rate: number) {
+    const ctx = this.listener.context;
+    const src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = false;
+    src.playbackRate.value = rate;
+    const panner = ctx.createStereoPanner();
+    panner.pan.value = pan;
+    const gain = ctx.createGain();
+    gain.gain.value = volume;
+    src.connect(panner);
+    panner.connect(gain);
+    gain.connect(this.listener.gain);
+    try {
+      src.start();
+    } catch {
+      // Host audio can refuse playback.
+    }
   }
 
   stopWindup(id?: string) {
@@ -749,6 +822,7 @@ export class AudioManager {
     this.musicSound?.stop();
     this.lanternSound?.stop();
     this.lanternMode = 'off';
+    this.stopSlimeLoops();
     for (const v of this.voices) {
       if (v.loop && v.audio.isPlaying) v.audio.stop();
     }
@@ -1030,6 +1104,160 @@ export class AudioManager {
 
   setFightDuck(on: boolean) {
     if (this.musicSound) this.musicSound.setVolume(on ? 0.12 : this.musicVolume);
+  }
+
+  /** Web Audio buffer-source loops with loop=true. */
+  private startBufferLoop(
+    src: AudioBufferSourceNode | null,
+    gain: GainNode | null,
+    names: string[],
+    volume: number
+  ): { src: AudioBufferSourceNode | null; gain: GainNode | null } {
+    if (src) return { src, gain };
+    const buf = names.map((n) => this.buffers.get(n)).find((b): b is AudioBuffer => !!b);
+    if (!buf) return { src, gain };
+    const ctx = this.listener.context;
+    const nextGain = ctx.createGain();
+    nextGain.gain.value = volume;
+    nextGain.connect(this.listener.gain);
+    const nextSrc = ctx.createBufferSource();
+    nextSrc.buffer = buf;
+    nextSrc.loop = true;
+    const points = this.loopPoints.get(buf);
+    if (points) {
+      nextSrc.loopStart = points.start;
+      nextSrc.loopEnd = points.end;
+    } else {
+      const loopLen = names.map(audioLoopLength).find((n): n is number => n != null);
+      if (loopLen != null) applyBufferLoopPoints(nextSrc, buf, loopLen);
+    }
+    nextSrc.connect(nextGain);
+    try {
+      nextSrc.start();
+    } catch {
+      // Host audio can refuse playback; the loop is still intended to run.
+    }
+    return { src: nextSrc, gain: nextGain };
+  }
+
+  private stopBufferLoop(src: AudioBufferSourceNode | null, gain: GainNode | null) {
+    try {
+      src?.stop();
+    } catch {
+      // already stopped
+    }
+    try {
+      src?.disconnect();
+    } catch {
+      // already disconnected
+    }
+    try {
+      gain?.disconnect();
+    } catch {
+      // already disconnected
+    }
+  }
+
+  startSlimeGurgleLoop() {
+    const started = this.startBufferLoop(
+      this.slimeGurgleSrc,
+      this.slimeGurgleGain,
+      ['slime_gurgle_loop', 'sfx_slime_gurgle_loop'],
+      0.35
+    );
+    this.slimeGurgleSrc = started.src;
+    this.slimeGurgleGain = started.gain;
+  }
+
+  startSlimeBattleLoop() {
+    const started = this.startBufferLoop(
+      this.slimeBattleSrc,
+      this.slimeBattleGain,
+      ['music.music_slime_battle', 'music_slime_battle', 'slime_battle'],
+      0.28
+    );
+    this.slimeBattleSrc = started.src;
+    this.slimeBattleGain = started.gain;
+  }
+
+  stopSlimeGurgleLoop() {
+    this.stopBufferLoop(this.slimeGurgleSrc, this.slimeGurgleGain);
+    this.slimeGurgleSrc = null;
+    this.slimeGurgleGain = null;
+  }
+
+  stopSlimeBattleLoop() {
+    this.stopBufferLoop(this.slimeBattleSrc, this.slimeBattleGain);
+    this.slimeBattleSrc = null;
+    this.slimeBattleGain = null;
+  }
+
+  stopSlimeLoops() {
+    this.stopSlimeGurgleLoop();
+    this.stopSlimeBattleLoop();
+  }
+
+  syncSlimeLoops(slimes: Array<{ kind: string; x: number; y: number }>, inFight: boolean) {
+    const alive = slimes.some((m) => isSlimeKind(m.kind));
+    if (alive) this.startSlimeGurgleLoop();
+    else this.stopSlimeGurgleLoop();
+    if (alive && inFight) this.startSlimeBattleLoop();
+    else this.stopSlimeBattleLoop();
+  }
+
+  playOilFlask(opts?: { fadeAt?: number | null; fadeSec?: number }) {
+    this.playUi('oil_flask');
+    const sound = [...this.uiPool].reverse().find((a) => a.isPlaying) ?? this.uiPool[this.uiPool.length - 1];
+    if (!sound || opts?.fadeAt == null) return;
+    const startFade = opts.fadeAt * 1000;
+    const fadeMs = (opts.fadeSec ?? 0.05) * 1000;
+    const t0 = performance.now();
+    const tick = () => {
+      if (!sound.isPlaying) return;
+      const elapsed = performance.now() - t0;
+      if (elapsed < startFade) {
+        requestAnimationFrame(tick);
+        return;
+      }
+      this.fadeOut(sound, fadeMs);
+    };
+    requestAnimationFrame(tick);
+  }
+
+  playCaveIn() {
+    this.playUi('cave_in');
+  }
+
+  /** Fade act-1 music (and halls ambience) to silence before sting_slime_lair. */
+  fadeToPreStingSilence(ms = 1000, onSilent?: () => void) {
+    this.preStingSilence = true;
+    const fading = !!(this.musicSound?.isPlaying || this.ambientSound?.isPlaying);
+    this.fadeOut(this.musicSound, ms);
+    this.fadeOut(this.ambientSound, ms);
+    if (!onSilent) return;
+    if (!fading) onSilent();
+    else window.setTimeout(onSilent, ms);
+  }
+
+  clearPreStingSilence() {
+    this.preStingSilence = false;
+  }
+
+  playSting(name: string) {
+    this.playUi(name);
+  }
+
+  fadeCaveIn(ms = 300) {
+    const sound = [...this.uiPool].reverse().find((a) => a.isPlaying);
+    this.fadeOut(sound ?? null, ms);
+  }
+
+  introAudioState(): string | null {
+    try {
+      return this.listener.context?.state ?? null;
+    } catch {
+      return null;
+    }
   }
 
   playUi(name: string, volume = 1, rate = 1) {

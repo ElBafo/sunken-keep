@@ -9,6 +9,14 @@ import {
   tileBedY
 } from './constants';
 import type { HitKind } from '../core/types';
+import { isSlimeKind, slimeFrostFramePath } from '../core/slime-frost';
+import {
+  SLIME_PAIR_OFFSET_FRAC,
+  SLIME_PAIR_SLIDE_MS,
+  livingPairVisual,
+  slimePairSideSign,
+  type SlimePairSlot
+} from '../core/slime-pair';
 import { loadSpriteTexture, textureFrameSize } from './atlas';
 import { fetchJsonCached } from './asset-cache';
 import { createLimiter, mapPool, SPRITE_LOAD_CONCURRENCY } from './load-pool';
@@ -22,7 +30,8 @@ const DEFAULT_WORLD_HEIGHT: Record<string, number> = {
   keep_rat: 0.25,
   rust_crab: 0.35,
   cellar_spider: 0.3,
-  slime: 0.55,
+  slime: 0.39,
+  slime_small: 0.312,
   drowned_dwarf: 0.6,
   captain_dural: 0.68,
   tide_spawn: 0.85
@@ -142,8 +151,8 @@ interface HitFxSpec {
 }
 
 interface HitFxPlay {
-  sprite: THREE.Sprite;
-  material: THREE.SpriteMaterial;
+  sprite: THREE.Sprite | null;
+  material: THREE.SpriteMaterial | null;
   frames: THREE.Texture[];
   started: number;
   fps: number;
@@ -156,6 +165,8 @@ interface HitFxPlay {
   holdFps: number;
   tintHost: boolean;
   frame: number;
+  restoreHostMap?: THREE.Texture | null;
+  bodySwap?: boolean;
 }
 
 interface BodyAnchor {
@@ -203,6 +214,19 @@ interface SpriteInfo {
   forceLit?: boolean;
   itemId?: string;
   frostAmount?: number;
+  frostFlash?: boolean;
+  pairSlot?: SlimePairSlot;
+  pairId?: string;
+  pairSlide?: number;
+  pairSlideFrom?: number;
+  pairSlideTo?: number;
+  pairSlideAt?: number;
+  /** Added at runtime (slimelings); dropped on floor reset. */
+  liveAdded?: boolean;
+  /** Death has started; later hurt/idle must not replace it. */
+  dying?: boolean;
+  /** Render object removed from the scene (split / death finished). */
+  disposed?: boolean;
 }
 
 function configureSpriteTexture(tex: THREE.Texture) {
@@ -289,6 +313,7 @@ export class SpriteManager {
   private v2Px = new Map<string, Partial<Record<LodName, [number, number]>>>();
   private heights = new Map<string, number>();
   private hitFx = new Map<string, HitFxSpec>();
+  private slimeFrostTex = new Map<string, THREE.Texture>();
   private bodyAnchors = new Map<string, BodyAnchor>();
   private playingFx: HitFxPlay[] = [];
   lastHitType: HitKind | null = null;
@@ -299,6 +324,8 @@ export class SpriteManager {
   private animCache = new Map<string, Promise<THREE.Texture[]>>();
   private monstersReady = false;
   private monsterLoad: Promise<void> | null = null;
+  private floorSpawnBlocked = new Set<string>();
+  private retiredMonsterIds = new Set<string>();
   adjacentScale = 1;
 
   constructor(camera: THREE.Camera) {
@@ -402,7 +429,7 @@ export class SpriteManager {
   setLitVisible(x: number, y: number, kind: 'monster' | 'item' | 'sconce', lit: boolean) {
     for (const sprite of this.sprites) {
       if (sprite.kind === kind && sprite.x === x && sprite.y === y) {
-        if (sprite.pickedUp) {
+        if (sprite.pickedUp || sprite.hidden || sprite.disposed) {
           sprite.object.visible = false;
           continue;
         }
@@ -522,6 +549,7 @@ export class SpriteManager {
     }
     const created = await mapPool(jobs, SPRITE_LOAD_CONCURRENCY, async (job) => {
       const { x, y, kind, feetY } = job;
+      if (this.floorSpawnBlocked.has(`${x},${y}`) || this.hasMonsterSpriteAt(x, y)) return null;
       const v2 = this.v2Px.has(kind);
       const folder = v2 ? V2_FOLDER : V1_FOLDER;
       const lodSets: NonNullable<SpriteInfo['lodSets']> = {};
@@ -582,7 +610,12 @@ export class SpriteManager {
       return info;
     });
     for (const info of created) {
-      if (info) this.sprites.push(info);
+      if (!info) continue;
+      if (this.floorSpawnBlocked.has(`${info.x},${info.y}`) || this.hasMonsterSpriteAt(info.x, info.y)) {
+        info.object.removeFromParent();
+        continue;
+      }
+      this.sprites.push(info);
     }
     this.monstersReady = true;
   }
@@ -610,25 +643,42 @@ export class SpriteManager {
     for (const sprite of this.sprites) {
       if (sprite.hidden || sprite.pickedUp) continue;
       if (sprite.kind === 'monster') {
-        this.placeMonster(sprite, playerX, playerY);
+        this.placeMonster(sprite, playerX, playerY, dir);
         continue;
       }
       if (sprite.kind === 'item') this.placeItem(sprite, playerX, playerY, camX, camZ, fx, fz);
     }
   }
 
-  private placeMonster(sprite: SpriteInfo, playerX: number, playerY: number) {
+  private placeMonster(sprite: SpriteInfo, playerX: number, playerY: number, dir: number) {
     const dist = Math.max(Math.abs(sprite.x - playerX), Math.abs(sprite.y - playerY));
     this.applyMonsterLod(sprite, dist);
-    const size = sprite.lodSize?.[sprite.currentLod ?? 'near'] ?? { w: sprite.baseW, h: sprite.baseH };
+    const size =
+      sprite.lodSize?.[sprite.currentLod ?? 'near'] ??
+      sprite.lodSize?.near ??
+      sprite.lodSize?.close ??
+      { w: sprite.baseW, h: sprite.baseH };
     sprite.baseW = size.w;
     sprite.baseH = size.h;
     const file = this.frameFile(sprite);
     const floor = sprite.tileFloorY ?? sprite.floorY;
     const feet = file ? this.feetFor(file, size.h, floor) : floor;
     const { ox, oz } = monsterVisualOffset(sprite.x, sprite.y, playerX, playerY);
-    sprite.object.position.set(sprite.x * CELL_SIZE + ox, feet, sprite.y * CELL_SIZE + oz);
-    sprite.object.scale.set(size.w, size.h, 1);
+    const slide = sprite.pairSlide ?? (sprite.pairSlot ? 1 : 0);
+    const lat = slimePairSideSign(sprite.pairSlot) * SLIME_PAIR_OFFSET_FRAC * size.w * slide;
+    const right = ([
+      [1, 0],
+      [0, 1],
+      [-1, 0],
+      [0, -1]
+    ] as const)[dir & 3];
+    sprite.object.position.set(
+      sprite.x * CELL_SIZE + ox + right[0] * lat,
+      feet,
+      sprite.y * CELL_SIZE + oz + right[1] * lat
+    );
+    const flip = sprite.pairSlot === 'right' ? -1 : 1;
+    sprite.object.scale.set(size.w * flip, size.h, 1);
     sprite.object.renderOrder = SPRITE_RENDER_ORDER;
   }
 
@@ -688,17 +738,47 @@ export class SpriteManager {
   private applyMonsterLod(sprite: SpriteInfo, dist: number) {
     const hasClose = !!sprite.lodSets?.close;
     const lod = monsterLodName(dist, hasClose);
-    if (sprite.currentLod === lod && sprite.sets === sprite.lodSets?.[lod]) return;
-    const sets = sprite.lodSets?.[lod] ?? sprite.lodSets?.near;
+    const sets = this.lodSetsFor(sprite, lod);
     if (!sets) return;
+    const sameLod = sprite.currentLod === lod && sprite.sets === sets;
     sprite.currentLod = lod;
     sprite.sets = sets;
-    const frames = sets[sprite.anim] ?? sets.idle;
+    const frames = this.framesForAnim(sprite, sprite.anim, lod);
     if (!frames?.length) return;
     sprite.frames = frames;
     sprite.currentFrame = Math.min(sprite.currentFrame, frames.length - 1);
+    if (!sprite.hidden && !sprite.disposed) sprite.object.visible = true;
+    if (sprite.frostFlash || sameLod) return;
     sprite.material.map = frames[sprite.currentFrame];
     sprite.material.needsUpdate = true;
+  }
+
+  private lodSetsFor(sprite: SpriteInfo, lod: LodName) {
+    return (
+      sprite.lodSets?.[lod] ??
+      sprite.lodSets?.near ??
+      sprite.lodSets?.close ??
+      sprite.lodSets?.mid ??
+      sprite.lodSets?.far
+    );
+  }
+
+  private framesForAnim(sprite: SpriteInfo, anim: SpriteInfo['anim'], prefer?: LodName) {
+    const order: Array<LodName | undefined> = [
+      prefer,
+      sprite.currentLod,
+      'near',
+      'close',
+      'mid',
+      'far'
+    ];
+    for (const lod of order) {
+      if (!lod) continue;
+      const frames = sprite.lodSets?.[lod]?.[anim];
+      if (frames?.length) return frames;
+    }
+    const fallback = sprite.sets?.[anim] ?? (anim === 'death' ? sprite.sets?.death : sprite.sets?.idle);
+    return fallback ?? sprite.frames;
   }
 
   private frameFile(sprite: SpriteInfo): string {
@@ -751,8 +831,7 @@ export class SpriteManager {
         if (time - sprite.lastFrameTime > sprite.animSpeed) {
           if (sprite.animOnce && sprite.currentFrame >= sprite.frames.length - 1) {
             if (sprite.anim === 'death') {
-              sprite.object.visible = false;
-              sprite.hidden = true;
+              this.finishDeath(sprite);
             } else if (sprite.anim !== 'windup') {
               this.playAnimAt(sprite, 'idle', time);
             }
@@ -760,17 +839,48 @@ export class SpriteManager {
             sprite.currentFrame = sprite.animOnce
               ? Math.min(sprite.frames.length - 1, sprite.currentFrame + 1)
               : (sprite.currentFrame + 1) % sprite.frames.length;
-            sprite.material.map = sprite.frames[sprite.currentFrame];
-            sprite.material.needsUpdate = true;
+            if (!sprite.frostFlash) {
+              sprite.material.map = sprite.frames[sprite.currentFrame];
+              sprite.material.needsUpdate = true;
+            }
           }
           sprite.lastFrameTime = time;
         }
       }
     }
     this.updateHitFx(time);
+    this.tickPairSlides(time);
     if (playerX !== undefined && playerY !== undefined && dir !== undefined) {
       this.layoutBillboards(playerX, playerY, dir);
     }
+  }
+
+  private tickPairSlides(time: number) {
+    for (const sprite of this.sprites) {
+      if (sprite.pairSlideTo == null || sprite.pairSlideAt == null) continue;
+      const t = Math.min(1, (time - sprite.pairSlideAt) / SLIME_PAIR_SLIDE_MS);
+      const from = sprite.pairSlideFrom ?? 1;
+      sprite.pairSlide = from + (sprite.pairSlideTo - from) * t;
+      if (t >= 1) {
+        sprite.pairSlide = sprite.pairSlideTo;
+        sprite.pairSlideTo = undefined;
+        sprite.pairSlot = undefined;
+      }
+    }
+  }
+
+  /** Slide the surviving slimeling back to the square centre. Returns its id. */
+  beginPairSlide(deadId: string, now: number): string | null {
+    const dead = this.spriteByMonsterId(deadId);
+    if (!dead?.pairId) return null;
+    const mate = this.sprites.find(
+      (s) => s.kind === 'monster' && s.pairId === dead.pairId && s.monsterId !== deadId && !s.hidden
+    );
+    if (!mate?.monsterId) return null;
+    mate.pairSlideFrom = mate.pairSlide ?? 1;
+    mate.pairSlideTo = 0;
+    mate.pairSlideAt = now;
+    return mate.monsterId;
   }
 
   private async loadAnchors(baseUrl: string) {
@@ -901,9 +1011,27 @@ export class SpriteManager {
     return this.sprites.find((s) => s.kind === 'monster' && s.monsterId === id);
   }
 
-  bindMonster(x: number, y: number, id: string) {
-    const s = this.sprites.find((s) => s.kind === 'monster' && s.x === x && s.y === y);
+  bindMonster(x: number, y: number, id: string, kind?: string) {
+    if (this.retiredMonsterIds.has(id)) return;
+    const s = this.sprites.find(
+      (s) =>
+        s.kind === 'monster' &&
+        s.x === x &&
+        s.y === y &&
+        !s.hidden &&
+        !s.disposed &&
+        !s.monsterId &&
+        (!kind || s.monsterKind === kind)
+    );
     if (s) s.monsterId = id;
+  }
+
+  private hasMonsterSpriteAt(x: number, y: number): boolean {
+    return this.sprites.some((s) => s.kind === 'monster' && s.x === x && s.y === y);
+  }
+
+  blockFloorSpawn(x: number, y: number) {
+    this.floorSpawnBlocked.add(`${x},${y}`);
   }
 
   moveMonster(fromX: number, fromY: number, toX: number, toY: number) {
@@ -935,8 +1063,8 @@ export class SpriteManager {
   }
 
   private playAnimAt(s: SpriteInfo, anim: SpriteInfo['anim'], now: number) {
-    const lodSets = s.lodSets?.[s.currentLod ?? 'near'] ?? s.sets;
-    const frames = lodSets?.[anim] ?? lodSets?.idle ?? s.sets?.[anim] ?? s.frames;
+    if ((s.dying || s.anim === 'death') && anim !== 'death') return;
+    const frames = this.framesForAnim(s, anim);
     if (!frames?.length) return;
     s.anim = anim;
     s.frames = frames;
@@ -946,7 +1074,12 @@ export class SpriteManager {
     s.animSpeed = anim === 'death' ? 140 : anim === 'hurt' ? 180 : anim === 'windup' ? 280 : 200;
     s.material.map = frames[0];
     s.material.needsUpdate = true;
-    if (anim === 'death') s.hidden = false;
+    if (anim === 'death') {
+      s.dying = true;
+      if (s.disposed) return;
+      s.hidden = false;
+      s.object.visible = true;
+    }
   }
 
   hideMonster(x: number, y: number) {
@@ -970,15 +1103,219 @@ export class SpriteManager {
   hideDeadMonsterId(id: string) {
     const s = this.spriteByMonsterId(id);
     if (!s) return;
+    if (s.dying && s.anim === 'death' && !s.hidden) return;
     s.hidden = true;
     s.object.visible = false;
   }
 
+  /** Remove the render object immediately (split leftover). */
+  disposeMonsterId(id: string) {
+    this.retiredMonsterIds.add(id);
+    const matches = this.sprites.filter((s) => s.kind === 'monster' && s.monsterId === id);
+    if (matches[0]) this.blockFloorSpawn(matches[0].x, matches[0].y);
+    for (const s of matches) this.detachMonster(s);
+    this.dropDuplicateMonsterSprites(id);
+  }
+
+  /** Floor-map leftovers at a split tile (unbound or retired parent). */
+  detachFloorMonsterAt(x: number, y: number, kind: string) {
+    this.blockFloorSpawn(x, y);
+    for (const s of this.sprites) {
+      if (s.kind !== 'monster' || s.x !== x || s.y !== y) continue;
+      if (s.monsterKind !== kind) continue;
+      if (s.liveAdded) continue;
+      if (!s.monsterId || this.retiredMonsterIds.has(s.monsterId)) this.detachMonster(s);
+    }
+  }
+
+  private dropDuplicateMonsterSprites(id?: string) {
+    const seen = new Map<string, SpriteInfo>();
+    const drop: SpriteInfo[] = [];
+    for (const s of this.sprites) {
+      if (s.kind !== 'monster' || !s.monsterId) continue;
+      if (id && s.monsterId !== id) continue;
+      const prev = seen.get(s.monsterId);
+      if (!prev) {
+        seen.set(s.monsterId, s);
+        continue;
+      }
+      const prefer = !s.disposed && prev.disposed ? s : prev;
+      const extra = prefer === s ? prev : s;
+      this.detachMonster(extra);
+      seen.set(s.monsterId, prefer);
+      drop.push(extra);
+    }
+    if (drop.length) this.sprites = this.sprites.filter((s) => !drop.includes(s));
+  }
+
+  private finishDeath(sprite: SpriteInfo) {
+    sprite.dying = true;
+    sprite.anim = 'death';
+    this.detachMonster(sprite);
+  }
+
+  private detachMonster(sprite: SpriteInfo) {
+    sprite.hidden = true;
+    sprite.disposed = true;
+    sprite.object.visible = false;
+    sprite.object.removeFromParent();
+  }
+
+  async addLiveMonster(
+    scene: THREE.Scene,
+    kind: string,
+    x: number,
+    y: number,
+    id: string,
+    feetY = 0,
+    pair?: { pairSlot: SlimePairSlot; pairId: string }
+  ) {
+    if (this.retiredMonsterIds.has(id)) return null;
+    const existing = this.spriteByMonsterId(id);
+    if (existing) return existing.disposed ? null : existing;
+    const v2 = this.v2Px.has(kind);
+    const folder = v2 ? V2_FOLDER : V1_FOLDER;
+    const lodSets: NonNullable<SpriteInfo['lodSets']> = {};
+    const lodSize: NonNullable<SpriteInfo['lodSize']> = {};
+    const worldHeight = this.wallHeightOf(kind);
+    const lods = v2 ? LOD_NAMES : (['near', 'mid', 'far'] as const);
+    await Promise.all(
+      lods.map(async (lod) => {
+        const [idle, attack, hurt, death] = await Promise.all([
+          this.loadSet(folder, kind, 'idle', 4, lod),
+          this.loadSet(folder, kind, 'attack', 3, lod),
+          this.loadSet(folder, kind, 'hurt', 1, lod),
+          this.loadSet(folder, kind, 'death', 4, lod)
+        ]);
+        if (!idle.length) return;
+        lodSets[lod] = { idle, attack, hurt, death, windup: attack.length ? [attack[0]] : idle };
+        lodSize[lod] = this.quadForLod(kind, lod, worldHeight, idle[0]);
+      })
+    );
+    const startLod: LodName = lodSets.near ? 'near' : ((Object.keys(lodSets)[0] as LodName | undefined) ?? 'near');
+    const startSets = lodSets[startLod] ?? {};
+    const frames = startSets.idle ?? [];
+    if (!frames.length) return null;
+    const size = lodSize[startLod] ?? quadForWorldHeight(worldHeight, CELL_SIZE, 80, 60);
+    const feet = this.feetFor(`${kind}_idle_1_${startLod}.png`, size.h, feetY);
+    const mat = makeSpriteMaterial(frames[0], true);
+    const sprite = makeBillboard(mat, x * CELL_SIZE, feet, y * CELL_SIZE, size.w, size.h);
+    sprite.renderOrder = SPRITE_RENDER_ORDER;
+    scene.add(sprite);
+    const info: SpriteInfo = {
+      object: sprite,
+      material: mat,
+      x,
+      y,
+      kind: 'monster',
+      monsterKind: kind,
+      monsterId: id,
+      spawnX: x,
+      spawnY: y,
+      v2,
+      worldHeight,
+      baseW: size.w,
+      baseH: size.h,
+      floorY: feet,
+      tileFloorY: feetY,
+      imageH: this.anchors.get(`${kind}_idle_1_${startLod}.png`)?.imageH ?? texSize(frames[0]).h,
+      gapBelow: this.anchors.get(`${kind}_idle_1_${startLod}.png`)?.gapBelow ?? 0,
+      frames,
+      sets: startSets,
+      lodSets,
+      lodSize,
+      currentLod: startLod,
+      currentFrame: 0,
+      animSpeed: 200,
+      lastFrameTime: 0,
+      anim: 'idle',
+      animOnce: false,
+      pairSlot: pair?.pairSlot,
+      pairId: pair?.pairId,
+      pairSlide: pair ? 1 : 0,
+      liveAdded: true
+    };
+    this.sprites.push(info);
+    return info;
+  }
+
+  /**
+   * Bind or spawn a billboard for every living combat monster. Split slimelings
+   * are not on the floor map, so a save/load must recreate them here.
+   */
+  async syncLiveMonsters(
+    scene: THREE.Scene,
+    monsters: Array<{
+      id: string;
+      kind: string;
+      x: number;
+      y: number;
+      alive: boolean;
+      pairSlot?: SlimePairSlot;
+      pairId?: string;
+    }>,
+    feetY = 0
+  ) {
+    this.scene = scene;
+    const livingIds = new Set(
+      monsters.filter((m) => m.alive && !this.retiredMonsterIds.has(m.id)).map((m) => m.id)
+    );
+    for (const m of monsters) {
+      if (!m.alive || this.retiredMonsterIds.has(m.id)) continue;
+      let s = this.spriteByMonsterId(m.id);
+      if (s?.disposed) s = undefined;
+      if (!s) {
+        this.bindMonster(m.x, m.y, m.id, m.kind);
+        s = this.spriteByMonsterId(m.id);
+        if (s?.disposed) s = undefined;
+      }
+      if (!s) {
+        this.blockFloorSpawn(m.x, m.y);
+        const visual = livingPairVisual(m, monsters);
+        const pair =
+          visual.pairSlot && m.pairId ? { pairSlot: visual.pairSlot, pairId: m.pairId } : undefined;
+        s = (await this.addLiveMonster(scene, m.kind, m.x, m.y, m.id, feetY, pair)) ?? undefined;
+      }
+      if (!s) continue;
+      s.hidden = false;
+      s.disposed = false;
+      s.dying = false;
+      const visual = livingPairVisual(m, monsters);
+      s.pairSlot = visual.pairSlot;
+      s.pairId = m.pairId;
+      s.pairSlide = visual.pairSlide;
+      s.object.visible = true;
+      if (this.scene && !s.object.parent) this.scene.add(s.object);
+      this.moveMonsterId(m.id, m.x, m.y);
+    }
+    for (const m of monsters) {
+      if (!m.alive || this.retiredMonsterIds.has(m.id)) this.hideDeadMonsterId(m.id);
+    }
+    for (const s of [...this.sprites]) {
+      if (s.kind !== 'monster') continue;
+      if (s.monsterId && livingIds.has(s.monsterId)) continue;
+      this.detachMonster(s);
+    }
+    this.dropDuplicateMonsterSprites();
+  }
+
   resetMonsters(floor: FloorData) {
+    this.floorSpawnBlocked.clear();
+    this.retiredMonsterIds.clear();
+    const dropped: SpriteInfo[] = [];
     for (const s of this.sprites) {
       if (s.kind !== 'monster') continue;
+      if (s.liveAdded) {
+        s.object.removeFromParent();
+        dropped.push(s);
+        continue;
+      }
       s.hidden = false;
+      s.disposed = false;
+      s.dying = false;
+      s.anim = 'idle';
       s.object.visible = true;
+      if (this.scene && !s.object.parent) this.scene.add(s.object);
       if (s.spawnX != null && s.spawnY != null) {
         s.x = s.spawnX;
         s.y = s.spawnY;
@@ -988,16 +1325,21 @@ export class SpriteManager {
       s.monsterId = undefined;
       this.playAnimAt(s, 'idle', 0);
     }
+    if (dropped.length) this.sprites = this.sprites.filter((s) => !dropped.includes(s));
     this.clearHitFx();
     void floor;
   }
 
   playHitFx(id: string, kind: HitKind, now: number) {
     this.lastHitType = kind;
+    const host = this.spriteByMonsterId(id);
+    if (host && isSlimeKind(host.monsterKind) && kind === 'resist') {
+      this.playSlimeFrostFlash(host, now);
+      return;
+    }
     const specName = kind === 'resist' ? 'resist' : kind === 'weak' ? 'weak' : null;
     if (!specName) return;
     const spec = this.hitFx.get(specName);
-    const host = this.spriteByMonsterId(id);
     const scene = this.scene;
     if (!spec || !host || !scene || !spec.frames.length) return;
 
@@ -1046,6 +1388,58 @@ export class SpriteManager {
     this.playingFx.push(play);
     this.placeHitFx(play, host);
     this.applyHostTint(play, host);
+  }
+
+  private playSlimeFrostFlash(host: SpriteInfo, now: number) {
+    const existing = this.playingFx.find((fx) => fx.hostId === host.monsterId);
+    if (existing) this.removeHitFx(existing);
+    const lod = host.currentLod ?? 'near';
+    const kind = host.monsterKind ?? 'slime';
+    const tex = this.slimeFrostTex.get(`${kind}:${lod}`) ?? this.slimeFrostTex.get(`${kind}:near`);
+    const restore = host.material instanceof THREE.SpriteMaterial ? host.material.map : null;
+    host.frostFlash = true;
+    if (tex && host.material instanceof THREE.SpriteMaterial) {
+      host.material.map = tex;
+      host.material.blending = THREE.NormalBlending;
+      host.material.opacity = 1;
+      host.material.needsUpdate = true;
+    }
+    const play: HitFxPlay = {
+      sprite: null,
+      material: null,
+      frames: tex ? [tex] : [],
+      started: now,
+      fps: FROST_HOLD_FPS,
+      hostId: host.monsterId ?? '',
+      imgW: 0,
+      imgH: 0,
+      pivotX: 0.5,
+      pivotYFromTop: 0.5,
+      holdFrames: FROST_HOLD_FRAMES,
+      holdFps: FROST_HOLD_FPS,
+      tintHost: false,
+      frame: 0,
+      restoreHostMap: restore,
+      bodySwap: true
+    };
+    host.frostAmount = 0;
+    if (host.material instanceof THREE.SpriteMaterial) setFrostAmount(host.material, 0);
+    this.playingFx.push(play);
+  }
+
+  private async loadSlimeFrostFrames() {
+    for (const kind of ['slime', 'slime_small'] as const) {
+      await Promise.all(
+        LOD_NAMES.map(async (lod) => {
+          try {
+            const tex = await this.loadTex(slimeFrostFramePath(kind, lod));
+            this.slimeFrostTex.set(`${kind}:${lod}`, tex);
+          } catch {
+            // missing LOD keeps the idle frame; each kind uses its own <idle>_frost name
+          }
+        })
+      );
+    }
   }
 
   private hitFxFrame(fx: HitFxPlay, elapsedSec: number): number {
@@ -1115,9 +1509,11 @@ export class SpriteManager {
     } catch {
       // optional art
     }
+    await this.loadSlimeFrostFrames();
   }
 
   private placeHitFx(fx: HitFxPlay, host: SpriteInfo) {
+    if (fx.bodySwap || !fx.sprite) return;
     const anchor = this.bodyAnchors.get(host.monsterKind ?? '') ?? { u: 0.5, vFromBottom: 0.4 };
     const wx = host.object.position.x + (anchor.u - 0.5) * host.baseW;
     const wy = host.floorY + anchor.vFromBottom * host.baseH;
@@ -1142,6 +1538,18 @@ export class SpriteManager {
         continue;
       }
       this.placeHitFx(fx, host);
+      if (fx.bodySwap) {
+        const elapsed = (time - fx.started) / 1000;
+        const holdDur = fx.holdFrames / fx.holdFps;
+        fx.frame = Math.min(Math.max(fx.holdFrames - 1, 0), Math.floor(elapsed * fx.holdFps));
+        if (elapsed >= holdDur) {
+          this.removeHitFx(fx);
+          continue;
+        }
+        this.applyHostTint(fx, host);
+        live.push(fx);
+        continue;
+      }
       const frame = this.hitFxFrame(fx, (time - fx.started) / 1000);
       if (frame >= fx.frames.length) {
         this.removeHitFx(fx);
@@ -1150,7 +1558,7 @@ export class SpriteManager {
       fx.frame = frame;
       this.applyHostTint(fx, host);
       const tex = fx.frames[Math.max(0, frame)];
-      if (fx.material.map !== tex) {
+      if (fx.material && fx.material.map !== tex) {
         fx.material.map = tex;
         fx.material.needsUpdate = true;
       }
@@ -1165,9 +1573,21 @@ export class SpriteManager {
       host.frostAmount = 0;
       if (host.material instanceof THREE.SpriteMaterial) setFrostAmount(host.material, 0);
     }
-    fx.sprite.visible = false;
-    fx.sprite.parent?.remove(fx.sprite);
-    fx.material.dispose();
+    if (host && fx.bodySwap) {
+      host.frostFlash = false;
+      host.frostAmount = 0;
+      if (host.material instanceof THREE.SpriteMaterial) {
+        setFrostAmount(host.material, 0);
+        host.material.blending = THREE.NormalBlending;
+        host.material.opacity = 1;
+      }
+      this.playAnimAt(host, 'idle', 0);
+    }
+    if (fx.sprite) {
+      fx.sprite.visible = false;
+      fx.sprite.parent?.remove(fx.sprite);
+    }
+    fx.material?.dispose();
   }
 
   private clearHitFx() {

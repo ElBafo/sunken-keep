@@ -71,24 +71,45 @@
   },
   "slime": {
     "floor": 1,
-    "hp": 40,
+    "hp": 70,
     "damage": [
-      3,
-      6
+      4,
+      8
     ],
     "_role": "toughest thing on floor 1",
     "ac": 11,
     "interval": 2.5,
     "behavior": {
       "habit": "resist_blades",
-      "detail": "axe and dagger deal half damage; mace and frost deal full, frost +25%",
+      "detail": "axe and dagger deal half damage; mace deals full; frost deals half (it slides off the slime)",
       "tell": "blades sink in with a wet thunk",
-      "counter": "Ilsevar's frost, Wren swapping forward",
+      "counter": "the mace (blunt hits do full damage), Wren swapping forward",
       "stationary": true,
-      "stationary_note": "never chases; it blocks the arch to the guard hall so the crab and slime are separate fights"
+      "stationary_note": "never chases; it blocks the arch to the guard hall so the crab and slime are separate fights",
+      "frostMul": 0.5
     },
     "size": {
-      "worldHeight": 0.55
+      "worldHeight": 0.39
+    }
+  },
+  "slime_small": {
+    "floor": 1,
+    "hp": 20,
+    "damage": [
+      2,
+      5
+    ],
+    "ac": 11,
+    "interval": 2.5,
+    "_role": "half-HP split of the v2 slime; inherits the big slime's resistances",
+    "behavior": {
+      "habit": "resist_blades",
+      "detail": "axe and dagger deal half damage; mace deals full; frost deals half (it slides off the slime)",
+      "stationary": true,
+      "frostMul": 0.5
+    },
+    "size": {
+      "worldHeight": 0.312
     }
   },
   "drowned_dwarf": {

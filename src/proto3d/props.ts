@@ -75,7 +75,7 @@ export class PropBuilder {
         else if (tile.prop === 'desk' || tile.prop === 'table') this.addDesk(x, y);
         else if (tile.prop === 'jar_rack' || tile.prop === 'weapon_rack') this.addRack(x, y);
         else if (tile.prop === 'lamp_capped') this.addLamp(x, y, tile, isWallFace(tile.propWall) ? tile.propWall : 'E');
-        else if (tile.prop) this.addGeneric(x, y, String(tile.prop));
+        else if (tile.prop) console.warn(`Unknown prop "${tile.prop}" at (${x},${y}); not drawn as a box`);
       }
     }
   }
@@ -226,16 +226,6 @@ export class PropBuilder {
     face.position.set(wallX + 0.16, 0.39, wz);
     face.rotation.y = Math.PI / 2;
     this.tag(face, x, y, 'rack');
-  }
-
-  private addGeneric(x: number, y: number, kind: string) {
-    const wx = x * CELL_SIZE;
-    const wz = y * CELL_SIZE;
-    const h = kind === 'bunk' ? 0.28 : kind === 'altar' || kind === 'offering_bowl' ? 0.42 : 0.7;
-    const w = kind === 'bunk' ? 1.15 : 0.55;
-    const d = kind === 'bunk' ? 0.55 : 0.55;
-    const mesh = this.box(w, h, d, this.woodPlain, x, y, kind);
-    mesh.position.set(wx, h / 2, wz);
   }
 
   private addLamp(x: number, y: number, _tile: Tile, face: PropWall) {
