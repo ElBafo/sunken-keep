@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { compareEquip, equipJob, sameEquipJob } from '../src/proto3d/items';
+import {
+  compareEquip,
+  equipJob,
+  isReadable,
+  sameEquipJob,
+  usesHeroTarget
+} from '../src/proto3d/items';
 
 describe('equip comparison jobs', () => {
   it('treats main-hand gear and fists as weapons, mail as armour', () => {
@@ -26,6 +32,18 @@ describe('equip comparison jobs', () => {
     expect(sameEquipJob('iron_shield', 'tricks_pouch')).toBe(false);
     expect(sameEquipJob('iron_shield', 'scroll')).toBe(false);
     expect(sameEquipJob('iron_shield', 'shield')).toBe(false);
+  });
+
+  it('treats journal pages as readable and potions as the only hero-target uses', () => {
+    expect(isReadable('journal_page')).toBe(true);
+    expect(isReadable('scroll')).toBe(false);
+    expect(isReadable('key')).toBe(false);
+    expect(usesHeroTarget('potion_red')).toBe(true);
+    expect(usesHeroTarget('potion_blue')).toBe(true);
+    expect(usesHeroTarget('potion_green')).toBe(true);
+    expect(usesHeroTarget('journal_page')).toBe(false);
+    expect(usesHeroTarget('key')).toBe(false);
+    expect(usesHeroTarget('oil_flask')).toBe(false);
   });
 
   it('scores better / worse / same for matching jobs', () => {

@@ -7,6 +7,8 @@ export interface ItemDef {
   id: string;
   stack: boolean;
   usable: boolean;
+  /** Opens the note/journal reader instead of a hero picker. */
+  readable?: boolean;
   slot: ItemSlot;
   material: ItemMaterial;
   equipHeroes: HeroId[] | 'any';
@@ -72,6 +74,7 @@ const DEFS: Record<string, ItemDef> = {
     id: 'journal_page',
     stack: false,
     usable: true,
+    readable: true,
     slot: 'bag',
     material: CLOTH,
     equipHeroes: [],
@@ -269,6 +272,36 @@ export function equippable(id: string): boolean {
 export function usable(id: string): boolean {
   return itemDef(id).usable;
 }
+
+export function isReadable(id: string): boolean {
+  return !!itemDef(normalizeItemId(id)).readable;
+}
+
+/** Items that must pick a living hero (potions). Keys, oil, and notes do not. */
+export function usesHeroTarget(id: string): boolean {
+  const item = normalizeItemId(id);
+  return item === 'potion_red' || item === 'potion_blue' || item === 'potion_green';
+}
+
+export type ReadableKind = 'journal' | 'note';
+
+export interface ReadableDoc {
+  kind: ReadableKind;
+  id: string;
+  title: string;
+  text: string;
+}
+
+export function journalIntroKey(page: number): string {
+  return page === 2 ? 'journal_f2' : 'read_journal';
+}
+
+export function journalTriggerId(page: number): string {
+  return `journal_page_${Math.max(1, page)}`;
+}
+
+/** `audio.json` `sfx.scroll` registry key (buffer aliases: scroll, sfx_scroll). */
+export const NOTE_SCROLL_SFX = 'scroll';
 
 export type EquipJob = 'weapon' | 'armour';
 

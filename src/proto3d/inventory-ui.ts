@@ -7,10 +7,12 @@ import {
   canEquip,
   compareEquip,
   equippable,
+  isReadable,
   preferredHand,
   sameEquipJob,
   STACK_MAX,
-  usable
+  usable,
+  usesHeroTarget
 } from './items';
 import type { PartyBag } from './bag';
 import { panelArtPath, type InventoryScreenLayout, type LayoutRect } from './layout585';
@@ -289,6 +291,10 @@ export class InventoryUi {
       this.onUse(this.selected);
       return;
     }
+    if (isReadable(entry.item) || usable(entry.item)) {
+      this.onUse(this.selected);
+      return;
+    }
     if (equippable(entry.item)) {
       this.onEquip(this.selected, hero, slot);
       return;
@@ -309,6 +315,7 @@ export class InventoryUi {
     this.lastCompare = null;
     this.lastCompareKind = null;
     const slot = this.bag.slots[index];
+    if (slot && isReadable(slot.item)) this.onUse(index);
     if (slot && equippable(slot.item)) {
       const hero = HEROES.find((h) => canEquip(slot.item, h));
       if (hero) {
@@ -508,7 +515,7 @@ export class InventoryUi {
         if (dest) this.drawFont(line, dest[0], dest[1], BODY_COLOUR);
       });
     }
-    if (slot && !this.pickHero && usable(slot.item)) {
+    if (slot && !this.pickHero && usesHeroTarget(slot.item)) {
       const [hx, hy, hw] = this.layout.hintLine;
       const hint = this.story.uiText('bag.pick_hero');
       this.drawFont(hint.slice(0, Math.floor(hw / this.fontCellW)), hx, hy, NAME_COLOUR);

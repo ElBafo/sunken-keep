@@ -80,7 +80,17 @@ import { PartyHud, type GearId, type HandSlot } from './party-hud';
 import type { HeroId } from '../constants';
 import { PartyBag } from './bag';
 import { InventoryUi } from './inventory-ui';
-import { canEquip, equipSfx, pickupSfx, preferredHand } from './items';
+import {
+  canEquip,
+  equipSfx,
+  isReadable,
+  journalIntroKey,
+  journalTriggerId,
+  NOTE_SCROLL_SFX,
+  pickupSfx,
+  preferredHand
+} from './items';
+import { NoteReader } from './note-reader';
 import { atlasFallbackPaths, coveredSingleFileLoads, ensureAtlases, recordedPngRelPaths } from './atlas';
 import { fetchJsonCached } from './asset-cache';
 import {
@@ -124,6 +134,7 @@ class Game {
   private swapTimer: ReturnType<typeof setTimeout> | null = null;
   bag = new PartyBag();
   inventory!: InventoryUi;
+  noteReader!: NoteReader;
   private pendingPotion: 'potion_red' | 'potion_blue' | 'potion_green' | null = null;
   private lootSnap: Array<{ x: number; y: number; item?: string; chest?: boolean; chestItems?: string[]; chestOpen?: boolean }> = [];
   lastMessage = '';
@@ -417,9 +428,11 @@ class Game {
       onClose: () => this.closeBag(),
       playUi: (name) => this.audioManager?.playUi(name)
     });
+    this.noteReader = new NoteReader(() => this.hideNote());
     const atlases = ensureAtlases();
     const hudReady = this.hud.load();
     void this.inventory.load();
+    void this.noteReader.load();
     if (this.bubble) void this.bubble.load();
 
     this.sceneBuilder = new SceneBuilder();
@@ -760,7 +773,8 @@ class Game {
     if (tile.chest && !tile.chestOpen) return this.lootChest(x, y, tile);
     if (!tile.item) return false;
     const id = tile.item === 'oil' ? 'oil_flask' : tile.item;
-    const added = this.bag.add(id);
+    const meta = id === 'journal_page' ? { journalPage: tile.journalPage ?? 1 } : undefined;
+    const added = this.bag.add(id, 1, undefined, meta);
     if (!added) {
       this.showPrompt(this.storyLog('bag_full'));
       this.audioManager.playUi('item_use_fail');
@@ -771,7 +785,7 @@ class Game {
     this.darkFx.hideItemAt(x, y);
     this.syncKeyFlag();
     this.audioManager.playUi(pickupSfx(id));
-    const key = id === 'oil_flask' ? 'oil_pickup' : `pickup_${id}`;
+    const key = id === 'oil_flask' ? 'oil_pickup' : id === 'journal_page' ? 'pickup_scroll' : `pickup_${id}`;
     const named = this.storyLog(key);
     this.showMessage(named || this.storyLog('pickup_item', { item: this.story.itemName(id) }));
     this.inventory?.redraw();
@@ -819,6 +833,7 @@ class Game {
   closeBag() {
     if (!this.inventory?.open) return;
     this.clearPotionPick();
+    this.hideNote();
     this.inventory.hide();
   }
 
@@ -855,6 +870,10 @@ class Game {
         this.drinkBagSlot(this.inventory.selected, hero);
         return;
       }
+      if (slot && isReadable(slot.item)) {
+        this.useBagSlot(this.inventory.selected);
+        return;
+      }
       if (this.inventory.equipPick) this.equipBagSlot(this.inventory.selected, hero);
     }
   }
@@ -887,6 +906,10 @@ class Game {
   useBagSlot(index: number) {
     const slot = this.bag.slots[index];
     if (!slot) return;
+    if (isReadable(slot.item)) {
+      this.readBagSlot(index);
+      return;
+    }
     if (slot.item === 'potion_red' || slot.item === 'potion_blue' || slot.item === 'potion_green') {
       this.beginPotionPick(slot.item);
       return;
@@ -1347,23 +1370,42 @@ class Game {
     this.lampNote.text = this.story.noteText();
   }
 
-  showNote() {
-    const text = this.lampNote.text;
-    this.lastMessage = text;
-    const overlay = document.getElementById('note-overlay');
+  showNote(title?: string, text?: string) {
+    const docTitle = title ?? this.lampNote.title;
+    const docText = text ?? this.lampNote.text;
+    this.lampNote = { title: docTitle, text: docText };
+    this.lastMessage = docText;
     const titleEl = document.getElementById('note-title');
     const textEl = document.getElementById('note-text');
-    if (titleEl) titleEl.textContent = this.lampNote.title;
-    if (textEl) textEl.textContent = text.replace(/\. /g, '.\n');
-    if (overlay) overlay.classList.add('show');
+    if (titleEl) titleEl.textContent = docTitle;
+    if (textEl) textEl.textContent = docText;
+    this.noteReader?.show(docTitle, docText);
+    document.getElementById('note-overlay')?.classList.add('show');
     document.getElementById('message-toast')?.classList.remove('show');
     this.noteOpen = true;
+    this.audioManager?.playUi(NOTE_SCROLL_SFX);
     this.messageTimer = performance.now() + 6000;
   }
 
   hideNote() {
+    this.noteReader?.hide();
     document.getElementById('note-overlay')?.classList.remove('show');
     this.noteOpen = false;
+  }
+
+  private readBagSlot(index: number) {
+    const slot = this.bag.slots[index];
+    if (!slot || !isReadable(slot.item)) return;
+    const doc = this.story.readableItem(slot.item, slot.journalPage);
+    if (!doc) return;
+    if (doc.kind === 'journal') {
+      const page = slot.journalPage && slot.journalPage > 0 ? slot.journalPage : 1;
+      const introKey = journalIntroKey(page);
+      if (this.storyProgress.fire(introKey)) this.showMessage(this.storyLog(introKey));
+      this.storyProgress.fire(journalTriggerId(page));
+      this.rememberStoryKey(journalTriggerId(page));
+    }
+    this.showNote(doc.title, doc.text);
   }
 
   readFacingDesk(): boolean {
@@ -1386,8 +1428,8 @@ class Game {
     this.storyProgress.fire('note_lampkeeper');
     this.flags.add('note_lampkeeper');
     this.rememberStoryKey('note_lampkeeper');
-    this.rememberStoryKey('journal_page_1');
-    this.showNote();
+    const doc = this.story.lampkeeperNote();
+    this.showNote(doc.title, doc.text);
     return true;
   }
 
@@ -1469,6 +1511,11 @@ class Game {
       return;
     }
     this.interactCount += 1;
+    if (this.noteOpen) {
+      this.hideNote();
+      this.messageTimer = 0;
+      return;
+    }
     if (this.inventory?.open) {
       if (this.inventory.selected >= 0) {
         this.useBagSlot(this.inventory.selected);
@@ -2717,6 +2764,8 @@ class Game {
       partyState: () => this.combat.partyState(),
       lastNote: () => this.lampNote,
       noteOpen: () => this.noteOpen,
+      noteScroll: () => this.noteReader?.scroll ?? 0,
+      noteMaxScroll: () => this.noteReader?.maxScroll() ?? 0,
       getOil: () => this.oil,
       setOil: (n: number) => this.setOil(n),
       getBright: () => this.bright,
@@ -2774,8 +2823,8 @@ class Game {
       carriedTorch: () => this.hud.carriedTorch(),
       hasCarriedTorchLight: () => this.vertexLighting.hasCarriedTorch(),
       getBag: () => this.bag.serialize(),
-      giveItem: (id: string, n = 1) => {
-        this.bag.add(id, n);
+      giveItem: (id: string, n = 1, journalPage?: number) => {
+        this.bag.add(id, n, undefined, journalPage != null ? { journalPage } : undefined);
         this.syncKeyFlag();
         this.inventory?.redraw();
       },

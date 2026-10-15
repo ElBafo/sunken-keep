@@ -47,12 +47,11 @@ test('proto3d iPhone tap: canvas interact once; HTML buttons still work', async 
   ).toBe(true);
   await expect(page.locator('#note-overlay')).toHaveClass(/show/);
 
-  await page.locator('#render-canvas').tap();
+  await page.locator('#note-overlay').tap();
   await page.waitForTimeout(80);
-  expect(await count(), 'second desk tap fires interact exactly once more').toBe(deskBefore + 2);
   expect(
     await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.noteOpen()),
-    'second tap closes Pell\'s note'
+    'tapping the open note closes Pell\'s note'
   ).toBe(false);
   await expect(page.locator('#note-overlay')).not.toHaveClass(/show/);
 

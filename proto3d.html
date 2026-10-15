@@ -472,33 +472,34 @@
     }
     #note-overlay {
       position: absolute;
-      left: 50%;
-      top: 18%;
-      transform: translate(-50%, 0);
-      width: 238px;
-      background: rgba(18, 14, 10, 0.92);
-      border: 1px solid #8a7348;
-      color: #e8e0d0;
-      font-family: monospace;
-      padding: 12px 14px 14px;
+      inset: 0;
+      width: 270px;
+      height: 585px;
       z-index: 280;
       opacity: 0;
       pointer-events: none;
+      touch-action: none;
       transition: opacity 0.15s;
     }
-    #note-overlay.show { opacity: 1; }
-    #note-title {
-      font-size: 13px;
-      letter-spacing: 0.06em;
-      color: #d4b56a;
-      margin-bottom: 12px;
+    #note-overlay.show {
+      opacity: 1;
+      pointer-events: auto;
     }
+    #note-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
+    }
+    #note-title,
     #note-text {
-      font-size: 14px;
-      line-height: 1.6;
-      letter-spacing: 0.02em;
-      word-spacing: 0.2em;
-      white-space: pre-wrap;
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
     }
   </style>
 </head>
@@ -527,6 +528,7 @@
       </div>
       <div id="message-toast"></div>
       <div id="note-overlay">
+        <canvas id="note-canvas" width="270" height="585"></canvas>
         <div id="note-title"></div>
         <div id="note-text"></div>
       </div>

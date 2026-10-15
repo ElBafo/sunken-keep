@@ -14,16 +14,35 @@ export interface FontMeta {
 
 let tintScratch: HTMLCanvasElement | null = null;
 
+export function normalizeFontText(text: string): string {
+  return text.normalize('NFC');
+}
+
 function glyphSource(
   ch: string,
   glyphs: FontGlyphs | undefined,
   cellW: number
 ): { sx: number; sy: number } | null {
-  const g = glyphs?.[ch];
+  const nfc = ch.normalize('NFC');
+  const g = glyphs?.[nfc] ?? glyphs?.[ch];
   if (g) return { sx: g.x, sy: g.y };
-  const index = ch.charCodeAt(0) - 32;
+  const index = nfc.charCodeAt(0) - 32;
   if (index < 0 || index > 94) return null;
   return { sx: (index % 16) * cellW, sy: Math.floor(index / 16) * 10 };
+}
+
+export function hasFontGlyph(ch: string, glyphs?: FontGlyphs, cellW = 6): boolean {
+  if (!ch) return false;
+  return glyphSource(ch.normalize('NFC'), glyphs, cellW) != null;
+}
+
+export function missingFontGlyphs(text: string, glyphs?: FontGlyphs, cellW = 6): string[] {
+  const missing: string[] = [];
+  for (const ch of normalizeFontText(text)) {
+    if (ch === '\n' || ch === '\r' || ch === '\t') continue;
+    if (!hasFontGlyph(ch, glyphs, cellW)) missing.push(ch);
+  }
+  return missing;
 }
 
 function drawTintedGlyph(
@@ -104,18 +123,19 @@ export function drawFont5x7(
   shadow?: { colour: string; dx?: number; dy?: number }
 ) {
   if (!text) return;
+  const drawn = normalizeFontText(text);
   if (shadow) {
-    drawFont5x7(ctx, font, text, x + (shadow.dx ?? 1), y + (shadow.dy ?? 1), glyphs, cellW, shadow.colour);
+    drawFont5x7(ctx, font, drawn, x + (shadow.dx ?? 1), y + (shadow.dy ?? 1), glyphs, cellW, shadow.colour);
   }
   if (!font) {
     ctx.fillStyle = colour ?? '#d8ccb0';
     ctx.font = '8px monospace';
     ctx.textBaseline = 'top';
-    ctx.fillText(text, x, y);
+    ctx.fillText(drawn, x, y);
     return;
   }
-  for (let i = 0; i < text.length; i++) {
-    const src = glyphSource(text[i], glyphs, cellW);
+  for (let i = 0; i < drawn.length; i++) {
+    const src = glyphSource(drawn[i], glyphs, cellW);
     if (!src) continue;
     const dx = x + i * cellW;
     if (colour) drawTintedGlyph(ctx, font, src.sx, src.sy, dx, y, colour);

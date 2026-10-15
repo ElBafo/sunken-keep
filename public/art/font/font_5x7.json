@@ -685,10 +685,18 @@
    "y": 10
   },
   "·": {
-   "x": 30,
-   "y": 100
+    "x": 30,
+    "y": 100
+  },
+  "«": {
+    "x": 42,
+    "y": 100
+  },
+  "»": {
+    "x": 48,
+    "y": 100
   }
  },
- "extraChars": "ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩαβγδεζηθικλμνξοπρσςτυφχψωΆΈΉΊΌΎΏΪΫάέήίόύώϊϋΐΰ·΄;·",
- "greekNote": "Greek block (add_greek.py) starts at y=60; look extra chars up by 'glyphs' (the index formula in howToFind is for ASCII only). Advance stays 6 px. Lowercase accents use rows 0-1; accented capitals use a left tonos in column 0. U+037E maps to ';', U+0387 to U+00B7."
+ "extraChars": "ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩαβγδεζηθικλμνξοπρσςτυφχψωΆΈΉΊΌΎΏΪΫάέήίόύώϊϋΐΰ·΄;·«»",
+ "greekNote": "Greek block (add_greek.py) starts at y=60; look extra chars up by 'glyphs' (the index formula in howToFind is for ASCII only). Advance stays 6 px. Lowercase accents use rows 0-1; accented capitals use a left tonos in column 0. U+037E maps to ';', U+0387 to U+00B7. Guillemets «» sit on the extra row at (42,100) and (48,100)."
 }

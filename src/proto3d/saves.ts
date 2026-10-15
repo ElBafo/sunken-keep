@@ -69,6 +69,7 @@ export interface SavedBagEntry {
   item: string;
   count: number;
   from?: { hero: HeroId; hand: HandSlot };
+  journalPage?: number;
 }
 
 export interface SavePayload {
