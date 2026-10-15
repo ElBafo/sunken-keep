@@ -29,6 +29,16 @@ export function saveLocale(locale: Locale) {
   }
 }
 
+/** Reload lamp-note copy after a locale change; redraw if the reader is open. */
+export function refreshLampNoteAfterLocaleChange(opts: {
+  noteOpen: boolean;
+  loadLampNote: () => void;
+  showNote: () => void;
+}): void {
+  opts.loadLampNote();
+  if (opts.noteOpen) opts.showNote();
+}
+
 export function loadSavedLocale(): Locale | null {
   try {
     const raw = localStorage.getItem(LANG_STORAGE);

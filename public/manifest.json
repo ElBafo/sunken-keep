@@ -1,7 +1,7 @@
 {
   "name": "The Sunken Keep",
   "short_name": "Sunken Keep",
-  "description": "A grid-based first-person dungeon crawler",
+  "description": "First-person 3D dungeon crawler",
   "start_url": "./",
   "display": "fullscreen",
   "orientation": "portrait",

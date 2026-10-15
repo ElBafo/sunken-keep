@@ -62,7 +62,7 @@ import { enterPlayFromIntro, mountIntroSkip, type IntroSkipHandle } from './intr
 import { interactPropAt, tileBlocksPath } from './wall-props';
 import { SpeechBubble } from './bubble';
 import { StoryProgress } from './story-progress';
-import { saveLocale, type Locale } from './i18n';
+import { refreshLampNoteAfterLocaleChange, resolveLocale, saveLocale, StoryText, type Locale } from './i18n';
 import { qualityFromSearch, QualityLevel } from './quality';
 import { PixelRenderer } from './renderer';
 import { SceneBuilder } from './scene-builder';
@@ -73,7 +73,6 @@ import { VertexLightingManager } from './vertex-lighting';
 import { WaterSystem } from './water';
 import { DarkFx } from './dark-fx';
 import { PropBuilder } from './props';
-import { resolveLocale, StoryText } from './i18n';
 import { applyLetterboxStone, fitGameStage } from './game-stage';
 import { loadLayout585 } from './layout585';
 import { PartyHud, type GearId, type HandSlot } from './party-hud';
@@ -2323,6 +2322,11 @@ class Game {
     this.applyStoryLabels();
     this.title.refreshHint();
     this.title.layoutButtons();
+    refreshLampNoteAfterLocaleChange({
+      noteOpen: this.noteOpen,
+      loadLampNote: () => this.loadLampNote(),
+      showNote: () => this.showNote()
+    });
   }
 
   private showTitleToast(text: string) {

@@ -20,26 +20,247 @@
       width: 100%;
       height: 100dvh;
       overflow: hidden;
-      background-color: #1a1612;
-      background-image: url('/sunken-keep/art/ui/layout585/stone_strip_tile.png');
-      background-repeat: repeat;
-      image-rendering: pixelated;
-      image-rendering: crisp-edges;
+      background: #000;
       touch-action: none;
       position: fixed;
       overscroll-behavior: none;
     }
     body {
+      padding: 0;
+    }
+    #game-letterbox {
+      position: absolute;
+      inset: 0;
+      padding-top: env(safe-area-inset-top, 0);
+      background: #000;
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
+      overflow: hidden;
+    }
+    #game-stage {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 270px;
+      height: 585px;
+      transform-origin: top left;
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
+    }
+    #canvas-container {
+      position: relative;
+      width: 270px;
+      height: 380px;
+      line-height: 0;
+      background: #000;
+    }
+    #party-hud {
+      position: relative;
+      width: 270px;
+      height: 205px;
+      line-height: 0;
+      background: #000;
+    }
+    #party-canvas {
+      display: block;
+      width: 270px;
+      height: 205px;
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
+    }
+    .hand-btn,
+    .portrait-btn,
+    .hud-chrome-btn {
+      position: absolute;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+      touch-action: none;
+      -webkit-tap-highlight-color: transparent;
+      z-index: 20;
+    }
+    .hud-chrome-btn {
+      transform: translate(-50%, -50%);
+    }
+    .portrait-btn.pick-hero {
+      outline: 2px solid #f0d060;
+      outline-offset: 1px;
+      background: rgba(240, 208, 96, 0.28);
+    }
+    #inventory-screen {
+      position: absolute;
+      inset: 0;
+      width: 270px;
+      height: 585px;
+      z-index: 90;
+      display: none;
+      background: #000;
+      touch-action: none;
+    }
+    #inventory-screen.show { display: block; }
+    #inventory-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
+    }
+    .inv-slot,
+    .inv-action,
+    .inv-close,
+    .inv-doll,
+    .inv-hero {
+      position: absolute;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: #d8ccb0;
+      font-family: monospace;
+      font-size: 11px;
+      cursor: pointer;
+      touch-action: none;
+      -webkit-tap-highlight-color: transparent;
+      z-index: 91;
+    }
+    .hand-btn.swap-armed {
+      outline: 2px solid #f0d060;
+      outline-offset: 1px;
+      background: rgba(240, 208, 96, 0.42);
+      box-shadow: 0 0 0 1px #3a2a10, 0 0 8px 2px rgba(240, 208, 96, 0.65);
+    }
+    .hand-btn[data-hint="wand"],
+    .hand-btn.wand-hint {
+      outline: 1px solid #9ad4ff;
+      outline-offset: 1px;
+      box-shadow: 0 0 10px 3px rgba(140, 210, 255, 0.85);
+      background: rgba(120, 190, 255, 0.22);
+    }
+    #flank-flash {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 40;
+      opacity: 0;
+      box-shadow: none;
+      transition: opacity 90ms linear;
+    }
+    #flank-flash.show { opacity: 1; }
+    #flank-flash.show[data-side="left"] {
+      box-shadow: inset 22px 0 18px -4px rgba(200, 24, 24, 0.92);
+    }
+    #flank-flash.show[data-side="right"] {
+      box-shadow: inset -22px 0 18px -4px rgba(200, 24, 24, 0.92);
+    }
+    #flank-flash.show[data-side="behind"] {
+      box-shadow: inset 0 -22px 18px -4px rgba(200, 24, 24, 0.92);
+    }
+    #speech-bubble {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      top: calc(348 / 380 * 100%);
+      height: calc(32 / 380 * 100%);
+      display: none;
+      pointer-events: none;
+      z-index: 45;
+      image-rendering: pixelated;
+    }
+    #speech-bubble.show { display: block; }
+    #torch-choice {
+      position: absolute;
+      left: 50%;
+      bottom: 10px;
+      transform: translateX(-50%);
+      display: none;
+      gap: 8px;
+      z-index: 80;
+      pointer-events: auto;
+    }
+    #torch-choice.show { display: flex; }
+    .hud-choice-btn {
+      min-width: 44px;
+      min-height: 44px;
+      width: max(44px, calc(52 * (100vw / 270)));
+      max-width: calc(56 * (100vw / 270));
+      height: max(44px, calc(31 * (100vw / 270)));
+      padding: 0 6px;
+      border: 0;
+      background: #2a2420 url('%BASE_URL%art/ui/panel/btn_choice.png') center / 100% 100% no-repeat;
+      color: #d8ccb0;
+      font-family: monospace;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      image-rendering: pixelated;
+      cursor: pointer;
+      touch-action: none;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .hud-choice-btn:active {
+      background-image: url('%BASE_URL%art/ui/panel/btn_choice_pressed.png');
+    }
+    #render-canvas {
+      display: block;
+      width: 270px;
+      height: 380px;
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
+    }
+    .control-btn {
+      min-width: 44px;
+      min-height: 44px;
+      width: 44px;
+      height: 44px;
+      background: rgba(40, 40, 40, 0.7);
+      border: 2px solid #666;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 20px;
       display: flex;
       align-items: center;
       justify-content: center;
-      /* Safe area insets for iPhone notch and home bar */
-      padding: env(safe-area-inset-top, 0) env(safe-area-inset-right, 0) env(safe-area-inset-bottom, 0) env(safe-area-inset-left, 0);
+      user-select: none;
+      cursor: pointer;
+      touch-action: none;
     }
-    #game {
-      image-rendering: pixelated;
-      image-rendering: crisp-edges;
+    .control-btn:active {
+      background: rgba(60, 60, 60, 0.9);
+      border-color: #888;
     }
+    #btn-door {
+      position: absolute;
+      right: 8px;
+      bottom: 8px;
+      display: none;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      z-index: 50;
+    }
+    #btn-door.visible { display: flex; }
+    #message-toast {
+      position: absolute;
+      top: 28%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      color: #e8e0d0;
+      font-family: monospace;
+      font-size: 18px;
+      text-shadow: 0 1px 3px #000;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.15s;
+      z-index: 300;
+    }
+    #message-toast.show { opacity: 1; }
     #tap-to-start {
       position: fixed;
       top: 0;
@@ -51,9 +272,11 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      z-index: 1000;
+      z-index: 1800;
       font-family: monospace;
       color: #fff;
+      touch-action: manipulation;
+      cursor: pointer;
     }
     #tap-to-start.hidden {
       display: none;
@@ -63,64 +286,274 @@
       margin-bottom: 20px;
       animation: pulse 2s infinite;
     }
+    #tap-to-start.feedback #tap-to-start-text {
+      animation: none;
+      opacity: 0.35;
+    }
     @keyframes pulse {
       0%, 100% { opacity: 1; }
       50% { opacity: 0.5; }
     }
-    #install-hint {
+    #gameover {
       position: fixed;
-      left: 50%;
-      top: 0;
-      transform: translate(-50%, -50%);
-      background: rgba(0, 0, 0, 0.9);
-      color: #fff;
-      padding: 8px 12px;
-      border-radius: 8px;
-      font-family: monospace;
-      font-size: 10px;
-      text-align: center;
-      max-width: 220px;
-      z-index: 999;
-      border: 1px solid #555;
-      cursor: pointer;
-      pointer-events: auto;
-    }
-    #install-hint.hidden {
+      inset: 0;
+      z-index: 2000;
       display: none;
+      align-items: flex-start;
+      justify-content: center;
+      background: #0a1210;
+      image-rendering: pixelated;
     }
-    #mute-toggle {
-      position: fixed;
+    #gameover.show { display: flex; }
+    #gameover-stage {
+      position: relative;
+      width: min(100vw, calc(100vh * 270 / 585));
+      aspect-ratio: 270 / 585;
+      background: url('%BASE_URL%art/ui/gameover/gameover_bg.png') center / 100% 100% no-repeat;
+      image-rendering: pixelated;
+    }
+    #gameover-title,
+    #gameover-body {
+      position: absolute;
+      left: calc(10 / 270 * 100%);
+      width: calc(250 / 270 * 100%);
+      color: #d8ccb0;
+      font-family: monospace;
+      text-align: center;
+      text-shadow: 1px 1px 0 #1a1210;
+      pointer-events: none;
+    }
+    #gameover-title {
+      top: calc(232 / 585 * 100%);
+      height: calc(24 / 585 * 100%);
+      font-size: clamp(11px, 4.2vw, 16px);
+    }
+    #gameover-body {
+      top: calc(256 / 585 * 100%);
+      height: calc(20 / 585 * 100%);
+      font-size: clamp(10px, 3.6vw, 13px);
+    }
+    .gameover-btn {
+      position: absolute;
+      left: calc(85 / 270 * 100%);
+      width: calc(100 / 270 * 100%);
+      height: calc(31 / 585 * 100%);
+      padding: 0;
+      border: 4px solid transparent;
+      border-image: url('%BASE_URL%art/ui/panel/button_9slice.png') 4 fill;
+      background: transparent;
+      color: #d8ccb0;
+      font-family: monospace;
+      font-size: clamp(10px, 3.4vw, 13px);
+      text-shadow: 1px 1px 0 #1a1210;
+      image-rendering: pixelated;
+      cursor: pointer;
+    }
+    #btn-go-autosave { top: calc(410 / 585 * 100%); }
+    #btn-go-floor { top: calc(449 / 585 * 100%); }
+    .gameover-btn:active {
+      border-image-source: url('%BASE_URL%art/ui/panel/button_pressed_9slice.png');
+      transform: translate(1px, 1px);
+    }
+    .gameover-btn[hidden] { display: none; }
+    #title-overlay,
+    #intro-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 1500;
+      display: none;
+      background: #000;
+    }
+    #title-overlay.show,
+    #intro-overlay.show { display: block; }
+    #intro-overlay { z-index: 1600; }
+    .intro-skip {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      left: auto;
+      bottom: auto;
+      transform: none;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 10px 16px;
+      border: 1px solid #8a7348;
+      background: rgba(12, 10, 8, 0.85);
+      color: #e8d8a0;
+      font-family: monospace;
+      font-size: 14px;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      z-index: 2;
+    }
+    .intro-skip[hidden] { display: none; }
+    .intro-skip:active { transform: translateY(1px); }
+    #title-stage,
+    #intro-stage {
+      position: relative;
+      width: 270px;
+      height: 585px;
+      background: #000;
+    }
+    #title-canvas,
+    #intro-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
+    }
+    .title-hit {
+      position: absolute;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+      touch-action: none;
+      -webkit-tap-highlight-color: transparent;
+      z-index: 2;
+    }
+    #title-hint {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+      clip-path: inset(50%);
+      white-space: nowrap;
+      pointer-events: none;
+    }
+    #title-toast {
+      position: absolute;
+      left: 10%;
+      right: 10%;
+      top: calc(340 / 585 * 100%);
+      color: #e8d8a0;
+      font-family: monospace;
+      font-size: clamp(11px, 3.4vw, 14px);
+      text-align: center;
+      opacity: 0;
+      pointer-events: none;
+    }
+    #title-toast.show { opacity: 1; }
+    #fps-counter {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(0, 0, 0, 0.7);
+      color: #0f0;
+      padding: 5px 10px;
+      font-family: monospace;
+      font-size: 12px;
+      z-index: 200;
+      display: none; /* Hidden by default, shown with ?debug=1 */
+    }
+    body.bag-open #oil-readout,
+    body.bag-open #fps-counter {
+      visibility: hidden;
+    }
+    #oil-readout {
+      position: absolute;
       top: 10px;
       right: 10px;
-      width: 40px;
-      height: 40px;
-      background: rgba(0, 0, 0, 0.7);
-      border: 2px solid #888;
-      border-radius: 4px;
-      color: #fff;
-      font-size: 20px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      z-index: 500;
-      cursor: pointer;
-      user-select: none;
+      background: rgba(0, 0, 0, 0.65);
+      color: #e8c98a;
+      padding: 4px 8px;
+      font-family: monospace;
+      font-size: 12px;
+      letter-spacing: 0.04em;
+      z-index: 200;
+      pointer-events: none;
     }
-    #mute-toggle:active {
-      background: rgba(0, 0, 0, 0.9);
+    #note-overlay {
+      position: absolute;
+      left: 50%;
+      top: 18%;
+      transform: translate(-50%, 0);
+      width: 238px;
+      background: rgba(18, 14, 10, 0.92);
+      border: 1px solid #8a7348;
+      color: #e8e0d0;
+      font-family: monospace;
+      padding: 12px 14px 14px;
+      z-index: 280;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s;
+    }
+    #note-overlay.show { opacity: 1; }
+    #note-title {
+      font-size: 13px;
+      letter-spacing: 0.06em;
+      color: #d4b56a;
+      margin-bottom: 12px;
+    }
+    #note-text {
+      font-size: 14px;
+      line-height: 1.6;
+      letter-spacing: 0.02em;
+      word-spacing: 0.2em;
+      white-space: pre-wrap;
     }
   </style>
 </head>
 <body>
-  <div id="tap-to-start">
-    <div id="tap-to-start-text">TAP TO START</div>
+  <div id="tap-to-start" role="button" tabindex="0">
+    <div id="tap-to-start-text"></div>
     <div style="font-size: 12px; color: #888;">The Sunken Keep</div>
   </div>
-  <canvas id="game"></canvas>
-  <button id="mute-toggle" class="hidden">🔊</button>
-  <div id="install-hint" class="hidden">
-    For full screen, tap Share<br>then Add to Home Screen
+  <div id="game-letterbox">
+    <div id="game-stage">
+      <div id="canvas-container">
+        <canvas id="render-canvas"></canvas>
+        <div id="flank-flash" aria-hidden="true"></div>
+        <div id="torch-choice">
+          <button id="btn-torch-take" class="hud-choice-btn" type="button"></button>
+          <button id="btn-torch-snuff" class="hud-choice-btn" type="button"></button>
+        </div>
+        <button id="btn-door" class="control-btn" type="button"></button>
+        <canvas id="speech-bubble" width="270" height="32" aria-hidden="true"></canvas>
+      </div>
+      <div id="party-hud">
+        <canvas id="party-canvas"></canvas>
+      </div>
+      <div id="inventory-screen" hidden>
+        <canvas id="inventory-canvas"></canvas>
+      </div>
+      <div id="message-toast"></div>
+      <div id="note-overlay">
+        <div id="note-title"></div>
+        <div id="note-text"></div>
+      </div>
+      <div id="oil-readout"></div>
+      <div id="fps-counter">FPS: --</div>
+      <div id="title-overlay">
+        <div id="title-stage">
+          <canvas id="title-canvas" width="270" height="585"></canvas>
+          <div id="title-hint"></div>
+          <div id="title-toast"></div>
+        </div>
+      </div>
+      <div id="intro-overlay">
+        <div id="intro-stage">
+          <canvas id="intro-canvas" width="270" height="480"></canvas>
+        </div>
+      </div>
+    </div>
   </div>
-  <script type="module" src="/src/main.ts"></script>
+  <div id="gameover">
+    <div id="gameover-stage">
+      <div id="gameover-title"></div>
+      <div id="gameover-body"></div>
+      <button id="btn-go-autosave" class="gameover-btn" type="button" hidden></button>
+      <button id="btn-go-floor" class="gameover-btn" type="button"></button>
+    </div>
+  </div>
+  <script type="module" src="/src/proto3d/main.ts"></script>
 </body>
 </html>

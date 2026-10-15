@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Visual polish verification', () => {
   test('capture screenshots and measure FPS', async ({ page }) => {
     await page.goto('/sunken-keep/');
-    await page.waitForSelector('canvas#game', { timeout: 15000 });
+    await page.waitForSelector('#render-canvas', { timeout: 15000 });
     const tap = page.locator('#tap-to-start');
     if (await tap.isVisible()) {
       await tap.click({ timeout: 5000 }).catch(() => {});
