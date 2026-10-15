@@ -376,15 +376,56 @@ test('proto3d step3 inventory: pickup, chest loot-all, bag, potions, key, oil, g
   });
   expect(ownMiss, 'own square not facing the wall does not use the lamp').toBe(false);
 
+  const laterLamp = await page.evaluate(() => {
+    const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    proto.setPosition(13, 9, 1);
+    proto.interactFacingProp();
+    proto.interactFacingProp();
+    return proto.lastMessage();
+  });
+  expect(laterLamp, 'later lamp tap is lamp_sealed').toMatch(/Sealed tight/i);
+
   const wallDraw = await page.evaluate(() => {
     const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
     proto.setPosition(13, 9, 1);
     return proto.wallPropDraw?.() ?? [];
   });
-  expect(wallDraw.find((d) => d.kind === 'lamp_capped')?.visible).toBe(false);
+  expect(wallDraw.find((d) => d.kind === 'lamp_capped')).toBeUndefined();
   const flat = wallDraw.find((d) => d.kind === 'lamp_capped_wall');
   expect(flat?.visible, 'wall-flat lamp on own square').toBe(true);
-  expect(flat?.scaleY, 'scaled to wall height').toBe(2);
+  expect(flat?.scaleY, 'sprite-sized on the wall').toBeCloseTo(0.48, 5);
+  expect(flat?.face).toBe('E');
+
+  const lampAway = await page.evaluate(() => {
+    const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    proto.setPosition(13, 9, 3);
+    return proto.wallPropDraw?.() ?? [];
+  });
+  expect(lampAway.find((d) => d.kind === 'lamp_capped_wall')?.visible).toBe(false);
+
+  const lampAdj = await page.evaluate(() => {
+    const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    proto.setPosition(13, 8, 2);
+    return proto.wallPropDraw?.() ?? [];
+  });
+  expect(lampAdj.find((d) => d.kind === 'lamp_capped_wall')?.visible).toBe(true);
+  expect(lampAdj.find((d) => d.kind === 'lamp_capped_wall')?.scaleY).toBeCloseTo(0.48, 5);
+
+  const rackWest = await page.evaluate(() => {
+    const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    proto.setPosition(9, 10, 3);
+    return proto.wallPropDraw?.() ?? [];
+  });
+  const rack = rackWest.filter((d) => d.x === 9 && d.y === 10);
+  expect(rack.length, 'jar rack on west wall').toBeGreaterThan(0);
+  expect(rack.every((d) => d.face === 'W' && d.visible)).toBe(true);
+
+  const rackEast = await page.evaluate(() => {
+    const proto = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    proto.setPosition(9, 10, 1);
+    return proto.wallPropDraw?.() ?? [];
+  });
+  expect(rackEast.filter((d) => d.x === 9 && d.y === 10).every((d) => !d.visible)).toBe(true);
 
   // Desk tap squares
   for (const pose of [

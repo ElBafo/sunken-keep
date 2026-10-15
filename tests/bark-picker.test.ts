@@ -194,4 +194,33 @@ describe('bark picker', () => {
     expect(director.queuedCount()).toBe(1);
     expect(director.flush(0)).toEqual(expect.objectContaining({ trigger: 'lampkeeper_note_read' }));
   });
+
+  it('does not drop lampkeeper_capped_lamp to flavour rate limits', () => {
+    const director = new BarkDirector({
+      flavour_gap_s: 120,
+      flavour_min_interval_s: 180,
+      min_gap_s: 8
+    });
+    const flavour: BarkLine[] = [
+      { trigger: 'idle', speaker: 'mags', text: 'Hmm.', tier: 'flavour' }
+    ];
+    const lamp: BarkLine[] = [
+      {
+        trigger: 'lampkeeper_capped_lamp',
+        speaker: 'brannoc',
+        text: 'He capped the last one himself. Brave little thief.',
+        tier: 'story'
+      }
+    ];
+    const flavourLine = director.pick('idle', flavour, { nowMs: 0, party, flags: new Set() });
+    expect(flavourLine).toBeTruthy();
+    const afterFlavour = barkDurationMs(flavourLine!) + 1000;
+    expect(afterFlavour).toBeLessThan(120_000);
+    const story = director.pick('lampkeeper_capped_lamp', lamp, {
+      nowMs: afterFlavour,
+      party,
+      flags: new Set()
+    });
+    expect(story?.trigger).toBe('lampkeeper_capped_lamp');
+  });
 });

@@ -1,20 +1,20 @@
 import * as THREE from 'three';
 import { loadSpriteTexture, textureFrameSize } from './atlas';
 import { loadTextureCached } from './asset-cache';
-import { CELL_SIZE } from './constants';
+import { CELL_SIZE, FACE_INTO_ROOM } from './constants';
 import { FloorData, Tile } from './types';
 import {
   isBlockingProp,
   isWallFace,
   isWallProp,
+  OPPOSITE_WALL,
+  WALL_PROP_WORLD_HEIGHT,
   wallPropPlanePose,
-  wallPropShowsFlat,
+  wallPropVisible,
   type PropWall
 } from './wall-props';
 
 const WOOD_COLOR = 0x3a2414;
-const LAMP_W = 0.16 * CELL_SIZE;
-const LAMP_H = 0.24 * CELL_SIZE;
 
 function configureTex(tex: THREE.Texture, repeat: boolean) {
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -73,8 +73,11 @@ export class PropBuilder {
         const tile = tiles[y][x];
         if (tile.prop === 'beams_fallen') this.addBeams(x, y, !!tile.mirror);
         else if (tile.prop === 'desk' || tile.prop === 'table') this.addDesk(x, y);
-        else if (tile.prop === 'jar_rack' || tile.prop === 'weapon_rack') this.addRack(x, y);
-        else if (tile.prop === 'lamp_capped') this.addLamp(x, y, tile, isWallFace(tile.propWall) ? tile.propWall : 'E');
+        else if (tile.prop === 'jar_rack' || tile.prop === 'weapon_rack') {
+          this.addRack(x, y, tile.prop, isWallFace(tile.propWall) ? tile.propWall : 'W');
+        } else if (tile.prop === 'lamp_capped') {
+          this.addLamp(x, y, isWallFace(tile.propWall) ? tile.propWall : 'E');
+        }
         else if (tile.prop) console.warn(`Unknown prop "${tile.prop}" at (${x},${y}); not drawn as a box`);
       }
     }
@@ -107,6 +110,14 @@ export class PropBuilder {
     mesh.userData.lanternProp = true;
     mesh.userData.noPick = true;
     this.group.add(mesh);
+  }
+
+  private markWallProp(obj: THREE.Object3D, x: number, y: number, face: PropWall, kind: string) {
+    obj.userData.wallMounted = true;
+    obj.userData.gridX = x;
+    obj.userData.gridY = y;
+    obj.userData.propWall = face;
+    obj.userData.kind = kind;
   }
 
   private box(
@@ -192,27 +203,34 @@ export class PropBuilder {
     this.tag(front, x, y, 'desk');
   }
 
-  private addRack(x: number, y: number) {
+  private addRack(x: number, y: number, kind: string, face: PropWall) {
     const wx = x * CELL_SIZE;
     const wz = y * CELL_SIZE;
     const map = this.woodPlain;
-    const wallX = wx - CELL_SIZE / 2 + 0.18;
+    const along = FACE_INTO_ROOM[face];
+    const into = FACE_INTO_ROOM[OPPOSITE_WALL[face]];
+    const wallX = wx + along.nx * (CELL_SIZE / 2 - 0.18);
+    const wallZ = wz + along.nz * (CELL_SIZE / 2 - 0.18);
+    const perpX = along.nz;
+    const perpZ = -along.nx;
     const shelfW = 0.22;
     const shelfD = 1.15;
 
     const sideH = 0.72;
     for (const zOff of [-0.52, 0.52] as const) {
-      const side = this.box(0.08, sideH, 0.08, map, x, y, 'rack');
-      side.position.set(wallX, sideH / 2, wz + zOff);
+      const side = this.box(0.08, sideH, 0.08, map, x, y, kind);
+      side.position.set(wallX + perpX * zOff, sideH / 2, wallZ + perpZ * zOff);
+      this.markWallProp(side, x, y, face, kind);
     }
 
     for (const hy of [0.18, 0.4, 0.62] as const) {
-      const shelf = this.box(shelfW, 0.05, shelfD, map, x, y, 'rack');
-      shelf.position.set(wallX + 0.04, hy, wz);
+      const shelf = this.box(shelfW, 0.05, shelfD, map, x, y, kind);
+      shelf.position.set(wallX + into.nx * 0.04, hy, wallZ + into.nz * 0.04);
+      this.markWallProp(shelf, x, y, face, kind);
     }
 
     if (!this.jarFront) return;
-    const face = new THREE.Mesh(
+    const front = new THREE.Mesh(
       new THREE.PlaneGeometry(1.2, 0.78),
       new THREE.MeshBasicMaterial({
         map: this.jarFront,
@@ -223,58 +241,26 @@ export class PropBuilder {
         side: THREE.DoubleSide
       })
     );
-    face.position.set(wallX + 0.16, 0.39, wz);
-    face.rotation.y = Math.PI / 2;
-    this.tag(face, x, y, 'rack');
+    front.position.set(wallX + into.nx * 0.16, 0.39, wallZ + into.nz * 0.16);
+    front.rotation.y = into.rotY;
+    this.tag(front, x, y, kind);
+    this.markWallProp(front, x, y, face, kind);
   }
 
-  private addLamp(x: number, y: number, _tile: Tile, face: PropWall) {
+  private addLamp(x: number, y: number, face: PropWall) {
+    const size = this.lampTex ? textureFrameSize(this.lampTex) : { w: 32, h: 48 };
+    const pose = wallPropPlanePose(x, y, face, size.w || 32, size.h || 48, WALL_PROP_WORLD_HEIGHT);
     if (!this.lampTex) {
-      const stub = this.box(LAMP_W, LAMP_H, 0.08, this.woodPlain, x, y, 'lamp_capped');
-      stub.position.set(x * CELL_SIZE - 0.55, LAMP_H / 2, y * CELL_SIZE + 0.15);
-      stub.userData.gridX = x;
-      stub.userData.gridY = y;
-      stub.userData.propWall = face;
+      const stub = new THREE.Mesh(new THREE.PlaneGeometry(1, 1), this.woodMat(this.woodPlain));
+      stub.position.set(pose.x, pose.y, pose.z);
+      stub.rotation.y = pose.rotY;
+      stub.scale.set(pose.scaleX, pose.scaleY, 1);
+      this.tag(stub, x, y, 'lamp_capped_wall');
+      this.markWallProp(stub, x, y, face, 'lamp_capped_wall');
+      stub.userData.scaleX = pose.scaleX;
+      stub.userData.scaleY = pose.scaleY;
       return;
     }
-    const mat = new THREE.SpriteMaterial({
-      map: this.lampTex,
-      color: 0xffffff,
-      transparent: true,
-      alphaTest: 0.12,
-      depthTest: true,
-      depthWrite: false,
-      sizeAttenuation: true,
-      fog: false,
-      toneMapped: false
-    });
-    const sprite = new THREE.Sprite(mat);
-    sprite.center.set(0.5, 0);
-    // Stand by the desk — slightly west of cell centre, on the floor. Emits no light.
-    const baseX = x * CELL_SIZE - 0.55;
-    const baseY = 0.02;
-    const baseZ = y * CELL_SIZE + 0.15;
-    sprite.position.set(baseX, baseY, baseZ);
-    sprite.scale.set(LAMP_W, LAMP_H, 1);
-    sprite.frustumCulled = false;
-    sprite.renderOrder = 8;
-    sprite.userData.isSprite = true;
-    sprite.userData.skipVertexLighting = true;
-    sprite.userData.kind = 'lamp_capped';
-    sprite.userData.lightX = x;
-    sprite.userData.lightY = y;
-    sprite.userData.gridX = x;
-    sprite.userData.gridY = y;
-    sprite.userData.propWall = face;
-    sprite.userData.baseX = baseX;
-    sprite.userData.baseY = baseY;
-    sprite.userData.baseZ = baseZ;
-    sprite.userData.baseW = LAMP_W;
-    sprite.userData.baseH = LAMP_H;
-    this.group.add(sprite);
-
-    const size = textureFrameSize(this.lampTex);
-    const pose = wallPropPlanePose(x, y, face, size.w || 32, size.h || 48);
     const wallMat = new THREE.MeshLambertMaterial({
       map: this.lampTex,
       emissive: new THREE.Color(0xffffff),
@@ -292,42 +278,26 @@ export class PropBuilder {
     plane.position.set(pose.x, pose.y, pose.z);
     plane.rotation.y = pose.rotY;
     plane.scale.set(pose.scaleX, pose.scaleY, 1);
-    plane.visible = false;
     plane.frustumCulled = false;
     plane.renderOrder = 8;
     plane.userData.noPick = true;
-    plane.userData.kind = 'lamp_capped_wall';
     plane.userData.lightX = x;
     plane.userData.lightY = y;
-    plane.userData.gridX = x;
-    plane.userData.gridY = y;
-    plane.userData.propWall = face;
     plane.userData.scaleX = pose.scaleX;
     plane.userData.scaleY = pose.scaleY;
-    this.group.add(plane);
+    this.tag(plane, x, y, 'lamp_capped_wall');
+    this.markWallProp(plane, x, y, face, 'lamp_capped_wall');
   }
 
-  /** Billboard off the party's square; wall-flat when standing on it facing propWall. */
+  /** Wall-mounted props stay on their face; hide when the camera sits on that wall. */
   layoutAdjacent(playerX: number, playerY: number, _adjacentScale = 1, dir = 0) {
     this.group.traverse((obj) => {
-      const kind = obj.userData.kind as string | undefined;
-      if (kind !== 'lamp_capped' && kind !== 'lamp_capped_wall') return;
+      if (!obj.userData.wallMounted) return;
       const gx = obj.userData.gridX as number;
       const gy = obj.userData.gridY as number;
       const face = obj.userData.propWall as PropWall;
-      const onOwn = playerX === gx && playerY === gy;
-      const flat = wallPropShowsFlat(playerX, playerY, dir, gx, gy, face);
-      if (kind === 'lamp_capped') {
-        obj.visible = !onOwn;
-        if (!onOwn) {
-          const baseW = (obj.userData.baseW as number) ?? LAMP_W;
-          const baseH = (obj.userData.baseH as number) ?? LAMP_H;
-          obj.position.set(obj.userData.baseX, obj.userData.baseY, obj.userData.baseZ);
-          obj.scale.set(baseW, baseH, 1);
-        }
-        return;
-      }
-      obj.visible = flat;
+      if (!isWallFace(face)) return;
+      obj.visible = wallPropVisible(playerX, playerY, dir, gx, gy, face);
     });
   }
 
@@ -350,10 +320,9 @@ export class PropBuilder {
       scaleY: number;
     }> = [];
     this.group.traverse((obj) => {
-      const kind = obj.userData.kind as string | undefined;
-      if (kind !== 'lamp_capped' && kind !== 'lamp_capped_wall') return;
+      if (!obj.userData.wallMounted) return;
       out.push({
-        kind,
+        kind: obj.userData.kind,
         x: obj.userData.gridX,
         y: obj.userData.gridY,
         visible: obj.visible,

@@ -305,6 +305,8 @@ describe('note open sound', () => {
     expect(isSilentLogKey('read_journal')).toBe(true);
     expect(isSilentLogKey('journal_f2')).toBe(true);
     expect(isSilentLogKey('oil_full')).toBe(false);
+    expect(isSilentLogKey('lamp_sealed')).toBe(true);
+    expect(isSilentLogKey('torch_capped')).toBe(false);
     expect(collectLogPush('Orrun left a page.', 40, true)).toEqual({
       parts: ['Orrun left a page.'],
       silent: true
