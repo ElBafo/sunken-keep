@@ -1,11 +1,4 @@
-import {
-  DEPTH_LAYERS,
-  LAYER_SIZE,
-  MAT_DRY,
-  MAT_MOSS,
-  MAT_WET,
-  MaterialId
-} from './constants';
+import { DEPTH_LAYERS, MAT_DRY, MAT_MOSS, MAT_WET, MaterialId } from './constants';
 
 export function luma(r: number, g: number, b: number): number {
   return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
@@ -38,29 +31,11 @@ export function classifyPixel(
   return { steps, material: MAT_DRY };
 }
 
-/** Never 0 — black texels still pack a material nibble. */
-export function packVoxel(r: number, g: number, b: number, material: MaterialId): number {
-  return ((material + 1) << 24) | (r << 16) | (g << 8) | b;
-}
-
-export function unpackMaterial(packed: number): MaterialId {
-  return (((Math.abs(packed) >>> 24) & 0xff) - 1) as MaterialId;
-}
-
-export function unpackRGB(packed: number): [number, number, number] {
-  const p = Math.abs(packed);
-  return [(p >>> 16) & 255, (p >>> 8) & 255, p & 255];
-}
-
-export function srgb8ToLinear(c: number): number {
-  const s = c / 255;
-  return s <= 0.04045 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
-}
-
 export interface VolumeFromPixels {
-  volume: Uint32Array;
+  volume: Uint8Array;
   dims: [number, number, number];
   voxelCount: number;
+  roughness: Uint8Array;
 }
 
 /**
@@ -75,7 +50,10 @@ export function volumeFromImageData(image: {
   const W = image.width;
   const H = image.height;
   const D = DEPTH_LAYERS;
-  const volume = new Uint32Array(W * H * D);
+  const volume = new Uint8Array(W * H * D);
+  const roughness = new Uint8Array(W * H);
+  const lum = new Float32Array(W * H);
+  const classified: Array<{ steps: number; material: MaterialId } | null> = new Array(W * H);
   let voxelCount = 0;
   for (let py = 0; py < H; py++) {
     const v = H - 1 - py;
@@ -85,18 +63,42 @@ export function volumeFromImageData(image: {
       const g = image.data[i + 1];
       const b = image.data[i + 2];
       const a = image.data[i + 3];
-      const c = classifyPixel(r, g, b, a, u, v);
+      const idx = u + v * W;
+      lum[idx] = luma(r, g, b);
+      classified[idx] = classifyPixel(r, g, b, a, u, v);
+    }
+  }
+  // 5×5 blur so noisy brick faces share a depth and greedy-merge.
+  const smooth = new Float32Array(W * H);
+  for (let v = 0; v < H; v++) {
+    for (let u = 0; u < W; u++) {
+      let s = 0;
+      let n = 0;
+      for (let dy = -2; dy <= 2; dy++) {
+        const y = v + dy;
+        if (y < 0 || y >= H) continue;
+        for (let dx = -2; dx <= 2; dx++) {
+          const x = u + dx;
+          if (x < 0 || x >= W) continue;
+          s += lum[x + y * W];
+          n += 1;
+        }
+      }
+      smooth[u + v * W] = s / n;
+    }
+  }
+  for (let v = 0; v < H; v++) {
+    for (let u = 0; u < W; u++) {
+      const idx = u + v * W;
+      const c = classified[idx];
       if (!c) continue;
       voxelCount += 1;
-      const packed = packVoxel(r, g, b, c.material);
-      for (let k = 0; k < c.steps; k++) {
-        volume[u + v * W + k * W * H] = packed;
+      const steps = Math.max(1, Math.min(DEPTH_LAYERS, 1 + Math.round(smooth[idx] * 2)));
+      roughness[idx] = c.material === MAT_MOSS ? 245 : c.material === MAT_WET ? 36 : 178;
+      for (let k = 0; k < steps; k++) {
+        volume[idx + k * W * H] = 1;
       }
     }
   }
-  return { volume, dims: [W, H, D], voxelCount };
-}
-
-export function layerSize(): number {
-  return LAYER_SIZE;
+  return { volume, dims: [W, H, D], voxelCount, roughness };
 }

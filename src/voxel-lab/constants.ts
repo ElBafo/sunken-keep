@@ -20,15 +20,15 @@ export const MOVE_MS = 260;
 export const LOOK_SENS = 0.00135;
 export const PITCH_MAX = 0.72;
 
-export const SHADOW_MAP_MOBILE = 256;
-export const SHADOW_MAP_DESKTOP = 512;
+export const SHADOW_MAP_MOBILE = 128;
+export const SHADOW_MAP_DESKTOP = 256;
 
 export const TORCH_COLOR = 0xff9a48;
-export const TORCH_INTENSITY = 18;
-export const TORCH_DISTANCE = 9;
-export const LAMP_COLOR = 0xffc878;
-export const LAMP_INTENSITY = 42;
-export const LAMP_DISTANCE = 14;
+export const TORCH_INTENSITY = 10;
+export const TORCH_DISTANCE = 8;
+export const LAMP_COLOR = 0xffc070;
+export const LAMP_INTENSITY = 11;
+export const LAMP_DISTANCE = 11;
 
 export const MAT_DRY = 0;
 export const MAT_WET = 1;

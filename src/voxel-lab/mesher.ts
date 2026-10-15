@@ -1,15 +1,18 @@
-import { unpackMaterial, unpackRGB, srgb8ToLinear } from './classify';
-import { MaterialId } from './constants';
+/**
+ * Greedy meshing (Mikola Lysenko) over a binary occupancy volume.
+ * Occupancy is 0 or 1 — colour lives on the source texture via UVs, so
+ * same-depth brick faces collapse even when the PNG is noisy.
+ */
 
 export interface MeshArrays {
   positions: number[];
   normals: number[];
-  colors: number[];
+  uvs: number[];
   indices: number[];
 }
 
 export function emptyMesh(): MeshArrays {
-  return { positions: [], normals: [], colors: [], indices: [] };
+  return { positions: [], normals: [], uvs: [], indices: [] };
 }
 
 export function triangleCount(mesh: MeshArrays): number {
@@ -22,13 +25,11 @@ function addQuad(
   c1: [number, number, number],
   c2: [number, number, number],
   c3: [number, number, number],
-  r: number,
-  g: number,
-  b: number
+  uv0: [number, number],
+  uv1: [number, number],
+  uv2: [number, number],
+  uv3: [number, number]
 ): void {
-  const lr = srgb8ToLinear(r);
-  const lg = srgb8ToLinear(g);
-  const lb = srgb8ToLinear(b);
   const ax = c1[0] - c0[0];
   const ay = c1[1] - c0[1];
   const az = c1[2] - c0[2];
@@ -44,33 +45,40 @@ function addQuad(
   nz /= len;
   const base = mesh.positions.length / 3;
   const corners = [c0, c1, c2, c3];
-  for (const p of corners) {
+  const uvs = [uv0, uv1, uv2, uv3];
+  for (let i = 0; i < 4; i++) {
+    const p = corners[i];
     mesh.positions.push(p[0], p[1], p[2]);
     mesh.normals.push(nx, ny, nz);
-    mesh.colors.push(lr, lg, lb);
+    mesh.uvs.push(uvs[i][0], uvs[i][1]);
   }
   mesh.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
 }
 
 export interface GreedyOptions {
-  /** Skip faces whose outward normal is −axis at the volume origin (wall backs). */
   cullNeg?: [boolean, boolean, boolean];
   cullPos?: [boolean, boolean, boolean];
 }
 
 export interface GreedyResult {
-  groups: [MeshArrays, MeshArrays, MeshArrays];
+  mesh: MeshArrays;
   quads: number;
   triangles: number;
 }
 
-/**
- * Greedy meshing (Mikola Lysenko) over a packed voxel volume.
- * Adjacent same-colour / same-material faces collapse to one quad.
- * Hidden faces between two solid cells are dropped.
- */
+function texelUV(
+  x: number,
+  y: number,
+  W: number,
+  H: number
+): [number, number] {
+  const u = (Math.min(Math.max(x, 0), W) - (x >= W ? 0.001 : 0)) / W;
+  const v = (Math.min(Math.max(y, 0), H) - (y >= H ? 0.001 : 0)) / H;
+  return [u, v];
+}
+
 export function greedyMesh(
-  volume: Uint32Array,
+  volume: Uint8Array,
   dims: [number, number, number],
   toWorld: (x: number, y: number, z: number) => [number, number, number],
   options: GreedyOptions = {}
@@ -78,7 +86,7 @@ export function greedyMesh(
   const [W, H, D] = dims;
   const cullNeg = options.cullNeg ?? [false, false, true];
   const cullPos = options.cullPos ?? [false, false, false];
-  const groups: [MeshArrays, MeshArrays, MeshArrays] = [emptyMesh(), emptyMesh(), emptyMesh()];
+  const mesh = emptyMesh();
   let quads = 0;
 
   const get = (x: number, y: number, z: number): number => {
@@ -93,7 +101,7 @@ export function greedyMesh(
     const x = [0, 0, 0];
     const q = [0, 0, 0];
     q[d] = 1;
-    const mask = new Int32Array(dimsA[u] * dimsA[v]);
+    const mask = new Int8Array(dimsA[u] * dimsA[v]);
 
     for (x[d] = -1; x[d] < dimsA[d]; ) {
       let n = 0;
@@ -101,8 +109,8 @@ export function greedyMesh(
         for (x[u] = 0; x[u] < dimsA[u]; ++x[u], ++n) {
           const a = get(x[0], x[1], x[2]);
           const b = get(x[0] + q[0], x[1] + q[1], x[2] + q[2]);
-          if (a !== 0 && b === 0) mask[n] = a;
-          else if (a === 0 && b !== 0) mask[n] = -b;
+          if (a !== 0 && b === 0) mask[n] = 1;
+          else if (a === 0 && b !== 0) mask[n] = -1;
           else mask[n] = 0;
         }
       }
@@ -129,7 +137,6 @@ export function greedyMesh(
           }
 
           const posSign = c > 0;
-          const packed = posSign ? c : -c;
           const plane = x[d];
           const skip =
             (!posSign && plane === 0 && cullNeg[d]) ||
@@ -158,11 +165,13 @@ export function greedyMesh(
             const w1 = toWorld(p1[0], p1[1], p1[2]);
             const w2 = toWorld(p2[0], p2[1], p2[2]);
             const w3 = toWorld(p3[0], p3[1], p3[2]);
+            const uv0 = texelUV(p0[0], p0[1], W, H);
+            const uv1 = texelUV(p1[0], p1[1], W, H);
+            const uv2 = texelUV(p2[0], p2[1], W, H);
+            const uv3 = texelUV(p3[0], p3[1], W, H);
 
-            const mat = unpackMaterial(packed) as MaterialId;
-            const [r, g, b] = unpackRGB(packed);
-            if (posSign) addQuad(groups[mat], w0, w1, w2, w3, r, g, b);
-            else addQuad(groups[mat], w0, w3, w2, w1, r, g, b);
+            if (posSign) addQuad(mesh, w0, w1, w2, w3, uv0, uv1, uv2, uv3);
+            else addQuad(mesh, w0, w3, w2, w1, uv0, uv3, uv2, uv1);
             quads += 1;
           }
 
@@ -178,8 +187,7 @@ export function greedyMesh(
     }
   }
 
-  const triangles = groups.reduce((sum, m) => sum + triangleCount(m), 0);
-  return { groups, quads, triangles };
+  return { mesh, quads, triangles: triangleCount(mesh) };
 }
 
 export function mergeMeshes(meshes: MeshArrays[]): MeshArrays {
@@ -188,7 +196,7 @@ export function mergeMeshes(meshes: MeshArrays[]): MeshArrays {
     const base = out.positions.length / 3;
     for (let i = 0; i < m.positions.length; i++) out.positions.push(m.positions[i]);
     for (let i = 0; i < m.normals.length; i++) out.normals.push(m.normals[i]);
-    for (let i = 0; i < m.colors.length; i++) out.colors.push(m.colors[i]);
+    for (let i = 0; i < m.uvs.length; i++) out.uvs.push(m.uvs[i]);
     for (let i = 0; i < m.indices.length; i++) out.indices.push(m.indices[i] + base);
   }
   return out;

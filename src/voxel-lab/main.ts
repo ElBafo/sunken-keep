@@ -65,7 +65,7 @@ async function boot(): Promise<void> {
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
   renderer.toneMappingExposure = 1.05;
   renderer.shadowMap.enabled = true;
-  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.setClearColor(0x050403, 1);
 
   const scene = new THREE.Scene();
@@ -93,8 +93,8 @@ async function boot(): Promise<void> {
     return light;
   };
 
-  const torchA = makeTorch(0.22, 1.48, CELL * 1.5);
-  const torchB = makeTorch(CELL * ROOM_TILES - 0.22, 1.48, CELL * 1.5);
+  const torchA = makeTorch(CELL * 1.0, 1.48, 0.38);
+  const torchB = makeTorch(CELL * 2.0, 1.48, 0.38);
 
   const lampLight = new THREE.PointLight(LAMP_COLOR, 0, LAMP_DISTANCE, 1.6);
   lampLight.position.set(CELL * 1.5, 1.35, 0.35);
@@ -120,7 +120,7 @@ async function boot(): Promise<void> {
       toneMapped: false,
       blending: THREE.AdditiveBlending
     });
-    flame.scale.set(0.42, 0.52, 1);
+    flame.scale.set(0.5, 0.62, 1);
     flame.visible = true;
   }
 

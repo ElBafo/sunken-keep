@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classifyPixel, isMoss, luma, packVoxel, volumeFromImageData } from '../src/voxel-lab/classify';
+import { classifyPixel, isMoss, luma, volumeFromImageData } from '../src/voxel-lab/classify';
 import { DEPTH_LAYERS, MAT_MOSS, MAT_WET } from '../src/voxel-lab/constants';
 import { greedyMesh, triangleCount } from '../src/voxel-lab/mesher';
 
@@ -7,9 +7,9 @@ function identity(x: number, y: number, z: number): [number, number, number] {
   return [x, y, z];
 }
 
-function fill(w: number, h: number, d: number, packed: number): Uint32Array {
-  const vol = new Uint32Array(w * h * d);
-  vol.fill(packed);
+function fill(w: number, h: number, d: number): Uint8Array {
+  const vol = new Uint8Array(w * h * d);
+  vol.fill(1);
   return vol;
 }
 
@@ -50,28 +50,46 @@ describe('voxel-lab classify', () => {
 });
 
 describe('voxel-lab greedy mesh', () => {
-  it('collapses a solid same-colour slab to a handful of quads', () => {
-    const packed = packVoxel(80, 80, 80, 0);
-    const volume = fill(8, 8, 1, packed);
+  it('collapses a solid same-depth slab to a handful of quads', () => {
+    const volume = fill(8, 8, 1);
     const mesh = greedyMesh(volume, [8, 8, 1], identity, { cullNeg: [false, false, false] });
     expect(mesh.quads).toBe(6);
     expect(mesh.triangles).toBe(12);
   });
 
   it('culls the back of a wall slab', () => {
-    const packed = packVoxel(80, 80, 80, 0);
-    const volume = fill(8, 8, 1, packed);
+    const volume = fill(8, 8, 1);
     const culled = greedyMesh(volume, [8, 8, 1], identity);
     const full = greedyMesh(volume, [8, 8, 1], identity, { cullNeg: [false, false, false] });
     expect(culled.quads).toBe(full.quads - 1);
   });
 
-  it('does not merge different colours', () => {
-    const volume = new Uint32Array(2 * 1 * 1);
-    volume[0] = packVoxel(255, 0, 0, 0);
-    volume[1] = packVoxel(0, 255, 0, 0);
-    const mesh = greedyMesh(volume, [2, 1, 1], identity, { cullNeg: [false, false, false] });
-    expect(mesh.quads).toBeGreaterThanOrEqual(6);
+  it('merges mixed colours at the same depth so a noisy brick is one front face', () => {
+    const W = 8;
+    const H = 8;
+    const volume = fill(W, H, 1);
+    const mesh = greedyMesh(volume, [W, H, 1], identity);
+    expect(mesh.quads).toBeLessThan(10);
+    expect(mesh.mesh.uvs.length).toBe(mesh.mesh.positions.length / 3 * 2);
+  });
+
+  it('blurs luma so noisy bricks still greedy-merge', () => {
+    const W = 16;
+    const H = 16;
+    const data = new Uint8ClampedArray(W * H * 4);
+    for (let y = 0; y < H; y++) {
+      for (let x = 0; x < W; x++) {
+        const o = (y * W + x) * 4;
+        const n = 70 + ((x * 13 + y * 7) % 40);
+        data[o] = n;
+        data[o + 1] = n;
+        data[o + 2] = n - 4;
+        data[o + 3] = 255;
+      }
+    }
+    const vol = volumeFromImageData({ width: W, height: H, data });
+    const mesh = greedyMesh(vol.volume, vol.dims, identity);
+    expect(mesh.quads).toBeLessThan(40);
   });
 
   it('counts one voxel per opaque texel and beats naive cube triangles', () => {
@@ -91,9 +109,7 @@ describe('voxel-lab greedy mesh', () => {
     const mesh = greedyMesh(vol.volume, vol.dims, identity);
     const naive = vol.voxelCount * 12;
     expect(mesh.triangles).toBeGreaterThan(0);
-    expect(mesh.triangles).toBeLessThan(naive / 4);
-    expect(triangleCount(mesh.groups[0]) + triangleCount(mesh.groups[1]) + triangleCount(mesh.groups[2])).toBe(
-      mesh.triangles
-    );
+    expect(mesh.triangles).toBeLessThan(naive / 8);
+    expect(triangleCount(mesh.mesh)).toBe(mesh.triangles);
   });
 });

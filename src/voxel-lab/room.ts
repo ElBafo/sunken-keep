@@ -6,8 +6,6 @@ import {
   FLOOR_FILES,
   LAMP_FILE,
   LAYER_SIZE,
-  MAT_MOSS,
-  MAT_WET,
   ROOM_TILES,
   SCONCE_FILE,
   WALL_FILES
@@ -74,26 +72,45 @@ function hashPick<T>(list: readonly T[], x: number, z: number, salt: number): T 
   return list[(h >>> 0) % list.length];
 }
 
-function materialFor(kind: number): THREE.MeshStandardMaterial {
-  const roughness = kind === MAT_MOSS ? 0.96 : kind === MAT_WET ? 0.16 : 0.7;
-  return new THREE.MeshStandardMaterial({
-    roughness,
-    metalness: 0,
-    vertexColors: true,
-    flatShading: true,
-    envMapIntensity: 0
-  });
-}
-
 function geometryFrom(mesh: MeshArrays): THREE.BufferGeometry | null {
   if (mesh.indices.length === 0) return null;
   const g = new THREE.BufferGeometry();
   g.setAttribute('position', new THREE.Float32BufferAttribute(mesh.positions, 3));
   g.setAttribute('normal', new THREE.Float32BufferAttribute(mesh.normals, 3));
-  g.setAttribute('color', new THREE.Float32BufferAttribute(mesh.colors, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(mesh.uvs, 2));
   g.setIndex(mesh.indices);
   g.computeBoundingSphere();
   return g;
+}
+
+function roughnessMap(data: Uint8Array, w: number, h: number): THREE.DataTexture {
+  const rgba = new Uint8Array(w * h * 4);
+  for (let i = 0; i < w * h; i++) {
+    const r = data[i];
+    rgba[i * 4] = r;
+    rgba[i * 4 + 1] = r;
+    rgba[i * 4 + 2] = r;
+    rgba[i * 4 + 3] = 255;
+  }
+  const tex = new THREE.DataTexture(rgba, w, h, THREE.RGBAFormat);
+  tex.colorSpace = THREE.NoColorSpace;
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.generateMipmaps = false;
+  tex.flipY = false;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+function voxelMaterial(map: THREE.Texture, rough: THREE.Texture): THREE.MeshStandardMaterial {
+  return new THREE.MeshStandardMaterial({
+    map,
+    roughnessMap: rough,
+    roughness: 1,
+    metalness: 0,
+    flatShading: true,
+    envMapIntensity: 0
+  });
 }
 
 type TileJob = { face: FaceId; tx: number; tz: number; file: string };
@@ -140,7 +157,8 @@ export async function buildRoom(): Promise<BuiltRoom> {
     })
   );
 
-  const perMat: MeshArrays[][] = [[], [], []];
+  const byFile = new Map<string, MeshArrays[]>();
+  const roughByFile = new Map<string, THREE.DataTexture>();
   let voxels = 0;
   let quads = 0;
   let triangles = 0;
@@ -157,13 +175,16 @@ export async function buildRoom(): Promise<BuiltRoom> {
     if (!png) continue;
     const vol = volumeFromImageData(png.data);
     voxels += vol.voxelCount;
+    if (!roughByFile.has(job.file)) {
+      roughByFile.set(job.file, roughnessMap(vol.roughness, vol.dims[0], vol.dims[1]));
+    }
     const toWorld = makeToWorld(job.face, job.tx, job.tz, vol.dims, LAYER_SIZE);
     const meshed = greedyMesh(vol.volume, vol.dims, toWorld);
     quads += meshed.quads;
     triangles += meshed.triangles;
-    perMat[0].push(meshed.groups[0]);
-    perMat[1].push(meshed.groups[1]);
-    perMat[2].push(meshed.groups[2]);
+    const list = byFile.get(job.file) ?? [];
+    list.push(meshed.mesh);
+    byFile.set(job.file, list);
 
     const pose = flatPlanePose(job.face, job.tx, job.tz);
     const mat = new THREE.MeshStandardMaterial({
@@ -180,11 +201,12 @@ export async function buildRoom(): Promise<BuiltRoom> {
     flatGroup.add(mesh);
   }
 
-  for (let i = 0; i < 3; i++) {
-    const merged = mergeMeshes(perMat[i]);
-    const geo = geometryFrom(merged);
-    if (!geo) continue;
-    const mesh = new THREE.Mesh(geo, materialFor(i));
+  for (const [file, meshes] of byFile) {
+    const png = pngs.get(file);
+    const rough = roughByFile.get(file);
+    const geo = geometryFrom(mergeMeshes(meshes));
+    if (!png || !rough || !geo) continue;
+    const mesh = new THREE.Mesh(geo, voxelMaterial(png.texture, rough));
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     voxelGroup.add(mesh);
@@ -221,8 +243,8 @@ export async function buildRoom(): Promise<BuiltRoom> {
     torchFlames.push(flame);
   };
 
-  placeSconce(0.07, 1.32, CELL * 1.5, Math.PI / 2, [0.14, 0, 0]);
-  placeSconce(CELL * ROOM_TILES - 0.07, 1.32, CELL * 1.5, -Math.PI / 2, [-0.14, 0, 0]);
+  placeSconce(CELL * 1.0, 1.32, 0.07, 0, [0, 0, 0.16]);
+  placeSconce(CELL * 2.0, 1.32, 0.07, 0, [0, 0, 0.16]);
 
   const lampH = 0.72;
   const lampW = lampH * (lampPng.img.naturalWidth / lampPng.img.naturalHeight);
