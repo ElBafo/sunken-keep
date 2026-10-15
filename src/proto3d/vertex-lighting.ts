@@ -317,7 +317,10 @@ export class VertexLightingManager {
     return { radius: EMBER_RADIUS_TILES, intensity: EMBER_INTENSITY, rgb: EMBER_RGB };
   }
 
-  /** Combined torch + lantern weight at a tile (no ambient, no sunbeam). */
+  /**
+   * Gameplay / monster-visibility tile-light (no ambient, no sunbeam).
+   * One source wins via Math.max — never the wall/floor/ceiling screen-blend.
+   */
   sourceLight(tileX: number, tileY: number): number {
     const wx = tileX * CELL_SIZE;
     const wy = 0.08;
@@ -418,8 +421,8 @@ export class VertexLightingManager {
       ambient * AMBIENT_RGB[1],
       ambient * AMBIENT_RGB[2]
     ];
-    // Props keep max() (gameplay/sprite lighting). Walls, floors, and ceilings
-    // screen-combine lantern + torch so the seam between pools is not a dark band.
+    // Screen-combine lantern + torch on wall/floor/ceiling shading only.
+    // Lantern props keep max(). Gameplay tile-light is sourceLight() (max()).
     const geometry = !isProp;
     const rgb: [number, number, number] = geometry ? [0, 0, 0] : [ambientRgb[0], ambientRgb[1], ambientRgb[2]];
     const add = (weight: number, color: [number, number, number]) => {

@@ -12,6 +12,7 @@ import {
   WALL_LANTERN_INTENSITY,
   WALL_LANTERN_RADIUS_TILES
 } from '../src/proto3d/constants';
+import { monsterBodyVisible } from '../src/proto3d/dark-fx';
 import { floor1, floor1Sconces } from '../src/proto3d/floor-data';
 import { lanternFalloff, partyDistTiles, partyFalloff, VertexLightingManager } from '../src/proto3d/vertex-lighting';
 
@@ -233,10 +234,26 @@ describe('lantern: steep floors, soft props', () => {
 
   it('keeps gameplay tile-light on max() so no floor-1 square flips dark/lit', () => {
     const src = readFileSync(resolve(__dirname, '../src/proto3d/vertex-lighting.ts'), 'utf8');
+    const dark = readFileSync(resolve(__dirname, '../src/proto3d/dark-fx.ts'), 'utf8');
+    const shade = src.slice(src.indexOf('private shadeVertex'), src.indexOf('private lightTileOf'));
     const gameplay = src.slice(src.indexOf('sourceLight(tileX'), src.indexOf('isSquareLit'));
     expect(gameplay).toContain('Math.max(maxW');
     expect(gameplay).not.toContain('screenAccum');
     expect(src).toContain('screenAccum');
+    expect(shade).toContain('const geometry = !isProp');
+    expect(shade).toContain('if (geometry) this.screenAccum');
+    expect(shade).toContain('else this.maxAccum');
+    expect(dark).toContain('squareLit: lighting.isSquareLit(sprite.x, sprite.y)');
+
+    const snapshot = JSON.parse(
+      readFileSync(resolve(__dirname, './fixtures/floor1-gameplay-source-light.json'), 'utf8')
+    ) as {
+      width: number;
+      height: number;
+      poses: Record<string, Record<string, number>>;
+    };
+    expect(snapshot.width).toBe(floor1.width);
+    expect(snapshot.height).toBe(floor1.height);
 
     const lighting = new VertexLightingManager(floor1, floor1Sconces, {
       floor: 1,
@@ -251,14 +268,23 @@ describe('lantern: steep floors, soft props', () => {
       '11,9': '2,1|3,1|2,2|3,2|3,3|1,4|1,5|2,5|4,5|5,5|6,5|7,5|1,6|2,6|5,6|6,6|7,6|1,7|2,7|11,9',
       '3,14': '2,1|3,1|2,2|3,2|3,3|1,4|1,5|2,5|4,5|5,5|6,5|7,5|1,6|2,6|5,6|6,6|7,6|1,7|2,7|3,14'
     };
+    expect(Object.keys(snapshot.poses).sort()).toEqual(Object.keys(expectedLit).sort());
     for (const [pose, want] of Object.entries(expectedLit)) {
       const [px, py] = pose.split(',').map(Number);
       lighting.setPartyPosition(px, py);
+      const frozen = snapshot.poses[pose];
+      expect(frozen, `snapshot pose ${pose}`).toBeTruthy();
       const lit: string[] = [];
       for (let y = 0; y < floor1.height; y++) {
         for (let x = 0; x < floor1.width; x++) {
           const w = lighting.sourceLight(x, y);
+          const wantW = frozen[`${x},${y}`] ?? 0;
+          expect(w, `sourceLight(${x},${y}) from lantern (${pose})`).toBeCloseTo(wantW, 10);
           expect(lighting.isSquareLit(x, y)).toBe(w >= DARK_LIGHT_THRESHOLD);
+          expect(
+            monsterBodyVisible({ adjacent: false, squareLit: lighting.isSquareLit(x, y) }),
+            `monster body at (${x},${y}) from (${pose})`
+          ).toBe(wantW >= DARK_LIGHT_THRESHOLD);
           if (w >= DARK_LIGHT_THRESHOLD) lit.push(`${x},${y}`);
         }
       }
