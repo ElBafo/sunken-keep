@@ -15,6 +15,8 @@ import {
   LANTERN_RADIUS_TILES,
   PROP_LANTERN_INTENSITY,
   PROP_LANTERN_RADIUS_TILES,
+  WALL_LANTERN_INTENSITY,
+  WALL_LANTERN_RADIUS_TILES,
   LIGHT_FLICKER_AMPLITUDE,
   LIGHT_FLICKER_PERIOD_MS,
   CARRIED_TORCH_INTENSITY,
@@ -36,10 +38,17 @@ interface CachedFace {
   colors: THREE.BufferAttribute;
   isDark: boolean;
   isProp: boolean;
+  isWall: boolean;
   nearSconce: boolean;
   tileX: number;
   tileY: number;
   lightGround: boolean;
+}
+
+/** Walls, doors, and ceilings share the soft lantern pool (not the floor disk). */
+function isWallLike(kind: unknown): boolean {
+  if (typeof kind !== 'string') return false;
+  return kind === 'wall' || kind === 'secret' || kind === 'ceiling' || kind.startsWith('door');
 }
 
 interface SconceWorld {
@@ -87,8 +96,8 @@ export function lanternFalloff(distTiles: number, radius: number): number {
 }
 
 /**
- * Floors, walls, and carried torch: full on the party square, then a steep
- * quartic drop so the middle of the next square is already near-ambient.
+ * Floors and carried torch: full on the party square, then a steep quartic
+ * drop so the middle of the next square is already near-ambient.
  */
 export function partyFalloff(distTiles: number, radius: number, coreTiles = LANTERN_CORE_TILES): number {
   if (radius <= 0 || distTiles >= radius) return 0;
@@ -104,17 +113,20 @@ export function partyDistTiles(
   wz: number,
   partyX: number,
   partyY: number,
-  opts?: { prop?: boolean }
+  opts?: { prop?: boolean; wall?: boolean }
 ): number {
   const dx = wx / CELL_SIZE - partyX;
   const dz = wz / CELL_SIZE - partyY;
   const horiz = Math.sqrt(dx * dx + dz * dz);
-  // Floor disk: 2D reach. Walls and ceiling pay +0.55 so they die with the
-  // puddle (main). Props skip that penalty and use 3D distance only.
-  if (wy < 0.28) return horiz;
   const dy = (wy - LANTERN_HEIGHT) / CELL_SIZE;
   const d = Math.sqrt(horiz * horiz + dy * dy);
-  return opts?.prop ? d : d + 0.55;
+  // Props, walls, and ceilings: true 3D. Never use the floor-disk shortcut —
+  // wall quads dip below y 0.28, and treating those verts as floor punched a
+  // party-centered dark oval into the mid-wall that slid when strafing.
+  if (opts?.prop || opts?.wall) return d;
+  // Floor disk: 2D reach. Untagged non-floor verts keep the +0.55 penalty.
+  if (wy < 0.28) return horiz;
+  return d + 0.55;
 }
 
 function parseBright(value: number): number {
@@ -261,6 +273,7 @@ export class VertexLightingManager {
         colors: geometry.attributes.color as THREE.BufferAttribute,
         isDark,
         isProp: !!obj.userData.lanternProp,
+        isWall: isWallLike(obj.userData.kind),
         nearSconce: this.nearAnySconce(tileX, tileY, radiusTiles),
         tileX,
         tileY,
@@ -279,7 +292,7 @@ export class VertexLightingManager {
   private rebuildPartyReach() {
     const radius = Math.max(
       this.lanternSpec().radius,
-      this.oilFn() > 0 ? PROP_LANTERN_RADIUS_TILES : 0,
+      this.oilFn() > 0 ? Math.max(PROP_LANTERN_RADIUS_TILES, WALL_LANTERN_RADIUS_TILES) : 0,
       this.carriedTorch ? CARRIED_TORCH_RADIUS_TILES : 0
     );
     this.partyCells = partyReach(this.floorData, this.partyX, this.partyY, radius);
@@ -350,9 +363,10 @@ export class VertexLightingManager {
     tileX: number,
     tileY: number,
     isDark = false,
-    isProp = false
+    isProp = false,
+    isWall = false
   ): { rgb: [number, number, number]; luma: number } {
-    const rgb = this.shadeVertex(wx, wy, wz, tileX, tileY, isDark, 1, isProp);
+    const rgb = this.shadeVertex(wx, wy, wz, tileX, tileY, isDark, 1, isProp, isWall);
     return { rgb, luma: (rgb[0] + rgb[1] + rgb[2]) / 3 };
   }
 
@@ -382,7 +396,8 @@ export class VertexLightingManager {
     tileY: number,
     isDark: boolean,
     flick: number,
-    isProp = false
+    isProp = false,
+    isWall = false
   ): [number, number, number] {
     const ambient = this.floorAmbient();
     const rgb: [number, number, number] = [
@@ -392,7 +407,10 @@ export class VertexLightingManager {
     ];
 
     const lantern = this.lanternSpec();
-    const partyDist = partyDistTiles(wx, wy, wz, this.partyX, this.partyY, { prop: isProp });
+    const partyDist = partyDistTiles(wx, wy, wz, this.partyX, this.partyY, {
+      prop: isProp,
+      wall: isWall
+    });
     if (reachAt(this.partyCells, tileX, tileY) !== undefined) {
       if (isProp && this.oilFn() > 0) {
         this.accum(
@@ -400,6 +418,10 @@ export class VertexLightingManager {
           PROP_LANTERN_INTENSITY * lanternFalloff(partyDist, PROP_LANTERN_RADIUS_TILES),
           lantern.rgb
         );
+      } else if (isWall) {
+        const wallRadius = this.oilFn() > 0 ? WALL_LANTERN_RADIUS_TILES : lantern.radius;
+        const wallIntensity = this.oilFn() > 0 ? WALL_LANTERN_INTENSITY : lantern.intensity;
+        this.accum(rgb, wallIntensity * smoothFalloff(partyDist, wallRadius), lantern.rgb);
       } else {
         this.accum(rgb, lantern.intensity * partyFalloff(partyDist, lantern.radius), lantern.rgb);
       }
@@ -479,7 +501,8 @@ export class VertexLightingManager {
         face.tileY,
         face.isDark,
         flick,
-        face.isProp
+        face.isProp,
+        face.isWall
       );
       colors.setXYZ(i, r, g, b);
     }

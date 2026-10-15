@@ -330,5 +330,10 @@
  },
  "intro": {
   "skip": "Skip"
+ },
+ "stairs": {
+  "_about": "Toast when stepping onto a down-stairs square that does not leave the floor yet. _short is the 41-char HUD log.",
+  "floor2_soon": "The stairs lead down into darkness... Floor 2 is coming soon.",
+  "floor2_soon_short": "Stairs into darkness. Floor 2 soon."
  }
 }

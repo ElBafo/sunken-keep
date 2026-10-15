@@ -601,6 +601,9 @@ class Game {
       this.maybeDunkTorch(this.player.moveToX, this.player.moveToY);
       this.fireTileBark(this.player.moveToX, this.player.moveToY);
       this.fireTileTrigger(this.player.moveToX, this.player.moveToY);
+      if (this.player.moveToX !== this.player.x || this.player.moveToY !== this.player.y) {
+        this.fireTileStepUi(this.player.moveToX, this.player.moveToY);
+      }
       return;
     }
     if (result === 'secret') {
@@ -645,10 +648,10 @@ class Game {
     btn.classList.toggle('visible', !!this.doorAhead());
   }
 
-  showMessage(text: string, prompt = false, opts?: { silent?: boolean }) {
+  showMessage(text: string, prompt = false, opts?: { silent?: boolean; log?: string }) {
     if (!text) return;
     this.lastMessage = text;
-    this.hud?.pushLog(text, opts);
+    this.hud?.pushLog(opts?.log ?? text, opts);
     if (!prompt) return;
     const el = document.getElementById('message-toast');
     if (!el) return;
@@ -2291,6 +2294,18 @@ class Game {
     const key = `bark:${tile.bark}`;
     if (this.flags.has(key) || !this.storyProgress.fire(tile.bark)) return;
     if (this.speakBark(tile.bark)) this.flags.add(key);
+  }
+
+  /** ui_text toast (+ optional `_short` log). Fires every visit; not once-per-save. */
+  private fireTileStepUi(x: number, y: number) {
+    const tile = this.player.tileAt(x, y);
+    const path = typeof tile?.stepUi === 'string' ? tile.stepUi : '';
+    if (!path) return;
+    const toast = this.story.uiText(path);
+    if (!toast) return;
+    const log = this.story.uiText(`${path}_short`) || toast;
+    this.showMessage(toast, true, { log });
+    this.messageTimer = performance.now() + 2400;
   }
 
   private fireTileTrigger(x: number, y: number) {

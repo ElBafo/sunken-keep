@@ -2,6 +2,7 @@
 // Old fields (wall, door, secret, carving, item, chest, monster...) are unchanged.
 export interface Act1TileExtras {
   stairs?: 'up' | 'down';       // matches src/types.ts on the overnight-build branch
+  stepUi?: string;             // ui_text path; toast (+ _short log) each time you step on, not once
   dialogue?: string;           // id in story/dialogue.json, fires once when you step on the tile
   then?: string;               // dialogue that fires right after the first one (f4_tam_cell -> f4_tide_wakes)
   bark?: string;               // id in barks.json (puzzle barks: puzzles_act1.json), once per save

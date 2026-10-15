@@ -67,7 +67,7 @@ FLOORS[1] = dict(
     (19,4): dict(trigger='slime_trail_save', autosave=True, once=True, note='autosave under the slime-scarred sconce'),
     (19,5): dict(trigger='slime_lair_door', once=True, sting=True, note='lair door, sting plays, stays open'),
     (19,7): dict(monster=('slime',70), split=True, note='1-wide neck of the lair; splits at half HP'),
-    (16,10): dict(stairsDown=True),
+    (16,10): dict(stairsDown=True, stepUi='stairs.floor2_soon', note='toast each visit; Floor 2 coming soon'),
     (8,6): dict(bark='lampkeeper_hooks_heard', note='hook clinks first heard here; dead torch above'),
     (11,8): dict(bark='lampkeeper_enter', note="Pell the lamp-keeper's room, optional dead end"),
     (12,8): dict(item='oil_flask', note="Pell's flask, the only oil on floor 1"),

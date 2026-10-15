@@ -92,9 +92,16 @@ export const TORCH_INTENSITY = 1.45;
 export const LANTERN_RADIUS_TILES = 1.5;
 export const LANTERN_INTENSITY = 0.64;
 /**
+ * Side walls / ceilings only. Smooth 2-square oil fade so the lantern pool
+ * does not draw a hard oval that slides along the wall as the party strafes.
+ * Floors stay on the steep puddle above; darkness beyond ~2 squares is kept.
+ */
+export const WALL_LANTERN_RADIUS_TILES = 2;
+export const WALL_LANTERN_INTENSITY = 0.4;
+/**
  * Props-only lantern (desk, rack, beams). Soft 1−(d/r)² so furniture reads
- * at 1 tile (~0.25) and still glows at 2 (~0.12). Floors and walls stay on
- * the steep oil puddle above.
+ * at 1 tile (~0.25) and still glows at 2 (~0.12). Floors stay on the steep
+ * oil puddle; walls use WALL_LANTERN_* instead.
  */
 export const PROP_LANTERN_RADIUS_TILES = 2.5;
 export const PROP_LANTERN_INTENSITY = 0.4;

@@ -4,7 +4,9 @@ import {
   LANTERN_INTENSITY,
   LANTERN_RADIUS_TILES,
   PROP_LANTERN_INTENSITY,
-  PROP_LANTERN_RADIUS_TILES
+  PROP_LANTERN_RADIUS_TILES,
+  WALL_LANTERN_INTENSITY,
+  WALL_LANTERN_RADIUS_TILES
 } from '../src/proto3d/constants';
 import { floor1, floor1Sconces } from '../src/proto3d/floor-data';
 import { lanternFalloff, partyDistTiles, partyFalloff, VertexLightingManager } from '../src/proto3d/vertex-lighting';
@@ -120,6 +122,64 @@ describe('lantern: steep floors, soft props', () => {
     expect(rack.luma, 'rack at (9,10) from (11,10) — 2 tiles').toBeGreaterThan(0.1);
     expect(rack.luma).toBeLessThan(0.16);
     expect(rackFloor, 'floor at the rack stays unlit at 2 tiles').toBe(0);
+  });
+
+  it('softens the oil lantern on side walls instead of a sliding mid-wall smear', () => {
+    expect(WALL_LANTERN_RADIUS_TILES).toBe(2);
+    expect(WALL_LANTERN_INTENSITY).toBe(0.4);
+
+    const lighting = new VertexLightingManager(floor1, [], { floor: 1, bright: 1, oil: () => 2 });
+    const party = { x: 7, y: 1 };
+    lighting.setPartyPosition(party.x, party.y);
+
+    const wallX = party.x * CELL_SIZE - CELL_SIZE / 2;
+    const wallZ = party.y * CELL_SIZE;
+    const sample = (wy: number, dzTiles: number, tileY = party.y) =>
+      lighting.sampleVertex(wallX, wy, wallZ + dzTiles * CELL_SIZE, party.x, tileY, false, false, true)
+        .luma;
+
+    const bottom = sample(0.2, 0);
+    const mid = sample(0.88, 0);
+    const top = sample(1.6, 0);
+    const along1 = sample(0.88, 1, party.y + 1);
+    const along2 = sample(0.88, 2, party.y + 2);
+    const floorAhead = lighting.calculateBrightness(party.x, party.y + 1, false);
+
+    console.log('WALL_LANTERN', { bottom, mid, top, along1, along2, floorAhead });
+
+    expect(mid, 'adjacent side wall is lantern-lit').toBeGreaterThan(0.18);
+    expect(Math.abs(mid - bottom), 'no baseboard-vs-mid height hole').toBeLessThan(0.08);
+    expect(Math.abs(mid - top), 'ceiling-adjacent wall matches mid-wall').toBeLessThan(0.12);
+    expect(along1, '1-tile wall still has a soft tail').toBeGreaterThan(0.08);
+    expect(along1).toBeLessThan(mid);
+    expect(along2, '2-tile wall is at the lantern edge').toBeLessThan(along1);
+    expect(along2).toBeLessThan(0.08);
+    expect(floorAhead, 'floor puddle stays steep').toBeLessThan(0.08);
+  });
+
+  it('keeps the slime lair unlit and (19,8) at ambient', () => {
+    const lighting = new VertexLightingManager(floor1, floor1Sconces, {
+      floor: 1,
+      bright: 1,
+      oil: () => 2
+    });
+    const ambient = lighting.ambientBrightness();
+    expect(ambient).toBeCloseTo(0.0585, 3);
+
+    for (const [px, py] of [
+      [19, 5],
+      [19, 6]
+    ] as const) {
+      lighting.setPartyPosition(px, py);
+      expect(lighting.isSquareLit(19, 7), `slime (19,7) unlit from (${px},${py})`).toBe(false);
+      expect(lighting.sourceLight(19, 7), `slime floor has no lantern/torch from (${px},${py})`).toBeLessThan(
+        0.08
+      );
+      expect(
+        lighting.calculateBrightness(19, 8, false),
+        `(19,8) stays ambient from (${px},${py})`
+      ).toBeCloseTo(0.0585, 3);
+    }
   });
 
   it("Pell's capped lamp at (13,9) still emits nothing", () => {
