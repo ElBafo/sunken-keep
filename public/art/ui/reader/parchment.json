@@ -1,0 +1,55 @@
+{
+ "page": "parchment_page.png",
+ "pageSize": [
+  240,
+  320
+ ],
+ "nineSlice": {
+  "image": "parchment_9slice.png",
+  "size": [
+   96,
+   96
+  ],
+  "insets": {
+   "left": 16,
+   "right": 16,
+   "top": 16,
+   "bottom": 16
+  },
+  "edgeMode": "repeat",
+  "note": "corners 16x16 fixed; edges are 64px strips that tile seamlessly (repeat), centre 64x64 tiles; stretching also works but repeat keeps the grain crisp. Draw with imageSmoothingEnabled=false at integer scale."
+ },
+ "tile": {
+  "image": "parchment_tile.png",
+  "size": [
+   64,
+   64
+  ],
+  "seamless": true
+ },
+ "textArea": {
+  "left": 16,
+  "right": 16,
+  "top": 18,
+  "bottom": 20,
+  "note": "matches NOTE_MARGIN_* in note-reader.ts; the dark sepia border sits inside the outer ~10px so text never touches it"
+ },
+ "textColours": {
+  "body": "#3a2418",
+  "title": "#5a1810"
+ },
+ "palette": [
+  "#e2d2ac",
+  "#d8c69e",
+  "#cdba91",
+  "#c1ac84",
+  "#b29c75",
+  "#9e8662",
+  "#846a4a",
+  "#685036",
+  "#4e3824",
+  "#382618",
+  "#beb48c",
+  "#a8a07c"
+ ]
+}
