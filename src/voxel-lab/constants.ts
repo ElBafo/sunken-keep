@@ -43,6 +43,10 @@ export const LANTERN_SHADOW_MAP = 128;
 export const MAT_DRY = 0;
 export const MAT_WET = 1;
 export const MAT_MOSS = 2;
+/** Roughness map bytes (G channel). Wet glints vs moss/mortar matte. */
+export const ROUGH_WET = 12;
+export const ROUGH_STONE = 150;
+export const ROUGH_MATTE = 252;
 export type MaterialId = typeof MAT_DRY | typeof MAT_WET | typeof MAT_MOSS;
 export const MATERIAL_NAMES = ['dry', 'wet', 'moss'] as const;
 

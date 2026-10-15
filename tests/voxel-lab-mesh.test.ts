@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { classifyPixel, isMoss, luma, volumeFromImageData } from '../src/voxel-lab/classify';
-import { DEPTH_LAYERS, MAT_MOSS, MAT_WET } from '../src/voxel-lab/constants';
+import { DEPTH_LAYERS, MAT_DRY, MAT_MOSS, MAT_WET, ROUGH_MATTE, ROUGH_STONE, ROUGH_WET } from '../src/voxel-lab/constants';
 import { greedyMesh, triangleCount } from '../src/voxel-lab/mesher';
 
 function identity(x: number, y: number, z: number): [number, number, number] {
@@ -15,32 +15,36 @@ function fill(w: number, h: number, d: number): Uint8Array {
 
 describe('voxel-lab classify', () => {
   it('recesses dark mortar and pushes bright stone out 1–3 layers', () => {
-    const dark = classifyPixel(30, 28, 26, 255, 0, 0)!;
-    const bright = classifyPixel(200, 196, 188, 255, 3, 1)!;
+    const dark = classifyPixel(30, 28, 26, 255)!;
+    const bright = classifyPixel(200, 196, 188, 255)!;
     expect(dark.steps).toBe(1);
     expect(bright.steps).toBe(3);
   });
 
   it('marks dark-green pixels as rough moss', () => {
     expect(isMoss(40, 90, 50)).toBe(true);
-    expect(classifyPixel(40, 90, 50, 255, 0, 0)?.material).toBe(MAT_MOSS);
+    expect(classifyPixel(40, 90, 50, 255)?.material).toBe(MAT_MOSS);
     expect(isMoss(120, 118, 110)).toBe(false);
   });
 
-  it('can mark some brighter stone as wet/glossy', () => {
-    let wet = 0;
-    for (let y = 0; y < 32; y++) {
-      for (let x = 0; x < 32; x++) {
-        const c = classifyPixel(180, 176, 168, 255, x, y);
-        if (c?.material === MAT_WET) wet += 1;
-      }
-    }
-    expect(wet).toBeGreaterThan(20);
-    expect(wet).toBeLessThan(400);
+  it('marks painted stone highlights as wet/glossy and mid-stone as dry', () => {
+    expect(classifyPixel(200, 196, 188, 255)?.material).toBe(MAT_WET);
+    expect(classifyPixel(90, 88, 80, 255)?.material).toBe(MAT_DRY);
+  });
+
+  it('writes matte roughness for moss/mortar and glossy for wet highlights', () => {
+    const pixel = (r: number, g: number, b: number) => {
+      const data = new Uint8ClampedArray([r, g, b, 255]);
+      return volumeFromImageData({ width: 1, height: 1, data }).roughness[0];
+    };
+    expect(pixel(40, 90, 50)).toBe(ROUGH_MATTE);
+    expect(pixel(28, 26, 24)).toBe(ROUGH_MATTE);
+    expect(pixel(200, 196, 188)).toBe(ROUGH_WET);
+    expect(pixel(90, 88, 80)).toBe(ROUGH_STONE);
   });
 
   it('ignores transparent texels', () => {
-    expect(classifyPixel(10, 80, 20, 0, 0, 0)).toBeNull();
+    expect(classifyPixel(10, 80, 20, 0)).toBeNull();
   });
 
   it('luma is in 0–1', () => {

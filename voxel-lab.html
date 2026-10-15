@@ -39,15 +39,20 @@
       pointer-events: none;
     }
     #stats {
-      pointer-events: none;
-      background: rgba(0, 0, 0, 0.62);
-      color: #9fef9f;
-      padding: 6px 10px;
-      font-size: 12px;
-      letter-spacing: 0.03em;
-      line-height: 1.35;
-      border-radius: 4px;
+      pointer-events: auto;
+      user-select: text;
+      -webkit-user-select: text;
+      background: rgba(0, 0, 0, 0.82);
+      color: #c8ff9a;
+      padding: 10px 12px;
+      font-size: 16px;
+      letter-spacing: 0.02em;
+      line-height: 1.45;
+      border-radius: 6px;
+      text-shadow: 0 1px 0 #000;
+      min-width: 11.5em;
     }
+    #stats b { color: #e7ffc4; font-weight: 700; }
     #toggles {
       margin-left: auto;
       display: flex;

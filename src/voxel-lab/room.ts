@@ -102,14 +102,16 @@ function roughnessMap(data: Uint8Array, w: number, h: number): THREE.DataTexture
   return tex;
 }
 
-function voxelMaterial(map: THREE.Texture, rough: THREE.Texture): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({
+function voxelMaterial(map: THREE.Texture, rough: THREE.Texture): THREE.MeshPhysicalMaterial {
+  return new THREE.MeshPhysicalMaterial({
     map,
     roughnessMap: rough,
     roughness: 1,
     metalness: 0,
-    flatShading: true,
-    envMapIntensity: 0
+    ior: 1.5,
+    specularIntensity: 1,
+    envMapIntensity: 0,
+    flatShading: false
   });
 }
 
@@ -190,8 +192,7 @@ export async function buildRoom(): Promise<BuiltRoom> {
     const mat = new THREE.MeshStandardMaterial({
       map: png.texture,
       roughness: 0.7,
-      metalness: 0,
-      flatShading: true
+      metalness: 0
     });
     const mesh = new THREE.Mesh(planeGeo, mat);
     mesh.position.set(pose.x, pose.y, pose.z);

@@ -13,6 +13,7 @@ describe('voxel-lab is a standalone Vite page', () => {
     expect(html).toContain('src="/src/voxel-lab/main.ts"');
     expect(html).not.toContain('src="/src/proto3d/main.ts"');
     expect(html).toContain('id="lab-canvas"');
+    expect(html).toContain('id="stats"');
     expect(html).toContain('id="btn-shadows"');
     expect(html).toContain('id="btn-lantern"');
     expect(html).toContain('id="btn-mode"');
@@ -20,6 +21,12 @@ describe('voxel-lab is a standalone Vite page', () => {
     expect(html).toContain('id="btn-back"');
     expect(html).not.toContain('id="party-hud"');
     expect(html).not.toContain('id="game-stage"');
+  });
+
+  it('stats HUD is copyable and large enough to read on a phone', () => {
+    expect(html).toMatch(/#stats[\s\S]*font-size:\s*16px/);
+    expect(html).toMatch(/#stats[\s\S]*user-select:\s*text/);
+    expect(html).toMatch(/#stats[\s\S]*-webkit-user-select:\s*text/);
   });
 
   it('is registered on the GitHub Pages multi-page build', () => {

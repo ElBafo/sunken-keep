@@ -1,4 +1,13 @@
-import { DEPTH_LAYERS, MAT_DRY, MAT_MOSS, MAT_WET, MaterialId } from './constants';
+import {
+  DEPTH_LAYERS,
+  MAT_DRY,
+  MAT_MOSS,
+  MAT_WET,
+  MaterialId,
+  ROUGH_MATTE,
+  ROUGH_STONE,
+  ROUGH_WET
+} from './constants';
 
 export function luma(r: number, g: number, b: number): number {
   return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
@@ -9,25 +18,18 @@ export function isMoss(r: number, g: number, b: number): boolean {
   return g > r + 10 && g > b + 4 && g < 155 && r < 120;
 }
 
-export function hash32(x: number, y: number): number {
-  let h = Math.imul(x, 374761393) + Math.imul(y, 668265263);
-  h = Math.imul(h ^ (h >>> 13), 1274126177);
-  return (h ^ (h >>> 16)) >>> 0;
-}
-
 export function classifyPixel(
   r: number,
   g: number,
   b: number,
-  a: number,
-  x: number,
-  y: number
+  a: number
 ): { steps: number; material: MaterialId } | null {
   if (a < 16) return null;
   const L = luma(r, g, b);
   const steps = Math.max(1, Math.min(DEPTH_LAYERS, 1 + Math.round(L * 2)));
   if (isMoss(r, g, b)) return { steps, material: MAT_MOSS };
-  if (L > 0.38 && hash32(x, y) % 11 < 2) return { steps, material: MAT_WET };
+  // Painted highlights on stone — glossy, not random speckles.
+  if (L > 0.45) return { steps, material: MAT_WET };
   return { steps, material: MAT_DRY };
 }
 
@@ -65,7 +67,7 @@ export function volumeFromImageData(image: {
       const a = image.data[i + 3];
       const idx = u + v * W;
       lum[idx] = luma(r, g, b);
-      classified[idx] = classifyPixel(r, g, b, a, u, v);
+      classified[idx] = classifyPixel(r, g, b, a);
     }
   }
   // 5×5 blur so noisy brick faces share a depth and greedy-merge.
@@ -94,7 +96,13 @@ export function volumeFromImageData(image: {
       if (!c) continue;
       voxelCount += 1;
       const steps = Math.max(1, Math.min(DEPTH_LAYERS, 1 + Math.round(smooth[idx] * 2)));
-      roughness[idx] = c.material === MAT_MOSS ? 245 : c.material === MAT_WET ? 36 : 178;
+      const mortar = lum[idx] < 0.32;
+      roughness[idx] =
+        c.material === MAT_MOSS || mortar
+          ? ROUGH_MATTE
+          : c.material === MAT_WET
+            ? ROUGH_WET
+            : ROUGH_STONE;
       for (let k = 0; k < steps; k++) {
         volume[idx + k * W * H] = 1;
       }

@@ -32,6 +32,9 @@ THREE.ColorManagement.enabled = true;
 type LabApi = {
   ready: boolean;
   fps: number;
+  avgMs: number;
+  worstMs: number;
+  draws: number;
   voxels: number;
   triangles: number;
   quads: number;
@@ -44,6 +47,8 @@ type LabApi = {
   setMode: (mode: 'voxel' | 'flat') => void;
   setLamp: (on: boolean) => void;
 };
+
+const STATS_WINDOW_MS = 2000;
 
 function isMobile(): boolean {
   return window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 700;
@@ -72,8 +77,7 @@ async function boot(): Promise<void> {
   });
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
-  renderer.toneMapping = THREE.ACESFilmicToneMapping;
-  renderer.toneMappingExposure = 1.05;
+  renderer.toneMapping = THREE.NoToneMapping;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.setClearColor(0x050403, 1);
@@ -330,14 +334,17 @@ async function boot(): Promise<void> {
   setMode('voxel');
   setLamp(false);
 
-  let frames = 0;
-  let fps = 0;
-  let fpsT = performance.now();
   let flameT = 0;
+  let lastFrame = performance.now();
+  let lastHud = 0;
+  const frameSamples: Array<{ t: number; dt: number }> = [];
 
   const api: LabApi = {
     ready: true,
     fps: 0,
+    avgMs: 0,
+    worstMs: 0,
+    draws: 0,
     voxels: room.stats.voxels,
     triangles: room.stats.triangles,
     quads: room.stats.quads,
@@ -368,18 +375,11 @@ async function boot(): Promise<void> {
 
   const loop = (now: number): void => {
     requestAnimationFrame(loop);
-    frames += 1;
-    if (now - fpsT >= 500) {
-      fps = Math.round((frames * 1000) / (now - fpsT));
-      frames = 0;
-      fpsT = now;
-      api.fps = fps;
-      api.shadows = shadowsOn;
-      api.lantern = lanternOn;
-      api.mode = mode;
-      api.lampLit = lampLit;
-      statsEl.textContent = `${fps} fps  ·  ${room.stats.voxels.toLocaleString()} voxels  ·  ${room.stats.triangles.toLocaleString()} tris`;
-    }
+    const dt = now - lastFrame;
+    lastFrame = now;
+    frameSamples.push({ t: now, dt });
+    const cutoff = now - STATS_WINDOW_MS;
+    while (frameSamples.length > 1 && frameSamples[0].t < cutoff) frameSamples.shift();
 
     const t = now * 0.001;
     torchA.intensity = TORCH_INTENSITY * (1 + 0.07 * Math.sin(t * 6.1) + 0.04 * Math.sin(t * 13.7));
@@ -402,6 +402,29 @@ async function boot(): Promise<void> {
     }
 
     renderer.render(scene, camera);
+
+    const span = now - frameSamples[0].t || dt;
+    const avgMs = frameSamples.reduce((s, s0) => s + s0.dt, 0) / frameSamples.length;
+    let worstMs = 0;
+    for (const s of frameSamples) if (s.dt > worstMs) worstMs = s.dt;
+    const fps = span > 0 ? Math.round((frameSamples.length * 1000) / span) : 0;
+    const draws = renderer.info.render.calls;
+    api.fps = fps;
+    api.avgMs = avgMs;
+    api.worstMs = worstMs;
+    api.draws = draws;
+    api.shadows = shadowsOn;
+    api.lantern = lanternOn;
+    api.mode = mode;
+    api.lampLit = lampLit;
+    if (now - lastHud >= 200) {
+      lastHud = now;
+      statsEl.innerHTML =
+        `<div><b>${fps}</b> fps</div>` +
+        `<div>${avgMs.toFixed(1)} ms avg · <b>${worstMs.toFixed(1)}</b> ms worst</div>` +
+        `<div>${room.stats.voxels.toLocaleString()} vx · ${draws} draws</div>` +
+        `<div>${room.stats.triangles.toLocaleString()} tri</div>`;
+    }
   };
   requestAnimationFrame(loop);
 }
