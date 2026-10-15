@@ -293,7 +293,11 @@
    "ambience": "Ατμόσφαιρα",
    "on": "Ναι",
    "off": "Όχι",
-   "ambience_short": "Ατμόσφ."
+   "ambience_short": "Ατμόσφ.",
+   "layout": "Διάταξη",
+   "layout_framed": "Πλαίσιο",
+   "layout_edge": "Άκρη",
+   "layout_hint": "Δοκιμή. Αποθηκεύεται εδώ."
   },
   "tap_to_start": "Πάτα για να αρχίσεις"
  },

@@ -38,6 +38,19 @@
       image-rendering: crisp-edges;
       overflow: hidden;
     }
+    body.layout-edge #game-letterbox {
+      padding-top: max(env(safe-area-inset-top, 0px), var(--proto-safe-top, 0px));
+      padding-right: max(env(safe-area-inset-right, 0px), var(--proto-safe-right, 0px));
+      padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--proto-safe-bottom, 0px));
+      padding-left: max(env(safe-area-inset-left, 0px), var(--proto-safe-left, 0px));
+    }
+    body.layout-edge #game-stage {
+      overflow: hidden;
+    }
+    body.layout-edge #canvas-container,
+    body.layout-edge #render-canvas {
+      width: 100%;
+    }
     #game-stage {
       position: absolute;
       top: 0;
@@ -505,6 +518,74 @@
       overflow: hidden;
       clip: rect(0 0 0 0);
     }
+    #settings-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 350;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(8, 6, 4, 0.72);
+      padding: 16px;
+      touch-action: none;
+    }
+    #settings-overlay.show { display: flex; }
+    #settings-sheet {
+      width: min(280px, 100%);
+      padding: 16px 14px 14px;
+      background: #1a1612;
+      border: 4px solid transparent;
+      border-image: url('%BASE_URL%art/ui/panel/button_9slice.png') 4 fill;
+      color: #d8ccb0;
+      font-family: monospace;
+      image-rendering: pixelated;
+    }
+    #settings-title {
+      margin: 0 0 12px;
+      color: #e8d8a0;
+      font-size: 16px;
+      text-align: center;
+      text-shadow: 1px 1px 0 #1a1210;
+    }
+    #settings-layout-label {
+      margin: 0 0 8px;
+      font-size: 13px;
+    }
+    #settings-layout-row {
+      display: flex;
+      gap: 8px;
+    }
+    #settings-layout-hint {
+      margin: 10px 0 14px;
+      color: #918d7d;
+      font-size: 11px;
+      line-height: 1.35;
+    }
+    .settings-btn {
+      min-width: 44px;
+      min-height: 44px;
+      padding: 8px 10px;
+      border: 4px solid transparent;
+      border-image: url('%BASE_URL%art/ui/panel/button_9slice.png') 4 fill;
+      background: transparent;
+      color: #d8ccb0;
+      font-family: monospace;
+      font-size: 13px;
+      text-shadow: 1px 1px 0 #1a1210;
+      image-rendering: pixelated;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #settings-layout-row .settings-btn { flex: 1; }
+    .settings-btn.selected {
+      color: #ffbe5a;
+    }
+    .settings-btn:active {
+      border-image-source: url('%BASE_URL%art/ui/panel/button_pressed_9slice.png');
+      transform: translate(1px, 1px);
+    }
+    #btn-settings-close { width: 100%; }
   </style>
 </head>
 <body>
@@ -550,6 +631,18 @@
       <canvas id="note-canvas" width="240" height="320"></canvas>
       <div id="note-title"></div>
       <div id="note-text"></div>
+    </div>
+    <div id="settings-overlay" hidden>
+      <div id="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <h2 id="settings-title">Settings</h2>
+        <p id="settings-layout-label">Layout</p>
+        <div id="settings-layout-row">
+          <button id="btn-layout-framed" class="settings-btn" type="button" aria-pressed="true">Framed</button>
+          <button id="btn-layout-edge" class="settings-btn" type="button" aria-pressed="false">Edge</button>
+        </div>
+        <p id="settings-layout-hint">Prototype. Saved on this phone.</p>
+        <button id="btn-settings-close" class="settings-btn" type="button">Resume</button>
+      </div>
     </div>
   </div>
   <div id="gameover">

@@ -73,9 +73,17 @@ import { VertexLightingManager } from './vertex-lighting';
 import { WaterSystem } from './water';
 import { DarkFx } from './dark-fx';
 import { PropBuilder } from './props';
-import { applyLetterboxStone, fitGameStage } from './game-stage';
+import { applyLetterboxStone, fitGameStage, setDocumentLayout } from './game-stage';
 import { loadLayout585 } from './layout585';
 import { PartyHud, type GearId, type HandSlot } from './party-hud';
+import {
+  getLayoutMode,
+  layoutFromSearch,
+  saveLayoutMode,
+  syncLayoutQuery,
+  type LayoutMode
+} from './phone-layout';
+import { SettingsMenu } from './settings-menu';
 import type { HeroId } from '../constants';
 import { PartyBag } from './bag';
 import { InventoryUi } from './inventory-ui';
@@ -141,6 +149,7 @@ class Game {
   bag = new PartyBag();
   inventory!: InventoryUi;
   noteReader!: NoteReader;
+  settingsMenu!: SettingsMenu;
   private pendingPotion: 'potion_red' | 'potion_blue' | 'potion_green' | null = null;
   private lootSnap: Array<{ x: number; y: number; item?: string; chest?: boolean; chestItems?: string[]; chestOpen?: boolean }> = [];
   lastMessage = '';
@@ -224,6 +233,7 @@ class Game {
     const params = new URLSearchParams(window.location.search);
     this.quality = qualityFromSearch(params);
     this.persist = persistEnabled();
+    setDocumentLayout(layoutFromSearch(params, this.persist));
     const brightParam = params.get('bright');
     if (brightParam != null && brightParam !== '') {
       const brightRaw = Number(brightParam);
@@ -236,6 +246,11 @@ class Game {
     this.skipTitle = params.get('test') === '1' && params.get('title') !== '1';
     this.wantDebugReader = debugReaderRequested(params);
 
+    this.settingsMenu = new SettingsMenu(this.story, {
+      getLayout: () => getLayoutMode(),
+      setLayout: (mode) => this.setLayoutMode(mode),
+      playUi: (name) => this.audioManager?.playUi(name)
+    });
     this.fitStage();
     void applyLetterboxStone();
     this.audioManager = new AudioManager(this.quality);
@@ -245,6 +260,7 @@ class Game {
     document.documentElement.lang = locale;
     await this.story.load(locale);
     await this.loadBarkRules();
+    this.settingsMenu.mount();
     this.setTapStatus('loading');
     if (this.skipTitle) {
       this.storyProgress.startNewGame();
@@ -425,6 +441,7 @@ class Game {
       onPortrait: (hero) => this.handlePortraitTap(hero),
       onBag: () => this.toggleBag(),
       onSave: () => this.requestManualSave(),
+      onMenu: () => this.settingsMenu.toggle(),
       onPotion: (kind) => this.quickPotion(kind),
       potionCounts: () => ({
         health: this.bag.countOf('potion_red'),
@@ -524,9 +541,23 @@ class Game {
 
   private fitStage() {
     fitGameStage();
+    this.renderer?.resize();
     if (this.stageFitWired) return;
     this.stageFitWired = true;
-    window.addEventListener('resize', () => fitGameStage());
+    window.addEventListener('resize', () => {
+      fitGameStage();
+      this.renderer?.resize();
+    });
+  }
+
+  private setLayoutMode(mode: LayoutMode) {
+    if (this.persist) saveLayoutMode(mode);
+    setDocumentLayout(mode);
+    this.renderer?.resize();
+    if (typeof window !== 'undefined') {
+      const next = syncLayoutQuery(mode, new URL(window.location.href));
+      window.history.replaceState(null, '', `${next.pathname}${next.search}${next.hash}`);
+    }
   }
 
   private beginTitleBackgroundLoads() {
@@ -1051,6 +1082,7 @@ class Game {
     if (goBody) goBody.textContent = this.story.uiText('game_over.body');
     this.refreshGameOverButtons();
     this.introSkip?.refresh();
+    this.settingsMenu?.refreshLabels();
   }
 
   private refreshGameOverButtons() {
@@ -3165,6 +3197,9 @@ class Game {
       gameOverVisible: () => !!document.getElementById('gameover')?.classList.contains('show'),
       logLines: () => this.hud.logLines.slice(),
       layout: () => this.hud.layout,
+      layoutMode: () => getLayoutMode(),
+      setLayoutMode: (mode: LayoutMode) => this.setLayoutMode(mode),
+      settingsOpen: () => this.settingsMenu?.open === true,
       tryMoveForward: () => {
         const before = { x: this.player.x, y: this.player.y };
         const result = this.player.moveForward();

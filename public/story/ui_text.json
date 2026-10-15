@@ -293,7 +293,11 @@
    "ambience": "Ambience",
    "on": "On",
    "off": "Off",
-   "ambience_short": "Ambience"
+   "ambience_short": "Ambience",
+   "layout": "Layout",
+   "layout_framed": "Framed",
+   "layout_edge": "Edge",
+   "layout_hint": "Prototype. Saved on this phone."
   },
   "tap_to_start": "Tap to start"
  },
