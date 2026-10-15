@@ -456,24 +456,11 @@ export class AudioManager {
   }
 
   private ensureAct1Music() {
-    if (this.preStingSilence) return;
-    const music = this.buffers.get('music_act1');
-    if (music && !this.musicSound) {
-      this.musicSound = new THREE.Audio(this.listener);
-      this.musicSound.setBuffer(music);
-      this.musicSound.setLoop(true);
-      this.musicSound.setVolume(this.musicVolume);
-      this.routeThroughBedDuck(this.musicSound);
-    }
-    if (this.playStarted && this.act1MusicAllowed && this.musicSound && !this.musicSound.isPlaying) {
-      this.musicSound.setVolume(0);
-      try {
-        this.musicSound.play();
-        this.fadeIn(this.musicSound, this.musicVolume, ACT1_MUSIC_FADE_MS);
-      } catch {
-        // Host audio can refuse playback; later beds still load.
-      }
-    }
+    // Floors have no background music. Title / intro / ending keep their own
+    // players. music_act1_loop stays in audio/ and still streams in so load
+    // order tests and files remain, but it is never started here.
+    void ACT1_MUSIC_FADE_MS;
+    void this.act1MusicAllowed;
   }
 
   private startAmbienceIfReady() {
@@ -1256,14 +1243,7 @@ export class AudioManager {
   }
 
   startSlimeBattleLoop() {
-    const started = this.startBufferLoop(
-      this.slimeBattleSrc,
-      this.slimeBattleGain,
-      ['music.music_slime_battle', 'music_slime_battle', 'slime_battle'],
-      0.28
-    );
-    this.slimeBattleSrc = started.src;
-    this.slimeBattleGain = started.gain;
+    // No lair battle bed. music_slime_battle_loop stays in audio/.
   }
 
   stopSlimeGurgleLoop() {
@@ -1287,8 +1267,8 @@ export class AudioManager {
     const alive = slimes.some((m) => isSlimeKind(m.kind));
     if (alive) this.startSlimeGurgleLoop();
     else this.stopSlimeGurgleLoop();
-    if (alive && inFight) this.startSlimeBattleLoop();
-    else this.stopSlimeBattleLoop();
+    void inFight;
+    this.stopSlimeBattleLoop();
   }
 
   playOilFlask(opts?: { fadeAt?: number | null; fadeSec?: number }) {
@@ -1314,11 +1294,10 @@ export class AudioManager {
     this.playUi('cave_in');
   }
 
-  /** Fade act-1 music (and halls ambience) to silence before sting_slime_lair. */
+  /** Fade halls ambience out (dark trail). Floor music is not playing. */
   fadeToPreStingSilence(ms = 1000, onSilent?: () => void) {
     this.preStingSilence = true;
-    const fading = !!(this.musicSound?.isPlaying || this.ambientSound?.isPlaying);
-    this.fadeOut(this.musicSound, ms);
+    const fading = !!this.ambientSound?.isPlaying;
     this.fadeOut(this.ambientSound, ms);
     if (!onSilent) return;
     if (!fading) onSilent();
@@ -1331,7 +1310,20 @@ export class AudioManager {
 
   playSting(name: string) {
     if (this.readerOpen) return;
+    this.duckAmbienceForSting();
     this.playUi(name);
+  }
+
+  /** Brief ambience duck under sting_slime_lair; restore unless the trail already faded it. */
+  private duckAmbienceForSting() {
+    const amb = this.ambientSound;
+    if (!amb?.isPlaying || this.preStingSilence) return;
+    const ducked = this.ambVolume * 0.35;
+    amb.setVolume(ducked);
+    window.setTimeout(() => {
+      if (this.preStingSilence || !this.ambientSound) return;
+      this.fadeIn(this.ambientSound, this.ambVolume, 800);
+    }, 1800);
   }
 
   fadeCaveIn(ms = 300) {

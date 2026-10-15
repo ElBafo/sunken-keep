@@ -2355,11 +2355,12 @@ class Game {
     if (!tile?.trigger) return;
     const key = `trigger:${tile.trigger}`;
     if (tile.once && this.flags.has(key)) return;
-    const fade = !!(tile.ambienceOut || tile.sting);
+    const fade = !!tile.ambienceOut;
     const sting = !!tile.sting;
     if (fade || sting) {
       if (tile.once) this.flags.add(key);
-      this.audioManager?.fadeToPreStingSilence(1000, sting ? () => this.audioManager?.playSting('sting_slime_lair') : undefined);
+      if (fade) this.audioManager?.fadeToPreStingSilence(1000);
+      if (sting) this.audioManager?.playSting('sting_slime_lair');
     }
   }
 
