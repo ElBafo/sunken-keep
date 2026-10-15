@@ -62,7 +62,7 @@ import { enterPlayFromIntro, mountIntroSkip, type IntroSkipHandle } from './intr
 import { interactPropAt, tileBlocksPath } from './wall-props';
 import { SpeechBubble } from './bubble';
 import { StoryProgress } from './story-progress';
-import { saveLocale, type Locale } from './i18n';
+import { copyForOpenNote, resolveLocale, saveLocale, StoryText, type Locale, type OpenNoteRef } from './i18n';
 import { qualityFromSearch, QualityLevel } from './quality';
 import { PixelRenderer } from './renderer';
 import { SceneBuilder } from './scene-builder';
@@ -73,7 +73,6 @@ import { VertexLightingManager } from './vertex-lighting';
 import { WaterSystem } from './water';
 import { DarkFx } from './dark-fx';
 import { PropBuilder } from './props';
-import { resolveLocale, StoryText } from './i18n';
 import { applyLetterboxStone, fitGameStage } from './game-stage';
 import { loadLayout585 } from './layout585';
 import { PartyHud, type GearId, type HandSlot } from './party-hud';
@@ -151,6 +150,7 @@ class Game {
   private flankTimer: ReturnType<typeof setTimeout> | null = null;
   lampNote = { title: '', text: '' };
   noteOpen = false;
+  private openNoteRef: OpenNoteRef | null = null;
   private wantDebugReader = false;
   private gameClock = new GameClock();
   private heldCombatLogs: string[] = [];
@@ -1404,6 +1404,7 @@ class Game {
       await this.noteReader?.load();
       const doc = await fetchJsonCached<DebugReaderNote>(`${base}${DEBUG_READER_NOTE_PATH}`);
       if (!doc?.title || !doc?.body) return;
+      this.openNoteRef = { kind: 'debug', title: doc.title, body: doc.body };
       const loc = this.story.locale === 'el' ? 'el' : 'en';
       const title = doc.title[loc] || doc.title.en;
       const text = doc.body[loc] || doc.body.en;
@@ -1413,7 +1414,7 @@ class Game {
     }
   }
 
-  showNote(title?: string, text?: string) {
+  showNote(title?: string, text?: string, opts?: { fx?: boolean }) {
     const docTitle = title ?? this.lampNote.title;
     const docText = text ?? this.lampNote.text;
     this.lampNote = { title: docTitle, text: docText };
@@ -1426,9 +1427,10 @@ class Game {
     document.getElementById('note-overlay')?.classList.add('show');
     document.getElementById('message-toast')?.classList.remove('show');
     this.noteOpen = true;
+    if (!this.openNoteRef) this.openNoteRef = { kind: 'lampkeeper' };
     this.gameClock.pause();
     this.audioManager?.setReaderOpen(true);
-    this.audioManager?.playUi(NOTE_SCROLL_SFX);
+    if (opts?.fx !== false) this.audioManager?.playUi(NOTE_SCROLL_SFX);
   }
 
   hideNote() {
@@ -1436,6 +1438,7 @@ class Game {
     this.noteReader?.hide();
     document.getElementById('note-overlay')?.classList.remove('show');
     this.noteOpen = false;
+    this.openNoteRef = null;
     if (!wasOpen) return;
     this.gameClock.resume();
     this.audioManager?.setReaderOpen(false);
@@ -1457,6 +1460,10 @@ class Game {
       this.storyProgress.fire(journalTriggerId(page));
       this.rememberStoryKey(journalTriggerId(page));
     }
+    this.openNoteRef =
+      doc.kind === 'journal'
+        ? { kind: 'journal', page: slot.journalPage && slot.journalPage > 0 ? slot.journalPage : 1 }
+        : { kind: 'lampkeeper' };
     this.showNote(doc.title, doc.text);
   }
 
@@ -1481,6 +1488,7 @@ class Game {
     this.flags.add('note_lampkeeper');
     this.rememberStoryKey('note_lampkeeper');
     const doc = this.story.lampkeeperNote();
+    this.openNoteRef = { kind: 'lampkeeper' };
     this.showNote(doc.title, doc.text);
     return true;
   }
@@ -2323,6 +2331,11 @@ class Game {
     this.applyStoryLabels();
     this.title.refreshHint();
     this.title.layoutButtons();
+    this.loadLampNote();
+    if (this.noteOpen) {
+      const copy = copyForOpenNote(locale, this.openNoteRef, this.story);
+      if (copy) this.showNote(copy.title, copy.text, { fx: false });
+    }
   }
 
   private showTitleToast(text: string) {

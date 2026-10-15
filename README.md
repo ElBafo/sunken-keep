@@ -38,9 +38,10 @@ The live game will be available at: `https://elbafo.github.io/sunken-keep/`
 
 ## Tech Stack
 
-- **Vite** + **TypeScript**
-- Plain **Canvas 2D** rendering
-- Portrait layout: 270×480 base resolution, integer-scaled
+- **Vite** + **TypeScript** + **three.js**
+- First-person 3D dungeon (the 2D canvas prototype is retired)
+- Portrait layout: 270×585, letterboxed
+- `/proto3d.html` still loads the same 3D game so old links and Home Screen icons keep working
 
 ## Assets Still Needed
 

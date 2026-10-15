@@ -115,6 +115,14 @@ describe('story copy for readable items', () => {
     expect(logText(logEl, journalIntroKey(1))).toMatch(/[Α-ω]/);
     expect(journalTriggerId(1)).toBe('journal_page_1');
   });
+
+  it('setLocale redraws the open parchment in the new language', () => {
+    const fn = mainSrc.slice(mainSrc.indexOf('private async setLocale'), mainSrc.indexOf('private showTitleToast'));
+    expect(fn).toContain('await this.story.load(locale)');
+    expect(fn).toContain('copyForOpenNote');
+    expect(fn).toContain('this.showNote(copy.title, copy.text, { fx: false })');
+    expect(noteEn.text).not.toBe(noteEl.text);
+  });
 });
 
 describe('pixel font coverage', () => {
