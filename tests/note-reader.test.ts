@@ -165,7 +165,7 @@ describe('note reader layout', () => {
     expect(wrapNoteText('one\n\ntwo', 200, fontMeta.glyphs)).toEqual(['one', '', 'two']);
   });
 
-  it('clips partial lines to the text box and still scrolls the last line fully into view', () => {
+  it('draws only fully visible lines and still scrolls the last line into view', () => {
     const long = Array.from({ length: 24 }, (_, i) => `Line ${i + 1}`).join('\n');
     const layout = layoutNote('Title', long, fontMeta.glyphs);
     const box = layout.textRect;
@@ -179,24 +179,22 @@ describe('note reader layout', () => {
     for (let i = first; i < last; i++) {
       const clip = noteLineClip(i, mid, box, layout.lineH);
       expect(clip).not.toBeNull();
-      expect(clip!.clipTop).toBeGreaterThanOrEqual(box.y);
-      expect(clip!.clipBottom).toBeLessThanOrEqual(box.y + box.h);
-      expect(clip!.clipBottom).toBeGreaterThan(clip!.clipTop);
+      expect(clip!.y).toBeGreaterThanOrEqual(box.y);
+      expect(clip!.y + layout.lineH).toBeLessThanOrEqual(box.y + box.h);
+      expect(clip!.clipTop).toBe(clip!.y);
+      expect(clip!.clipBottom).toBe(clip!.y + layout.lineH);
     }
-    const topPartial = noteLineClip(first, mid, box, layout.lineH)!;
-    expect(topPartial.y).toBeLessThan(box.y);
-    expect(topPartial.clipTop).toBe(box.y);
-    const bottomPartial = noteLineClip(last - 1, mid, box, layout.lineH)!;
-    expect(bottomPartial.y + layout.lineH).toBeGreaterThan(box.y + box.h);
-    expect(bottomPartial.clipBottom).toBe(box.y + box.h);
     expect(noteLineClip(first - 1, mid, box, layout.lineH)).toBeNull();
     expect(noteLineClip(last, mid, box, layout.lineH)).toBeNull();
+    const leftoverTop = noteLineClip(0, 0, box, layout.lineH);
+    expect(leftoverTop).not.toBeNull();
+    expect(noteLineClip(14, 0, box, layout.lineH)).toBeNull();
 
     const { maxScroll } = clampNoteScroll(0, layout.lines.length, box.h, layout.lineH);
     const lastClip = noteLineClip(layout.lines.length - 1, maxScroll, box, layout.lineH)!;
     expect(lastClip.y).toBeGreaterThanOrEqual(box.y);
+    expect(lastClip.y + layout.lineH).toBeLessThanOrEqual(box.y + box.h);
     expect(lastClip.clipTop).toBe(lastClip.y);
-    expect(lastClip.clipBottom).toBe(box.y + box.h);
     expect(noteVisibleRange(maxScroll, layout.lines.length, box.h, layout.lineH).last).toBe(
       layout.lines.length
     );

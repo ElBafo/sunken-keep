@@ -27,6 +27,14 @@ import {
   titleMenuStems
 } from './audio-groups';
 import { ACT1_MUSIC_FADE_MS, FIRST_FIGHT_CAP_MS } from './floor1-sounds';
+import {
+  NOTE_READER_DUCK_CLOSE_SEC,
+  NOTE_READER_DUCK_DB,
+  NOTE_READER_DUCK_OPEN_SEC,
+  dbToGain,
+  isMonsterReaderSfx,
+  isUnstartedSfx
+} from './reader-pause';
 import { HERO_IDS } from '../core/types';
 import { isSlimeKind } from '../core/slime-frost';
 import { SLIME_SMALL_SFX_GAP_MS, slimeSmallPitchRate } from '../core/slime-pair';
@@ -132,6 +140,13 @@ export class AudioManager {
   private slimelingPan = new Map<string, number>();
   private lastSlimelingSfxAt = Number.NEGATIVE_INFINITY;
   private preStingSilence = false;
+  private readerOpen = false;
+  private bedDuck: GainNode | null = null;
+  private pendingMonsterSfx: Array<{
+    timer?: ReturnType<typeof setTimeout>;
+    src?: AudioBufferSourceNode;
+    startAt: number;
+  }> = [];
 
   constructor(quality: QualityLevel) {
     this.listener = new THREE.AudioListener();
@@ -436,6 +451,7 @@ export class AudioManager {
       this.ambientSound.setBuffer(amb);
       this.ambientSound.setLoop(true);
       this.ambientSound.setVolume(this.ambVolume);
+      this.routeThroughBedDuck(this.ambientSound);
     }
   }
 
@@ -447,6 +463,7 @@ export class AudioManager {
       this.musicSound.setBuffer(music);
       this.musicSound.setLoop(true);
       this.musicSound.setVolume(this.musicVolume);
+      this.routeThroughBedDuck(this.musicSound);
     }
     if (this.playStarted && this.act1MusicAllowed && this.musicSound && !this.musicSound.isPlaying) {
       this.musicSound.setVolume(0);
@@ -713,6 +730,7 @@ export class AudioManager {
   }
 
   playCombat(name: string, volume = 1, x?: number, y?: number, id?: string) {
+    if (this.readerOpen && isMonsterReaderSfx(name)) return;
     const family = this.combatFamilies[name];
     const pick = family ? this.pickVariant(name, family) : name;
     if (this.isSlimelingStem(name) || (id && this.slimelingPan.has(id))) {
@@ -754,6 +772,7 @@ export class AudioManager {
   }
 
   private playSlimeling(name: string, volume: number, id?: string) {
+    if (this.readerOpen && isMonsterReaderSfx(name)) return;
     const buf = this.buffers.get(name) ?? this.buffers.get(`sfx_${name}`);
     if (!buf) return;
     const now = performance.now();
@@ -761,12 +780,10 @@ export class AudioManager {
     this.lastSlimelingSfxAt = now + wait;
     const pan = id != null ? (this.slimelingPan.get(id) ?? 0) : 0;
     const semitone = Math.random() * 2 - 1;
-    const start = () => this.startSlimelingVoice(buf, volume, pan, slimeSmallPitchRate(semitone));
-    if (wait > 0) setTimeout(start, wait);
-    else start();
+    this.startSlimelingVoice(buf, volume, pan, slimeSmallPitchRate(semitone), wait / 1000);
   }
 
-  private startSlimelingVoice(buf: AudioBuffer, volume: number, pan: number, rate: number) {
+  private startSlimelingVoice(buf: AudioBuffer, volume: number, pan: number, rate: number, delaySec = 0) {
     const ctx = this.listener.context;
     const src = ctx.createBufferSource();
     src.buffer = buf;
@@ -779,11 +796,80 @@ export class AudioManager {
     src.connect(panner);
     panner.connect(gain);
     gain.connect(this.listener.gain);
+    const startAt = ctx.currentTime + Math.max(0, delaySec);
+    const pending = { src, startAt };
+    this.pendingMonsterSfx.push(pending);
+    src.onended = () => {
+      this.pendingMonsterSfx = this.pendingMonsterSfx.filter((p) => p !== pending);
+    };
     try {
-      src.start();
+      src.start(startAt);
     } catch {
       // Host audio can refuse playback.
     }
+  }
+
+  cancelUnstartedMonsterSfx() {
+    const now = this.listener.context.currentTime;
+    const keep: typeof this.pendingMonsterSfx = [];
+    for (const p of this.pendingMonsterSfx) {
+      if (p.timer != null) {
+        clearTimeout(p.timer);
+        p.timer = undefined;
+      }
+      if (p.src && isUnstartedSfx(now, p.startAt)) {
+        try {
+          p.src.stop();
+        } catch {
+          // not started or already stopped
+        }
+        continue;
+      }
+      keep.push(p);
+    }
+    this.pendingMonsterSfx = keep;
+  }
+
+  pendingMonsterSfxCount(): number {
+    return this.pendingMonsterSfx.length;
+  }
+
+  setReaderOpen(open: boolean) {
+    this.readerOpen = open;
+    this.routeThroughBedDuck(this.musicSound);
+    this.routeThroughBedDuck(this.ambientSound);
+    if (open) this.cancelUnstartedMonsterSfx();
+    this.rampBedDuck(open ? dbToGain(-NOTE_READER_DUCK_DB) : 1, open ? NOTE_READER_DUCK_OPEN_SEC : NOTE_READER_DUCK_CLOSE_SEC);
+  }
+
+  private ensureBedDuck(): GainNode {
+    if (this.bedDuck) return this.bedDuck;
+    const g = this.listener.context.createGain();
+    g.gain.value = 1;
+    g.connect(this.listener.gain);
+    this.bedDuck = g;
+    return g;
+  }
+
+  private routeThroughBedDuck(sound: THREE.Audio | null) {
+    if (!sound) return;
+    const duck = this.ensureBedDuck();
+    const out = sound.gain;
+    try {
+      out.disconnect();
+    } catch {
+      // already disconnected
+    }
+    out.connect(duck);
+  }
+
+  private rampBedDuck(target: number, durSec: number) {
+    const duck = this.ensureBedDuck();
+    const param = duck.gain;
+    const now = this.listener.context.currentTime;
+    param.cancelScheduledValues(now);
+    param.setValueAtTime(param.value, now);
+    param.linearRampToValueAtTime(target, now + durSec);
   }
 
   stopWindup(id?: string) {
@@ -1244,6 +1330,7 @@ export class AudioManager {
   }
 
   playSting(name: string) {
+    if (this.readerOpen) return;
     this.playUi(name);
   }
 

@@ -231,12 +231,12 @@ export function noteVisibleRange(
 ): { first: number; last: number } {
   const { scroll: y } = clampNoteScroll(scroll, lineCount, textH, lineH);
   if (lineCount <= 0 || textH <= 0) return { first: 0, last: 0 };
-  const first = Math.max(0, Math.floor(y / lineH));
-  const last = Math.min(lineCount, Math.ceil((y + textH) / lineH));
-  return { first, last };
+  const first = Math.max(0, Math.ceil(y / lineH));
+  const last = Math.min(lineCount, Math.floor((y + textH) / lineH));
+  return { first, last: Math.max(first, last) };
 }
 
-/** Visible slice of a line after clipping to the text box. Null if fully outside. */
+/** Fully visible line inside the text box. Null if any pixel would sit outside. */
 export function noteLineClip(
   index: number,
   scroll: number,
@@ -246,10 +246,8 @@ export function noteLineClip(
   const y = textRect.y + index * lineH - scroll;
   const boxTop = textRect.y;
   const boxBottom = textRect.y + textRect.h;
-  const clipTop = Math.max(y, boxTop);
-  const clipBottom = Math.min(y + lineH, boxBottom);
-  if (clipBottom <= clipTop) return null;
-  return { y, clipTop, clipBottom };
+  if (y < boxTop || y + lineH > boxBottom) return null;
+  return { y, clipTop: y, clipBottom: y + lineH };
 }
 
 export interface FloorReadablePickup {

@@ -107,6 +107,7 @@ import {
   type BarkPartyMember,
   type BarkRules
 } from './bark-picker';
+import { GameClock } from './reader-pause';
 
 const FLOOR_NUMBER = 1;
 const FLOOR_SCONCE_DEFAULTS = floor1Sconces.map((s) => ({ ...s }));
@@ -151,6 +152,8 @@ class Game {
   lampNote = { title: '', text: '' };
   noteOpen = false;
   private wantDebugReader = false;
+  private gameClock = new GameClock();
+  private heldCombatLogs: string[] = [];
   interactCount = 0;
   messageTimer = 0;
 
@@ -1057,8 +1060,12 @@ class Game {
     if (goFloor) goFloor.textContent = this.story.uiText('game_over.load_floor', { n: FLOOR_NUMBER });
   }
 
-  private nowSec() {
-    return performance.now() / 1000;
+  private nowMs(wall = performance.now()) {
+    return this.gameClock.nowMs(wall);
+  }
+
+  private nowSec(wall = performance.now()) {
+    return this.gameClock.nowSec(wall);
   }
 
   private async initCombat(params: URLSearchParams) {
@@ -1105,7 +1112,7 @@ class Game {
     for (const id of HERO_IDS) {
       this.hud.syncHero(id, this.combat.heroes[id]);
     }
-    this.hud.draw(performance.now());
+    this.hud.draw(this.nowMs());
   }
 
   private logVars(vars?: Record<string, string | number>) {
@@ -1120,8 +1127,21 @@ class Game {
   private combatLog(key: string, vars?: Record<string, string | number>) {
     const text = this.story.log(key, this.logVars(vars));
     if (!text) return;
+    if (this.noteOpen) {
+      this.heldCombatLogs.push(text);
+      return;
+    }
     this.lastMessage = text;
     this.hud?.pushLog(text);
+  }
+
+  private flushHeldCombatLogs() {
+    const held = this.heldCombatLogs;
+    this.heldCombatLogs = [];
+    for (const text of held) {
+      this.lastMessage = text;
+      this.hud?.pushLog(text);
+    }
   }
 
   private applyEvents(events: CombatEvent[]) {
@@ -1406,13 +1426,21 @@ class Game {
     document.getElementById('note-overlay')?.classList.add('show');
     document.getElementById('message-toast')?.classList.remove('show');
     this.noteOpen = true;
+    this.gameClock.pause();
+    this.audioManager?.setReaderOpen(true);
     this.audioManager?.playUi(NOTE_SCROLL_SFX);
   }
 
   hideNote() {
+    const wasOpen = this.noteOpen;
     this.noteReader?.hide();
     document.getElementById('note-overlay')?.classList.remove('show');
     this.noteOpen = false;
+    if (!wasOpen) return;
+    this.gameClock.resume();
+    this.audioManager?.setReaderOpen(false);
+    this.flushHeldCombatLogs();
+    this.flushBarks(performance.now());
   }
 
   private readBagSlot(index: number) {
@@ -1772,6 +1800,7 @@ class Game {
   }
 
   useHand(hero: HeroId, hand: HandSlot): boolean {
+    if (this.noteOpen) return false;
     if (!this.combat || this.combat.gameOver) return false;
     this.syncEquipmentToCombat();
     const before = this.hud.handTapCount;
@@ -2192,7 +2221,8 @@ class Game {
       flags: this.flags,
       act: 1,
       forcedSpeaker,
-      skipRateLimits: !!forcedSpeaker
+      skipRateLimits: !!forcedSpeaker,
+      held: this.noteOpen
     });
     if (!picked) return false;
     this.lastBarkTrigger = trigger;
@@ -2210,6 +2240,7 @@ class Game {
   }
 
   private flushBarks(nowMs: number) {
+    if (this.noteOpen) return;
     const picked = this.barkDirector.flush(nowMs);
     if (picked) this.deliverBark(picked);
   }
@@ -3217,34 +3248,37 @@ class Game {
       return;
     }
 
-    const prevX = this.player.x;
-    const prevY = this.player.y;
-    this.player.update(deltaTime);
+    const paused = this.noteOpen || this.gameClock.paused;
+    if (!paused) {
+      const prevX = this.player.x;
+      const prevY = this.player.y;
+      this.player.update(deltaTime);
 
-    if (this.combat) {
-      this.combat.setPartyPos(this.player.x, this.player.y, this.player.dir);
-    }
+      if (this.combat) {
+        this.combat.setPartyPos(this.player.x, this.player.y, this.player.dir);
+      }
 
-    if (this.player.x !== prevX || this.player.y !== prevY) {
-      this.combat?.noteStep(this.nowSec());
-      this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
-      this.vertexLighting.updateAllMeshes(this.renderer.scene);
-      this.audioManager.checkBones(this.player.x, this.player.y);
-      this.updateDoorButton();
-    }
+      if (this.player.x !== prevX || this.player.y !== prevY) {
+        this.combat?.noteStep(this.nowSec());
+        this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
+        this.vertexLighting.updateAllMeshes(this.renderer.scene);
+        this.audioManager.checkBones(this.player.x, this.player.y);
+        this.updateDoorButton();
+      }
 
-    if (this.combat && !this.combat.gameOver && this.isCombatAwake()) {
-      this.applyEvents(this.combat.tick(this.nowSec()));
-    }
+      if (this.combat && !this.combat.gameOver && this.isCombatAwake()) {
+        this.applyEvents(this.combat.tick(this.nowSec()));
+      }
 
-    if (this.pendingUnlock && now >= this.doorUnlockTimer) {
-      const { x, y } = this.pendingUnlock;
-      this.pendingUnlock = null;
-      const visual = this.sceneBuilder.doors.get(x, y);
-      if (visual) {
-        this.sceneBuilder.doors.startSlide(visual, true, now);
-        this.audioManager.playDoor('door_open', x, y);
-        this.vertexLighting.relight();
+      if (this.pendingUnlock && now >= this.doorUnlockTimer) {
+        const { x, y } = this.pendingUnlock;
+        this.pendingUnlock = null;
+        const visual = this.sceneBuilder.doors.get(x, y);
+        if (visual) {
+          this.sceneBuilder.doors.startSlide(visual, true, now);
+          this.audioManager.playDoor('door_open', x, y);
+          this.vertexLighting.relight();
+        }
       }
     }
 
@@ -3259,10 +3293,12 @@ class Game {
     this.torches.update(now, this.player.x, this.player.y, this.player.dir);
     this.spriteManager.update(now, this.player.x, this.player.y, this.player.dir);
     this.darkFx.update(now, this.vertexLighting, this.spriteManager, this.audioManager, this.player.x, this.player.y);
-    this.fireSlimeReveal();
     this.vertexLighting.setFlickerTime(now);
-    this.hud?.draw(now);
-    this.updateCaveIn(now);
+    this.hud?.draw(this.nowMs());
+    if (!paused) {
+      this.fireSlimeReveal();
+      this.updateCaveIn(now);
+    }
 
     if (this.messageTimer && now >= this.messageTimer) {
       this.messageTimer = 0;

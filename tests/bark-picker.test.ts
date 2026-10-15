@@ -176,4 +176,22 @@ describe('bark picker', () => {
     expect(director.queuedCount()).toBe(0);
     expect(director.flush(20_000)).toBeNull();
   });
+
+  it('queues story barks while held and drops flavour', () => {
+    const director = new BarkDirector({
+      flavour_gap_s: 0,
+      flavour_min_interval_s: 0,
+      min_gap_s: 0
+    });
+    const lines: BarkLine[] = [
+      { trigger: 'lampkeeper_note_read', speaker: 'wren', text: 'A page.', tier: 'story' },
+      { trigger: 'idle', speaker: 'mags', text: 'Hmm.', tier: 'flavour' }
+    ];
+    const held = { nowMs: 0, party, flags: new Set<string>(), held: true };
+    expect(director.pick('idle', lines, held)).toBeNull();
+    expect(director.queuedCount()).toBe(0);
+    expect(director.pick('lampkeeper_note_read', lines, held)).toBeNull();
+    expect(director.queuedCount()).toBe(1);
+    expect(director.flush(0)).toEqual(expect.objectContaining({ trigger: 'lampkeeper_note_read' }));
+  });
 });
