@@ -7,6 +7,8 @@ import {
   LAMP_FILE,
   LAYER_SIZE,
   ROOM_TILES,
+  ROUGH_MATTE,
+  ROUGH_WET,
   SCONCE_FILE,
   WALL_FILES
 } from './constants';
@@ -83,14 +85,20 @@ function geometryFrom(mesh: MeshArrays): THREE.BufferGeometry | null {
   return g;
 }
 
-function roughnessMap(data: Uint8Array, w: number, h: number): THREE.DataTexture {
+/**
+ * Packed PBR map from per-texel roughness:
+ * R = clearcoat (wet only), G = roughness, A = specular intensity.
+ */
+function pbrMap(data: Uint8Array, w: number, h: number): THREE.DataTexture {
   const rgba = new Uint8Array(w * h * 4);
   for (let i = 0; i < w * h; i++) {
-    const r = data[i];
-    rgba[i * 4] = r;
-    rgba[i * 4 + 1] = r;
-    rgba[i * 4 + 2] = r;
-    rgba[i * 4 + 3] = 255;
+    const rough = data[i];
+    const wet = rough <= ROUGH_WET;
+    const matte = rough >= ROUGH_MATTE;
+    rgba[i * 4] = wet ? 255 : 0;
+    rgba[i * 4 + 1] = rough;
+    rgba[i * 4 + 2] = rough;
+    rgba[i * 4 + 3] = wet ? 255 : matte ? 8 : 96;
   }
   const tex = new THREE.DataTexture(rgba, w, h, THREE.RGBAFormat);
   tex.colorSpace = THREE.NoColorSpace;
@@ -102,14 +110,18 @@ function roughnessMap(data: Uint8Array, w: number, h: number): THREE.DataTexture
   return tex;
 }
 
-function voxelMaterial(map: THREE.Texture, rough: THREE.Texture): THREE.MeshPhysicalMaterial {
+function voxelMaterial(map: THREE.Texture, pbr: THREE.Texture): THREE.MeshPhysicalMaterial {
   return new THREE.MeshPhysicalMaterial({
     map,
-    roughnessMap: rough,
+    roughnessMap: pbr,
     roughness: 1,
     metalness: 0,
     ior: 1.5,
     specularIntensity: 1,
+    specularIntensityMap: pbr,
+    clearcoat: 1,
+    clearcoatMap: pbr,
+    clearcoatRoughness: 0.08,
     envMapIntensity: 0,
     flatShading: false
   });
@@ -178,7 +190,7 @@ export async function buildRoom(): Promise<BuiltRoom> {
     const vol = volumeFromImageData(png.data);
     voxels += vol.voxelCount;
     if (!roughByFile.has(job.file)) {
-      roughByFile.set(job.file, roughnessMap(vol.roughness, vol.dims[0], vol.dims[1]));
+      roughByFile.set(job.file, pbrMap(vol.roughness, vol.dims[0], vol.dims[1]));
     }
     const toWorld = makeToWorld(job.face, job.tx, job.tz, vol.dims, LAYER_SIZE);
     const meshed = greedyMesh(vol.volume, vol.dims, toWorld);

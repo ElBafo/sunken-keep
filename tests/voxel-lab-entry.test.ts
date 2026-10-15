@@ -27,6 +27,7 @@ describe('voxel-lab is a standalone Vite page', () => {
     expect(html).toMatch(/#stats[\s\S]*font-size:\s*16px/);
     expect(html).toMatch(/#stats[\s\S]*user-select:\s*text/);
     expect(html).toMatch(/#stats[\s\S]*-webkit-user-select:\s*text/);
+    expect(html).toMatch(/#stats[\s\S]*white-space:\s*nowrap/);
   });
 
   it('is registered on the GitHub Pages multi-page build', () => {

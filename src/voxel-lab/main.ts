@@ -377,7 +377,8 @@ async function boot(): Promise<void> {
     requestAnimationFrame(loop);
     const dt = now - lastFrame;
     lastFrame = now;
-    frameSamples.push({ t: now, dt });
+    // Ignore tab-hidden / screenshot stalls so avg/worst stay real frame times.
+    if (dt > 0 && dt < 1000) frameSamples.push({ t: now, dt });
     const cutoff = now - STATS_WINDOW_MS;
     while (frameSamples.length > 1 && frameSamples[0].t < cutoff) frameSamples.shift();
 
@@ -403,16 +404,18 @@ async function boot(): Promise<void> {
 
     renderer.render(scene, camera);
 
-    const span = now - frameSamples[0].t || dt;
-    const avgMs = frameSamples.reduce((s, s0) => s + s0.dt, 0) / frameSamples.length;
-    let worstMs = 0;
-    for (const s of frameSamples) if (s.dt > worstMs) worstMs = s.dt;
-    const fps = span > 0 ? Math.round((frameSamples.length * 1000) / span) : 0;
     const draws = renderer.info.render.calls;
-    api.fps = fps;
-    api.avgMs = avgMs;
-    api.worstMs = worstMs;
     api.draws = draws;
+    if (frameSamples.length > 0) {
+      const span = now - frameSamples[0].t || dt;
+      const avgMs = frameSamples.reduce((s, s0) => s + s0.dt, 0) / frameSamples.length;
+      let worstMs = 0;
+      for (const s of frameSamples) if (s.dt > worstMs) worstMs = s.dt;
+      const fps = span > 0 ? Math.round((frameSamples.length * 1000) / span) : 0;
+      api.fps = fps;
+      api.avgMs = avgMs;
+      api.worstMs = worstMs;
+    }
     api.shadows = shadowsOn;
     api.lantern = lanternOn;
     api.mode = mode;
@@ -420,8 +423,8 @@ async function boot(): Promise<void> {
     if (now - lastHud >= 200) {
       lastHud = now;
       statsEl.innerHTML =
-        `<div><b>${fps}</b> fps</div>` +
-        `<div>${avgMs.toFixed(1)} ms avg · <b>${worstMs.toFixed(1)}</b> ms worst</div>` +
+        `<div><b>${api.fps}</b> fps</div>` +
+        `<div>${api.avgMs.toFixed(1)} ms avg · <b>${api.worstMs.toFixed(1)}</b> ms worst</div>` +
         `<div>${room.stats.voxels.toLocaleString()} vx · ${draws} draws</div>` +
         `<div>${room.stats.triangles.toLocaleString()} tri</div>`;
     }
