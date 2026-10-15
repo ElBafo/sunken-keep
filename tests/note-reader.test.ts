@@ -1,26 +1,65 @@
-import { readFileSync } from 'fs';
+import { readdirSync, readFileSync, statSync } from 'fs';
 import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
 import { audioStemKeys, beforePlayRelPaths } from '../src/proto3d/audio-groups';
 import { floor1 } from '../src/proto3d/floor-data';
 import type { FontGlyphs } from '../src/proto3d/font5x7';
-import { missingFontGlyphs } from '../src/proto3d/font5x7';
+import { glyphAdvance, measureFontWidth, missingFontGlyphs } from '../src/proto3d/font5x7';
 import { PartyBag } from '../src/proto3d/bag';
-import { isReadable, journalIntroKey, journalTriggerId, NOTE_SCROLL_SFX, usesHeroTarget } from '../src/proto3d/items';
+import {
+  isReadable,
+  isSilentLogKey,
+  journalIntroKey,
+  journalTriggerId,
+  NOTE_SCROLL_SFX,
+  usesHeroTarget
+} from '../src/proto3d/items';
+import { collectLogPush } from '../src/proto3d/party-hud';
 import {
   clampNoteScroll,
+  DEBUG_READER_NOTE_PATH,
+  DEBUG_READER_QUERY,
+  debugReaderRequested,
+  debugReaderUrl,
+  drawParchmentPanel,
   floorReadableEntries,
-  JOURNAL_PAGE_FRAMES,
   layoutNote,
-  NOTE_PARCHMENT,
+  NOTE_MARGIN_BOTTOM,
+  NOTE_MARGIN_LEFT,
+  NOTE_MARGIN_RIGHT,
+  NOTE_MARGIN_TOP,
+  NOTE_PAGE_H,
+  NOTE_PAGE_W,
+  NOTE_VIEWPORT_RATIO,
+  noteOverlayRect,
   noteVisibleRange,
-  wrapNoteText
+  wrapNoteText,
+  type DebugReaderNote
 } from '../src/proto3d/note-reader';
 
 const ROOT = resolve(__dirname, '../public');
 
 function readJson<T>(rel: string): T {
   return JSON.parse(readFileSync(resolve(ROOT, rel), 'utf8')) as T;
+}
+
+function walkJson(dir: string): string[] {
+  const out: string[] = [];
+  if (!statSync(dir, { throwIfNoEntry: false })?.isDirectory()) return out;
+  for (const name of readdirSync(dir)) {
+    const full = resolve(dir, name);
+    const st = statSync(full);
+    if (st.isDirectory()) out.push(...walkJson(full));
+    else if (name.endsWith('.json')) out.push(full);
+  }
+  return out;
+}
+
+function collectText(value: unknown): string {
+  if (typeof value === 'string') return value;
+  if (Array.isArray(value)) return value.map(collectText).join('\n');
+  if (value && typeof value === 'object') return Object.values(value as Record<string, unknown>).map(collectText).join('\n');
+  return '';
 }
 
 const fontMeta = readJson<{ glyphs: FontGlyphs }>('art/font/font_5x7.json');
@@ -31,6 +70,11 @@ const noteEl = readJson<{ title: string; text: string }>('story/el/note_lampkeep
 const logEn = readJson<Array<{ key: string; text?: string }>>('log.json');
 const logEl = readJson<Array<{ key: string; text?: string }>>('story/el/log.el.json');
 const audio = readJson<{ sfx: Record<string, string> }>('audio/audio.json');
+const debugNote = readJson<DebugReaderNote>(DEBUG_READER_NOTE_PATH);
+const noteReaderSrc = readFileSync(resolve(__dirname, '../src/proto3d/note-reader.ts'), 'utf8');
+const mainSrc = readFileSync(resolve(__dirname, '../src/proto3d/main.ts'), 'utf8');
+const htmlSrc = readFileSync(resolve(__dirname, '../proto3d.html'), 'utf8');
+const floor1Src = readFileSync(resolve(__dirname, '../public/levels/floor1.ts'), 'utf8');
 
 function logText(log: Array<{ key: string; text?: string }>, key: string): string {
   return log.find((e) => e.key === key)?.text ?? '';
@@ -74,37 +118,96 @@ describe('pixel font coverage', () => {
       ...journalEl.pages['1'].lines,
       noteEl.title,
       noteEl.text,
-      '«Καλημέρα» Ά Έ Ή Ί Ό Ύ Ώ άέήίόύώ'
+      '«Καλημέρα» Ά Έ Ή Ί Ό Ύ Ώ άέήίόύώ ΪΫΐΰ'
     ].join('\n');
     expect(fontMeta.glyphs['«']).toEqual({ x: 42, y: 100 });
     expect(fontMeta.glyphs['»']).toEqual({ x: 48, y: 100 });
     expect(fontMeta.glyphs['ά']).toBeTruthy();
-    expect(fontMeta.glyphs['Ό']).toBeTruthy();
+    expect(fontMeta.glyphs['Ό']).toMatchObject({ x: 30, y: 90, w: 6, advance: 7 });
+    expect(glyphAdvance('Ά', fontMeta.glyphs)).toBe(7);
+    expect(glyphAdvance('Α', fontMeta.glyphs)).toBe(6);
     expect(missingFontGlyphs(sample, fontMeta.glyphs)).toEqual([]);
+  });
+
+  it('has a glyph for every character used in story/el texts', () => {
+    const files = [
+      ...walkJson(resolve(ROOT, 'story/el')),
+      resolve(ROOT, 'story/debug_reader_test.json')
+    ];
+    const blob = files.map((f) => collectText(JSON.parse(readFileSync(f, 'utf8')))).join('\n');
+    expect(blob).toMatch(/[Α-ω]/);
+    expect(missingFontGlyphs(blob, fontMeta.glyphs)).toEqual([]);
   });
 });
 
 describe('note reader layout', () => {
   it('wraps long copy and scrolls until the last line is visible', () => {
     const long = Array.from({ length: 28 }, (_, i) => `Line ${i + 1} of a long waterlogged page.`).join('\n');
-    const layout = layoutNote('Orrun\'s journal. The ink still holds.', long);
+    const layout = layoutNote('Orrun\'s journal. The ink still holds.', long, fontMeta.glyphs);
     expect(layout.bodyLines.length).toBeGreaterThan(layout.visible);
+    expect(layout.textRect.x).toBe(NOTE_MARGIN_LEFT);
+    expect(layout.textRect.y).toBe(NOTE_MARGIN_TOP);
+    expect(layout.textRect.x + layout.textRect.w).toBe(NOTE_PAGE_W - NOTE_MARGIN_RIGHT);
+    expect(layout.textRect.y + layout.textRect.h).toBe(NOTE_PAGE_H - NOTE_MARGIN_BOTTOM);
     const { maxScroll } = clampNoteScroll(0, layout.lines.length, layout.visible, layout.lineH);
     expect(maxScroll).toBeGreaterThan(0);
     const end = clampNoteScroll(9999, layout.lines.length, layout.visible, layout.lineH);
     expect(end.scroll).toBe(maxScroll);
     const range = noteVisibleRange(end.scroll, layout.lines.length, layout.visible, layout.lineH);
     expect(range.last).toBe(layout.lines.length);
-    expect(wrapNoteText('one\n\ntwo', 20)).toEqual(['one', '', 'two']);
+    expect(wrapNoteText('one\n\ntwo', 200, fontMeta.glyphs)).toEqual(['one', '', 'two']);
   });
 
-  it('loads journal page frames as single PNGs behind the text', () => {
-    expect(NOTE_PARCHMENT).toBe('art/dungeon/item_journal_page_near.png');
-    expect(JOURNAL_PAGE_FRAMES).toEqual([
-      'art/dungeon/item_journal_page_near.png',
-      'art/dungeon/item_journal_page_mid.png',
-      'art/dungeon/item_journal_page_far.png'
-    ]);
+  it('sizes a centred 92% overlay on 393x852 and fits landscape/desktop', () => {
+    const phone = noteOverlayRect(393, 852);
+    expect(phone.w).toBe(Math.round(393 * NOTE_VIEWPORT_RATIO));
+    expect(phone.w / 393).toBeCloseTo(NOTE_VIEWPORT_RATIO, 2);
+    expect(phone.h).toBeLessThanOrEqual(Math.round(852 * NOTE_VIEWPORT_RATIO));
+    expect(phone.x).toBe(Math.round((393 - phone.w) / 2));
+    expect(phone.y).toBe(Math.round((852 - phone.h) / 2));
+    expect(phone.w / phone.h).toBeCloseTo(NOTE_PAGE_W / NOTE_PAGE_H, 2);
+
+    const landscape = noteOverlayRect(852, 393);
+    expect(landscape.h).toBeLessThanOrEqual(Math.round(393 * NOTE_VIEWPORT_RATIO));
+    expect(landscape.w).toBeLessThanOrEqual(Math.round(852 * NOTE_VIEWPORT_RATIO));
+    expect(landscape.x).toBeGreaterThan(0);
+    expect(landscape.w / landscape.h).toBeCloseTo(NOTE_PAGE_W / NOTE_PAGE_H, 2);
+
+    const desktop = noteOverlayRect(1920, 1080);
+    expect(desktop.w).toBeLessThanOrEqual(Math.round(1920 * NOTE_VIEWPORT_RATIO));
+    expect(desktop.h).toBeLessThanOrEqual(Math.round(1080 * NOTE_VIEWPORT_RATIO));
+    expect(desktop.w / desktop.h).toBeCloseTo(NOTE_PAGE_W / NOTE_PAGE_H, 2);
+  });
+
+  it('draws a procedural parchment panel instead of item_journal_page_near.png', () => {
+    expect(typeof drawParchmentPanel).toBe('function');
+    expect(noteReaderSrc).toContain('export function drawParchmentPanel');
+    expect(noteReaderSrc).not.toContain('item_journal_page');
+    expect(htmlSrc).toMatch(/#note-overlay[\s\S]*rgba\(8,\s*6,\s*4/);
+    expect(htmlSrc.indexOf('id="note-overlay"')).toBeGreaterThan(htmlSrc.indexOf('</div>\n    <div id="note-overlay">') - 1);
+    expect(htmlSrc).toMatch(/<div id="game-stage">[\s\S]*<\/div>\s*<div id="note-overlay">/);
+  });
+});
+
+describe('debug reader test note', () => {
+  it('is loaded only behind ?debug=reader and is never placed on a map', () => {
+    expect(debugReaderRequested(new URLSearchParams('debug=reader'))).toBe(true);
+    expect(debugReaderRequested(new URLSearchParams('reader=1'))).toBe(true);
+    expect(debugReaderRequested(new URLSearchParams('debug=1'))).toBe(false);
+    expect(debugReaderUrl()).toContain(`?${DEBUG_READER_QUERY}`);
+    expect(mainSrc).toContain('debugReaderRequested');
+    expect(mainSrc).toContain('DEBUG_READER_NOTE_PATH');
+    expect(floor1Src).not.toContain('debug_reader_test');
+    expect(debugNote.body.en.split('\n')).toHaveLength(24);
+    expect(debugNote.body.el.split('\n')).toHaveLength(24);
+  });
+
+  it('has a glyph for every character in the EN/EL debug note and must scroll', () => {
+    const blob = [debugNote.title.en, debugNote.title.el, debugNote.body.en, debugNote.body.el].join('\n');
+    expect(missingFontGlyphs(blob, fontMeta.glyphs)).toEqual([]);
+    const layout = layoutNote(debugNote.title.el, debugNote.body.el, fontMeta.glyphs);
+    expect(layout.lines.length).toBeGreaterThan(layout.visible);
+    expect(clampNoteScroll(0, layout.lines.length, layout.visible, layout.lineH).maxScroll).toBeGreaterThan(0);
   });
 });
 
@@ -116,5 +219,25 @@ describe('note open sound', () => {
     expect(NOTE_SCROLL_SFX).not.toBe('item_use_fail');
     expect(NOTE_SCROLL_SFX).not.toBe('ui_button');
     expect(beforePlayRelPaths()).toContain('audio/sfx_scroll.mp3');
+  });
+
+  it('writes the journal intro silently and still ticks oil_full / other lines', () => {
+    expect(isSilentLogKey('read_journal')).toBe(true);
+    expect(isSilentLogKey('journal_f2')).toBe(true);
+    expect(isSilentLogKey('oil_full')).toBe(false);
+    expect(collectLogPush('Orrun left a page.', 40, true)).toEqual({
+      parts: ['Orrun left a page.'],
+      silent: true
+    });
+    expect(collectLogPush('Lantern is full.', 40, false).silent).toBe(false);
+    expect(mainSrc).toMatch(/onLog:\s*\(\)\s*=>\s*this\.audioManager\?\.playUi\('ui_log_line'\)/);
+    const readBag = mainSrc.slice(mainSrc.indexOf('private readBagSlot'), mainSrc.indexOf('readFacingDesk'));
+    expect(readBag).toContain('silent:');
+    expect(readBag).toContain('isSilentLogKey');
+    expect(readBag).toContain('showNote');
+    const oilFull = mainSrc.slice(mainSrc.indexOf("plan.kind === 'full'"), mainSrc.indexOf('if (!this.bag.takeAt'));
+    expect(oilFull).toContain("storyLog('oil_full')");
+    expect(oilFull).not.toMatch(/silent/);
+    expect(mainSrc).toContain("this.audioManager?.playUi(NOTE_SCROLL_SFX)");
   });
 });

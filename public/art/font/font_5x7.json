@@ -594,31 +594,45 @@
   },
   "Ά": {
    "x": 6,
-   "y": 90
+   "y": 90,
+   "w": 6,
+   "advance": 7
   },
   "Έ": {
    "x": 12,
-   "y": 90
+   "y": 90,
+   "w": 6,
+   "advance": 7
   },
   "Ή": {
    "x": 18,
-   "y": 90
+   "y": 90,
+   "w": 6,
+   "advance": 7
   },
   "Ί": {
    "x": 24,
-   "y": 90
+   "y": 90,
+   "w": 6,
+   "advance": 7
   },
   "Ό": {
    "x": 30,
-   "y": 90
+   "y": 90,
+   "w": 6,
+   "advance": 7
   },
   "Ύ": {
    "x": 36,
-   "y": 90
+   "y": 90,
+   "w": 6,
+   "advance": 7
   },
   "Ώ": {
    "x": 42,
-   "y": 90
+   "y": 90,
+   "w": 6,
+   "advance": 7
   },
   "Ϊ": {
    "x": 48,
@@ -698,5 +712,5 @@
   }
  },
  "extraChars": "ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩαβγδεζηθικλμνξοπρσςτυφχψωΆΈΉΊΌΎΏΪΫάέήίόύώϊϋΐΰ·΄;·«»",
- "greekNote": "Greek block (add_greek.py) starts at y=60; look extra chars up by 'glyphs' (the index formula in howToFind is for ASCII only). Advance stays 6 px. Lowercase accents use rows 0-1; accented capitals use a left tonos in column 0. U+037E maps to ';', U+0387 to U+00B7. Guillemets «» sit on the extra row at (42,100) and (48,100)."
+ "greekNote": "Greek block starts at y=60; look extra chars up by 'glyphs' (the index formula in howToFind is for ASCII only). Default advance is 6 px. Lowercase accents (άέήίόύώ) use a 2px tonos in rows 0-1 on the right. Accented capitals (ΆΈΉΊΌΎΏ) draw a small tonos at the upper LEFT beside a full-width letter, 6px ink, 7px advance. ΪΫ are dialytika only; ΐΰ are dialytika plus tonos. All-caps copy uses unaccented capitals. U+037E maps to ';', U+0387 to U+00B7. Guillemets «» sit on the extra row at (42,100) and (48,100)."
 }

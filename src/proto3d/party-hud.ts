@@ -51,6 +51,20 @@ const HERO_STATS: Record<HeroId, { maxHp: number; maxMana: number }> = {
 
 const ACT_SFX = ITEM_ACT_SFX;
 
+/** Split a HUD log write. `silent` skips the ui_log_line tick for that entry only. */
+export function collectLogPush(
+  text: string,
+  maxChars: number,
+  silent = false
+): { parts: string[]; silent: boolean } {
+  const parts: string[] = [];
+  for (const line of text.split('\n')) {
+    if (!line) continue;
+    parts.push(...wrapFontLine(line, maxChars));
+  }
+  return { parts, silent: !!silent };
+}
+
 function healthState(hp: number, maxHp: number): 'healthy' | 'wounded' | 'near_death' {
   const pct = maxHp <= 0 ? 0 : hp / maxHp;
   if (pct < 0.25) return 'near_death';
@@ -455,17 +469,14 @@ export class PartyHud {
     this.draw(performance.now());
   }
 
-  pushLog(text: string) {
+  pushLog(text: string, opts?: { silent?: boolean }) {
     if (!text) return;
     const [, , w] = this.logRect;
     const maxChars = Math.max(8, Math.floor((w - 4) / this.fontCellW));
-    for (const line of text.split('\n')) {
-      if (!line) continue;
-      const wrapped = wrapFontLine(line, maxChars);
-      for (const part of wrapped) {
-        this.logLines.push(part);
-        this.onLog(part);
-      }
+    const { parts, silent } = collectLogPush(text, maxChars, opts?.silent);
+    for (const part of parts) {
+      this.logLines.push(part);
+      if (!silent) this.onLog(part);
     }
     if (this.logLines.length > 24) this.logLines.splice(0, this.logLines.length - 24);
     this.draw(performance.now());

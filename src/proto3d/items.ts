@@ -296,6 +296,11 @@ export function journalIntroKey(page: number): string {
   return page === 2 ? 'journal_f2' : 'read_journal';
 }
 
+/** Journal intro lines write to the HUD but must not tick ui_log_line. */
+export function isSilentLogKey(key: string): boolean {
+  return key === 'read_journal' || key === 'journal_f2';
+}
+
 export function journalTriggerId(page: number): string {
   return `journal_page_${Math.max(1, page)}`;
 }

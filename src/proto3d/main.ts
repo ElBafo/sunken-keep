@@ -84,13 +84,19 @@ import {
   canEquip,
   equipSfx,
   isReadable,
+  isSilentLogKey,
   journalIntroKey,
   journalTriggerId,
   NOTE_SCROLL_SFX,
   pickupSfx,
   preferredHand
 } from './items';
-import { NoteReader } from './note-reader';
+import {
+  DEBUG_READER_NOTE_PATH,
+  debugReaderRequested,
+  NoteReader,
+  type DebugReaderNote
+} from './note-reader';
 import { atlasFallbackPaths, coveredSingleFileLoads, ensureAtlases, recordedPngRelPaths } from './atlas';
 import { fetchJsonCached } from './asset-cache';
 import {
@@ -144,6 +150,7 @@ class Game {
   private flankTimer: ReturnType<typeof setTimeout> | null = null;
   lampNote = { title: '', text: '' };
   noteOpen = false;
+  private wantDebugReader = false;
   interactCount = 0;
   messageTimer = 0;
 
@@ -224,6 +231,7 @@ class Game {
     this.oil = loadProgress(floor1Sconces, this.persist && params.get('test') === '1');
     persistStorage();
     this.skipTitle = params.get('test') === '1' && params.get('title') !== '1';
+    this.wantDebugReader = debugReaderRequested(params);
 
     this.fitStage();
     void applyLetterboxStone();
@@ -634,10 +642,10 @@ class Game {
     btn.classList.toggle('visible', !!this.doorAhead());
   }
 
-  showMessage(text: string, prompt = false) {
+  showMessage(text: string, prompt = false, opts?: { silent?: boolean }) {
     if (!text) return;
     this.lastMessage = text;
-    this.hud?.pushLog(text);
+    this.hud?.pushLog(text, opts);
     if (!prompt) return;
     const el = document.getElementById('message-toast');
     if (!el) return;
@@ -1370,6 +1378,21 @@ class Game {
     this.lampNote.text = this.story.noteText();
   }
 
+  private async openDebugReaderNote() {
+    const base = import.meta.env.BASE_URL;
+    try {
+      await this.noteReader?.load();
+      const doc = await fetchJsonCached<DebugReaderNote>(`${base}${DEBUG_READER_NOTE_PATH}`);
+      if (!doc?.title || !doc?.body) return;
+      const loc = this.story.locale === 'el' ? 'el' : 'en';
+      const title = doc.title[loc] || doc.title.en;
+      const text = doc.body[loc] || doc.body.en;
+      this.showNote(title, text);
+    } catch {
+      // Debug-only path; ignore a missing fixture.
+    }
+  }
+
   showNote(title?: string, text?: string) {
     const docTitle = title ?? this.lampNote.title;
     const docText = text ?? this.lampNote.text;
@@ -1401,7 +1424,9 @@ class Game {
     if (doc.kind === 'journal') {
       const page = slot.journalPage && slot.journalPage > 0 ? slot.journalPage : 1;
       const introKey = journalIntroKey(page);
-      if (this.storyProgress.fire(introKey)) this.showMessage(this.storyLog(introKey));
+      if (this.storyProgress.fire(introKey)) {
+        this.showMessage(this.storyLog(introKey), false, { silent: isSilentLogKey(introKey) });
+      }
       this.storyProgress.fire(journalTriggerId(page));
       this.rememberStoryKey(journalTriggerId(page));
     }
@@ -2382,6 +2407,7 @@ class Game {
       this.pendingStartSnapshot = false;
     }
     this.audioManager.crossfadeToAct1();
+    if (this.wantDebugReader) void this.openDebugReaderNote();
     if (this.wantOpeningCaveIn) {
       this.wantOpeningCaveIn = false;
       this.maybeStartCaveIn(this.skipTitle);
