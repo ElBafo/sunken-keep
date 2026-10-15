@@ -28,7 +28,7 @@ describe('bark voice and capped-lamp log', () => {
   });
 
   it('uses lamp_sealed for later taps on Pell\'s lamp, not torch_capped', () => {
-    const fn = main.slice(main.indexOf('handleCappedLamp'), main.indexOf('wireTorchChoice'));
+    const fn = main.slice(main.indexOf('private handleCappedLamp'), main.indexOf('private wireTorchChoice'));
     expect(fn).toContain("storyLog('lamp_sealed')");
     expect(fn).toContain('silent:');
     expect(fn).toContain("speakBark(barkId)");

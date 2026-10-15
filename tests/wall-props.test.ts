@@ -84,7 +84,7 @@ describe('wall vs floor props', () => {
     expect(pose.y).toBeCloseTo(CELL_SIZE / 2);
     expect(pose.x).toBeGreaterThan(13 * CELL_SIZE);
     expect(pose.x).toBeLessThan(13 * CELL_SIZE + CELL_SIZE / 2);
-    expect(13 * CELL_SIZE + CELL_SIZE / 2 - pose.x).toBeGreaterThanOrEqual(CAMERA_NEAR);
+    expect(13 * CELL_SIZE + CELL_SIZE / 2 - pose.x).toBeCloseTo(wallPropInset(), 10);
     expect(wallPropInset()).toBeGreaterThanOrEqual(CAMERA_NEAR);
     expect(wallPropShowsFlat(13, 9, 1, 13, 9, 'E')).toBe(true);
     expect(wallPropShowsFlat(13, 9, 3, 13, 9, 'E')).toBe(false);
