@@ -35,6 +35,7 @@ import {
   PARCHMENT_PAGE_PATH,
   parchmentColours,
   parchmentMargins,
+  noteLineClip,
   noteOverlayRect,
   noteVisibleRange,
   wrapNoteText,
@@ -155,13 +156,50 @@ describe('note reader layout', () => {
     expect(layout.textRect.y).toBe(NOTE_MARGIN_TOP);
     expect(layout.textRect.x + layout.textRect.w).toBe(NOTE_PAGE_W - NOTE_MARGIN_RIGHT);
     expect(layout.textRect.y + layout.textRect.h).toBe(NOTE_PAGE_H - NOTE_MARGIN_BOTTOM);
-    const { maxScroll } = clampNoteScroll(0, layout.lines.length, layout.visible, layout.lineH);
+    const { maxScroll } = clampNoteScroll(0, layout.lines.length, layout.textRect.h, layout.lineH);
     expect(maxScroll).toBeGreaterThan(0);
-    const end = clampNoteScroll(9999, layout.lines.length, layout.visible, layout.lineH);
+    const end = clampNoteScroll(9999, layout.lines.length, layout.textRect.h, layout.lineH);
     expect(end.scroll).toBe(maxScroll);
-    const range = noteVisibleRange(end.scroll, layout.lines.length, layout.visible, layout.lineH);
+    const range = noteVisibleRange(end.scroll, layout.lines.length, layout.textRect.h, layout.lineH);
     expect(range.last).toBe(layout.lines.length);
     expect(wrapNoteText('one\n\ntwo', 200, fontMeta.glyphs)).toEqual(['one', '', 'two']);
+  });
+
+  it('clips partial lines to the text box and still scrolls the last line fully into view', () => {
+    const long = Array.from({ length: 24 }, (_, i) => `Line ${i + 1}`).join('\n');
+    const layout = layoutNote('Title', long, fontMeta.glyphs);
+    const box = layout.textRect;
+    expect(box.y).toBe(NOTE_MARGIN_TOP);
+    expect(box.y + box.h).toBe(NOTE_PAGE_H - NOTE_MARGIN_BOTTOM);
+    expect(box.h % layout.lineH).not.toBe(0);
+
+    const mid = 7;
+    const { first, last } = noteVisibleRange(mid, layout.lines.length, box.h, layout.lineH);
+    expect(last).toBeGreaterThan(first);
+    for (let i = first; i < last; i++) {
+      const clip = noteLineClip(i, mid, box, layout.lineH);
+      expect(clip).not.toBeNull();
+      expect(clip!.clipTop).toBeGreaterThanOrEqual(box.y);
+      expect(clip!.clipBottom).toBeLessThanOrEqual(box.y + box.h);
+      expect(clip!.clipBottom).toBeGreaterThan(clip!.clipTop);
+    }
+    const topPartial = noteLineClip(first, mid, box, layout.lineH)!;
+    expect(topPartial.y).toBeLessThan(box.y);
+    expect(topPartial.clipTop).toBe(box.y);
+    const bottomPartial = noteLineClip(last - 1, mid, box, layout.lineH)!;
+    expect(bottomPartial.y + layout.lineH).toBeGreaterThan(box.y + box.h);
+    expect(bottomPartial.clipBottom).toBe(box.y + box.h);
+    expect(noteLineClip(first - 1, mid, box, layout.lineH)).toBeNull();
+    expect(noteLineClip(last, mid, box, layout.lineH)).toBeNull();
+
+    const { maxScroll } = clampNoteScroll(0, layout.lines.length, box.h, layout.lineH);
+    const lastClip = noteLineClip(layout.lines.length - 1, maxScroll, box, layout.lineH)!;
+    expect(lastClip.y).toBeGreaterThanOrEqual(box.y);
+    expect(lastClip.clipTop).toBe(lastClip.y);
+    expect(lastClip.clipBottom).toBe(box.y + box.h);
+    expect(noteVisibleRange(maxScroll, layout.lines.length, box.h, layout.lineH).last).toBe(
+      layout.lines.length
+    );
   });
 
   it('sizes a centred 92% overlay on 393x852 and fits landscape/desktop', () => {
@@ -237,7 +275,7 @@ describe('debug reader test note', () => {
     expect(missingFontGlyphs(blob, fontMeta.glyphs)).toEqual([]);
     const layout = layoutNote(debugNote.title.el, debugNote.body.el, fontMeta.glyphs);
     expect(layout.lines.length).toBeGreaterThan(layout.visible);
-    expect(clampNoteScroll(0, layout.lines.length, layout.visible, layout.lineH).maxScroll).toBeGreaterThan(0);
+    expect(clampNoteScroll(0, layout.lines.length, layout.textRect.h, layout.lineH).maxScroll).toBeGreaterThan(0);
   });
 });
 

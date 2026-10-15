@@ -168,23 +168,40 @@ export function layoutNote(title: string, body: string, glyphs?: FontGlyphs, met
 export function clampNoteScroll(
   scroll: number,
   lineCount: number,
-  visible: number,
+  textH: number,
   lineH = NOTE_LINE_H
 ): { scroll: number; maxScroll: number } {
-  const maxScroll = Math.max(0, (lineCount - visible) * lineH);
+  const maxScroll = Math.max(0, lineCount * lineH - textH);
   return { scroll: Math.max(0, Math.min(maxScroll, scroll)), maxScroll };
 }
 
 export function noteVisibleRange(
   scroll: number,
   lineCount: number,
-  visible: number,
+  textH: number,
   lineH = NOTE_LINE_H
 ): { first: number; last: number } {
-  const { scroll: y } = clampNoteScroll(scroll, lineCount, visible, lineH);
-  const first = Math.floor(y / lineH);
-  const last = Math.min(lineCount, first + visible);
+  const { scroll: y } = clampNoteScroll(scroll, lineCount, textH, lineH);
+  if (lineCount <= 0 || textH <= 0) return { first: 0, last: 0 };
+  const first = Math.max(0, Math.floor(y / lineH));
+  const last = Math.min(lineCount, Math.ceil((y + textH) / lineH));
   return { first, last };
+}
+
+/** Visible slice of a line after clipping to the text box. Null if fully outside. */
+export function noteLineClip(
+  index: number,
+  scroll: number,
+  textRect: NotePageRect,
+  lineH: number
+): { y: number; clipTop: number; clipBottom: number } | null {
+  const y = textRect.y + index * lineH - scroll;
+  const boxTop = textRect.y;
+  const boxBottom = textRect.y + textRect.h;
+  const clipTop = Math.max(y, boxTop);
+  const clipBottom = Math.min(y + lineH, boxBottom);
+  if (clipBottom <= clipTop) return null;
+  return { y, clipTop, clipBottom };
 }
 
 export interface FloorReadablePickup {
@@ -324,13 +341,22 @@ export class NoteReader {
 
   maxScroll(): number {
     if (!this.layout) return 0;
-    return clampNoteScroll(this.scroll, this.layout.lines.length, this.layout.visible, this.layout.lineH)
-      .maxScroll;
+    return clampNoteScroll(
+      this.scroll,
+      this.layout.lines.length,
+      this.layout.textRect.h,
+      this.layout.lineH
+    ).maxScroll;
   }
 
   setScroll(y: number) {
     if (!this.layout) return;
-    this.scroll = clampNoteScroll(y, this.layout.lines.length, this.layout.visible, this.layout.lineH).scroll;
+    this.scroll = clampNoteScroll(
+      y,
+      this.layout.lines.length,
+      this.layout.textRect.h,
+      this.layout.lineH
+    ).scroll;
     this.draw();
   }
 
@@ -371,22 +397,27 @@ export class NoteReader {
     const { page, textRect, titleLines, lines } = layout;
     const colours = parchmentColours(this.parchmentMeta);
     drawParchmentPanel(ctx, page, this.parchmentImg);
-    const { scroll } = clampNoteScroll(this.scroll, lines.length, layout.visible, layout.lineH);
+    const { scroll } = clampNoteScroll(this.scroll, lines.length, textRect.h, layout.lineH);
     this.scroll = scroll;
     ctx.save();
     ctx.beginPath();
-    ctx.rect(textRect.x, textRect.y, textRect.w, textRect.h);
+    ctx.rect(
+      Math.ceil(textRect.x),
+      Math.ceil(textRect.y),
+      Math.floor(textRect.w),
+      Math.floor(textRect.h)
+    );
     ctx.clip();
     lines.forEach((line, i) => {
-      const y = textRect.y + i * layout.lineH - scroll;
-      if (y + layout.lineH < textRect.y || y > textRect.y + textRect.h) return;
+      const clip = noteLineClip(i, scroll, textRect, layout.lineH);
+      if (!clip) return;
       const colour = i < titleLines.length ? colours.title : colours.body;
       drawFont5x7(
         ctx,
         this.fontImg,
         line,
         textRect.x,
-        y,
+        clip.y,
         this.fontGlyphs,
         NOTE_ADVANCE,
         colour,
