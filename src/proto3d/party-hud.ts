@@ -102,6 +102,7 @@ export class PartyHud {
   private onPortrait: ((hero: HeroId) => void) | null = null;
   private onBag: (() => void) | null = null;
   private onSave: (() => void) | null = null;
+  private onMenu: (() => void) | null = null;
   private onPotion: ((kind: 'health' | 'mana') => void) | null = null;
   private potionCounts: () => { health: number; mana: number };
   private pressed = new Set<string>();
@@ -129,6 +130,7 @@ export class PartyHud {
       onPortrait?: (hero: HeroId) => void;
       onBag?: () => void;
       onSave?: () => void;
+      onMenu?: () => void;
       onPotion?: (kind: 'health' | 'mana') => void;
       potionCounts?: () => { health: number; mana: number };
     }
@@ -143,6 +145,7 @@ export class PartyHud {
     this.onPortrait = hooks.onPortrait ?? null;
     this.onBag = hooks.onBag ?? null;
     this.onSave = hooks.onSave ?? null;
+    this.onMenu = hooks.onMenu ?? null;
     this.onPotion = hooks.onPotion ?? null;
     this.potionCounts = hooks.potionCounts ?? (() => ({ health: 0, mana: 0 }));
     this.heroes = this.createHeroes();
@@ -367,6 +370,17 @@ export class PartyHud {
       this.story.uiText('bag.title'),
       () => this.onBag?.()
     );
+    const menuRect = this.layout.menu ?? this.layout.panelIcons.menu?.rect;
+    if (menuRect) {
+      this.placeChromeBtn(
+        host,
+        'btn-menu',
+        menuRect,
+        'menu',
+        this.story.uiText('buttons.menu') || this.story.uiText('settings.title'),
+        () => this.onMenu?.()
+      );
+    }
     if (this.layout.save) {
       this.placeChromeBtn(
         host,
@@ -411,6 +425,14 @@ export class PartyHud {
       e.stopPropagation();
       onTap();
     });
+    if (onTap) {
+      // One event path: pointerup opens. Eat the iOS/WebKit compatibility click
+      // so it cannot retarget onto an overlay backdrop and dismiss it.
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      });
+    }
     btn.addEventListener('pointercancel', clearPress);
     btn.addEventListener('pointerleave', clearPress);
     host.appendChild(btn);

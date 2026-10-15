@@ -9,7 +9,7 @@ function isUiTarget(el: EventTarget | null): boolean {
   return (
     el instanceof HTMLElement &&
     !!el.closest(
-      '.control-btn, #tap-to-start, .hand-btn, .portrait-btn, .hud-chrome-btn, .hud-choice-btn, #torch-choice, #party-hud, #inventory-screen, .inv-slot, .inv-action, .inv-close, .inv-doll, .inv-hero, #title-overlay, #intro-overlay, #intro-skip, .intro-skip, .title-hit'
+      '.control-btn, #tap-to-start, .hand-btn, .portrait-btn, .hud-chrome-btn, .hud-choice-btn, #torch-choice, #party-hud, #inventory-screen, .inv-slot, .inv-action, .inv-close, .inv-doll, .inv-hero, #title-overlay, #intro-overlay, #intro-skip, .intro-skip, .title-hit, #settings-overlay, .settings-btn'
     )
   );
 }
@@ -36,6 +36,7 @@ export class InputManager {
   }
 
   private emitMove(result: MoveResult) {
+    if (document.body.classList.contains('settings-open')) return;
     this.hooks.onMove(result);
   }
 
@@ -79,6 +80,7 @@ export class InputManager {
       canvas.addEventListener('pointerup', (e) => {
         if (!e.isPrimary || !this.pointerDown) return;
         this.pointerDown = false;
+        if (document.body.classList.contains('settings-open')) return;
         const dx = e.clientX - this.pointerStartX;
         const dy = e.clientY - this.pointerStartY;
         if (Math.abs(dx) < 18 && Math.abs(dy) < 18) {
@@ -125,6 +127,10 @@ export class InputManager {
     });
 
     document.addEventListener('keydown', (e) => {
+      if (document.body.classList.contains('settings-open')) {
+        if (e.key === 'Escape') document.getElementById('btn-settings-close')?.click();
+        return;
+      }
       switch (e.key) {
         case 'ArrowUp':
         case 'w':

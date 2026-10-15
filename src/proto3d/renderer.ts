@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { fetchJsonCached } from './asset-cache';
 import { CAMERA_FAR, CAMERA_FOV, CAMERA_NEAR, FOG_COLOR, FOG_FAR, FOG_NEAR } from './constants';
+import { getLayoutMode } from './phone-layout';
 
 // Enable Three.js color management for proper sRGB handling
 THREE.ColorManagement.enabled = true;
@@ -224,9 +225,25 @@ export class PixelRenderer {
   }
   
   resize() {
-    // Internal 3D resolution is fixed to camera.json `view`. CSS scales the 270×585 stage.
     const w = this.viewWidth;
     const h = this.viewHeight;
+    if (getLayoutMode() === 'edge') {
+      const parent = this.canvas.parentElement;
+      const cssW = parent?.clientWidth || w;
+      const cssH = Math.max(1, parent?.clientHeight || h);
+      const aspect = cssW / cssH;
+      const pixelH = Math.max(1, Math.round((w * cssH) / cssW));
+      if (this.renderTarget.width !== w || this.renderTarget.height !== pixelH) {
+        this.renderTarget.setSize(w, pixelH);
+      }
+      this.camera.aspect = aspect;
+      this.camera.updateProjectionMatrix();
+      this.renderer.setSize(w, pixelH, false);
+      this.canvas.style.width = '100%';
+      this.canvas.style.height = '100%';
+      return;
+    }
+    // Internal 3D resolution is fixed to camera.json `view`. CSS scales the 270×585 stage.
     if (this.renderTarget.width !== w || this.renderTarget.height !== h) {
       this.renderTarget.setSize(w, h);
     }
