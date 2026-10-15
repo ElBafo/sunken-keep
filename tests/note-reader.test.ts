@@ -123,8 +123,8 @@ describe('pixel font coverage', () => {
     expect(fontMeta.glyphs['«']).toEqual({ x: 42, y: 100 });
     expect(fontMeta.glyphs['»']).toEqual({ x: 48, y: 100 });
     expect(fontMeta.glyphs['ά']).toBeTruthy();
-    expect(fontMeta.glyphs['Ό']).toMatchObject({ x: 30, y: 90, w: 6, advance: 7 });
-    expect(glyphAdvance('Ά', fontMeta.glyphs)).toBe(7);
+    expect(fontMeta.glyphs['Ό']).toMatchObject({ x: 32, y: 110, w: 7, advance: 8 });
+    expect(glyphAdvance('Ά', fontMeta.glyphs)).toBe(8);
     expect(glyphAdvance('Α', fontMeta.glyphs)).toBe(6);
     expect(missingFontGlyphs(sample, fontMeta.glyphs)).toEqual([]);
   });

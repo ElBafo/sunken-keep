@@ -593,46 +593,46 @@
    "y": 90
   },
   "Ά": {
-   "x": 6,
-   "y": 90,
-   "w": 6,
-   "advance": 7
+   "x": 0,
+   "y": 110,
+   "w": 7,
+   "advance": 8
   },
   "Έ": {
-   "x": 12,
-   "y": 90,
-   "w": 6,
-   "advance": 7
+   "x": 8,
+   "y": 110,
+   "w": 7,
+   "advance": 8
   },
   "Ή": {
-   "x": 18,
-   "y": 90,
-   "w": 6,
-   "advance": 7
+   "x": 16,
+   "y": 110,
+   "w": 7,
+   "advance": 8
   },
   "Ί": {
    "x": 24,
-   "y": 90,
-   "w": 6,
-   "advance": 7
+   "y": 110,
+   "w": 7,
+   "advance": 8
   },
   "Ό": {
-   "x": 30,
-   "y": 90,
-   "w": 6,
-   "advance": 7
+   "x": 32,
+   "y": 110,
+   "w": 7,
+   "advance": 8
   },
   "Ύ": {
-   "x": 36,
-   "y": 90,
-   "w": 6,
-   "advance": 7
+   "x": 40,
+   "y": 110,
+   "w": 7,
+   "advance": 8
   },
   "Ώ": {
-   "x": 42,
-   "y": 90,
-   "w": 6,
-   "advance": 7
+   "x": 48,
+   "y": 110,
+   "w": 7,
+   "advance": 8
   },
   "Ϊ": {
    "x": 48,
@@ -699,18 +699,18 @@
    "y": 10
   },
   "·": {
-    "x": 30,
-    "y": 100
+   "x": 30,
+   "y": 100
   },
   "«": {
-    "x": 42,
-    "y": 100
+   "x": 42,
+   "y": 100
   },
   "»": {
-    "x": 48,
-    "y": 100
+   "x": 48,
+   "y": 100
   }
  },
  "extraChars": "ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩαβγδεζηθικλμνξοπρσςτυφχψωΆΈΉΊΌΎΏΪΫάέήίόύώϊϋΐΰ·΄;·«»",
- "greekNote": "Greek block starts at y=60; look extra chars up by 'glyphs' (the index formula in howToFind is for ASCII only). Default advance is 6 px. Lowercase accents (άέήίόύώ) use a 2px tonos in rows 0-1 on the right. Accented capitals (ΆΈΉΊΌΎΏ) draw a small tonos at the upper LEFT beside a full-width letter, 6px ink, 7px advance. ΪΫ are dialytika only; ΐΰ are dialytika plus tonos. All-caps copy uses unaccented capitals. U+037E maps to ';', U+0387 to U+00B7. Guillemets «» sit on the extra row at (42,100) and (48,100)."
+ "greekNote": "Greek block starts at y=60; look extra chars up by 'glyphs' (the index formula in howToFind is for ASCII only). Default advance is 6 px. Lowercase accents (άέήίόύώ) use a 2px tonos in rows 0-1 on the right. Accented capitals (ΆΈΉΊΌΎΏ) live on row y=110 in 8px cells: 2px tonos in column 0 rows 0-1, a 1px gap, then the unchanged 5px capital in columns 2-6 (w 7, advance 8). ΪΫ: dialytika on row 0, row 1 blank, letter compressed to rows 2-6. ΐ: tonos row 0, dialytika row 1. ΰ: dialytika and tonos on row 0. All-caps copy uses unaccented capitals. U+037E maps to ';', U+0387 to U+00B7. Guillemets «» sit on the extra row at (42,100) and (48,100)."
 }
