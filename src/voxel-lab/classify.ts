@@ -3,6 +3,8 @@ import {
   MAT_DRY,
   MAT_MOSS,
   MAT_WET,
+  MIN_WET_BLOB,
+  MIN_WET_NEIGHBORS,
   MaterialId,
   ROUGH_MATTE,
   ROUGH_STONE,
@@ -31,6 +33,77 @@ export function classifyPixel(
   // Painted highlights on stone — glossy, not random speckles.
   if (L > 0.45) return { steps, material: MAT_WET };
   return { steps, material: MAT_DRY };
+}
+
+/**
+ * Gloss only on coherent wet-stone patches. Single bright texels (and 1-wide
+ * specks) would otherwise become tiny mirrored cubes that sparkle while turning.
+ */
+export function filterIsolatedWet(
+  classified: Array<{ steps: number; material: MaterialId } | null>,
+  W: number,
+  H: number
+): void {
+  const wet = new Uint8Array(W * H);
+  for (let i = 0; i < W * H; i++) {
+    if (classified[i]?.material === MAT_WET) wet[i] = 1;
+  }
+  const src = wet.slice();
+  for (let v = 0; v < H; v++) {
+    for (let u = 0; u < W; u++) {
+      const idx = u + v * W;
+      if (!src[idx]) continue;
+      let n = 0;
+      for (let dy = -1; dy <= 1; dy++) {
+        const y = v + dy;
+        if (y < 0 || y >= H) continue;
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const x = u + dx;
+          if (x < 0 || x >= W) continue;
+          if (src[x + y * W]) n += 1;
+        }
+      }
+      if (n < MIN_WET_NEIGHBORS) wet[idx] = 0;
+    }
+  }
+  const seen = new Uint8Array(W * H);
+  const stack: number[] = [];
+  const blob: number[] = [];
+  for (let start = 0; start < W * H; start++) {
+    if (!wet[start] || seen[start]) continue;
+    blob.length = 0;
+    stack.length = 0;
+    stack.push(start);
+    seen[start] = 1;
+    while (stack.length) {
+      const i = stack.pop()!;
+      blob.push(i);
+      const u = i % W;
+      const v = (i / W) | 0;
+      const neigh = [i - 1, i + 1, i - W, i + W];
+      const ok = [u > 0, u + 1 < W, v > 0, v + 1 < H];
+      for (let k = 0; k < 4; k++) {
+        if (!ok[k]) continue;
+        const j = neigh[k];
+        if (wet[j] && !seen[j]) {
+          seen[j] = 1;
+          stack.push(j);
+        }
+      }
+    }
+    const keep = blob.length >= MIN_WET_BLOB;
+    for (const i of blob) {
+      if (!keep && classified[i]) classified[i].material = MAT_DRY;
+      if (keep) wet[i] = 1;
+    }
+    if (!keep) {
+      for (const i of blob) wet[i] = 0;
+    }
+  }
+  for (let i = 0; i < W * H; i++) {
+    if (classified[i]?.material === MAT_WET && !wet[i]) classified[i]!.material = MAT_DRY;
+  }
 }
 
 export interface VolumeFromPixels {
@@ -70,6 +143,7 @@ export function volumeFromImageData(image: {
       classified[idx] = classifyPixel(r, g, b, a);
     }
   }
+  filterIsolatedWet(classified, W, H);
   // 5×5 blur so noisy brick faces share a depth and greedy-merge.
   const smooth = new Float32Array(W * H);
   for (let v = 0; v < H; v++) {

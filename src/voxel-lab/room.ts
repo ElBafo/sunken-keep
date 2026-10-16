@@ -95,10 +95,10 @@ function pbrMap(data: Uint8Array, w: number, h: number): THREE.DataTexture {
     const rough = data[i];
     const wet = rough <= ROUGH_WET;
     const matte = rough >= ROUGH_MATTE;
-    rgba[i * 4] = wet ? 255 : 0;
+    rgba[i * 4] = wet ? 90 : 0;
     rgba[i * 4 + 1] = rough;
     rgba[i * 4 + 2] = rough;
-    rgba[i * 4 + 3] = wet ? 255 : matte ? 8 : 96;
+    rgba[i * 4 + 3] = wet ? 70 : matte ? 6 : 36;
   }
   const tex = new THREE.DataTexture(rgba, w, h, THREE.RGBAFormat);
   tex.colorSpace = THREE.NoColorSpace;
@@ -116,14 +116,17 @@ function voxelMaterial(map: THREE.Texture, pbr: THREE.Texture): THREE.MeshPhysic
     roughnessMap: pbr,
     roughness: 1,
     metalness: 0,
-    ior: 1.5,
-    specularIntensity: 1,
+    ior: 1.45,
+    specularIntensity: 0.35,
     specularIntensityMap: pbr,
-    clearcoat: 1,
+    clearcoat: 0.4,
     clearcoatMap: pbr,
-    clearcoatRoughness: 0.08,
+    clearcoatRoughness: 0.32,
     envMapIntensity: 0,
-    flatShading: false
+    flatShading: false,
+    polygonOffset: true,
+    polygonOffsetFactor: 1,
+    polygonOffsetUnits: 1
   });
 }
 

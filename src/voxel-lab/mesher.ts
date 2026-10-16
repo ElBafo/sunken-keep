@@ -1,3 +1,5 @@
+import { FACE_INSET } from './constants';
+
 /**
  * Greedy meshing (Mikola Lysenko) over a binary occupancy volume.
  * Occupancy is 0 or 1 — colour lives on the source texture via UVs, so
@@ -48,7 +50,7 @@ function addQuad(
   const uvs = [uv0, uv1, uv2, uv3];
   for (let i = 0; i < 4; i++) {
     const p = corners[i];
-    mesh.positions.push(p[0], p[1], p[2]);
+    mesh.positions.push(p[0] + nx * FACE_INSET, p[1] + ny * FACE_INSET, p[2] + nz * FACE_INSET);
     mesh.normals.push(nx, ny, nz);
     mesh.uvs.push(uvs[i][0], uvs[i][1]);
   }

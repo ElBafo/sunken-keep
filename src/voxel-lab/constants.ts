@@ -52,9 +52,14 @@ export const MAT_DRY = 0;
 export const MAT_WET = 1;
 export const MAT_MOSS = 2;
 /** Roughness map bytes (G channel). Wet glints vs moss/mortar matte. */
-export const ROUGH_WET = 12;
+export const ROUGH_WET = 64;
 export const ROUGH_STONE = 150;
 export const ROUGH_MATTE = 252;
+/** Drop 1–2 texel sparkles; keep a 2×2 (or bigger) wet highlight. */
+export const MIN_WET_NEIGHBORS = 2;
+export const MIN_WET_BLOB = 4;
+/** Push greedy faces out along their normal so coplanar cube edges do not z-fight. */
+export const FACE_INSET = 0.00025;
 export type MaterialId = typeof MAT_DRY | typeof MAT_WET | typeof MAT_MOSS;
 export const MATERIAL_NAMES = ['dry', 'wet', 'moss'] as const;
 
