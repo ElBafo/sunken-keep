@@ -3,13 +3,18 @@ import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import {
+  CAMERA_EYE_HEIGHT,
   CAMERA_FOV,
   CAMERA_NEAR,
   CAMERA_VIEW,
   CELL_SIZE,
   DIR_DELTA,
+  FACE_INTO_ROOM,
+  SCONCE_HEIGHT_TILES,
   SCONCE_NEAR_CULL,
-  WALL_MOUNT_NEAR_CULL
+  SCONCE_WIDTH_TILES,
+  WALL_MOUNT_NEAR_CULL,
+  wallPropRoom
 } from '../src/proto3d/constants';
 import { floor1, floor1Sconces } from '../src/proto3d/floor-data';
 import { Player } from '../src/proto3d/player';
@@ -19,7 +24,8 @@ import {
   applyWallMountNearCull,
   cameraSpaceDepth,
   nearPlaneCulled,
-  objectNearPlaneCulled
+  objectNearPlaneCulled,
+  planeNearCulled
 } from '../src/proto3d/wall-near-cull';
 import {
   interactPropAt,
@@ -56,8 +62,8 @@ function easeInOutQuad(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 }
 
-function meshAt(x: number, y: number, z: number): THREE.Mesh {
-  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.8));
+function meshAt(x: number, y: number, z: number, w = 0.4, h = 0.8): THREE.Mesh {
+  const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, h));
   mesh.position.set(x, y, z);
   return mesh;
 }
@@ -132,27 +138,41 @@ function makeRackGroup(): THREE.Group {
 function makeSconceGroup(s: (typeof floor1Sconces)[number]): THREE.Group {
   const group = new THREE.Group();
   const poses = torchBracketPoses(s);
-  group.add(meshAt(poses.side.x, poses.side.y, poses.side.z));
-  group.add(meshAt(poses.front.x, poses.front.y, poses.front.z));
-  const flame = meshAt(poses.flame.x, poses.flame.y, poses.flame.z);
+  const { rotY } = FACE_INTO_ROOM[s.face];
+  const w = SCONCE_WIDTH_TILES * CELL_SIZE;
+  const h = SCONCE_HEIGHT_TILES * CELL_SIZE;
+  const side = meshAt(poses.side.x, poses.side.y, poses.side.z, w, h);
+  side.rotation.y = rotY - Math.PI / 2;
+  side.userData.isSconce = true;
+  side.userData.kind = 'torch-bracket';
+  side.userData.lightX = s.x;
+  side.userData.lightY = s.y;
+  group.add(side);
+  const front = meshAt(poses.front.x, poses.front.y, poses.front.z, w, h);
+  front.rotation.y = rotY;
+  front.userData.isSconce = true;
+  front.userData.kind = 'torch-bracket';
+  front.userData.lightX = s.x;
+  front.userData.lightY = s.y;
+  group.add(front);
+  const flame = meshAt(poses.flame.x, poses.flame.y, poses.flame.z, w, 0.3125 * CELL_SIZE);
   flame.visible = !!s.lit && !s.capped;
+  flame.userData.isSconce = true;
+  flame.userData.kind = 'torch-flame';
   group.add(flame);
   return group;
 }
 
 function visibleNear(root: THREE.Object3D, camera: THREE.Camera): boolean {
-  const world = new THREE.Vector3();
-  let hit = false;
   if (!root.visible) return false;
-  root.updateWorldMatrix(true, true);
-  root.traverse((obj) => {
-    if (hit) return;
-    if (!(obj instanceof THREE.Mesh) && !(obj instanceof THREE.Sprite)) return;
-    if (!obj.visible) return;
-    obj.getWorldPosition(world);
-    if (nearPlaneCulled(cameraSpaceDepth(world.x, world.y, world.z, camera))) hit = true;
-  });
-  return hit;
+  return objectNearPlaneCulled(root, camera);
+}
+
+function backIntoSconce(s: (typeof floor1Sconces)[number]) {
+  const room = wallPropRoom(s.x, s.y, s.face);
+  const dir = PROP_WALL_DIR[s.face];
+  const [dx, dy] = DIR_DELTA[dir];
+  return { fromX: room.x + dx, fromY: room.y + dy, toX: room.x, toY: room.y, dir };
 }
 
 function tapLampFromDesk(
@@ -336,5 +356,103 @@ describe('shared wall-mount near-plane cull', () => {
     expect(fn).toContain("tile.prop === 'lamp_capped'");
     expect(fn).toContain("this.storyLog('lamp_sealed')");
     expect(fn).not.toMatch(/NearCull|group\.visible|objectNearPlaneCulled/);
+  });
+
+  it('culls when a corner is in the band even if the mesh origin is not', () => {
+    const player = makePlayer(1, 6, 0);
+    const camZ = player.camera.position.z;
+    const z = camZ - (WALL_MOUNT_NEAR_CULL + 0.12);
+    const w = SCONCE_WIDTH_TILES * CELL_SIZE;
+    const h = SCONCE_HEIGHT_TILES * CELL_SIZE;
+    const x = player.camera.position.x;
+    const y = CAMERA_EYE_HEIGHT;
+    const mesh = meshAt(x, y, z, w, h);
+    mesh.rotation.y = Math.PI / 2;
+    const group = new THREE.Group();
+    group.add(mesh);
+    const centerD = cameraSpaceDepth(x, y, z, player.camera);
+    expect(centerD, 'origin stays outside the band').toBeGreaterThanOrEqual(WALL_MOUNT_NEAR_CULL);
+    expect(nearPlaneCulled(centerD)).toBe(false);
+    expect(
+      planeNearCulled(x, y, z, Math.PI / 2, w, h, player.camera),
+      'near edge already in the band'
+    ).toBe(true);
+    expect(objectNearPlaneCulled(group, player.camera)).toBe(true);
+    applyWallMountNearCull(group, player.camera);
+    expect(group.visible).toBe(false);
+  });
+
+  it('hides all 11 wall mounts while backing into them, including hitch frames, 20 times', () => {
+    expect(floor1Sconces).toHaveLength(9);
+    const mounts: Array<{ name: string; fromX: number; fromY: number; toX: number; toY: number; dir: number; root: () => THREE.Object3D }> = [];
+    for (const s of floor1Sconces) {
+      const path = backIntoSconce(s);
+      mounts.push({
+        name: `sconce ${s.x},${s.y} ${s.face}`,
+        ...path,
+        root: () => makeSconceGroup(s)
+      });
+    }
+    for (const prop of floor1WallProps()) {
+      const path = backIntoPath(prop.x, prop.y, prop.face);
+      mounts.push({
+        name: `${prop.prop}@${prop.x},${prop.y}`,
+        ...path,
+        root: () => (prop.prop === 'lamp_capped' ? makeLampGroup().group : makeRackGroup())
+      });
+    }
+    expect(
+      mounts.map((m) => m.name).sort(),
+      `got ${mounts.length} mounts`
+    ).toHaveLength(11);
+
+    const flashes: string[] = [];
+    for (let run = 0; run < 20; run++) {
+      for (const mount of mounts) {
+        const player = makePlayer(mount.fromX, mount.fromY, mount.dir);
+        const root = mount.root();
+        for (const hitch of [false, true]) {
+          const rotY = (-mount.dir * Math.PI) / 2;
+          const ts = hitch ? [0, 0.55, 0.92, 1] : Array.from({ length: 13 }, (_, i) => i / 12);
+          for (const t of ts) {
+            const eased = easeInOutQuad(t);
+            player.poseCamera(
+              mount.fromX + (mount.toX - mount.fromX) * eased,
+              mount.fromY + (mount.toY - mount.fromY) * eased,
+              rotY,
+              0
+            );
+            if (mount.name.startsWith('lamp')) {
+              const lamp = { group: root, sprite: root.children[0] as THREE.Sprite, plane: root.children[1] as THREE.Mesh };
+              layoutLamp(lamp, mount.fromX, mount.fromY, mount.dir, player.camera);
+            } else {
+              root.visible = true;
+              applyWallMountNearCull(root, player.camera);
+            }
+            if (visibleNear(root, player.camera)) {
+              flashes.push(`${mount.name} run ${run} t=${t.toFixed(2)} hitch=${hitch}`);
+            }
+          }
+        }
+      }
+    }
+    expect(flashes, flashes.slice(0, 8).join('; ')).toEqual([]);
+  });
+
+  it('hides from the live camera, not from a step event or stale player.x', () => {
+    const main = readFileSync(resolve(__dirname, '../src/proto3d/main.ts'), 'utf8');
+    const torches = readFileSync(resolve(__dirname, '../src/proto3d/torches.ts'), 'utf8');
+    const cull = readFileSync(resolve(__dirname, '../src/proto3d/wall-near-cull.ts'), 'utf8');
+    expect(cull).toContain('boundingBox');
+    expect(cull).toContain('planeNearCulled');
+    expect(torches).toContain('Live camera AABB');
+    expect(torches).toContain('objectNearPlaneCulled(visual.group, this.camera)');
+    expect(main).toContain('this.cullWallMounts(now)');
+    expect(main).toContain('this.cullWallMounts(performance.now())');
+    expect(main).toContain('destCullCam');
+    expect(main).toContain('listVisibleNearBand');
+    expect(cull).toContain('.isMesh');
+    expect(cull).toContain('.isSprite');
+    expect(cull).toContain('two Three copies');
   });
 });

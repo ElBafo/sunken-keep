@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+import { existsSync, readdirSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
 
@@ -54,5 +54,30 @@ describe('voxel-lab is a standalone Vite page', () => {
     expect(proto).toContain('src="/src/proto3d/main.ts"');
     expect(index).not.toContain('voxel-lab');
     expect(proto).not.toContain('voxel-lab');
+  });
+
+  it('does not import proto3d wall-mount cull or share the game camera', () => {
+    const labMain = readFileSync(resolve(__dirname, '../src/voxel-lab/main.ts'), 'utf8');
+    expect(labMain).not.toContain('wall-near-cull');
+    expect(labMain).not.toContain('proto3d/torches');
+    expect(labMain).not.toContain('proto3d/main');
+    expect(labMain).toContain("from './constants'");
+  });
+
+  it('full multi-page dist shares one three.js chunk; voxel-lab does not load the game', () => {
+    const dist = resolve(__dirname, '../dist');
+    const proto = resolve(dist, 'proto3d.html');
+    const lab = resolve(dist, 'voxel-lab.html');
+    if (!existsSync(proto) || !existsSync(lab)) return;
+    const protoHtml = readFileSync(proto, 'utf8');
+    const labHtml = readFileSync(lab, 'utf8');
+    const threeScripts = protoHtml.match(/assets\/three\.module-[^"]+\.js/g) ?? [];
+    expect(threeScripts.length, 'proto3d loads the shared three chunk').toBeGreaterThan(0);
+    expect(labHtml, 'voxel-lab preloads the same three chunk').toContain(threeScripts[0]);
+    expect(protoHtml).not.toContain('voxelLab-');
+    expect(labHtml).not.toMatch(/assets\/main-[^"]+\.js/);
+    const assets = readdirSync(resolve(dist, 'assets')).filter((f) => f.endsWith('.js') && !f.endsWith('.map'));
+    const threeChunks = assets.filter((f) => f.startsWith('three.module-'));
+    expect(threeChunks, 'one shared three.js chunk, not two copies').toEqual([threeScripts[0].split('/').pop()]);
   });
 });
