@@ -42,7 +42,7 @@ import {
   type SurfaceLightLocal,
   type SurfaceLightShared
 } from './surface-light';
-import { FloorData, Sconce } from './types';
+import { FloorData, Sconce, Tile } from './types';
 
 interface CachedFace {
   mesh: THREE.Mesh;
@@ -165,6 +165,8 @@ export class VertexLightingManager {
   private oilFn: () => number = () => 1;
   private carriedTorch = false;
   private lightDebug: LightDebugMode = 'final';
+  /** When lab look shades surfaces in the fragment, skip the CPU vertex bake. */
+  skipSurfaceBake = false;
 
   constructor(
     floorData: FloorData,
@@ -441,11 +443,19 @@ export class VertexLightingManager {
     return this.sourceLight(tileX, tileY) >= DARK_LIGHT_THRESHOLD;
   }
 
+  tileAt(tileX: number, tileY: number): Tile | undefined {
+    return this.floorData.tiles[tileY]?.[tileX];
+  }
+
   /**
-   * Visual tint for painted sprites in voxel mode: torch warmth + wall lantern
-   * falloff (same as walls). Does not change sourceLight / isSquareLit.
+   * Visual tint for painted sprites: torch warmth + wall lantern falloff
+   * (same as walls). Does not change sourceLight / isSquareLit.
    */
-  wallTintRgb(tileX: number, tileY: number): [number, number, number] {
+  wallTintRgb(
+    tileX: number,
+    tileY: number,
+    look?: { torch: [number, number, number]; lantern: [number, number, number] }
+  ): [number, number, number] {
     const tile = this.floorData.tiles[tileY]?.[tileX];
     const isDark = tile?.floorNDark || false;
     return this.shadeVertex(
@@ -457,7 +467,8 @@ export class VertexLightingManager {
       isDark,
       this.flicker,
       false,
-      true
+      true,
+      look
     );
   }
 
@@ -578,7 +589,8 @@ export class VertexLightingManager {
     isDark: boolean,
     flick: number,
     isProp = false,
-    isWall = false
+    isWall = false,
+    look?: { torch: [number, number, number]; lantern: [number, number, number] }
   ): [number, number, number] {
     if (this.lightDebug === 'albedo') return [1, 1, 1];
     const ambient = this.floorAmbient();
@@ -600,22 +612,24 @@ export class VertexLightingManager {
     };
 
     const lantern = this.lanternSpec();
+    const torchRgb = look?.torch ?? TORCH_RGB;
+    const lanternRgb = look && this.oilFn() > 0 ? look.lantern : lantern.rgb;
     const partyDist = partyDistTiles(wx, wy, wz, this.partyX, this.partyY, {
       prop: isProp,
       wall: isWall
     });
     if (!skipLantern && reachAt(this.partyCells, tileX, tileY) !== undefined) {
       if (isProp && this.oilFn() > 0) {
-        add(PROP_LANTERN_INTENSITY * lanternFalloff(partyDist, PROP_LANTERN_RADIUS_TILES), lantern.rgb);
+        add(PROP_LANTERN_INTENSITY * lanternFalloff(partyDist, PROP_LANTERN_RADIUS_TILES), lanternRgb);
       } else if (isWall) {
         const wallRadius = this.oilFn() > 0 ? WALL_LANTERN_RADIUS_TILES : lantern.radius;
         const wallIntensity = this.oilFn() > 0 ? WALL_LANTERN_INTENSITY : lantern.intensity;
-        add(wallIntensity * smoothFalloff(partyDist, wallRadius), lantern.rgb);
+        add(wallIntensity * smoothFalloff(partyDist, wallRadius), lanternRgb);
       } else {
-        add(lantern.intensity * partyFalloff(partyDist, lantern.radius), lantern.rgb);
+        add(lantern.intensity * partyFalloff(partyDist, lantern.radius), lanternRgb);
       }
       if (this.carriedTorch) {
-        add(CARRIED_TORCH_INTENSITY * partyFalloff(partyDist, CARRIED_TORCH_RADIUS_TILES), TORCH_RGB);
+        add(CARRIED_TORCH_INTENSITY * partyFalloff(partyDist, CARRIED_TORCH_RADIUS_TILES), torchRgb);
       }
     }
 
@@ -629,7 +643,7 @@ export class VertexLightingManager {
         const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
         if (dist >= radius) continue;
         const w = TORCH_INTENSITY * smoothFalloff(dist / CELL_SIZE, SCONCE_RADIUS_TILES) * flick;
-        add(w, TORCH_RGB);
+        add(w, torchRgb);
       }
 
       for (const beam of this.sunbeams) {
@@ -682,6 +696,7 @@ export class VertexLightingManager {
   }
 
   private bakeFace(face: CachedFace, flick: number) {
+    if (this.skipSurfaceBake && !face.isProp) return;
     const { worldPos, colors } = face;
     if (!colors) return;
     const n = colors.count;

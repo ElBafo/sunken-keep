@@ -64,6 +64,8 @@ import { SpeechBubble } from './bubble';
 import { StoryProgress } from './story-progress';
 import { copyForOpenNote, resolveLocale, saveLocale, StoryText, type Locale, type OpenNoteRef } from './i18n';
 import { qualityFromSearch, QualityLevel } from './quality';
+import type { LabLook } from './lab-look';
+import { labLightFromSearch, syncLabLightQuery } from './lab-light';
 import type { VoxelMode } from './voxel-mode';
 import { syncVoxelQuery, voxelFromSearch } from './voxel-opt-in';
 import { PixelRenderer } from './renderer';
@@ -156,6 +158,8 @@ class Game {
   settingsMenu!: SettingsMenu;
   private voxel: VoxelMode | null = null;
   private voxelWanted = false;
+  private labLook: LabLook | null = null;
+  private labWanted = false;
   private pendingPotion: 'potion_red' | 'potion_blue' | 'potion_green' | null = null;
   private lootSnap: Array<{ x: number; y: number; item?: string; chest?: boolean; chestItems?: string[]; chestOpen?: boolean }> = [];
   lastMessage = '';
@@ -262,6 +266,7 @@ class Game {
     this.wantDebugReader = debugReaderRequested(params);
 
     this.voxelWanted = voxelFromSearch(params);
+    this.labWanted = labLightFromSearch(params);
     this.settingsMenu = new SettingsMenu(this.story, {
       getLayout: () => getLayoutMode(),
       setLayout: (mode) => this.setLayoutMode(mode),
@@ -272,6 +277,18 @@ class Game {
         syncVoxelQuery(on);
         if (on) void this.enableVoxel();
         else this.voxel?.disable();
+        if (this.labLook?.enabled) this.labLook.refresh();
+        this.settingsMenu.refreshLabels();
+      },
+      getLabLight: () => this.labWanted,
+      setLabLight: (on) => {
+        this.labWanted = on;
+        syncLabLightQuery(on);
+        if (on) void this.enableLabLook();
+        else {
+          this.labLook?.disable();
+          this.voxel?.syncLights();
+        }
         this.settingsMenu.refreshLabels();
       }
     });
@@ -531,6 +548,7 @@ class Game {
     this.vertexLighting.registerScene(this.renderer.scene);
     this.vertexLighting.updateAllMeshes(this.renderer.scene);
     if (lightDebug) this.applyLightDebug(lightDebug);
+    if (this.labWanted) await this.enableLabLook();
     if (this.voxelWanted) await this.enableVoxel();
 
     this.darkFx = new DarkFx();
@@ -600,11 +618,32 @@ class Game {
         scene: this.renderer.scene,
         lighting: this.vertexLighting,
         sprites: this.spriteManager,
-        renderer: this.renderer.renderer
+        renderer: this.renderer.renderer,
+        decorateVoxel: (mesh) => {
+          if (this.labLook?.enabled) this.labLook.patchMesh(mesh);
+          else this.vertexLighting.registerVoxelMesh(mesh);
+        },
+        ownsSpriteTint: () => !this.labLook?.enabled
       });
     }
     this.voxel.setParty(this.player.x, this.player.y);
     this.voxel.enable();
+    if (this.labLook?.enabled) this.labLook.refresh();
+    if (this.lightDebug && this.lightDebug !== 'final') this.applyLightDebug(this.lightDebug);
+  }
+
+  private async enableLabLook() {
+    if (!this.renderer || !this.vertexLighting || !this.spriteManager) return;
+    if (!this.labLook) {
+      const { LabLook } = await import('./lab-look');
+      this.labLook = new LabLook({
+        scene: this.renderer.scene,
+        lighting: this.vertexLighting,
+        sprites: this.spriteManager,
+        renderer: this.renderer
+      });
+    }
+    this.labLook.enable();
     if (this.lightDebug && this.lightDebug !== 'final') this.applyLightDebug(this.lightDebug);
   }
 
@@ -2142,6 +2181,7 @@ class Game {
       this.vertexLighting?.registerScene(this.renderer.scene);
       this.vertexLighting?.relight();
       this.voxel?.refresh();
+      this.labLook?.refresh();
     }
   }
 
@@ -2153,6 +2193,7 @@ class Game {
     this.vertexLighting.relight();
     this.vertexLighting.updateAllMeshes(this.renderer.scene);
     this.voxel?.refresh();
+    this.labLook?.refresh();
   }
 
   private syncCaveInWorld() {
@@ -2457,6 +2498,7 @@ class Game {
     this.flags.add('secret_found');
     this.sceneBuilder.setSecretOpen(this.renderer.scene, x, y, true);
     this.voxel?.invalidateCell(x, y);
+    this.labLook?.refresh();
     this.spriteManager.resetItems(floor1);
     this.refreshOccupancy();
     this.vertexLighting.relight();
@@ -2997,6 +3039,17 @@ class Game {
         return Promise.resolve();
       },
       voxelStats: () => this.voxel?.stats() ?? { enabled: false, voxels: 0, triangles: 0, active: 0 },
+      labLight: () => this.labLook?.enabled === true,
+      setLabLight: (on: boolean) => {
+        this.labWanted = on;
+        syncLabLightQuery(on);
+        if (on) return this.enableLabLook();
+        this.labLook?.disable();
+        this.voxel?.syncLights();
+        return Promise.resolve();
+      },
+      labStats: () => this.labLook?.stats() ?? { enabled: false, patched: 0 },
+      paletteEnabled: () => this.renderer.paletteEnabled,
       frameMs: () => this.lastFrameMs,
       frameStats: () => {
         const s = this.frameSamples;
@@ -3542,7 +3595,10 @@ class Game {
       this.atmosphere.applyFog(scene, this.renderer.renderer);
     }
     this.renderer.setPaletteEnabled(
-      resolved !== 'nopalette' && resolved !== 'albedo' && resolved !== 'lighting'
+      !this.labLook?.enabled &&
+        resolved !== 'nopalette' &&
+        resolved !== 'albedo' &&
+        resolved !== 'lighting'
     );
     const wantMips = resolved !== 'nomip';
     const hideMaps = resolved === 'lighting';
@@ -3573,6 +3629,7 @@ class Game {
     });
     this.atmosphere.setQuality(isolate || resolved === 'nodust' ? 'low' : this.quality);
     this.voxel?.syncLights();
+    this.labLook?.sync();
   }
 
   gameLoop() {
@@ -3644,6 +3701,7 @@ class Game {
     this.darkFx.update(now, this.vertexLighting, this.spriteManager, this.audioManager, this.player.x, this.player.y);
     this.vertexLighting.setFlickerTime(now);
     this.voxel?.syncLights();
+    this.labLook?.sync();
     this.hud?.draw(this.nowMs());
     if (!paused) {
       this.fireSlimeReveal();
