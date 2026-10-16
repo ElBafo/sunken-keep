@@ -37,17 +37,32 @@ export type DevHost = {
 };
 
 const STYLE = `
-#dev-panel {
+#dev-stats {
   position: fixed;
   top: 8px;
+  left: 8px;
+  z-index: 9000;
+  max-width: min(240px, 58vw);
+  background: rgba(8, 6, 4, 0.78);
+  color: #e8d8a0;
+  font: 11px/1.3 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  border: 1px solid #6a5430;
+  border-radius: 4px;
+  padding: 5px 7px;
+  pointer-events: none;
+  white-space: pre-wrap;
+}
+#dev-panel {
+  position: fixed;
+  bottom: 8px;
   right: 8px;
   z-index: 9000;
-  width: min(260px, calc(100vw - 16px));
-  max-height: calc(100dvh - 16px);
+  width: min(250px, calc(100vw - 16px));
+  max-height: 42dvh;
   overflow: auto;
   background: rgba(8, 6, 4, 0.88);
   color: #e8d8a0;
-  font: 11px/1.35 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font: 12px/1.35 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   border: 1px solid #6a5430;
   border-radius: 6px;
   padding: 8px;
@@ -56,7 +71,7 @@ const STYLE = `
 }
 #dev-panel.collapsed {
   width: auto;
-  max-width: 46%;
+  max-width: 42%;
   padding: 6px 8px;
 }
 #dev-panel header {
@@ -67,7 +82,7 @@ const STYLE = `
   color: #f0c060;
   letter-spacing: 0.04em;
 }
-#dev-panel .stats { margin-bottom: 8px; white-space: pre-wrap; }
+#dev-panel.collapsed header { margin-bottom: 0; }
 #dev-panel .row { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0; align-items: center; }
 #dev-panel .lab { min-width: 46px; color: #b8a878; }
 #dev-panel button {
@@ -129,6 +144,10 @@ export class DevPanel {
     style.textContent = STYLE;
     document.head.appendChild(style);
 
+    this.statsEl = document.createElement('div');
+    this.statsEl.id = 'dev-stats';
+    document.body.appendChild(this.statsEl);
+
     this.root = document.createElement('div');
     this.root.id = 'dev-panel';
     this.root.classList.add('collapsed');
@@ -148,10 +167,6 @@ export class DevPanel {
     const body = document.createElement('div');
     body.className = 'dev-body';
     body.hidden = true;
-    this.statsEl = document.createElement('div');
-    this.statsEl.className = 'stats';
-    this.statsEl.id = 'dev-stats';
-    body.appendChild(this.statsEl);
 
     body.appendChild(this.modeRow('Res', DEV_RES_MODES, () => this.host.getRes(), (v) => this.host.setRes(v), String));
     body.appendChild(

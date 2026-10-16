@@ -129,11 +129,19 @@ test('dev panel toggles 3D res, compare scene, and capture', async ({ page }) =>
   });
   expect(two.some((s) => s.x === 1 && s.y === 5)).toBe(true);
 
+  await page.locator('#dev-collapse').click();
   await page.screenshot({ path: `${OUT}/dev_compare_slime_2sq_360.png`, fullPage: false });
+  await page.evaluate(async () => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    await p.setDevDist(1);
+  });
+  await page.waitForTimeout(160);
+  await page.screenshot({ path: `${OUT}/dev_compare_slime_1sq_360.png`, fullPage: false });
 
   await page.evaluate(async () => {
     const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
     await p.setDevEnemy('ooze');
+    await p.setDevDist(2);
   });
   await page.waitForTimeout(400);
   const ooze = await page.evaluate(() => {
@@ -147,10 +155,32 @@ test('dev panel toggles 3D res, compare scene, and capture', async ({ page }) =>
   expect(ooze.sprites.some((s) => s.monsterKind === 'slime' && s.x === 1 && s.y === 5)).toBe(false);
 
   await page.screenshot({ path: `${OUT}/dev_compare_ooze_2sq_360.png`, fullPage: false });
+  await page.evaluate(async () => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    await p.setDevDist(1);
+  });
+  await page.waitForTimeout(200);
+  await page.screenshot({ path: `${OUT}/dev_compare_ooze_1sq_360.png`, fullPage: false });
+
+  await page.evaluate(async () => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    await p.setDevEnemy('slime');
+    await p.setDevDist(1);
+    p.setDevRes(270);
+  });
+  await page.waitForTimeout(200);
+  await page.screenshot({ path: `${OUT}/dev_compare_slime_1sq_270.png`, fullPage: false });
+
+  await page.evaluate(async () => {
+    await (window as unknown as { __proto3d: Proto3d }).__proto3d.setLabLight(true);
+  });
+  await page.waitForTimeout(280);
+  await page.screenshot({ path: `${OUT}/dev_compare_slime_1sq_270_lab.png`, fullPage: false });
 
   const cap = await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.captureDevView());
-  expect(cap?.slug).toMatch(/360/);
-  expect(cap?.meta.enemy).toBe('ooze');
+  expect(cap?.slug).toMatch(/270/);
+  expect(cap?.meta.enemy).toBe('slime');
+  expect(cap?.meta.light).toBe('lab');
 
   await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.setDevRes(270));
 });
