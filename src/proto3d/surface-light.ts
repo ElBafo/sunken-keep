@@ -22,7 +22,18 @@ export const FLOOR_DISK_Y = 0.28;
 export const NONFLOOR_HEIGHT_PENALTY = 0.55;
 export const PARTY_FALLOFF_CORE_FRAC = 0.45;
 
-export const SURFACE_LIGHT_CACHE_KEY = 'surf-light-frag-v2';
+export const SURFACE_LIGHT_CACHE_KEY = 'surf-light-frag-v3';
+export type LightDebugMode =
+  | 'final'
+  | 'albedo'
+  | 'lantern'
+  | 'torch'
+  | 'ambient'
+  | 'lighting'
+  | 'nofog'
+  | 'nomip'
+  | 'nopalette'
+  | 'nodust';
 
 /**
  * Painted albedo × lighting factor. Never add ambient onto the texel —
@@ -76,6 +87,7 @@ export interface SurfaceLightShared {
   uFloorDiskY: { value: number };
   uHeightPenalty: { value: number };
   uCoreFrac: { value: number };
+  uDebugMode: { value: number };
 }
 
 export interface SurfaceLightLocal {
@@ -119,7 +131,8 @@ export function createSurfaceLightShared(): SurfaceLightShared {
     uLanternHeight: { value: LANTERN_HEIGHT },
     uFloorDiskY: { value: FLOOR_DISK_Y },
     uHeightPenalty: { value: NONFLOOR_HEIGHT_PENALTY },
-    uCoreFrac: { value: PARTY_FALLOFF_CORE_FRAC }
+    uCoreFrac: { value: PARTY_FALLOFF_CORE_FRAC },
+    uDebugMode: { value: 0 }
   };
 }
 
@@ -170,6 +183,7 @@ uniform float uLanternHeight;
 uniform float uFloorDiskY;
 uniform float uHeightPenalty;
 uniform float uCoreFrac;
+uniform float uDebugMode;
 uniform float uPartyReach;
 uniform float uIsWall;
 uniform float uIsDark;
@@ -277,7 +291,9 @@ vec3 surfaceLightRgb(vec3 worldPos) {
 }
 
 vec3 applySurfaceLight(vec3 albedo, vec3 worldPos) {
+  if (uDebugMode > 0.5 && uDebugMode < 1.5) return albedo;
   vec3 lighting = surfaceLightRgb(worldPos);
+  if (uDebugMode > 1.5 && uDebugMode < 2.5) return lighting;
   return albedo * lighting;
 }
 `;

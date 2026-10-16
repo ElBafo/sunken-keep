@@ -30,18 +30,7 @@ import {
 } from './constants';
 import { DressingMark } from './dressing';
 import { isLightPassable, LightReach, partyReach, reachAt, sconceOrigin, sconceReach } from './light-grid';
-import {
-  createSurfaceLightLocal,
-  createSurfaceLightShared,
-  FLOOR_DISK_Y,
-  isSurfaceLitKind,
-  NONFLOOR_HEIGHT_PENALTY,
-  patchSurfaceLightMaterial,
-  SURFACE_MAX_SUNBEAMS,
-  SURFACE_MAX_TORCHES,
-  SurfaceLightLocal,
-  SurfaceLightShared
-} from './surface-light';
+import { FLOOR_DISK_Y, LightDebugMode, NONFLOOR_HEIGHT_PENALTY } from './surface-light';
 import { FloorData, Sconce } from './types';
 
 interface CachedFace {
@@ -55,7 +44,6 @@ interface CachedFace {
   tileX: number;
   tileY: number;
   lightGround: boolean;
-  surface?: SurfaceLightLocal;
 }
 
 /** Walls, doors, and ceilings share the soft lantern pool (not the floor disk). */
@@ -163,7 +151,7 @@ export class VertexLightingManager {
   private bright = 1;
   private oilFn: () => number = () => 1;
   private carriedTorch = false;
-  private shared: SurfaceLightShared = createSurfaceLightShared();
+  private lightDebug: LightDebugMode = 'final';
 
   constructor(
     floorData: FloorData,
@@ -198,6 +186,15 @@ export class VertexLightingManager {
 
   hasCarriedTorch(): boolean {
     return this.carriedTorch;
+  }
+
+  setLightDebug(mode: LightDebugMode) {
+    this.lightDebug = mode;
+    for (const face of this.faces) this.bakeFace(face, this.flicker);
+  }
+
+  getLightDebug(): LightDebugMode {
+    return this.lightDebug;
   }
 
   setBright(value: number) {
@@ -258,32 +255,6 @@ export class VertexLightingManager {
       const isDark = tile?.floorNDark || false;
       const isWall = isWallLike(obj.userData.kind);
       const lightGround = !!obj.userData.lightGround || !!obj.userData.rubble;
-      const surfaceKind = isSurfaceLitKind(obj.userData.kind);
-
-      if (surfaceKind && obj.material instanceof THREE.MeshBasicMaterial) {
-        const local =
-          (obj.material.userData.surfaceLightLocal as SurfaceLightLocal | undefined) ??
-          createSurfaceLightLocal();
-        local.uIsWall.value = isWall ? 1 : 0;
-        local.uIsDark.value = isDark ? 1 : 0;
-        local.uLightGround.value = lightGround ? 1 : 0;
-        local.uGroundPos.value.set(tileX * CELL_SIZE, 0.08, tileY * CELL_SIZE);
-        patchSurfaceLightMaterial(obj.material, this.shared, local);
-        this.faces.push({
-          mesh: obj,
-          worldPos: new Float32Array(0),
-          colors: null,
-          isDark,
-          isProp: false,
-          isWall,
-          nearSconce: this.nearAnySconce(tileX, tileY, radiusTiles),
-          tileX,
-          tileY,
-          lightGround,
-          surface: local
-        });
-        return;
-      }
 
       if (!geometry.attributes.color) {
         const colors = new Float32Array(geometry.attributes.position.count * 3);
@@ -457,12 +428,16 @@ export class VertexLightingManager {
     isProp = false,
     isWall = false
   ): [number, number, number] {
+    if (this.lightDebug === 'albedo') return [1, 1, 1];
     const ambient = this.floorAmbient();
     const ambientRgb: [number, number, number] = [
       ambient * AMBIENT_RGB[0],
       ambient * AMBIENT_RGB[1],
       ambient * AMBIENT_RGB[2]
     ];
+    const skipLantern = this.lightDebug === 'torch' || this.lightDebug === 'ambient';
+    const skipTorch = this.lightDebug === 'lantern' || this.lightDebug === 'ambient';
+    const skipAmbient = this.lightDebug === 'lantern' || this.lightDebug === 'torch';
     // Screen-combine lantern + torch on wall/floor/ceiling shading only.
     // Lantern props keep max(). Gameplay tile-light is sourceLight() (max()).
     const geometry = !isProp;
@@ -477,7 +452,7 @@ export class VertexLightingManager {
       prop: isProp,
       wall: isWall
     });
-    if (reachAt(this.partyCells, tileX, tileY) !== undefined) {
+    if (!skipLantern && reachAt(this.partyCells, tileX, tileY) !== undefined) {
       if (isProp && this.oilFn() > 0) {
         add(PROP_LANTERN_INTENSITY * lanternFalloff(partyDist, PROP_LANTERN_RADIUS_TILES), lantern.rgb);
       } else if (isWall) {
@@ -492,7 +467,7 @@ export class VertexLightingManager {
       }
     }
 
-    if (!isDark) {
+    if (!skipTorch && !isDark) {
       const radius = SCONCE_RADIUS_TILES * CELL_SIZE;
       for (const s of this.sconceWorld) {
         if (reachAt(s.reach, tileX, tileY) === undefined) continue;
@@ -515,7 +490,7 @@ export class VertexLightingManager {
 
     // Lighting factor for MeshBasic (texture × this). Ambient floors the
     // factor, it is never added onto albedo (that would lift mortar gaps).
-    const lit: [number, number, number] = geometry
+    const lit: [number, number, number] = geometry && !skipAmbient
       ? [
           Math.max(ambientRgb[0], rgb[0]),
           Math.max(ambientRgb[1], rgb[1]),
@@ -555,10 +530,6 @@ export class VertexLightingManager {
   }
 
   private bakeFace(face: CachedFace, flick: number) {
-    if (face.surface) {
-      this.syncSurfaceFace(face);
-      return;
-    }
     const { worldPos, colors } = face;
     if (!colors) return;
     const n = colors.count;
@@ -581,50 +552,8 @@ export class VertexLightingManager {
     colors.needsUpdate = true;
   }
 
-  private syncSharedUniforms() {
-    const ambient = this.floorAmbient();
-    this.shared.uAmbientRgb.value.set(
-      ambient * AMBIENT_RGB[0],
-      ambient * AMBIENT_RGB[1],
-      ambient * AMBIENT_RGB[2]
-    );
-    this.shared.uBright.value = this.bright;
-    this.shared.uFlicker.value = this.flicker;
-    this.shared.uPartyX.value = this.partyX;
-    this.shared.uPartyY.value = this.partyY;
-    this.shared.uOil.value = this.oilFn() > 0 ? 1 : 0;
-    const lantern = this.lanternSpec();
-    this.shared.uLanternRgb.value.set(lantern.rgb[0], lantern.rgb[1], lantern.rgb[2]);
-    this.shared.uLanternIntensity.value = lantern.intensity;
-    this.shared.uLanternRadius.value = lantern.radius;
-    this.shared.uCarriedTorch.value = this.carriedTorch ? 1 : 0;
-    const beamN = Math.min(SURFACE_MAX_SUNBEAMS, this.sunbeams.length);
-    this.shared.uSunbeamCount.value = beamN;
-    for (let i = 0; i < beamN; i++) {
-      this.shared.uSunbeamPos.value[i].set(this.sunbeams[i].x, this.sunbeams[i].y);
-    }
-  }
-
-  private syncSurfaceFace(face: CachedFace) {
-    const local = face.surface;
-    if (!local) return;
-    local.uPartyReach.value = reachAt(this.partyCells, face.tileX, face.tileY) !== undefined ? 1 : 0;
-    local.uIsDark.value = face.isDark ? 1 : 0;
-    let n = 0;
-    if (!face.isDark) {
-      for (const s of this.sconceWorld) {
-        if (reachAt(s.reach, face.tileX, face.tileY) === undefined) continue;
-        local.uTorchPos.value[n].set(s.x, s.y, s.z);
-        n += 1;
-        if (n >= SURFACE_MAX_TORCHES) break;
-      }
-    }
-    local.uTorchCount.value = n;
-  }
-
   updateAllMeshes(_scene?: THREE.Scene) {
     this.rebuildPartyReach();
-    this.syncSharedUniforms();
     for (const face of this.faces) {
       this.bakeFace(face, this.flicker);
     }
@@ -637,9 +566,8 @@ export class VertexLightingManager {
     if (wrapped === this.flickerFrame && next === this.flicker) return;
     this.flickerFrame = wrapped;
     this.flicker = next;
-    this.shared.uFlicker.value = next;
     for (const face of this.faces) {
-      if (face.surface || !face.nearSconce) continue;
+      if (!face.nearSconce) continue;
       this.bakeFace(face, this.flicker);
     }
   }
@@ -651,9 +579,8 @@ export class VertexLightingManager {
     const q = Math.round(next * 200) / 200;
     if (q === this.flicker) return;
     this.flicker = q;
-    this.shared.uFlicker.value = q;
     for (const face of this.faces) {
-      if (face.surface || !face.nearSconce) continue;
+      if (!face.nearSconce) continue;
       this.bakeFace(face, this.flicker);
     }
   }

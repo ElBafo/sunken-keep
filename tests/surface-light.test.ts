@@ -12,7 +12,9 @@ import {
   SURFACE_LIGHT_GLSL
 } from '../src/proto3d/surface-light';
 
-describe('per-pixel wall/floor lighting', () => {
+// debug modes 1 = albedo, 2 = lighting factor
+
+describe('surface-light helpers (unused on walls after diagnosis)', () => {
   it('marks dungeon surfaces and skips props', () => {
     expect(isSurfaceLitKind('wall')).toBe(true);
     expect(isSurfaceLitKind('floor')).toBe(true);

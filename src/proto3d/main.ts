@@ -69,6 +69,7 @@ import { SceneBuilder } from './scene-builder';
 import { SpriteManager } from './sprites';
 import { TorchSystem, torchWorldPos } from './torches';
 import { Sconce, Tile } from './types';
+import { type LightDebugMode } from './surface-light';
 import { VertexLightingManager } from './vertex-lighting';
 import { WaterSystem } from './water';
 import { DarkFx } from './dark-fx';
@@ -206,6 +207,9 @@ class Game {
   private caveInCrashed = false;
   private wantOpeningCaveIn = false;
   private oilDisplay = OIL_START;
+  private lightDebug: LightDebugMode = 'final';
+  private wallMipFilters = new Map<THREE.Texture, THREE.MinificationTextureFilter>();
+  private wallMaps = new Map<THREE.Material, THREE.Texture | null>();
   private oilGlugTimers: number[] = [];
   private worldBoot: Promise<void> = Promise.resolve();
   private stageFitWired = false;
@@ -2997,6 +3001,11 @@ class Game {
         this.vertexLighting.setFlickerFrame(frame);
         this.renderer.render();
       },
+      setLightDebug: (mode: LightDebugMode) => {
+        this.applyLightDebug(mode);
+        this.renderer.render();
+      },
+      getLightDebug: () => this.lightDebug,
       darkFx: () => this.darkFx.snapshot(),
       lightFacingTorch: () => this.handleFacingTorch(),
       snuffFacing: () => {
@@ -3389,6 +3398,56 @@ class Game {
     stage?.addEventListener('touchstart', onStageTap, { capture: true, passive: true });
     titleCanvas?.addEventListener('pointerdown', onStageTap);
     titleCanvas?.addEventListener('touchstart', onStageTap, { passive: true });
+  }
+
+  private applyLightDebug(mode: LightDebugMode) {
+    this.lightDebug = mode;
+    this.vertexLighting.setLightDebug(mode);
+    const scene = this.renderer.scene;
+    const isolate =
+      mode === 'albedo' ||
+      mode === 'lantern' ||
+      mode === 'torch' ||
+      mode === 'ambient' ||
+      mode === 'lighting' ||
+      mode === 'nofog';
+    if (isolate) {
+      scene.fog = null;
+    } else {
+      this.atmosphere.applyFog(scene, this.renderer.renderer);
+    }
+    this.renderer.setPaletteEnabled(mode !== 'nopalette' && mode !== 'albedo' && mode !== 'lighting');
+    const wantMips = mode !== 'nomip';
+    const hideMaps = mode === 'lighting';
+    scene.traverse((obj) => {
+      if (!(obj instanceof THREE.Mesh)) return;
+      const mat = obj.material;
+      const mats = Array.isArray(mat) ? mat : [mat];
+      for (const m of mats) {
+        const basic = m as THREE.MeshBasicMaterial;
+        if (!this.wallMaps.has(basic) && 'map' in basic) this.wallMaps.set(basic, basic.map);
+        if (hideMaps) {
+          if (basic.map) {
+            basic.map = null;
+            basic.needsUpdate = true;
+          }
+        } else if (this.wallMaps.has(basic) && basic.map !== this.wallMaps.get(basic)) {
+          basic.map = this.wallMaps.get(basic)!;
+          basic.needsUpdate = true;
+        }
+        const map = basic.map;
+        if (!map) continue;
+        if (!this.wallMipFilters.has(map)) this.wallMipFilters.set(map, map.minFilter);
+        map.minFilter = wantMips ? this.wallMipFilters.get(map)! : THREE.NearestFilter;
+        map.needsUpdate = true;
+      }
+      if (obj instanceof THREE.Points || obj.userData.skipVertexLighting) {
+        if (mode === 'nodust' || isolate) {
+          if (obj instanceof THREE.Points) obj.visible = false;
+        }
+      }
+    });
+    this.atmosphere.setQuality(isolate || mode === 'nodust' ? 'low' : this.quality);
   }
 
   gameLoop() {

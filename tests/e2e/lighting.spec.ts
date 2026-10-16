@@ -42,6 +42,7 @@ type Proto3d = {
   useBagSlot: (i: number) => void;
   frameStats: () => { n: number; mean: number; p95: number };
   columnLumas: (y0: number, y1: number) => number[];
+  setLightDebug: (mode: string) => void;
 };
 
 test.use(devices['iPhone 15']);
@@ -608,7 +609,7 @@ test('proto3d lighting: screen luma of the 3D view', async ({ page }) => {
   expect(relightGain, 'relighting a dead torch raises nearby view luma ≥ 50%').toBeGreaterThanOrEqual(1.5);
 });
 
-test('proto3d lighting: per-pixel lantern+torch, no wall dip, tile-light frozen', async ({ page }) => {
+test('proto3d lighting: tile-light frozen, wall terms diagnosed', async ({ page }) => {
   test.setTimeout(90000);
   mkdirSync(OUT, { recursive: true });
 
@@ -739,6 +740,53 @@ test('proto3d lighting: per-pixel lantern+torch, no wall dip, tile-light frozen'
   expect(brick3.p10, 'far-wall mortar stays unlifted').toBeLessThan(6);
   expect(brick3.p50, 'far wall is not a flat ambient-grey slab').toBeLessThan(10);
   expect(brick3.p90, 'painted far-wall bricks still vary vs mortar').toBeGreaterThan(brick3.p10 + 5);
+
+  // (2,1)E: Testie's "levels" dip is painted mortar in albedo, not a lighting valley.
+  const termDip = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    const canvas = document.getElementById('render-canvas') as HTMLCanvasElement;
+    const dipOf = (mode: string) => {
+      p.setPosition(2, 1, 1);
+      p.setFlickerFrame(2);
+      p.setLightDebug(mode);
+      const lumas = p.columnLumas(canvas.height * 0.22, canvas.height * 0.62);
+      const left = lumas.slice(Math.floor(canvas.width * 0.02), Math.ceil(canvas.width * 0.28));
+      const k = 4;
+      const sm: number[] = [];
+      for (let i = 0; i < left.length; i++) {
+        let s = 0;
+        let n = 0;
+        for (let j = i - k; j <= i + k; j++) {
+          if (j >= 0 && j < left.length) {
+            s += left[j];
+            n++;
+          }
+        }
+        sm.push(s / n);
+      }
+      const a = Math.floor(sm.length * 0.08);
+      const b = Math.ceil(sm.length * 0.92);
+      const mid = sm.slice(a, b);
+      let dip = 0;
+      for (let i = 1; i < mid.length - 1; i++) {
+        const leftMax = Math.max(...mid.slice(0, i));
+        const rightMax = Math.max(...mid.slice(i + 1));
+        dip = Math.max(dip, Math.min(leftMax, rightMax) - mid[i]);
+      }
+      return { dip, min: Math.min(...mid), max: Math.max(...mid), levels8: dip / 8 };
+    };
+    const albedo = dipOf('albedo');
+    const lighting = dipOf('lighting');
+    const final = dipOf('final');
+    return { albedo, lighting, final };
+  });
+  console.log('TERM_DIP (2,1)E', termDip);
+  expect(termDip.albedo.levels8, '(2,1)E dip lives in albedo / mortar').toBeGreaterThan(0.5);
+  expect(
+    Math.abs(termDip.final.dip - termDip.albedo.dip),
+    'final dip matches albedo, not a lighting valley'
+  ).toBeLessThan(4);
+  expect(termDip.lighting.max, 'lighting factor on walls is a high flat field').toBeGreaterThan(180);
 
   await page.evaluate(() => {
     (window as unknown as { __proto3d: Proto3d }).__proto3d.setPosition(4, 5, 1);

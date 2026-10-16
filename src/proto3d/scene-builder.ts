@@ -58,7 +58,7 @@ export class SceneBuilder {
 
     const loadTex = async (path: string, opts: TexOpts): Promise<THREE.Texture> => {
       const filename = path.replace(/^proto3d\/tex3d\//, '');
-      if (hasWallMips(filename)) {
+      if (hasWallMips(filename) && opts.mipmaps) {
         const tex = await loadNearestMipTexture(baseUrl, filename);
         tex.wrapS = opts.wrapS;
         tex.wrapT = opts.wrapT;
@@ -112,8 +112,8 @@ export class SceneBuilder {
       });
     }
     const cutouts: Array<{ path: string; opts: TexOpts; key: 'doorOpen' | 'doorPanel' | 'secretClosed' | 'secretOpen' }> = [
-      { path: 'proto3d/tex3d/door_open.png', opts: cutout, key: 'doorOpen' },
-      { path: 'proto3d/tex3d/door_panel.png', opts: cutout, key: 'doorPanel' },
+      { path: 'proto3d/tex3d/door_open.png', opts: wall, key: 'doorOpen' },
+      { path: 'proto3d/tex3d/door_panel.png', opts: wall, key: 'doorPanel' },
       { path: 'proto3d/tex3d/secret_closed.png', opts: wall, key: 'secretClosed' },
       { path: 'proto3d/tex3d/secret_open.png', opts: cutout, key: 'secretOpen' }
     ];

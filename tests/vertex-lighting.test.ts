@@ -236,16 +236,37 @@ describe('lantern: steep floors, soft props', () => {
     expect(valleyDip(lumas), `lantern-torch wall dip`).toBeLessThanOrEqual(0.04);
   });
 
-  it('lights walls and floors per fragment so coarse verts cannot open a dip', () => {
-    const surf = readFileSync(resolve(__dirname, '../src/proto3d/surface-light.ts'), 'utf8');
+  it('multiplies MeshBasic by a lighting factor (no fragment wall shader)', () => {
     const src = readFileSync(resolve(__dirname, '../src/proto3d/vertex-lighting.ts'), 'utf8');
-    expect(FACE_SEGMENTS, 'tessellation is unused once lighting is per pixel').toBe(1);
-    expect(surf).toContain('applySurfaceLight(albedo, vSurfWorldPos)');
-    expect(surf).toContain('surfScreenAccum');
-    expect(surf).toContain('albedo * lighting');
-    expect(src).toContain('patchSurfaceLightMaterial');
-    expect(src).toContain('isSurfaceLitKind');
+    expect(FACE_SEGMENTS, 'no tessellation tax once the dip is known to be albedo').toBe(1);
     expect(src).toContain('sourceLight(tileX');
+    expect(src).not.toContain('patchSurfaceLightMaterial');
+    expect(src).toContain('if (this.lightDebug === \'albedo\') return [1, 1, 1]');
+  });
+
+  it('isolates albedo as white vertex colour so the (2,1)E dip can be compared to texture', () => {
+    const lighting = new VertexLightingManager(floor1, floor1Sconces, {
+      floor: 1,
+      bright: 1,
+      oil: () => 2
+    });
+    lighting.setPartyPosition(2, 1);
+    const wx = 2 * CELL_SIZE;
+    const wz = 1 * CELL_SIZE - CELL_SIZE / 2;
+    const lit = lighting.sampleVertex(wx, 0.88, wz, 2, 1, false, false, true);
+    expect(lit.luma).toBeGreaterThan(0.05);
+    lighting.setLightDebug('albedo');
+    const albedo = lighting.sampleVertex(wx, 0.88, wz, 2, 1, false, false, true);
+    expect(albedo.rgb).toEqual([1, 1, 1]);
+    lighting.setLightDebug('ambient');
+    const amb = lighting.sampleVertex(wx, 0.88, wz, 2, 1, false, false, true);
+    expect(amb.luma).toBeCloseTo(lighting.ambientBrightness(), 3);
+    lighting.setLightDebug('lantern');
+    const lantern = lighting.sampleVertex(wx, 0.88, wz, 2, 1, false, false, true);
+    expect(lantern.luma).toBeGreaterThan(0.05);
+    lighting.setLightDebug('torch');
+    const torch = lighting.sampleVertex(wx, 0.88, wz, 2, 1, false, false, true);
+    expect(torch.luma).toBeGreaterThan(lantern.luma);
   });
 
   it('has no lantern-torch valley at the QA viewpoints', () => {
@@ -322,7 +343,6 @@ describe('lantern: steep floors, soft props', () => {
     expect(gameplay).toContain('Math.max(maxW');
     expect(gameplay).not.toContain('screenAccum');
     expect(src).toContain('screenAccum');
-    expect(src).toContain('patchSurfaceLightMaterial');
     expect(shade).toContain('const geometry = !isProp');
     expect(shade).toContain('if (geometry) this.screenAccum');
     expect(shade).toContain('else this.maxAccum');
