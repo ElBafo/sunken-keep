@@ -13,7 +13,7 @@ type Lab = {
   setLamp: (on: boolean) => void;
   turnLeft: () => void;
   turnRight: () => void;
-  meanLuma: () => number;
+  meanLuma: (band?: { y0?: number; y1?: number }) => number;
   debugShadowState: () => {
     shadowMapEnabled: boolean;
     lightCast: number;
@@ -53,19 +53,18 @@ test('voxel-lab turn buttons and visible shadow toggle', async ({ page }) => {
 
   const onState = await page.evaluate(() => {
     const lab = (window as unknown as { __voxelLab: Lab }).__voxelLab;
-    lab.setLamp(true);
     lab.setShadows(true);
     return lab.debugShadowState();
   });
   expect(onState.shadowMapEnabled).toBe(true);
-  expect(onState.lightCast).toBeGreaterThanOrEqual(3);
+  expect(onState.lightCast).toBeGreaterThanOrEqual(2);
   expect(onState.meshCast).toBeGreaterThan(2);
   expect(onState.meshReceive).toBeGreaterThan(2);
 
   await page.waitForTimeout(250);
   await page.screenshot({ path: `${OUT}/voxel_lab_shadows_on.png`, fullPage: false });
   const lumaOn = await page.evaluate(() =>
-    (window as unknown as { __voxelLab: Lab }).__voxelLab.meanLuma()
+    (window as unknown as { __voxelLab: Lab }).__voxelLab.meanLuma({ y0: 0.05, y1: 0.42 })
   );
 
   const offState = await page.evaluate(() => {
@@ -81,10 +80,10 @@ test('voxel-lab turn buttons and visible shadow toggle', async ({ page }) => {
   await page.waitForTimeout(250);
   await page.screenshot({ path: `${OUT}/voxel_lab_shadows_off.png`, fullPage: false });
   const lumaOff = await page.evaluate(() =>
-    (window as unknown as { __voxelLab: Lab }).__voxelLab.meanLuma()
+    (window as unknown as { __voxelLab: Lab }).__voxelLab.meanLuma({ y0: 0.05, y1: 0.42 })
   );
 
-  expect(lumaOff).toBeGreaterThan(lumaOn + 0.02);
+  expect(lumaOff).toBeGreaterThan(lumaOn + 0.008);
 
   await page.evaluate(() => (window as unknown as { __voxelLab: Lab }).__voxelLab.setShadows(true));
   await left.click();

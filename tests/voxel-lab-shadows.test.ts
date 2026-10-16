@@ -87,6 +87,20 @@ describe('applyShadowToggle', () => {
     expect(wall.material).toMatchObject({ needsUpdate: true });
   });
 
+  it('honours castWhenOn / receiveWhenOn so floors can receive without casting', () => {
+    const renderer = { shadowMap: { enabled: false, needsUpdate: false } };
+    const floor = mesh({ material: { needsUpdate: false } });
+    floor.userData.castWhenOn = false;
+    applyShadowToggle({
+      on: true,
+      renderer,
+      lights: [],
+      roots: [group([floor])] as never
+    });
+    expect(floor.castShadow).toBe(false);
+    expect(floor.receiveShadow).toBe(true);
+  });
+
   it('does not let inactive lights cast even when shadows are on', () => {
     const renderer = { shadowMap: { enabled: false, needsUpdate: false } };
     const lamp: ShadowLight = { castShadow: false, shadow: { map: null } };

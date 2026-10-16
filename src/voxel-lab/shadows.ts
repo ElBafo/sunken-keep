@@ -10,7 +10,7 @@ type ShadowMesh = Object3D & {
   castShadow: boolean;
   receiveShadow: boolean;
   material?: Material | Material[];
-  userData: { noShadow?: boolean };
+  userData: { noShadow?: boolean; castWhenOn?: boolean; receiveWhenOn?: boolean };
 };
 
 /**
@@ -51,12 +51,12 @@ export function applyShadowToggle(opts: {
         bumpMaterials(mesh);
         return;
       }
-      mesh.castShadow = on;
-      mesh.receiveShadow = on;
-      if (on) {
-        meshCast += 1;
-        meshReceive += 1;
-      }
+      const cast = on && mesh.userData.castWhenOn !== false;
+      const receive = on && mesh.userData.receiveWhenOn !== false;
+      mesh.castShadow = cast;
+      mesh.receiveShadow = receive;
+      if (cast) meshCast += 1;
+      if (receive) meshReceive += 1;
       bumpMaterials(mesh);
     });
   }

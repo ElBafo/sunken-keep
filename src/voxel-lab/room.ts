@@ -164,6 +164,8 @@ function makeOccluder(
   const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
   mesh.name = name;
   mesh.position.set(x, y, z);
+  mesh.userData.castWhenOn = true;
+  mesh.userData.receiveWhenOn = true;
   mesh.castShadow = true;
   mesh.receiveShadow = true;
   return mesh;
@@ -242,9 +244,13 @@ export async function buildRoom(): Promise<BuiltRoom> {
     const rough = roughByFile.get(file);
     const geo = geometryFrom(mergeMeshes(meshes));
     if (!png || !rough || !geo) continue;
+    const isFloor = (FLOOR_FILES as readonly string[]).includes(file);
     const mesh = new THREE.Mesh(geo, voxelMaterial(png.texture, rough));
-    mesh.castShadow = true;
+    // Floors receive only — self-shadow on 1 cm relief eats crate/pillar umbras.
+    mesh.userData.castWhenOn = !isFloor;
+    mesh.castShadow = !isFloor;
     mesh.receiveShadow = true;
+    mesh.name = isFloor ? `floor:${file}` : file;
     voxelGroup.add(mesh);
   }
 
@@ -280,8 +286,8 @@ export async function buildRoom(): Promise<BuiltRoom> {
     torchFlames.push(flame);
   };
 
-  placeSconce(CELL * 1.0, 1.32, 0.07, 0, [0, 0, 0.16]);
-  placeSconce(CELL * 2.0, 1.32, 0.07, 0, [0, 0, 0.16]);
+  placeSconce(CELL * 1.0, 1.32, 0.12, 0, [0, 0, 0.16]);
+  placeSconce(CELL * 2.0, 1.32, 0.12, 0, [0, 0, 0.16]);
 
   const lampH = 0.72;
   const lampW = lampH * (lampPng.img.naturalWidth / lampPng.img.naturalHeight);
@@ -316,8 +322,10 @@ export async function buildRoom(): Promise<BuiltRoom> {
   // Obvious occluders so the Shadows toggle is not a no-op on a phone.
   const wallTex = pngs.get(WALL_FILES[0])!.texture;
   const floorTex = pngs.get(FLOOR_FILES[0])!.texture;
-  const crate = makeOccluder('lab-crate', floorTex, 0.72, 0.55, 0.72, 2.35, 0.275, 1.45);
-  const pillar = makeOccluder('lab-pillar', wallTex, 0.42, 2.15, 0.42, 5.52, 1.075, 2.15);
+  // Near the north wall, offset from center so their umbras are visible on
+  // the open floor and brick instead of sitting in the camera's face.
+  const crate = makeOccluder('lab-crate', floorTex, 0.7, 0.55, 0.7, 2.55, 0.275, 1.35);
+  const pillar = makeOccluder('lab-pillar', wallTex, 0.4, 1.85, 0.4, 4.95, 0.925, 1.55);
   propsGroup.add(crate, pillar);
 
   flatGroup.visible = false;

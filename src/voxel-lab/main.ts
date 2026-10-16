@@ -14,7 +14,10 @@ import {
   LANTERN_FLICKER_MS,
   LANTERN_HOLD,
   LANTERN_INTENSITY,
-  LANTERN_SHADOW_MAP,
+  LANTERN_SPOT_ANGLE,
+  LANTERN_SPOT_INTENSITY,
+  LANTERN_SPOT_MAP_DESKTOP,
+  LANTERN_SPOT_MAP_MOBILE,
   LOOK_SENS,
   MOVE_MS,
   TURN_MS,
@@ -51,7 +54,7 @@ type LabApi = {
   setLamp: (on: boolean) => void;
   turnLeft: () => void;
   turnRight: () => void;
-  meanLuma: () => number;
+  meanLuma: (band?: { y0?: number; y1?: number }) => number;
   debugShadowState: () => {
     shadowMapEnabled: boolean;
     lightCast: number;
@@ -104,9 +107,9 @@ async function boot(): Promise<void> {
   camera.rotation.order = 'YXZ';
 
   // Keep fill dim so torch/lantern umbras read as real shadows on a phone.
-  const ambient = new THREE.HemisphereLight(0x2a241c, 0x080605, 0.08);
+  const ambient = new THREE.HemisphereLight(0x2a241c, 0x080605, 0.04);
   scene.add(ambient);
-  scene.add(new THREE.AmbientLight(0x1c1814, 0.03));
+  scene.add(new THREE.AmbientLight(0x1c1814, 0.015));
 
   const shadowSize = isMobile() ? SHADOW_MAP_MOBILE : SHADOW_MAP_DESKTOP;
   const makeTorch = (x: number, y: number, z: number): THREE.PointLight => {
@@ -117,16 +120,38 @@ async function boot(): Promise<void> {
     light.shadow.camera.near = 0.05;
     light.shadow.camera.far = TORCH_DISTANCE;
     light.shadow.camera.updateProjectionMatrix();
-    light.shadow.bias = -0.0006;
-    light.shadow.normalBias = 0.02;
+    light.shadow.bias = -0.0004;
+    light.shadow.normalBias = 0.008;
     light.shadow.radius = 1;
     light.shadow.intensity = 1;
     scene.add(light);
     return light;
   };
 
-  const torchA = makeTorch(CELL * 1.0, 1.48, 0.38);
-  const torchB = makeTorch(CELL * 2.0, 1.48, 0.38);
+  const torchA = makeTorch(CELL * 1.0, 1.48, 0.48);
+  const torchB = makeTorch(CELL * 2.0, 1.48, 0.48);
+
+  const makeTorchSpot = (x: number, y: number, z: number, tx: number, ty: number, tz: number): THREE.SpotLight => {
+    const spot = new THREE.SpotLight(TORCH_COLOR, 10, 7.5, Math.PI / 4.8, 0.32, 1.4);
+    spot.position.set(x, y, z);
+    spot.target.position.set(tx, ty, tz);
+    spot.castShadow = true;
+    spot.shadow.mapSize.set(shadowSize, shadowSize);
+    spot.shadow.bias = -0.00015;
+    spot.shadow.normalBias = 0.012;
+    spot.shadow.radius = 1;
+    spot.shadow.intensity = 1;
+    spot.shadow.camera.near = 0.2;
+    spot.shadow.camera.far = 8;
+    spot.shadow.camera.updateProjectionMatrix();
+    scene.add(spot);
+    scene.add(spot.target);
+    return spot;
+  };
+  // Aimed into the room so crate/pillar throw long floor umbras (point lights
+  // light the sconce wall; cubemap shadows alone were too faint on a phone).
+  const torchSpotA = makeTorchSpot(CELL * 1.0, 1.48, 0.48, 3.2, 0.12, 3.3);
+  const torchSpotB = makeTorchSpot(CELL * 2.0, 1.48, 0.48, 4.3, 0.12, 3.3);
 
   const lampLight = new THREE.PointLight(LAMP_COLOR, 0, LAMP_DISTANCE, 1.6);
   lampLight.position.set(CELL * 1.5, 1.35, 0.35);
@@ -135,24 +160,42 @@ async function boot(): Promise<void> {
   lampLight.shadow.camera.near = 0.05;
   lampLight.shadow.camera.far = LAMP_DISTANCE;
   lampLight.shadow.camera.updateProjectionMatrix();
-  lampLight.shadow.bias = -0.0006;
-  lampLight.shadow.normalBias = 0.02;
+  lampLight.shadow.bias = -0.0004;
+  lampLight.shadow.normalBias = 0.008;
   lampLight.shadow.radius = 1;
   lampLight.shadow.intensity = 1;
   scene.add(lampLight);
 
   const lanternLight = new THREE.PointLight(LANTERN_COLOR, LANTERN_INTENSITY, LANTERN_DISTANCE, 2);
   lanternLight.position.set(LANTERN_HOLD[0], LANTERN_HOLD[1], LANTERN_HOLD[2]);
-  lanternLight.castShadow = true;
-  lanternLight.shadow.mapSize.set(LANTERN_SHADOW_MAP, LANTERN_SHADOW_MAP);
-  lanternLight.shadow.camera.near = 0.05;
-  lanternLight.shadow.camera.far = LANTERN_DISTANCE;
-  lanternLight.shadow.camera.updateProjectionMatrix();
-  lanternLight.shadow.bias = -0.0006;
-  lanternLight.shadow.normalBias = 0.02;
-  lanternLight.shadow.radius = 1;
-  lanternLight.shadow.intensity = 1;
+  // Point fill is omnidirectional; the spot carries the visible shadow so a
+  // crate/pillar silhouette actually lands on the wall in front of the camera.
+  lanternLight.castShadow = false;
   camera.add(lanternLight);
+
+  const lanternSpotMap = isMobile() ? LANTERN_SPOT_MAP_MOBILE : LANTERN_SPOT_MAP_DESKTOP;
+  const lanternSpot = new THREE.SpotLight(
+    LANTERN_COLOR,
+    LANTERN_SPOT_INTENSITY,
+    LANTERN_DISTANCE,
+    LANTERN_SPOT_ANGLE,
+    0.35,
+    1.6
+  );
+  lanternSpot.name = 'lantern-spot';
+  lanternSpot.position.set(LANTERN_HOLD[0], LANTERN_HOLD[1], LANTERN_HOLD[2]);
+  lanternSpot.target.position.set(LANTERN_HOLD[0], LANTERN_HOLD[1] - 0.2, LANTERN_HOLD[2] - 4);
+  lanternSpot.castShadow = true;
+  lanternSpot.shadow.mapSize.set(lanternSpotMap, lanternSpotMap);
+  lanternSpot.shadow.bias = -0.0002;
+  lanternSpot.shadow.normalBias = 0.01;
+  lanternSpot.shadow.radius = 1;
+  lanternSpot.shadow.intensity = 1;
+  lanternSpot.shadow.camera.near = 0.12;
+  lanternSpot.shadow.camera.far = LANTERN_DISTANCE;
+  lanternSpot.shadow.camera.updateProjectionMatrix();
+  camera.add(lanternSpot);
+  camera.add(lanternSpot.target);
   scene.add(camera);
 
   loading.textContent = 'Meshing voxels…';
@@ -211,8 +254,10 @@ async function boot(): Promise<void> {
       lights: [
         { light: torchA, active: true },
         { light: torchB, active: true },
+        { light: torchSpotA, active: true },
+        { light: torchSpotB, active: true },
         { light: lampLight, active: lampLit },
-        { light: lanternLight, active: lanternOn }
+        { light: lanternSpot, active: lanternOn }
       ],
       roots: [scene]
     });
@@ -227,6 +272,7 @@ async function boot(): Promise<void> {
   const setLantern = (on: boolean): void => {
     lanternOn = on;
     lanternLight.intensity = on ? LANTERN_INTENSITY : 0;
+    lanternSpot.intensity = on ? LANTERN_SPOT_INTENSITY : 0;
     syncShadows();
     btnLantern.textContent = on ? 'Lantern on' : 'Lantern off';
     btnLantern.setAttribute('aria-pressed', on ? 'true' : 'false');
@@ -437,13 +483,16 @@ async function boot(): Promise<void> {
     },
     turnLeft: () => turn(1),
     turnRight: () => turn(-1),
-    meanLuma: () => {
+    meanLuma: (band) => {
       renderer.render(scene, camera);
       const gl = renderer.getContext();
       const w = gl.drawingBufferWidth;
       const h = gl.drawingBufferHeight;
-      const pixels = new Uint8Array(w * h * 4);
-      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+      const y0 = Math.max(0, Math.floor((band?.y0 ?? 0) * h));
+      const y1 = Math.min(h, Math.ceil((band?.y1 ?? 1) * h));
+      const rows = Math.max(1, y1 - y0);
+      const pixels = new Uint8Array(w * rows * 4);
+      gl.readPixels(0, y0, w, rows, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
       let sum = 0;
       const n = pixels.length / 4;
       for (let i = 0; i < n; i++) {
@@ -481,18 +530,20 @@ async function boot(): Promise<void> {
 
     const t = now * 0.001;
     const flicker = preserveBuffer ? 0 : 1;
-    torchA.intensity =
-      TORCH_INTENSITY * (1 + flicker * (0.07 * Math.sin(t * 6.1) + 0.04 * Math.sin(t * 13.7)));
-    torchB.intensity =
-      TORCH_INTENSITY * (1 + flicker * (0.07 * Math.sin(t * 5.4 + 1.2) + 0.04 * Math.sin(t * 11.9)));
+    const flickA = 1 + flicker * (0.07 * Math.sin(t * 6.1) + 0.04 * Math.sin(t * 13.7));
+    const flickB = 1 + flicker * (0.07 * Math.sin(t * 5.4 + 1.2) + 0.04 * Math.sin(t * 11.9));
+    torchA.intensity = TORCH_INTENSITY * flickA;
+    torchB.intensity = TORCH_INTENSITY * flickB;
+    torchSpotA.intensity = 10 * flickA;
+    torchSpotB.intensity = 10 * flickB;
     if (lampLit) {
       lampLight.intensity =
         LAMP_INTENSITY * (1 + flicker * (0.03 * Math.sin(t * 2.4) + 0.02 * Math.sin(t * 7.1)));
     }
     if (lanternOn) {
-      lanternLight.intensity =
-        LANTERN_INTENSITY *
-        (1 + flicker * LANTERN_FLICKER * Math.sin((now / LANTERN_FLICKER_MS) * Math.PI * 2));
+      const k = 1 + flicker * LANTERN_FLICKER * Math.sin((now / LANTERN_FLICKER_MS) * Math.PI * 2);
+      lanternLight.intensity = LANTERN_INTENSITY * k;
+      lanternSpot.intensity = LANTERN_SPOT_INTENSITY * k;
     }
 
     if (now - flameT > 200) {
