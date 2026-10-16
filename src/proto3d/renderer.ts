@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { fetchJsonCached } from './asset-cache';
 import { CAMERA_FAR, CAMERA_FOV, CAMERA_NEAR, FOG_COLOR, FOG_FAR, FOG_NEAR } from './constants';
+import { type DevResMode, internalPixelSize } from './dev-opt-in';
 import { getLayoutMode } from './phone-layout';
 
 // Enable Three.js color management for proper sRGB handling
@@ -21,6 +22,8 @@ export class PixelRenderer {
   /** Logical 3D view size from layout585.json `view`. */
   viewWidth: number;
   viewHeight: number;
+  /** Internal 3D buffer width. CSS/HUD stay at the layout view size. */
+  internalRes: DevResMode = 270;
 
   constructor(canvas: HTMLCanvasElement, viewWidth: number, viewHeight: number) {
     this.canvas = canvas;
@@ -42,9 +45,9 @@ export class PixelRenderer {
     this.camera.rotation.order = 'YXZ';
     this.camera.position.set(0, 0, 0);
     
-    // WebGL renderer with preserveDrawingBuffer only for ?test=1
+    // WebGL renderer with preserveDrawingBuffer only for ?test=1 / ?dev=1
     const params = new URLSearchParams(window.location.search);
-    const preserveBuffer = params.get('test') === '1';
+    const preserveBuffer = params.get('test') === '1' || params.get('dev') === '1' || params.get('dev') === 'true';
     
     this.renderer = new THREE.WebGLRenderer({ 
       canvas,
@@ -225,34 +228,57 @@ export class PixelRenderer {
     this.finalMaterial.uniforms.paletteEnabled.value = enabled ? 1.0 : 0.0;
   }
   
+  nativeViewWidth(): number {
+    const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1;
+    const cssW = this.canvas.getBoundingClientRect().width || this.viewWidth;
+    return Math.max(1, Math.round(cssW * dpr));
+  }
+
+  setInternalResolution(mode: DevResMode) {
+    this.internalRes = mode;
+    this.resize();
+  }
+
+  internalBufferSize(): { w: number; h: number } {
+    return { w: this.renderTarget.width, h: this.renderTarget.height };
+  }
+
+  captureViewPng(): string {
+    this.render();
+    return this.canvas.toDataURL('image/png');
+  }
+
   resize() {
-    const w = this.viewWidth;
-    const h = this.viewHeight;
+    const viewW = this.viewWidth;
+    const viewH = this.viewHeight;
+    const nativeW = this.nativeViewWidth();
     if (getLayoutMode() === 'edge') {
       const parent = this.canvas.parentElement;
-      const cssW = parent?.clientWidth || w;
-      const cssH = Math.max(1, parent?.clientHeight || h);
+      const cssW = parent?.clientWidth || viewW;
+      const cssH = Math.max(1, parent?.clientHeight || viewH);
       const aspect = cssW / cssH;
-      const pixelH = Math.max(1, Math.round((w * cssH) / cssW));
-      if (this.renderTarget.width !== w || this.renderTarget.height !== pixelH) {
-        this.renderTarget.setSize(w, pixelH);
+      const pixelW = this.internalRes === 'native' ? nativeW : this.internalRes;
+      const pixelH = Math.max(1, Math.round(pixelW / aspect));
+      if (this.renderTarget.width !== pixelW || this.renderTarget.height !== pixelH) {
+        this.renderTarget.setSize(pixelW, pixelH);
       }
       this.camera.aspect = aspect;
       this.camera.updateProjectionMatrix();
-      this.renderer.setSize(w, pixelH, false);
+      this.renderer.setSize(pixelW, pixelH, false);
       this.canvas.style.width = '100%';
       this.canvas.style.height = '100%';
       return;
     }
-    // Internal 3D resolution is fixed to camera.json `view`. CSS scales the 270×585 stage.
-    if (this.renderTarget.width !== w || this.renderTarget.height !== h) {
-      this.renderTarget.setSize(w, h);
+    // CSS stays at the layout view box. Only the 3D buffer grows (dev res toggle).
+    const { w: pixelW, h: pixelH } = internalPixelSize(this.internalRes, viewW, viewH, nativeW);
+    if (this.renderTarget.width !== pixelW || this.renderTarget.height !== pixelH) {
+      this.renderTarget.setSize(pixelW, pixelH);
     }
-    this.camera.aspect = w / h;
+    this.camera.aspect = viewW / viewH;
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize(w, h, false);
-    this.canvas.style.width = `${w}px`;
-    this.canvas.style.height = `${h}px`;
+    this.renderer.setSize(pixelW, pixelH, false);
+    this.canvas.style.width = `${viewW}px`;
+    this.canvas.style.height = `${viewH}px`;
   }
   
   render() {

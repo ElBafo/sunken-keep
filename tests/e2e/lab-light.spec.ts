@@ -25,6 +25,8 @@ type Proto3d = {
   getAmbient: () => number;
   sprites: () => Array<{ item?: string; x: number; y: number; kind: string }>;
   regionStats: (x0: number, y0: number, x1: number, y1: number) => Region;
+  toggleSettings: () => void;
+  settingsOpen: () => boolean;
 };
 
 test.use(devices['iPhone 15']);
@@ -178,14 +180,25 @@ test('lab light screenshots, freeze, and fps vs default', async ({ page }) => {
   });
 
   const menu = page.locator('#settings-overlay');
-  await page.locator('#btn-menu').dispatchEvent('pointerup');
+  await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.toggleSettings());
   await expect(menu).toBeVisible();
   await expect(page.locator('#settings-lab-light-label')).toBeVisible();
+  await expect(page.locator('#btn-lab-light-on')).toHaveText(/Lab/i);
+  await expect(page.locator('#btn-lab-light-off')).toHaveText(/Classic/i);
+  await expect(page.locator('#btn-voxel-on')).toHaveText(/On/i);
+  await expect(page.locator('#btn-voxel-off')).toHaveText(/Off/i);
+  await page.screenshot({ path: `${OUT}/lab_settings_menu.png`, fullPage: false });
   await page.locator('#btn-lab-light-on').click();
-  await page.waitForTimeout(300);
+  await page.waitForTimeout(200);
+  await page.locator('#btn-voxel-off').click();
+  await page.locator('#btn-settings-close').click();
+  await expect(menu).toBeHidden();
   expect(
     await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.labLight())
   ).toBe(true);
+  expect(
+    await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.voxel())
+  ).toBe(false);
 
   const report = {
     default: offStats,
