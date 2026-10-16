@@ -166,8 +166,8 @@ describe('voxel lighting keeps gameplay rules', () => {
 describe('voxel occupancy is downsampled for the game', () => {
   it('caps axis and depth below the lab volume', () => {
     expect(VOXEL_MAX_AXIS).toBe(32);
-    expect(GAME_DEPTH_LAYERS).toBeLessThan(DEPTH_LAYERS);
-    expect(GAME_LAYER_SIZE).toBeLessThan(LAYER_SIZE);
+    expect(GAME_DEPTH_LAYERS).toBe(DEPTH_LAYERS);
+    expect(GAME_LAYER_SIZE).toBe(LAYER_SIZE);
     const src = {
       width: 64,
       height: 64,

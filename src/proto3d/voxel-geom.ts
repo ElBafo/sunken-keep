@@ -6,9 +6,9 @@ import { CELL_SIZE, WALL_BOTTOM, WALL_TOP } from './constants';
 import { flipUVsX, rotateUVs } from './texture-variants';
 
 /** Game-local occupancy (lab DEPTH_LAYERS/LAYER_SIZE stay on the lab page). */
-export const GAME_DEPTH_LAYERS = 2;
-export const GAME_LAYER_SIZE = 0.008;
-/** Cap greedy resolution so a wall is tens of thousands of tris, not hundreds. */
+export const GAME_DEPTH_LAYERS = 3;
+export const GAME_LAYER_SIZE = 0.01;
+/** Cap greedy resolution so a wall is tens of thousands of tris, not hundreds of thousands. */
 export const VOXEL_MAX_AXIS = 32;
 
 /** Keep relief inside the solid: front of the volume sits this far behind the original plane. */
@@ -153,6 +153,27 @@ export function collapseDepth(
   return { volume: out, dims: [W, H, newD] };
 }
 
+/** Keep mortar 1-deep and stone 2–N deep so greedy meshing still has brick relief. */
+export function remapColumnDepth(
+  volume: Uint8Array,
+  dims: [number, number, number],
+  newD: number
+): { volume: Uint8Array; dims: [number, number, number] } {
+  const [W, H, D] = dims;
+  if (newD === D) return { volume, dims };
+  const out = new Uint8Array(W * H * newD);
+  for (let i = 0; i < W * H; i++) {
+    let steps = 0;
+    for (let d = 0; d < D; d++) {
+      if (volume[i + d * W * H]) steps += 1;
+    }
+    if (steps === 0) continue;
+    const keep = steps <= 1 ? 1 : Math.min(newD, Math.max(2, Math.round((steps * newD) / D)));
+    for (let d = 0; d < keep; d++) out[i + d * W * H] = 1;
+  }
+  return { volume: out, dims: [W, H, newD] };
+}
+
 const geomCache = new Map<string, CachedVoxelGeom>();
 const pbrCache = new Map<string, THREE.DataTexture>();
 
@@ -227,9 +248,9 @@ export function getVoxelGeometry(
   const image = imageDataFromMap(map);
   if (!image) return null;
   const src = volumeFromImageData(downsampleImageData(image));
-  const collapsed = collapseDepth(src.volume, src.dims, GAME_DEPTH_LAYERS);
+  const remapped = remapColumnDepth(src.volume, src.dims, GAME_DEPTH_LAYERS);
   const built = buildVolumeForKind(
-    { volume: collapsed.volume, dims: collapsed.dims, voxelCount: 0, roughness: src.roughness },
+    { volume: remapped.volume, dims: remapped.dims, voxelCount: 0, roughness: src.roughness },
     kind
   );
   const [W, H] = built.dims;
