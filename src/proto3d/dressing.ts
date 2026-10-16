@@ -182,7 +182,7 @@ export class Dressing {
     destCamera?: THREE.Camera
   ) {
     this.group.traverse((obj) => {
-      if (!(obj instanceof THREE.Mesh)) return;
+      if (!(obj as THREE.Mesh).isMesh) return;
       if (obj.userData.kind === 'water-edge') return;
       const face = obj.userData.face;
       if (face !== 'N' && face !== 'E' && face !== 'S' && face !== 'W') return;

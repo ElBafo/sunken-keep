@@ -451,5 +451,8 @@ describe('shared wall-mount near-plane cull', () => {
     expect(main).toContain('this.cullWallMounts(performance.now())');
     expect(main).toContain('destCullCam');
     expect(main).toContain('listVisibleNearBand');
+    expect(cull).toContain('.isMesh');
+    expect(cull).toContain('.isSprite');
+    expect(cull).toContain('two Three copies');
   });
 });

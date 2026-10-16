@@ -19,8 +19,14 @@ export function nearPlaneCulled(depth: number): boolean {
   return depth < WALL_MOUNT_NEAR_CULL;
 }
 
+/**
+ * Duck-type, not `instanceof`. The multi-page Vite build (proto3d + voxel-lab)
+ * splits a shared `three.module-*.js` chunk. If two Three copies ever load,
+ * `instanceof THREE.Mesh` is false and centre-cull silently no-ops — the
+ * #33-alone vs live-main flash split. `.isMesh` / `.isSprite` stay true.
+ */
 function isDrawnSurface(obj: THREE.Object3D): obj is THREE.Mesh | THREE.Sprite {
-  return obj instanceof THREE.Mesh || obj instanceof THREE.Sprite;
+  return !!(obj as THREE.Mesh).isMesh || !!(obj as THREE.Sprite).isSprite;
 }
 
 export function ancestorHidden(obj: THREE.Object3D, root: THREE.Object3D | null): boolean {
@@ -101,11 +107,11 @@ export function objectNearPlaneCulled(root: THREE.Object3D, camera: THREE.Camera
     if (culled) return;
     if (!isDrawnSurface(obj) || !obj.visible) return;
     if (ancestorHidden(obj, root)) return;
-    if (obj instanceof THREE.Mesh) {
-      if (meshNearCulled(obj, camera)) culled = true;
+    if ((obj as THREE.Mesh).isMesh) {
+      if (meshNearCulled(obj as THREE.Mesh, camera)) culled = true;
       return;
     }
-    if (spriteNearCulled(obj, camera)) culled = true;
+    if (spriteNearCulled(obj as THREE.Sprite, camera)) culled = true;
   });
   return culled;
 }
@@ -148,8 +154,9 @@ export function listVisibleNearBand(
     if (!isDrawnSurface(obj) || !obj.visible) return;
     if (ancestorHidden(obj, scene)) return;
     if (!isWallMount(obj)) return;
-    const culled =
-      obj instanceof THREE.Mesh ? meshNearCulled(obj, camera) : spriteNearCulled(obj, camera);
+    const culled = (obj as THREE.Mesh).isMesh
+      ? meshNearCulled(obj as THREE.Mesh, camera)
+      : spriteNearCulled(obj as THREE.Sprite, camera);
     if (!culled) return;
     items.push({
       kind: String(obj.userData.kind ?? (obj.userData.isSconce ? 'sconce' : 'wall-mount')),

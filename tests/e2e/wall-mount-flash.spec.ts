@@ -17,12 +17,16 @@ const DIR_DELTA = [
 ] as const;
 const PROP_WALL_DIR: Record<string, number> = { N: 0, E: 1, S: 2, W: 3 };
 
+type MoveResult = { result: string; after: { x: number; y: number; dir: number } };
+type NearHit = { t: number; items: Array<{ kind: string; x: number; y: number }> };
+
 type Proto3d = {
   ready?: boolean;
   setPosition: (x: number, y: number, dir: number) => void;
-  tryMoveBackward: () => { result: string; after: { x: number; y: number; dir: number } };
+  tryMoveBackward: () => MoveResult;
+  tryMoveForward: () => MoveResult;
   beginNearBandLog: () => void;
-  endNearBandLog: () => Array<{ t: number; items: Array<{ kind: string; x: number; y: number }> }>;
+  endNearBandLog: () => NearHit[];
   nearBandVisible: () => Array<{ kind: string; x: number; y: number }>;
   torchStates: () => Array<{ x: number; y: number; face: string }>;
 };
@@ -37,7 +41,7 @@ function backIntoSconce(s: { x: number; y: number; face: string }) {
   return { fromX: room.x + dx, fromY: room.y + dy, dir };
 }
 
-test('full multi-page build: no wall-mount flash on 20 back-steps per mount', async ({ page }) => {
+test('full multi-page build: 20 backs each, 0 flashes, all 11 mounts', async ({ page }) => {
   test.setTimeout(180000);
 
   await page.goto(`${BASE_URL}/proto3d.html?test=1&debug=1`);
@@ -49,43 +53,50 @@ test('full multi-page build: no wall-mount flash on 20 back-steps per mount', as
   await page.locator('#tap-to-start').click();
   await page.waitForTimeout(400);
 
-  // Voxel-lab is a sibling entry of this preview build; the game page must
-  // still boot and cull on its own three.js camera.
-  expect(await page.locator('#lab-canvas').count()).toBe(0);
+  expect(await page.locator('#lab-canvas').count(), 'game page must not mount voxel-lab').toBe(0);
 
   const sconces = await page.evaluate(() =>
     (window as unknown as { __proto3d: Proto3d }).__proto3d.torchStates()
   );
   expect(sconces.length, 'floor-1 sconces').toBe(9);
 
-  const paths: Array<{ name: string; fromX: number; fromY: number; dir: number }> = sconces.map((s) => ({
-    name: `sconce ${s.x},${s.y} ${s.face}`,
-    ...backIntoSconce(s)
+  type Path = { name: string; fromX: number; fromY: number; dir: number; move: 'back' | 'forward' };
+  const paths: Path[] = sconces.map((s) => ({
+    name: `sconce ${s.x},${s.y} ${s.face} back-into`,
+    ...backIntoSconce(s),
+    move: 'back'
   }));
-  paths.push({ name: "Pell's lamp", fromX: 12, fromY: 9, dir: 3 });
-  paths.push({ name: 'jar rack', fromX: 10, fromY: 10, dir: 1 });
-  expect(paths.length).toBe(11);
+  // Exact Testie poses
+  paths.push({ name: "Pell's lamp from (12,9) facing east", fromX: 12, fromY: 9, dir: 1, move: 'back' });
+  paths.push({ name: "Pell's lamp step onto (13,9) facing east", fromX: 12, fromY: 9, dir: 1, move: 'forward' });
+  paths.push({ name: 'jar rack from (9,10) facing west', fromX: 9, fromY: 10, dir: 3, move: 'back' });
+  paths.push({ name: 'jar rack back-into from (10,10)', fromX: 10, fromY: 10, dir: 1, move: 'back' });
 
   const flashes: string[] = [];
-  let attempted = 0;
+  const counts: Record<string, number> = {};
+
   for (const path of paths) {
+    counts[path.name] = 0;
     for (let run = 0; run < RUNS; run++) {
       const result = await page.evaluate(
-        async ([x, y, dir]) => {
+        async ([x, y, dir, move]) => {
           const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
           p.setPosition(x, y, dir);
           p.beginNearBandLog();
-          const moved = p.tryMoveBackward();
+          const moved = move === 'forward' ? p.tryMoveForward() : p.tryMoveBackward();
           const t0 = performance.now();
           while (performance.now() - t0 < 420) {
             await new Promise<void>((r) => requestAnimationFrame(() => r()));
           }
           return { moved, log: p.endNearBandLog(), leftover: p.nearBandVisible() };
         },
-        [path.fromX, path.fromY, path.dir] as const
+        [path.fromX, path.fromY, path.dir, path.move] as const
       );
-      if (result.moved.result !== 'ok') continue;
-      attempted += 1;
+      expect(
+        result.moved.result,
+        `${path.name} run ${run + 1} move=${path.move} from (${path.fromX},${path.fromY},${path.dir})`
+      ).toBe('ok');
+      counts[path.name] += 1;
       if (result.log.length || result.leftover.length) {
         flashes.push(
           `${path.name} run ${run + 1}/${RUNS} log=${JSON.stringify(result.log)} leftover=${JSON.stringify(result.leftover)}`
@@ -94,6 +105,8 @@ test('full multi-page build: no wall-mount flash on 20 back-steps per mount', as
     }
   }
 
-  expect(attempted, 'completed back-steps across mounts').toBeGreaterThan(20 * 8);
-  expect(flashes, flashes.slice(0, 6).join('\n')).toEqual([]);
+  for (const path of paths) {
+    expect(counts[path.name], `${path.name} completed runs`).toBe(RUNS);
+  }
+  expect(flashes, flashes.slice(0, 8).join('\n')).toEqual([]);
 });
