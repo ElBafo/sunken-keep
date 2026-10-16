@@ -3420,8 +3420,10 @@ class Game {
     const wantMips = mode !== 'nomip';
     const hideMaps = mode === 'lighting';
     scene.traverse((obj) => {
-      if (!(obj instanceof THREE.Mesh)) return;
-      const mat = obj.material;
+      // Duck-type: the full Vite build can split three.module so instanceof Mesh misses.
+      const mesh = obj as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const mat = mesh.material;
       const mats = Array.isArray(mat) ? mat : [mat];
       for (const m of mats) {
         const basic = m as THREE.MeshBasicMaterial;
@@ -3432,7 +3434,7 @@ class Game {
             basic.needsUpdate = true;
           }
         } else if (this.wallMaps.has(basic) && basic.map !== this.wallMaps.get(basic)) {
-          basic.map = this.wallMaps.get(basic)!;
+          basic.map = this.wallMaps.get(basic) ?? null;
           basic.needsUpdate = true;
         }
         const map = basic.map;
@@ -3440,11 +3442,6 @@ class Game {
         if (!this.wallMipFilters.has(map)) this.wallMipFilters.set(map, map.minFilter);
         map.minFilter = wantMips ? this.wallMipFilters.get(map)! : THREE.NearestFilter;
         map.needsUpdate = true;
-      }
-      if (obj instanceof THREE.Points || obj.userData.skipVertexLighting) {
-        if (mode === 'nodust' || isolate) {
-          if (obj instanceof THREE.Points) obj.visible = false;
-        }
       }
     });
     this.atmosphere.setQuality(isolate || mode === 'nodust' ? 'low' : this.quality);

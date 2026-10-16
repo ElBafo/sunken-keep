@@ -776,9 +776,16 @@ test('proto3d lighting: tile-light frozen, wall terms diagnosed', async ({ page 
       return { dip, min: Math.min(...mid), max: Math.max(...mid), levels8: dip / 8 };
     };
     const albedo = dipOf('albedo');
+    const lantern = dipOf('lantern');
+    const torch = dipOf('torch');
+    const ambient = dipOf('ambient');
     const lighting = dipOf('lighting');
+    const nofog = dipOf('nofog');
+    const nopalette = dipOf('nopalette');
+    const nodust = dipOf('nodust');
+    const nomip = dipOf('nomip');
     const final = dipOf('final');
-    return { albedo, lighting, final };
+    return { albedo, lantern, torch, ambient, lighting, nofog, nopalette, nodust, nomip, final };
   });
   console.log('TERM_DIP (2,1)E', termDip);
   expect(termDip.albedo.levels8, '(2,1)E dip lives in albedo / mortar').toBeGreaterThan(0.5);
@@ -787,6 +794,48 @@ test('proto3d lighting: tile-light frozen, wall terms diagnosed', async ({ page 
     'final dip matches albedo, not a lighting valley'
   ).toBeLessThan(4);
   expect(termDip.lighting.max, 'lighting factor on walls is a high flat field').toBeGreaterThan(180);
+  expect(termDip.ambient.max, 'ambient-only is a dim floor, not the mortar valley').toBeLessThan(40);
+  expect(termDip.lantern.levels8, 'lantern-only is falloff, not the mortar valley').toBeLessThan(
+    termDip.albedo.levels8
+  );
+  expect(
+    Math.abs(termDip.torch.dip - termDip.albedo.dip),
+    'torch-only still shows the albedo mortar dip'
+  ).toBeLessThan(4);
+  expect(
+    Math.abs(termDip.nofog.dip - termDip.final.dip),
+    'fog is not the dip (no vignette / AO overlay in proto3d)'
+  ).toBeLessThan(2);
+  expect(Math.abs(termDip.nopalette.dip - termDip.final.dip), 'palette is not the dip').toBeLessThan(3);
+  expect(Math.abs(termDip.nodust.dip - termDip.final.dip), 'dust is not the dip').toBeLessThan(2);
+  expect(Math.abs(termDip.nomip.dip - termDip.final.dip), 'mips are not the dip').toBeLessThan(3);
+
+  const termShots: Array<[string, string]> = [
+    ['albedo', 'band_diag_21e_albedo_view.png'],
+    ['lantern', 'band_diag_21e_lantern_view.png'],
+    ['torch', 'band_diag_21e_torch_view.png'],
+    ['ambient', 'band_diag_21e_ambient_view.png'],
+    ['lighting', 'band_diag_21e_lighting_view.png'],
+    ['nofog', 'band_diag_21e_nofog_view.png'],
+    ['nopalette', 'band_diag_21e_nopalette_view.png'],
+    ['nodust', 'band_diag_21e_nodust_view.png'],
+    ['nomip', 'band_diag_21e_nomip_view.png'],
+    ['final', 'band_diag_21e_final_view.png']
+  ];
+  for (const [mode, file] of termShots) {
+    await page.evaluate((m) => {
+      const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+      p.setPosition(2, 1, 1);
+      p.setFlickerFrame(2);
+      p.setLightDebug(m);
+    }, mode);
+    await page.waitForTimeout(80);
+    await page.locator('#canvas-container').screenshot({ path: `${OUT}/${file}` });
+    console.log('SHOT', file);
+  }
+  await page.evaluate(() => {
+    (window as unknown as { __proto3d: Proto3d }).__proto3d.setLightDebug('final');
+  });
 
   await page.evaluate(() => {
     (window as unknown as { __proto3d: Proto3d }).__proto3d.setPosition(4, 5, 1);
@@ -797,6 +846,7 @@ test('proto3d lighting: tile-light frozen, wall terms diagnosed', async ({ page 
   );
   console.log('FRAME_STATS (4,5) east', frames);
   expect(frames.n, 'collected frame samples').toBeGreaterThan(20);
-  expect(frames.mean, 'frame samples are finite').toBeGreaterThan(0);
+  expect(frames.mean, 'vertex bake — not the ~80ms fragment-ALU regression').toBeLessThan(60);
+  expect(frames.p95, 'worst frames stay below the 80ms fragment regression').toBeLessThan(78);
 });
 
