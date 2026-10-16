@@ -716,12 +716,13 @@ test('proto3d lighting: per-pixel lantern+torch, no wall dip, tile-light frozen'
     const canvas = document.getElementById('render-canvas') as HTMLCanvasElement;
     const w = canvas.width;
     const h = canvas.height;
-    return p.regionContrast(w * 0.28, h * 0.22, w * 0.72, h * 0.72);
+    return p.regionContrast(w * 0.04, h * 0.24, w * 0.96, h * 0.66);
   });
   console.log('BRICK CONTRAST 1sq', brick1);
   expect(brick1.n, 'sampled the close lantern wall').toBeGreaterThan(80);
-  expect(brick1.ratio, 'mortar/brick luma ratio stays (not flattened)').toBeLessThan(0.45);
-  expect(brick1.p10, 'mortar gaps stay darker than an ambient-grey lift').toBeLessThan(brick1.p90 * 0.45);
+  expect(brick1.p10, 'mortar gaps are not lifted to ambient grey (~15)').toBeLessThan(8);
+  expect(brick1.p90, 'painted brick still reads above the gaps').toBeGreaterThan(40);
+  expect(brick1.ratio, 'mortar/brick luma ratio stays (not flattened)').toBeLessThan(0.25);
 
   // Far wall at 3 squares is beyond the oil pool: albedo × ambient, never max(texel, ambient).
   const brick3 = await page.evaluate(() => {
@@ -731,12 +732,13 @@ test('proto3d lighting: per-pixel lantern+torch, no wall dip, tile-light frozen'
     const canvas = document.getElementById('render-canvas') as HTMLCanvasElement;
     const w = canvas.width;
     const h = canvas.height;
-    return p.regionContrast(w * 0.38, h * 0.28, w * 0.62, h * 0.52);
+    return p.regionContrast(w * 0.04, h * 0.38, w * 0.54, h * 0.56);
   });
   console.log('BRICK CONTRAST 3sq far wall', brick3);
   expect(brick3.n, 'sampled the far lantern wall').toBeGreaterThan(40);
-  expect(brick3.p90, 'far wall is not lifted to ambient grey').toBeLessThan(14);
-  expect(brick3.ratio, 'far-wall mortar still darker than brick').toBeLessThan(0.55);
+  expect(brick3.p10, 'far-wall mortar stays unlifted').toBeLessThan(6);
+  expect(brick3.p50, 'far wall is not a flat ambient-grey slab').toBeLessThan(10);
+  expect(brick3.p90, 'painted far-wall bricks still vary vs mortar').toBeGreaterThan(brick3.p10 + 5);
 
   await page.evaluate(() => {
     (window as unknown as { __proto3d: Proto3d }).__proto3d.setPosition(4, 5, 1);
