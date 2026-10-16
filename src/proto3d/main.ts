@@ -3233,6 +3233,15 @@ class Game {
           : { x: this.player.x, y: this.player.y, dir: this.player.dir };
         return { result, before, after: dest };
       },
+      tryMoveBackward: () => {
+        const before = { x: this.player.x, y: this.player.y };
+        const result = this.player.moveBackward();
+        this.handleMove(result);
+        const dest = this.player.isMoving
+          ? { x: this.player.moveToX, y: this.player.moveToY, dir: this.player.moveToDir }
+          : { x: this.player.x, y: this.player.y, dir: this.player.dir };
+        return { result, before, after: dest };
+      },
       tryTurnLeft: () => {
         if (this.caveInBusy) {
           this.skipCaveIn();

@@ -1,11 +1,6 @@
 import * as THREE from 'three';
-import {
-  CAMERA_EYE_HEIGHT,
-  CAMERA_PITCH,
-  CELL_SIZE,
-  STEP_BOB_AMPLITUDE,
-  cameraOffsetXZ
-} from './constants';
+import { CAMERA_EYE_HEIGHT, CAMERA_PITCH, STEP_BOB_AMPLITUDE } from './constants';
+import { cameraWorldXZ, emitWallPlanes, type WallPlane } from './camera-wall-clear';
 import { FloorData, Tile } from './types';
 import { isBlockingProp } from './wall-props';
 
@@ -26,6 +21,7 @@ export class Player {
   dir: number; // 0=N, 1=E, 2=S, 3=W
   camera: THREE.Camera;
   floorData: FloorData;
+  private wallPlanes: WallPlane[];
   hasKey = false;
   /** Live combat occupancy; when set, this overrides the static tile.monster flag. */
   isOccupiedByMonster: ((x: number, y: number) => boolean) | null = null;
@@ -45,6 +41,7 @@ export class Player {
     this.camera = camera;
     this.camera.rotation.order = 'YXZ';
     this.floorData = floorData;
+    this.wallPlanes = emitWallPlanes(floorData);
     this.x = floorData.startX;
     this.y = floorData.startY;
     this.dir = floorData.startDir;
@@ -107,12 +104,8 @@ export class Player {
   }
 
   poseCamera(gridX: number, gridY: number, rotY: number, bob = 0) {
-    const [ox, oz] = cameraOffsetXZ(rotY);
-    this.camera.position.set(
-      gridX * CELL_SIZE + ox,
-      CAMERA_EYE_HEIGHT + bob,
-      gridY * CELL_SIZE + oz
-    );
+    const cleared = cameraWorldXZ(gridX, gridY, rotY, this.wallPlanes);
+    this.camera.position.set(cleared.x, CAMERA_EYE_HEIGHT + bob, cleared.z);
     this.camera.rotation.order = 'YXZ';
     this.camera.rotation.x = CAMERA_PITCH;
     this.camera.rotation.y = rotY;
