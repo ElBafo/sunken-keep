@@ -32,9 +32,49 @@ type TexOpts = {
 };
 
 /** True for cells that hide a neighbouring wall face. Doors and water are not solid. */
-function occludesWallFace(tile: Tile | undefined): boolean {
+export function occludesWallFace(tile: Tile | undefined): boolean {
   if (!tile) return true;
   return !!tile.wall || (!!tile.secret && !tile.secretOpen);
+}
+
+const INTO_OPEN: ReadonlyArray<{
+  ndx: number;
+  ndy: number;
+  face: 'N' | 'E' | 'S' | 'W';
+  fdx: number;
+  fdz: number;
+}> = [
+  { ndx: 0, ndy: -1, face: 'S', fdx: 0, fdz: 1 },
+  { ndx: 1, ndy: 0, face: 'W', fdx: -1, fdz: 0 },
+  { ndx: 0, ndy: 1, face: 'N', fdx: 0, fdz: -1 },
+  { ndx: -1, ndy: 0, face: 'E', fdx: 1, fdz: 0 }
+];
+
+/** Wall/secret cells that must emit a face into a now-walkable secret. */
+export function neighborFacesIntoCell(
+  floorData: FloorData,
+  x: number,
+  y: number
+): Array<{ cellX: number; cellY: number; face: 'N' | 'E' | 'S' | 'W'; fdx: number; fdz: number }> {
+  const { tiles, width, height } = floorData;
+  const out: Array<{
+    cellX: number;
+    cellY: number;
+    face: 'N' | 'E' | 'S' | 'W';
+    fdx: number;
+    fdz: number;
+  }> = [];
+  for (const spec of INTO_OPEN) {
+    const nx = x + spec.ndx;
+    const ny = y + spec.ndy;
+    if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+    const tile = tiles[ny]?.[nx];
+    if (!tile || tile.door) continue;
+    if (!tile.wall && !tile.secret) continue;
+    if (tile.secret && tile.secretOpen) continue;
+    out.push({ cellX: nx, cellY: ny, face: spec.face, fdx: spec.fdx, fdz: spec.fdz });
+  }
+  return out;
 }
 
 export class SceneBuilder {
@@ -50,6 +90,7 @@ export class SceneBuilder {
   private rubbleMeshes: THREE.Mesh[] = [];
   private dustSprite: THREE.Sprite | null = null;
   private worldGroup: THREE.Group | null = null;
+  private floorData: FloorData | null = null;
   doors = new DoorSystem();
 
   async loadTextures(): Promise<void> {
@@ -212,6 +253,7 @@ export class SceneBuilder {
   buildScene(scene: THREE.Scene, floorData: FloorData) {
     const group = new THREE.Group();
     this.worldGroup = group;
+    this.floorData = floorData;
     this.buildFloorAndCeiling(group, floorData);
     this.buildWalls(group, floorData);
     scene.add(group);
@@ -449,12 +491,75 @@ export class SceneBuilder {
     scene.traverse((obj) => {
       if (!(obj instanceof THREE.Mesh)) return;
       if (obj.userData.kind !== 'secret') return;
+      if (obj.userData.voxelMesh) return;
       if (obj.userData.cellX !== x || obj.userData.cellY !== y) return;
       const mat = obj.material as THREE.MeshBasicMaterial;
       mat.map = open ? this.secretOpen : this.secretClosed;
       mat.transparent = open;
       mat.alphaTest = open ? CUTOUT_ALPHA_TEST : 0;
+      mat.visible = true;
       mat.needsUpdate = true;
     });
+    if (open) this.revealSecretNeighbors(x, y);
+    else this.hideSecretNeighbors(x, y);
+    this.worldGroup?.updateMatrixWorld(true);
+  }
+
+  private hasWallFace(cellX: number, cellY: number, face: string): boolean {
+    const group = this.worldGroup;
+    if (!group) return false;
+    let found = false;
+    group.traverse((obj) => {
+      if (found || !(obj instanceof THREE.Mesh)) return;
+      if (obj.userData.voxelMesh) return;
+      if (obj.userData.cellX !== cellX || obj.userData.cellY !== cellY) return;
+      if (obj.userData.face !== face) return;
+      const kind = obj.userData.kind;
+      if (kind !== 'wall' && kind !== 'secret') return;
+      found = true;
+    });
+    return found;
+  }
+
+  private revealSecretNeighbors(x: number, y: number) {
+    const floorData = this.floorData;
+    const group = this.worldGroup;
+    if (!floorData || !group) return;
+    const { tiles, width, height } = floorData;
+    for (const spec of neighborFacesIntoCell(floorData, x, y)) {
+      if (this.hasWallFace(spec.cellX, spec.cellY, spec.face)) continue;
+      const tile = tiles[spec.cellY][spec.cellX];
+      const mesh = this.buildWallFace(
+        group,
+        tiles,
+        spec.cellX,
+        spec.cellY,
+        width,
+        height,
+        spec.cellX * CELL_SIZE,
+        spec.cellY * CELL_SIZE,
+        spec.fdx,
+        spec.fdz,
+        spec.face,
+        tile
+      );
+      if (!mesh) continue;
+      mesh.userData.secretReveal = true;
+      mesh.userData.revealedIntoX = x;
+      mesh.userData.revealedIntoY = y;
+    }
+  }
+
+  private hideSecretNeighbors(x: number, y: number) {
+    const group = this.worldGroup;
+    if (!group) return;
+    const remove: THREE.Mesh[] = [];
+    group.traverse((obj) => {
+      if (!(obj instanceof THREE.Mesh)) return;
+      if (!obj.userData.secretReveal) return;
+      if (obj.userData.revealedIntoX !== x || obj.userData.revealedIntoY !== y) return;
+      remove.push(obj);
+    });
+    for (const mesh of remove) mesh.parent?.remove(mesh);
   }
 }
