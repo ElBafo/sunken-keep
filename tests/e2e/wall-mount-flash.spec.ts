@@ -1,9 +1,21 @@
 import { test, expect, devices } from '@playwright/test';
-import { DIR_DELTA, wallPropRoom } from '../../src/proto3d/constants';
-import { PROP_WALL_DIR, type PropWall } from '../../src/proto3d/wall-props';
 
 const BASE_URL = 'http://127.0.0.1:4173/sunken-keep';
 const RUNS = 20;
+
+const FACE_INTO_ROOM: Record<string, { nx: number; nz: number }> = {
+  N: { nx: 0, nz: -1 },
+  E: { nx: 1, nz: 0 },
+  S: { nx: 0, nz: 1 },
+  W: { nx: -1, nz: 0 }
+};
+const DIR_DELTA = [
+  [0, -1],
+  [1, 0],
+  [0, 1],
+  [-1, 0]
+] as const;
+const PROP_WALL_DIR: Record<string, number> = { N: 0, E: 1, S: 2, W: 3 };
 
 type Proto3d = {
   ready?: boolean;
@@ -18,8 +30,9 @@ type Proto3d = {
 test.use(devices['iPhone 15']);
 
 function backIntoSconce(s: { x: number; y: number; face: string }) {
-  const room = wallPropRoom(s.x, s.y, s.face as PropWall);
-  const dir = PROP_WALL_DIR[s.face as PropWall];
+  const into = FACE_INTO_ROOM[s.face];
+  const room = { x: s.x + into.nx, y: s.y + into.nz };
+  const dir = PROP_WALL_DIR[s.face];
   const [dx, dy] = DIR_DELTA[dir];
   return { fromX: room.x + dx, fromY: room.y + dy, dir };
 }
@@ -54,6 +67,7 @@ test('full multi-page build: no wall-mount flash on 20 back-steps per mount', as
   expect(paths.length).toBe(11);
 
   const flashes: string[] = [];
+  let attempted = 0;
   for (const path of paths) {
     for (let run = 0; run < RUNS; run++) {
       const result = await page.evaluate(
@@ -71,6 +85,7 @@ test('full multi-page build: no wall-mount flash on 20 back-steps per mount', as
         [path.fromX, path.fromY, path.dir] as const
       );
       if (result.moved.result !== 'ok') continue;
+      attempted += 1;
       if (result.log.length || result.leftover.length) {
         flashes.push(
           `${path.name} run ${run + 1}/${RUNS} log=${JSON.stringify(result.log)} leftover=${JSON.stringify(result.leftover)}`
@@ -79,5 +94,6 @@ test('full multi-page build: no wall-mount flash on 20 back-steps per mount', as
     }
   }
 
+  expect(attempted, 'completed back-steps across mounts').toBeGreaterThan(20 * 8);
   expect(flashes, flashes.slice(0, 6).join('\n')).toEqual([]);
 });
