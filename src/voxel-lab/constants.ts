@@ -17,36 +17,49 @@ export const DEPTH_LAYERS = 3;
 export const LAYER_SIZE = 0.01;
 
 export const MOVE_MS = 260;
+/** 90° turns — same ease window as proto3d (180 ms). */
+export const TURN_MS = 180;
 export const LOOK_SENS = 0.00135;
 export const PITCH_MAX = 0.72;
 
-export const SHADOW_MAP_MOBILE = 128;
-export const SHADOW_MAP_DESKTOP = 256;
+/** Cubemap faces; 128 was too coarse for brick relief + sconce silhouettes. */
+export const SHADOW_MAP_MOBILE = 256;
+export const SHADOW_MAP_DESKTOP = 512;
 
 export const TORCH_COLOR = 0xff9a48;
-export const TORCH_INTENSITY = 10;
-export const TORCH_DISTANCE = 8;
+/** Local pools so a second torch cannot fill in the first torch's umbra. */
+export const TORCH_INTENSITY = 8;
+export const TORCH_DISTANCE = 3.2;
 export const LAMP_COLOR = 0xffc070;
-export const LAMP_INTENSITY = 11;
-export const LAMP_DISTANCE = 11;
+export const LAMP_INTENSITY = 9;
+export const LAMP_DISTANCE = 6;
 
-/** Wren's held lantern — warm, 1.5-tile pool, ±3% over 3.5 s (game constants). */
+/** Held lantern — long enough to throw crate/pillar silhouettes onto the far wall. */
 export const LANTERN_COLOR = 0xead1a3;
-export const LANTERN_INTENSITY = 5.5;
-export const LANTERN_DISTANCE = 1.5 * CELL;
+export const LANTERN_INTENSITY = 8.5;
+export const LANTERN_DISTANCE = 2.2 * CELL;
 export const LANTERN_FLICKER = 0.03;
 export const LANTERN_FLICKER_MS = 3500;
 /** Camera-local: +X right, +Y up, −Z forward. Slightly below eye, right hand. */
 export const LANTERN_HOLD: readonly [number, number, number] = [0.16, -0.07, -0.22];
-export const LANTERN_SHADOW_MAP = 128;
+/** Forward spot so crate/pillar umbras read on the far wall (cubemaps stay on the torches). */
+export const LANTERN_SPOT_MAP_MOBILE = 512;
+export const LANTERN_SPOT_MAP_DESKTOP = 1024;
+export const LANTERN_SPOT_ANGLE = Math.PI / 4.2;
+export const LANTERN_SPOT_INTENSITY = 7;
 
 export const MAT_DRY = 0;
 export const MAT_WET = 1;
 export const MAT_MOSS = 2;
 /** Roughness map bytes (G channel). Wet glints vs moss/mortar matte. */
-export const ROUGH_WET = 12;
+export const ROUGH_WET = 64;
 export const ROUGH_STONE = 150;
 export const ROUGH_MATTE = 252;
+/** Drop 1–2 texel sparkles; keep a 2×2 (or bigger) wet highlight. */
+export const MIN_WET_NEIGHBORS = 2;
+export const MIN_WET_BLOB = 4;
+/** Push greedy faces out along their normal so coplanar cube edges do not z-fight. */
+export const FACE_INSET = 0.00025;
 export type MaterialId = typeof MAT_DRY | typeof MAT_WET | typeof MAT_MOSS;
 export const MATERIAL_NAMES = ['dry', 'wet', 'moss'] as const;
 

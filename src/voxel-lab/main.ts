@@ -14,9 +14,13 @@ import {
   LANTERN_FLICKER_MS,
   LANTERN_HOLD,
   LANTERN_INTENSITY,
-  LANTERN_SHADOW_MAP,
+  LANTERN_SPOT_ANGLE,
+  LANTERN_SPOT_INTENSITY,
+  LANTERN_SPOT_MAP_DESKTOP,
+  LANTERN_SPOT_MAP_MOBILE,
   LOOK_SENS,
   MOVE_MS,
+  TURN_MS,
   PITCH_MAX,
   ROOM_TILES,
   SHADOW_MAP_DESKTOP,
@@ -25,7 +29,9 @@ import {
   TORCH_DISTANCE,
   TORCH_INTENSITY
 } from './constants';
+import { lookColors } from './look';
 import { buildRoom, loadFlameTextures } from './room';
+import { applyShadowToggle } from './shadows';
 
 THREE.ColorManagement.enabled = true;
 
@@ -42,10 +48,25 @@ type LabApi = {
   lantern: boolean;
   mode: 'voxel' | 'flat';
   lampLit: boolean;
+  shadowMapEnabled: boolean;
+  warmth: number;
+  matchGame: boolean;
   setShadows: (on: boolean) => void;
   setLantern: (on: boolean) => void;
   setMode: (mode: 'voxel' | 'flat') => void;
   setLamp: (on: boolean) => void;
+  setWarmth: (warmth: number) => void;
+  setMatchGame: (on: boolean) => void;
+  turnLeft: () => void;
+  turnRight: () => void;
+  meanLuma: (band?: { y0?: number; y1?: number }) => number;
+  meanRgb: (band?: { y0?: number; y1?: number }) => { r: number; g: number; b: number; rb: number };
+  debugShadowState: () => {
+    shadowMapEnabled: boolean;
+    lightCast: number;
+    meshCast: number;
+    meshReceive: number;
+  };
 };
 
 const STATS_WINDOW_MS = 2000;
@@ -66,6 +87,10 @@ async function boot(): Promise<void> {
   const btnMode = document.getElementById('btn-mode') as HTMLButtonElement;
   const btnFwd = document.getElementById('btn-fwd') as HTMLButtonElement;
   const btnBack = document.getElementById('btn-back') as HTMLButtonElement;
+  const btnLeft = document.getElementById('btn-left') as HTMLButtonElement;
+  const btnRight = document.getElementById('btn-right') as HTMLButtonElement;
+  const btnMatch = document.getElementById('btn-match') as HTMLButtonElement;
+  const sliderWarmth = document.getElementById('slider-warmth') as HTMLInputElement;
   const loading = document.getElementById('loading')!;
 
   const preserveBuffer = new URLSearchParams(location.search).get('test') === '1';
@@ -78,6 +103,7 @@ async function boot(): Promise<void> {
   renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NoToneMapping;
+  renderer.toneMappingExposure = 1;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.setClearColor(0x050403, 1);
@@ -89,9 +115,42 @@ async function boot(): Promise<void> {
   const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, CAMERA_NEAR, CAMERA_FAR);
   camera.rotation.order = 'YXZ';
 
-  const ambient = new THREE.HemisphereLight(0x2a241c, 0x080605, 0.22);
-  scene.add(ambient);
-  scene.add(new THREE.AmbientLight(0x1c1814, 0.08));
+  // Game 3D view: LinearSRGBColorSpace + a blit that does linearToSRGB (no ACES).
+  const matchRT = new THREE.WebGLRenderTarget(1, 1, {
+    minFilter: THREE.NearestFilter,
+    magFilter: THREE.NearestFilter,
+    format: THREE.RGBAFormat,
+    type: THREE.UnsignedByteType,
+    colorSpace: THREE.LinearSRGBColorSpace
+  });
+  const blitScene = new THREE.Scene();
+  const blitCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  const blitMat = new THREE.ShaderMaterial({
+    uniforms: { tDiffuse: { value: null } },
+    vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position, 1.0); }`,
+    fragmentShader: `
+      uniform sampler2D tDiffuse;
+      varying vec2 vUv;
+      vec3 linearToSRGB(vec3 linear) {
+        vec3 a = 12.92 * linear;
+        vec3 b = 1.055 * pow(linear, vec3(1.0 / 2.4)) - 0.055;
+        return mix(a, b, step(vec3(0.0031308), linear));
+      }
+      void main() {
+        vec4 t = texture2D(tDiffuse, vUv);
+        gl_FragColor = vec4(linearToSRGB(t.rgb), 1.0);
+      }
+    `,
+    depthTest: false,
+    depthWrite: false
+  });
+  blitScene.add(new THREE.Mesh(new THREE.PlaneGeometry(2, 2), blitMat));
+
+  // Keep fill dim so torch/lantern umbras read as real shadows on a phone.
+  const hemi = new THREE.HemisphereLight(0x2a241c, 0x080605, 0.04);
+  scene.add(hemi);
+  const fillLight = new THREE.AmbientLight(0x1c1814, 0.015);
+  scene.add(fillLight);
 
   const shadowSize = isMobile() ? SHADOW_MAP_MOBILE : SHADOW_MAP_DESKTOP;
   const makeTorch = (x: number, y: number, z: number): THREE.PointLight => {
@@ -99,36 +158,85 @@ async function boot(): Promise<void> {
     light.position.set(x, y, z);
     light.castShadow = true;
     light.shadow.mapSize.set(shadowSize, shadowSize);
-    light.shadow.camera.near = 0.08;
+    light.shadow.camera.near = 0.05;
     light.shadow.camera.far = TORCH_DISTANCE;
-    light.shadow.bias = -0.004;
-    light.shadow.radius = 2;
+    light.shadow.camera.updateProjectionMatrix();
+    light.shadow.bias = -0.0004;
+    light.shadow.normalBias = 0.008;
+    light.shadow.radius = 1;
+    light.shadow.intensity = 1;
     scene.add(light);
     return light;
   };
 
-  const torchA = makeTorch(CELL * 1.0, 1.48, 0.38);
-  const torchB = makeTorch(CELL * 2.0, 1.48, 0.38);
+  const torchA = makeTorch(CELL * 1.0, 1.48, 0.48);
+  const torchB = makeTorch(CELL * 2.0, 1.48, 0.48);
+
+  const makeTorchSpot = (x: number, y: number, z: number, tx: number, ty: number, tz: number): THREE.SpotLight => {
+    const spot = new THREE.SpotLight(TORCH_COLOR, 10, 7.5, Math.PI / 4.8, 0.32, 1.4);
+    spot.position.set(x, y, z);
+    spot.target.position.set(tx, ty, tz);
+    spot.castShadow = true;
+    spot.shadow.mapSize.set(shadowSize, shadowSize);
+    spot.shadow.bias = -0.00015;
+    spot.shadow.normalBias = 0.012;
+    spot.shadow.radius = 1;
+    spot.shadow.intensity = 1;
+    spot.shadow.camera.near = 0.2;
+    spot.shadow.camera.far = 8;
+    spot.shadow.camera.updateProjectionMatrix();
+    scene.add(spot);
+    scene.add(spot.target);
+    return spot;
+  };
+  // Aimed into the room so crate/pillar throw long floor umbras (point lights
+  // light the sconce wall; cubemap shadows alone were too faint on a phone).
+  const torchSpotA = makeTorchSpot(CELL * 1.0, 1.48, 0.48, 3.2, 0.12, 3.3);
+  const torchSpotB = makeTorchSpot(CELL * 2.0, 1.48, 0.48, 4.3, 0.12, 3.3);
 
   const lampLight = new THREE.PointLight(LAMP_COLOR, 0, LAMP_DISTANCE, 1.6);
   lampLight.position.set(CELL * 1.5, 1.35, 0.35);
   lampLight.castShadow = true;
   lampLight.shadow.mapSize.set(shadowSize, shadowSize);
-  lampLight.shadow.camera.near = 0.1;
+  lampLight.shadow.camera.near = 0.05;
   lampLight.shadow.camera.far = LAMP_DISTANCE;
-  lampLight.shadow.bias = -0.003;
-  lampLight.shadow.radius = 2;
+  lampLight.shadow.camera.updateProjectionMatrix();
+  lampLight.shadow.bias = -0.0004;
+  lampLight.shadow.normalBias = 0.008;
+  lampLight.shadow.radius = 1;
+  lampLight.shadow.intensity = 1;
   scene.add(lampLight);
 
   const lanternLight = new THREE.PointLight(LANTERN_COLOR, LANTERN_INTENSITY, LANTERN_DISTANCE, 2);
   lanternLight.position.set(LANTERN_HOLD[0], LANTERN_HOLD[1], LANTERN_HOLD[2]);
-  lanternLight.castShadow = true;
-  lanternLight.shadow.mapSize.set(LANTERN_SHADOW_MAP, LANTERN_SHADOW_MAP);
-  lanternLight.shadow.camera.near = 0.08;
-  lanternLight.shadow.camera.far = LANTERN_DISTANCE;
-  lanternLight.shadow.bias = -0.004;
-  lanternLight.shadow.radius = 2;
+  // Point fill is omnidirectional; the spot carries the visible shadow so a
+  // crate/pillar silhouette actually lands on the wall in front of the camera.
+  lanternLight.castShadow = false;
   camera.add(lanternLight);
+
+  const lanternSpotMap = isMobile() ? LANTERN_SPOT_MAP_MOBILE : LANTERN_SPOT_MAP_DESKTOP;
+  const lanternSpot = new THREE.SpotLight(
+    LANTERN_COLOR,
+    LANTERN_SPOT_INTENSITY,
+    LANTERN_DISTANCE,
+    LANTERN_SPOT_ANGLE,
+    0.35,
+    1.6
+  );
+  lanternSpot.name = 'lantern-spot';
+  lanternSpot.position.set(LANTERN_HOLD[0], LANTERN_HOLD[1], LANTERN_HOLD[2]);
+  lanternSpot.target.position.set(LANTERN_HOLD[0], LANTERN_HOLD[1] - 0.2, LANTERN_HOLD[2] - 4);
+  lanternSpot.castShadow = true;
+  lanternSpot.shadow.mapSize.set(lanternSpotMap, lanternSpotMap);
+  lanternSpot.shadow.bias = -0.0002;
+  lanternSpot.shadow.normalBias = 0.01;
+  lanternSpot.shadow.radius = 1;
+  lanternSpot.shadow.intensity = 1;
+  lanternSpot.shadow.camera.near = 0.12;
+  lanternSpot.shadow.camera.far = LANTERN_DISTANCE;
+  lanternSpot.shadow.camera.updateProjectionMatrix();
+  camera.add(lanternSpot);
+  camera.add(lanternSpot.target);
   scene.add(camera);
 
   loading.textContent = 'Meshing voxels…';
@@ -158,6 +266,8 @@ async function boot(): Promise<void> {
   let lanternOn = true;
   let mode: 'voxel' | 'flat' = 'voxel';
   let lampLit = false;
+  let warmth = 1;
+  let matchGame = false;
 
   const camPos = (gx: number, gz: number): THREE.Vector3 =>
     new THREE.Vector3((gx + 0.5) * CELL, EYE_HEIGHT, (gz + 0.5) * CELL);
@@ -173,6 +283,7 @@ async function boot(): Promise<void> {
     const w = window.innerWidth;
     const h = window.innerHeight;
     renderer.setSize(w, h, false);
+    matchRT.setSize(w, h);
     camera.aspect = w / Math.max(1, h);
     camera.updateProjectionMatrix();
   };
@@ -180,12 +291,24 @@ async function boot(): Promise<void> {
   window.addEventListener('resize', resize);
   window.visualViewport?.addEventListener('resize', resize);
 
+  const syncShadows = (): ReturnType<typeof applyShadowToggle> =>
+    applyShadowToggle({
+      on: shadowsOn,
+      renderer,
+      lights: [
+        { light: torchA, active: true },
+        { light: torchB, active: true },
+        { light: torchSpotA, active: true },
+        { light: torchSpotB, active: true },
+        { light: lampLight, active: lampLit },
+        { light: lanternSpot, active: lanternOn }
+      ],
+      roots: [scene]
+    });
+
   const setShadows = (on: boolean): void => {
     shadowsOn = on;
-    torchA.castShadow = on;
-    torchB.castShadow = on;
-    lampLight.castShadow = on && lampLit;
-    lanternLight.castShadow = on && lanternOn;
+    syncShadows();
     btnShadows.textContent = on ? 'Shadows on' : 'Shadows off';
     btnShadows.setAttribute('aria-pressed', on ? 'true' : 'false');
   };
@@ -193,7 +316,8 @@ async function boot(): Promise<void> {
   const setLantern = (on: boolean): void => {
     lanternOn = on;
     lanternLight.intensity = on ? LANTERN_INTENSITY : 0;
-    lanternLight.castShadow = on && shadowsOn;
+    lanternSpot.intensity = on ? LANTERN_SPOT_INTENSITY : 0;
+    syncShadows();
     btnLantern.textContent = on ? 'Lantern on' : 'Lantern off';
     btnLantern.setAttribute('aria-pressed', on ? 'true' : 'false');
   };
@@ -209,11 +333,107 @@ async function boot(): Promise<void> {
   const setLamp = (on: boolean): void => {
     lampLit = on;
     lampLight.intensity = on ? LAMP_INTENSITY : 0;
-    lampLight.castShadow = on && shadowsOn;
+    syncShadows();
     const mat = room.lampMesh.material as THREE.MeshStandardMaterial;
     mat.emissive.setHex(on ? 0xffcc88 : 0x000000);
     mat.emissiveIntensity = on ? 1.4 : 0;
     mat.emissiveMap = on ? mat.map : null;
+  };
+
+  const applyLook = (): void => {
+    const look = lookColors(warmth, matchGame);
+    const paint = (light: THREE.Light, rgb: [number, number, number]): void => {
+      light.color.setRGB(rgb[0], rgb[1], rgb[2]);
+    };
+    paint(torchA, look.torch);
+    paint(torchB, look.torch);
+    paint(torchSpotA, look.torch);
+    paint(torchSpotB, look.torch);
+    paint(lanternLight, look.lantern);
+    paint(lanternSpot, look.lantern);
+    paint(lampLight, look.lamp);
+    hemi.color.setRGB(look.ambientSky[0], look.ambientSky[1], look.ambientSky[2]);
+    hemi.groundColor.setRGB(look.ambientGround[0], look.ambientGround[1], look.ambientGround[2]);
+    fillLight.color.setRGB(look.ambientFill[0], look.ambientFill[1], look.ambientFill[2]);
+    scene.background = new THREE.Color(look.fog);
+    scene.fog = new THREE.Fog(look.fog, 10, 22);
+    renderer.setClearColor(look.fog, 1);
+    if (lampLit) {
+      const mat = room.lampMesh.material as THREE.MeshStandardMaterial;
+      mat.emissive.setRGB(look.lamp[0], look.lamp[1], look.lamp[2]);
+    }
+    renderer.toneMapping = THREE.NoToneMapping;
+    renderer.toneMappingExposure = 1;
+    if (matchGame) {
+      renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+    } else {
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+    }
+  };
+
+  const renderFrame = (): number => {
+    if (matchGame) {
+      renderer.outputColorSpace = THREE.LinearSRGBColorSpace;
+      renderer.setRenderTarget(matchRT);
+      renderer.render(scene, camera);
+      const sceneDraws = renderer.info.render.calls;
+      blitMat.uniforms.tDiffuse.value = matchRT.texture;
+      renderer.setRenderTarget(null);
+      renderer.render(blitScene, blitCam);
+      return sceneDraws;
+    }
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
+    renderer.setRenderTarget(null);
+    renderer.render(scene, camera);
+    return renderer.info.render.calls;
+  };
+
+  const samplePixels = (
+    band?: { y0?: number; y1?: number }
+  ): { r: number; g: number; b: number; luma: number; rb: number; n: number } => {
+    renderFrame();
+    const gl = renderer.getContext();
+    const w = gl.drawingBufferWidth;
+    const h = gl.drawingBufferHeight;
+    const y0 = Math.max(0, Math.floor((band?.y0 ?? 0) * h));
+    const y1 = Math.min(h, Math.ceil((band?.y1 ?? 1) * h));
+    const rows = Math.max(1, y1 - y0);
+    const pixels = new Uint8Array(w * rows * 4);
+    gl.readPixels(0, y0, w, rows, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    let r = 0;
+    let g = 0;
+    let b = 0;
+    const n = pixels.length / 4;
+    for (let i = 0; i < n; i++) {
+      const o = i * 4;
+      r += pixels[o];
+      g += pixels[o + 1];
+      b += pixels[o + 2];
+    }
+    const rr = n > 0 ? r / n / 255 : 0;
+    const gg = n > 0 ? g / n / 255 : 0;
+    const bb = n > 0 ? b / n / 255 : 0;
+    return {
+      r: rr,
+      g: gg,
+      b: bb,
+      luma: 0.2126 * rr + 0.7152 * gg + 0.0722 * bb,
+      rb: bb > 0.001 ? rr / bb : 99,
+      n
+    };
+  };
+
+  const setWarmth = (next: number): void => {
+    warmth = Math.min(1, Math.max(0, next));
+    sliderWarmth.value = String(Math.round(warmth * 100));
+    applyLook();
+  };
+
+  const setMatchGame = (on: boolean): void => {
+    matchGame = on;
+    btnMatch.setAttribute('aria-pressed', on ? 'true' : 'false');
+    btnMatch.textContent = on ? 'Match game on' : 'Match game';
+    applyLook();
   };
 
   btnShadows.addEventListener('click', (e) => {
@@ -227,6 +447,15 @@ async function boot(): Promise<void> {
   btnMode.addEventListener('click', (e) => {
     e.stopPropagation();
     setMode(mode === 'voxel' ? 'flat' : 'voxel');
+  });
+  btnMatch.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setMatchGame(!matchGame);
+  });
+  sliderWarmth.addEventListener('pointerdown', (e) => e.stopPropagation());
+  sliderWarmth.addEventListener('input', (e) => {
+    e.stopPropagation();
+    setWarmth(Number(sliderWarmth.value) / 100);
   });
 
   const facing = (): [number, number] => {
@@ -266,6 +495,27 @@ async function boot(): Promise<void> {
     requestAnimationFrame(tick);
   };
 
+  /** 90° in-place turn, same ease as proto3d. dir +1 = left (CCW). */
+  const turn = (dir: 1 | -1): void => {
+    if (moving) return;
+    moving = true;
+    const from = yaw;
+    const to = yaw + dir * (Math.PI / 2);
+    const t0 = performance.now();
+    const tick = (now: number): void => {
+      const t = Math.min(1, (now - t0) / TURN_MS);
+      yaw = from + (to - from) * easeInOut(t);
+      applyCamera();
+      if (t < 1) requestAnimationFrame(tick);
+      else {
+        yaw = to;
+        applyCamera();
+        moving = false;
+      }
+    };
+    requestAnimationFrame(tick);
+  };
+
   btnFwd.addEventListener('click', (e) => {
     e.stopPropagation();
     step(1);
@@ -273,6 +523,14 @@ async function boot(): Promise<void> {
   btnBack.addEventListener('click', (e) => {
     e.stopPropagation();
     step(-1);
+  });
+  btnLeft.addEventListener('click', (e) => {
+    e.stopPropagation();
+    turn(1);
+  });
+  btnRight.addEventListener('click', (e) => {
+    e.stopPropagation();
+    turn(-1);
   });
 
   let dragging = false;
@@ -289,7 +547,7 @@ async function boot(): Promise<void> {
     lastY = downY = y;
   };
   const onMove = (x: number, y: number): void => {
-    if (!dragging) return;
+    if (!dragging || moving) return;
     const dx = x - lastX;
     const dy = y - lastY;
     lastX = x;
@@ -326,6 +584,8 @@ async function boot(): Promise<void> {
   window.addEventListener('keydown', (e) => {
     if (e.key === 'w' || e.key === 'ArrowUp') step(1);
     if (e.key === 's' || e.key === 'ArrowDown') step(-1);
+    if (e.key === 'q' || e.key === 'ArrowLeft') turn(1);
+    if (e.key === 'e' || e.key === 'ArrowRight') turn(-1);
     if (e.key === 'l') setLamp(!lampLit);
   });
 
@@ -333,6 +593,8 @@ async function boot(): Promise<void> {
   setLantern(true);
   setMode('voxel');
   setLamp(false);
+  setWarmth(1);
+  setMatchGame(false);
 
   let flameT = 0;
   let lastFrame = performance.now();
@@ -352,9 +614,13 @@ async function boot(): Promise<void> {
     lantern: true,
     mode: 'voxel',
     lampLit: false,
+    shadowMapEnabled: true,
+    warmth: 1,
+    matchGame: false,
     setShadows: (on) => {
       setShadows(on);
       api.shadows = on;
+      api.shadowMapEnabled = renderer.shadowMap.enabled;
     },
     setLantern: (on) => {
       setLantern(on);
@@ -367,6 +633,34 @@ async function boot(): Promise<void> {
     setLamp: (on) => {
       setLamp(on);
       api.lampLit = on;
+    },
+    setWarmth: (w) => {
+      setWarmth(w);
+      api.warmth = warmth;
+    },
+    setMatchGame: (on) => {
+      setMatchGame(on);
+      api.matchGame = on;
+    },
+    turnLeft: () => turn(1),
+    turnRight: () => turn(-1),
+    meanLuma: (band) => samplePixels(band).luma,
+    meanRgb: (band) => {
+      const s = samplePixels(band);
+      return { r: s.r, g: s.g, b: s.b, rb: s.rb };
+    },
+    debugShadowState: () => {
+      const counts = { meshCast: 0, meshReceive: 0, lightCast: 0 };
+      scene.traverse((obj) => {
+        const mesh = obj as THREE.Mesh;
+        if (mesh.isMesh) {
+          if (mesh.castShadow) counts.meshCast += 1;
+          if (mesh.receiveShadow) counts.meshReceive += 1;
+        }
+        const light = obj as THREE.Light;
+        if (light.isLight && light.castShadow) counts.lightCast += 1;
+      });
+      return { shadowMapEnabled: renderer.shadowMap.enabled, ...counts };
     }
   };
   (window as unknown as { __voxelLab: LabApi }).__voxelLab = api;
@@ -383,15 +677,21 @@ async function boot(): Promise<void> {
     while (frameSamples.length > 1 && frameSamples[0].t < cutoff) frameSamples.shift();
 
     const t = now * 0.001;
-    torchA.intensity = TORCH_INTENSITY * (1 + 0.07 * Math.sin(t * 6.1) + 0.04 * Math.sin(t * 13.7));
-    torchB.intensity = TORCH_INTENSITY * (1 + 0.07 * Math.sin(t * 5.4 + 1.2) + 0.04 * Math.sin(t * 11.9));
+    const flicker = preserveBuffer ? 0 : 1;
+    const flickA = 1 + flicker * (0.07 * Math.sin(t * 6.1) + 0.04 * Math.sin(t * 13.7));
+    const flickB = 1 + flicker * (0.07 * Math.sin(t * 5.4 + 1.2) + 0.04 * Math.sin(t * 11.9));
+    torchA.intensity = TORCH_INTENSITY * flickA;
+    torchB.intensity = TORCH_INTENSITY * flickB;
+    torchSpotA.intensity = 10 * flickA;
+    torchSpotB.intensity = 10 * flickB;
     if (lampLit) {
       lampLight.intensity =
-        LAMP_INTENSITY * (1 + 0.03 * Math.sin(t * 2.4) + 0.02 * Math.sin(t * 7.1));
+        LAMP_INTENSITY * (1 + flicker * (0.03 * Math.sin(t * 2.4) + 0.02 * Math.sin(t * 7.1)));
     }
     if (lanternOn) {
-      lanternLight.intensity =
-        LANTERN_INTENSITY * (1 + LANTERN_FLICKER * Math.sin((now / LANTERN_FLICKER_MS) * Math.PI * 2));
+      const k = 1 + flicker * LANTERN_FLICKER * Math.sin((now / LANTERN_FLICKER_MS) * Math.PI * 2);
+      lanternLight.intensity = LANTERN_INTENSITY * k;
+      lanternSpot.intensity = LANTERN_SPOT_INTENSITY * k;
     }
 
     if (now - flameT > 200) {
@@ -402,9 +702,7 @@ async function boot(): Promise<void> {
       }
     }
 
-    renderer.render(scene, camera);
-
-    const draws = renderer.info.render.calls;
+    const draws = renderFrame();
     api.draws = draws;
     if (frameSamples.length > 0) {
       const span = now - frameSamples[0].t || dt;
@@ -417,9 +715,12 @@ async function boot(): Promise<void> {
       api.worstMs = worstMs;
     }
     api.shadows = shadowsOn;
+    api.shadowMapEnabled = renderer.shadowMap.enabled;
     api.lantern = lanternOn;
     api.mode = mode;
     api.lampLit = lampLit;
+    api.warmth = warmth;
+    api.matchGame = matchGame;
     if (now - lastHud >= 200) {
       lastHud = now;
       statsEl.innerHTML =

@@ -95,10 +95,10 @@ function pbrMap(data: Uint8Array, w: number, h: number): THREE.DataTexture {
     const rough = data[i];
     const wet = rough <= ROUGH_WET;
     const matte = rough >= ROUGH_MATTE;
-    rgba[i * 4] = wet ? 255 : 0;
+    rgba[i * 4] = wet ? 90 : 0;
     rgba[i * 4 + 1] = rough;
     rgba[i * 4 + 2] = rough;
-    rgba[i * 4 + 3] = wet ? 255 : matte ? 8 : 96;
+    rgba[i * 4 + 3] = wet ? 70 : matte ? 6 : 36;
   }
   const tex = new THREE.DataTexture(rgba, w, h, THREE.RGBAFormat);
   tex.colorSpace = THREE.NoColorSpace;
@@ -116,14 +116,17 @@ function voxelMaterial(map: THREE.Texture, pbr: THREE.Texture): THREE.MeshPhysic
     roughnessMap: pbr,
     roughness: 1,
     metalness: 0,
-    ior: 1.5,
-    specularIntensity: 1,
+    ior: 1.45,
+    specularIntensity: 0.35,
     specularIntensityMap: pbr,
-    clearcoat: 1,
+    clearcoat: 0.4,
     clearcoatMap: pbr,
-    clearcoatRoughness: 0.08,
+    clearcoatRoughness: 0.32,
     envMapIntensity: 0,
-    flatShading: false
+    flatShading: false,
+    polygonOffset: true,
+    polygonOffsetFactor: 1,
+    polygonOffsetUnits: 1
   });
 }
 
@@ -144,6 +147,31 @@ function tileJobs(): TileJob[] {
     }
   }
   return jobs;
+}
+
+function makeOccluder(
+  name: string,
+  map: THREE.Texture,
+  w: number,
+  h: number,
+  d: number,
+  x: number,
+  y: number,
+  z: number
+): THREE.Mesh {
+  const mat = new THREE.MeshStandardMaterial({
+    map,
+    roughness: 0.78,
+    metalness: 0
+  });
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  mesh.name = name;
+  mesh.position.set(x, y, z);
+  mesh.userData.castWhenOn = true;
+  mesh.userData.receiveWhenOn = true;
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
 }
 
 function spriteMat(map: THREE.Texture, additive = false): THREE.SpriteMaterial {
@@ -219,9 +247,13 @@ export async function buildRoom(): Promise<BuiltRoom> {
     const rough = roughByFile.get(file);
     const geo = geometryFrom(mergeMeshes(meshes));
     if (!png || !rough || !geo) continue;
+    const isFloor = (FLOOR_FILES as readonly string[]).includes(file);
     const mesh = new THREE.Mesh(geo, voxelMaterial(png.texture, rough));
-    mesh.castShadow = true;
+    // Floors receive only — self-shadow on 1 cm relief eats crate/pillar umbras.
+    mesh.userData.castWhenOn = !isFloor;
+    mesh.castShadow = !isFloor;
     mesh.receiveShadow = true;
+    mesh.name = isFloor ? `floor:${file}` : file;
     voxelGroup.add(mesh);
   }
 
@@ -245,8 +277,9 @@ export async function buildRoom(): Promise<BuiltRoom> {
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(x, y, z);
     mesh.rotation.y = rotY;
-    mesh.castShadow = false;
-    mesh.receiveShadow = false;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.name = 'sconce';
     propsGroup.add(mesh);
 
     const flame = new THREE.Sprite(spriteMat(sconce.texture));
@@ -256,8 +289,8 @@ export async function buildRoom(): Promise<BuiltRoom> {
     torchFlames.push(flame);
   };
 
-  placeSconce(CELL * 1.0, 1.32, 0.07, 0, [0, 0, 0.16]);
-  placeSconce(CELL * 2.0, 1.32, 0.07, 0, [0, 0, 0.16]);
+  placeSconce(CELL * 1.0, 1.32, 0.12, 0, [0, 0, 0.16]);
+  placeSconce(CELL * 2.0, 1.32, 0.12, 0, [0, 0, 0.16]);
 
   const lampH = 0.72;
   const lampW = lampH * (lampPng.img.naturalWidth / lampPng.img.naturalHeight);
@@ -275,14 +308,28 @@ export async function buildRoom(): Promise<BuiltRoom> {
   lampMesh.position.set(CELL * 1.5, 1.22, 0.08);
   lampMesh.userData.isLamp = true;
   lampMesh.name = 'pell-lamp';
+  lampMesh.castShadow = true;
+  lampMesh.receiveShadow = true;
   const lampHit = new THREE.Mesh(
     new THREE.PlaneGeometry(lampW * 1.6, lampH * 1.5),
     new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide })
   );
   lampHit.position.copy(lampMesh.position);
   lampHit.userData.isLamp = true;
+  lampHit.userData.noShadow = true;
   lampHit.name = 'pell-lamp-hit';
+  lampHit.castShadow = false;
+  lampHit.receiveShadow = false;
   propsGroup.add(lampMesh, lampHit);
+
+  // Obvious occluders so the Shadows toggle is not a no-op on a phone.
+  const wallTex = pngs.get(WALL_FILES[0])!.texture;
+  const floorTex = pngs.get(FLOOR_FILES[0])!.texture;
+  // Near the north wall, offset from center so their umbras are visible on
+  // the open floor and brick instead of sitting in the camera's face.
+  const crate = makeOccluder('lab-crate', floorTex, 0.7, 0.55, 0.7, 2.55, 0.275, 1.35);
+  const pillar = makeOccluder('lab-pillar', wallTex, 0.4, 1.85, 0.4, 4.95, 0.925, 1.55);
+  propsGroup.add(crate, pillar);
 
   flatGroup.visible = false;
 
