@@ -6,8 +6,11 @@ import {
   applySlimeSeeThrough,
   bobSlime,
   buildTexturedChest,
+  CHEST_POS,
   CHEST_VOXELS,
   chestFaceMaterialList,
+  SLIME_HEIGHT,
+  SLIME_POS,
   makeContactShadow,
   prepChestTexture,
   prepShadowPatchTexture,
@@ -18,6 +21,7 @@ import {
   type ChestFaceMaps
 } from '../src/voxel-lab/actors';
 import {
+  CELL,
   CHEST_BOTTOM_COLOR,
   CHEST_FRONT_FILE,
   CHEST_SIDE_FILE,
@@ -111,6 +115,26 @@ describe('textured chest box', () => {
     prepShadowPatchTexture(tex);
     expect(tex.magFilter).toBe(THREE.LinearFilter);
     expect(tex.minFilter).toBe(THREE.LinearFilter);
+  });
+});
+
+describe('start-pose placement', () => {
+  const camX = 1.5 * CELL;
+  const camZ = 1.5 * CELL;
+
+  it('puts slime ~1 cell ahead, off to one side, at game height, with a gap to the chest', () => {
+    const slimeDist = Math.hypot(SLIME_POS[0] - camX, SLIME_POS[2] - camZ);
+    const chestDist = Math.hypot(CHEST_POS[0] - camX, CHEST_POS[2] - camZ);
+    const gap = Math.hypot(SLIME_POS[0] - CHEST_POS[0], SLIME_POS[2] - CHEST_POS[2]);
+    const chestHalf = (CHEST_VOXELS.w * CHEST_VOXELS.size) / 2;
+    const slimeHalf = (SLIME_HEIGHT * (56 / 39)) / 2;
+    expect(SLIME_HEIGHT).toBeCloseTo(0.78, 5);
+    expect(slimeDist).toBeGreaterThan(2.1);
+    expect(chestDist).toBeGreaterThan(2.1);
+    expect(SLIME_POS[2]).toBeLessThan(1.7);
+    expect(CHEST_POS[2]).toBeLessThan(1.7);
+    expect(Math.abs(SLIME_POS[0] - camX)).toBeGreaterThan(0.35);
+    expect(gap).toBeGreaterThan(chestHalf + slimeHalf + 0.12);
   });
 });
 

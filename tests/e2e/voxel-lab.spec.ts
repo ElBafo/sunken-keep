@@ -37,6 +37,11 @@ type Lab = {
     chestHasSideMap: boolean;
     chestHasTopMap: boolean;
     contactCount: number;
+    chestX: number;
+    chestZ: number;
+    slimeX: number;
+    slimeZ: number;
+    slimeH: number;
   };
 };
 
@@ -102,6 +107,12 @@ test('voxel-lab turn buttons and visible shadow toggle', async ({ page }) => {
   expect(actorsOn.slimeHasDepthMat).toBe(true);
   expect(actorsOn.slimeDepthAlphaTest).toBeGreaterThan(0.2);
   expect(actorsOn.slimeDepthWrite).toBe(true);
+  expect(actorsOn.slimeH).toBeGreaterThan(0.7);
+  expect(actorsOn.slimeH).toBeLessThan(0.9);
+  expect(actorsOn.slimeZ).toBeLessThan(1.7);
+  expect(actorsOn.chestZ).toBeLessThan(1.7);
+  expect(Math.abs(actorsOn.slimeX - actorsOn.chestX)).toBeGreaterThan(0.9);
+  expect(Math.hypot(actorsOn.slimeX - 3.75, actorsOn.slimeZ - 3.75)).toBeGreaterThan(2.1);
 
   await page.waitForTimeout(250);
   await page.screenshot({ path: `${OUT}/voxel_lab_shadows_on.png`, fullPage: false });

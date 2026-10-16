@@ -94,6 +94,11 @@ type LabApi = {
     chestHasSideMap: boolean;
     chestHasTopMap: boolean;
     contactCount: number;
+    chestX: number;
+    chestZ: number;
+    slimeX: number;
+    slimeZ: number;
+    slimeH: number;
   };
 };
 
@@ -752,7 +757,12 @@ async function boot(): Promise<void> {
         chestHasFrontMap: chestFaceHasMap(actors.chestBox, 4),
         chestHasSideMap: chestFaceHasMap(actors.chestBox, 0),
         chestHasTopMap: chestFaceHasMap(actors.chestBox, 2),
-        contactCount: [actors.chestContact, actors.slimeContact].filter(Boolean).length
+        contactCount: [actors.chestContact, actors.slimeContact].filter(Boolean).length,
+        chestX: actors.chest.position.x,
+        chestZ: actors.chest.position.z,
+        slimeX: actors.slime.position.x,
+        slimeZ: actors.slime.position.z,
+        slimeH: actors.slimeBaseY * 2
       };
     }
   };

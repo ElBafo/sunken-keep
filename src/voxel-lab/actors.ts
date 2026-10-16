@@ -11,13 +11,18 @@ import {
 } from './constants';
 
 /**
- * Mid-room, slightly toward the camera so a west-side key light throws
- * umbras onto the open floor to the right of each actor (not under/behind).
+ * Start camera is cell (1,1) looking −Z. Two dungeon squares (5 m) would
+ * pass the north wall at z=0, so both props sit on the far floor tile
+ * (~2.3 m / one cell ahead), split left/right of the look axis with a
+ * gap of open floor between them. That gap is where the side key light
+ * drops umbras; painted patches sit under each.
  */
-export const CHEST_POS: readonly [number, number, number] = [3.38, 0, 1.82];
-export const SLIME_POS: readonly [number, number, number] = [3.58, 0, 2.52];
+export const CHEST_POS: readonly [number, number, number] = [3.14, 0, 1.40];
+export const SLIME_POS: readonly [number, number, number] = [4.26, 0, 1.46];
 /** Yaw so front + a sliver of the painted side read from the start view. */
 export const CHEST_YAW = 0.42;
+/** Game slime is 0.39 of a 2 m wall. */
+export const SLIME_HEIGHT = 0.78;
 
 /** 10×7×6 voxel box, one cell ≈ 6.2 cm. */
 export const CHEST_VOXELS = { w: 10, h: 7, d: 6, size: 0.062 } as const;
@@ -32,12 +37,12 @@ export const SLIME_THICKNESS = 0.06;
 export const SLIME_BOB_AMP = 0.028;
 export const SLIME_BOB_HZ = 0.35;
 
-/** Left and behind the camera; umbras fall right/north onto open floor in view. */
-export const ACTOR_KEY_POS: readonly [number, number, number] = [0.95, 1.78, 4.42];
-export const ACTOR_KEY_TARGET: readonly [number, number, number] = [3.55, 0.03, 1.65];
-export const ACTOR_KEY_ANGLE = Math.PI / 4.0;
-export const ACTOR_KEY_DISTANCE = 8.5;
-export const ACTOR_KEY_INTENSITY = 13;
+/** West of the camera, slightly behind; umbras fall right onto the gap and open floor. */
+export const ACTOR_KEY_POS: readonly [number, number, number] = [0.42, 1.58, 3.95];
+export const ACTOR_KEY_TARGET: readonly [number, number, number] = [3.72, 0.0, 1.18];
+export const ACTOR_KEY_ANGLE = Math.PI / 3.3;
+export const ACTOR_KEY_DISTANCE = 9;
+export const ACTOR_KEY_INTENSITY = 18;
 
 export type ChestFaceMaps = {
   front: THREE.Texture;
@@ -197,7 +202,7 @@ export function makeContactShadow(opts: {
 }
 
 function buildSlime(map: THREE.Texture, img: HTMLImageElement): { mesh: THREE.Mesh; baseY: number } {
-  const h = 0.7;
+  const h = SLIME_HEIGHT;
   const aspect = img.naturalHeight > 0 ? img.naturalWidth / img.naturalHeight : 1;
   const w = h * aspect;
   const geo = new THREE.PlaneGeometry(w, h);
@@ -267,8 +272,8 @@ export function createActorKeyLight(shadowMapSize: number): THREE.SpotLight {
   spot.shadow.normalBias = 0.014;
   spot.shadow.radius = 1;
   spot.shadow.intensity = 1;
-  spot.shadow.camera.near = 0.3;
-  spot.shadow.camera.far = 9;
+  spot.shadow.camera.near = 0.25;
+  spot.shadow.camera.far = 8;
   spot.shadow.camera.updateProjectionMatrix();
   return spot;
 }
@@ -295,18 +300,18 @@ export async function buildLabActors(): Promise<LabActors> {
   const { w, size } = CHEST_VOXELS;
   const chestContact = makeContactShadow({
     name: 'lab-chest-contact',
-    width: w * size * 1.55,
-    depth: (w * size * 1.55) / 2,
+    width: w * size * 1.7,
+    depth: (w * size * 1.7) / 2,
     x: CHEST_POS[0],
-    z: CHEST_POS[2],
+    z: CHEST_POS[2] + 0.06,
     map: patch
   });
   const slimeContact = makeContactShadow({
     name: 'lab-slime-contact',
-    width: 1.02,
-    depth: 0.51,
+    width: 1.18,
+    depth: 0.59,
     x: SLIME_POS[0],
-    z: SLIME_POS[2],
+    z: SLIME_POS[2] + 0.08,
     map: patch
   });
   group.add(chest, slimeBuilt.mesh, chestContact, slimeContact);
