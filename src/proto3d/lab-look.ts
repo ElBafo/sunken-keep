@@ -8,7 +8,7 @@ import {
   type SurfaceLightLocal,
   type SurfaceLightShared
 } from './surface-light';
-import type { VertexLightingManager } from './vertex-lighting';
+import { neutralizeBakedVertexColors, type VertexLightingManager } from './vertex-lighting';
 import { getPbrForTexture } from './voxel-geom';
 import { makeVoxelLocal, makeVoxelShared, patchVoxelLookMaterial, unpatchVoxelLookMaterial } from './voxel-surface';
 
@@ -107,6 +107,7 @@ export class LabLook {
     const src = asBasic(mesh.material);
     if (!src) return;
     this.lighting.unregisterVoxelMesh(mesh);
+    neutralizeBakedVertexColors(mesh);
     const local = makeVoxelLocal();
     const pbr = getPbrForTexture(src.map);
     patchVoxelLookMaterial(src, this.shared, local, pbr);

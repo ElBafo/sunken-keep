@@ -217,7 +217,7 @@ export class VoxelMode {
     const mat = srcMat.clone();
     mat.userData = { ...srcMat.userData };
     mat.visible = true;
-    mat.vertexColors = true;
+    mat.vertexColors = !srcMat.userData.voxelLookPatched;
     mat.needsUpdate = true;
     const geo = cached.geometry.clone();
     const voxel = new THREE.Mesh(geo, mat);
