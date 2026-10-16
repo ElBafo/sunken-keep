@@ -24,9 +24,11 @@ describe('voxel-lab is a standalone Vite page', () => {
     expect(html).toContain('Turn Left');
     expect(html).toContain('Turn Right');
     expect(html).toContain('id="btn-match"');
+    expect(html).toContain('id="btn-see-through"');
     expect(html).toContain('id="slider-warmth"');
     expect(html).toContain('Light warmth');
     expect(html).toContain('Match game');
+    expect(html).toContain('See-through slime');
     expect(html).not.toContain('id="party-hud"');
     expect(html).not.toContain('id="game-stage"');
   });

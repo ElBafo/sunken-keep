@@ -8,9 +8,11 @@ type Lab = {
   ready?: boolean;
   shadows: boolean;
   shadowMapEnabled: boolean;
+  seeThrough: boolean;
   fps: number;
   setShadows: (on: boolean) => void;
   setLamp: (on: boolean) => void;
+  setSeeThrough: (on: boolean) => void;
   turnLeft: () => void;
   turnRight: () => void;
   meanLuma: (band?: { y0?: number; y1?: number }) => number;
@@ -19,6 +21,18 @@ type Lab = {
     lightCast: number;
     meshCast: number;
     meshReceive: number;
+  };
+  debugActors: () => {
+    chestName: string;
+    chestMeshes: number;
+    chestCast: number;
+    slimeName: string;
+    slimeCast: boolean;
+    slimeSeeThrough: boolean;
+    slimeDepthWrite: boolean;
+    slimeOpacity: number;
+    slimeHasDepthMat: boolean;
+    slimeDepthAlphaTest: number;
   };
 };
 
@@ -51,6 +65,7 @@ test('voxel-lab turn buttons and visible shadow toggle', async ({ page }) => {
 
   await expect(page.locator('#stats')).toContainText('fps');
   await expect(page.locator('#btn-match')).toHaveText('Match game');
+  await expect(page.locator('#btn-see-through')).toHaveText('See-through slime');
   await expect(page.locator('#slider-warmth')).toBeVisible();
 
   const onState = await page.evaluate(() => {
@@ -62,6 +77,18 @@ test('voxel-lab turn buttons and visible shadow toggle', async ({ page }) => {
   expect(onState.lightCast).toBeGreaterThanOrEqual(2);
   expect(onState.meshCast).toBeGreaterThan(2);
   expect(onState.meshReceive).toBeGreaterThan(2);
+
+  const actorsOn = await page.evaluate(() =>
+    (window as unknown as { __voxelLab: Lab }).__voxelLab.debugActors()
+  );
+  expect(actorsOn.chestName).toBe('lab-chest');
+  expect(actorsOn.chestMeshes).toBeGreaterThanOrEqual(3);
+  expect(actorsOn.chestCast).toBeGreaterThanOrEqual(3);
+  expect(actorsOn.slimeName).toBe('lab-slime');
+  expect(actorsOn.slimeCast).toBe(true);
+  expect(actorsOn.slimeHasDepthMat).toBe(true);
+  expect(actorsOn.slimeDepthAlphaTest).toBeGreaterThan(0.2);
+  expect(actorsOn.slimeDepthWrite).toBe(true);
 
   await page.waitForTimeout(250);
   await page.screenshot({ path: `${OUT}/voxel_lab_shadows_on.png`, fullPage: false });
@@ -87,7 +114,23 @@ test('voxel-lab turn buttons and visible shadow toggle', async ({ page }) => {
 
   expect(lumaOff).toBeGreaterThan(lumaOn + 0.008);
 
-  await page.evaluate(() => (window as unknown as { __voxelLab: Lab }).__voxelLab.setShadows(true));
+  await page.evaluate(() => {
+    const lab = (window as unknown as { __voxelLab: Lab }).__voxelLab;
+    lab.setShadows(true);
+    lab.setSeeThrough(true);
+  });
+  const ghost = await page.evaluate(() =>
+    (window as unknown as { __voxelLab: Lab }).__voxelLab.debugActors()
+  );
+  expect(ghost.slimeSeeThrough).toBe(true);
+  expect(ghost.slimeDepthWrite).toBe(false);
+  expect(ghost.slimeCast).toBe(false);
+  expect(ghost.slimeOpacity).toBeLessThan(1);
+  await expect(page.locator('#btn-see-through')).toHaveText('See-through on');
+  await page.waitForTimeout(250);
+  await page.screenshot({ path: `${OUT}/voxel_lab_see_through_on.png`, fullPage: false });
+
+  await page.evaluate(() => (window as unknown as { __voxelLab: Lab }).__voxelLab.setSeeThrough(false));
   await left.click();
   await page.waitForTimeout(250);
   await page.screenshot({ path: `${OUT}/voxel_lab_after_turn_left.png`, fullPage: false });

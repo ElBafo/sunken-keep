@@ -82,3 +82,7 @@ export const FLAME_FILES = [
 
 export const SCONCE_FILE = 'torch/bracket_lit_front.png';
 export const LAMP_FILE = '../atmo/lamp_capped.png';
+
+/** Game sprites, loaded by URL only — do not import proto3d. */
+export const CHEST_SPRITE_FILE = 'art/dungeon/item_chest_near.png';
+export const SLIME_SPRITE_FILE = 'art/dungeon/monsters_v2/slime_idle_1_near.png';
