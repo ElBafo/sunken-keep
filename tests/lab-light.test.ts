@@ -14,7 +14,7 @@ import {
 } from '../src/proto3d/lab-light';
 import { canLabPatch } from '../src/proto3d/lab-look';
 import { isSurfaceLitKind, VOXEL_SUNBEAM_INTENSITY } from '../src/proto3d/surface-light';
-import { VertexLightingManager } from '../src/proto3d/vertex-lighting';
+import { neutralizeBakedVertexColors, VertexLightingManager } from '../src/proto3d/vertex-lighting';
 import * as THREE from 'three';
 
 describe('lab light opt-in', () => {
@@ -111,7 +111,11 @@ describe('lab look keeps gameplay lighting', () => {
     expect(look).toContain('VOXEL_SUNBEAM_INTENSITY');
     expect(look).toContain('setPaletteEnabled(false)');
     expect(look).toContain('skipSurfaceBake');
+    expect(look).toContain('neutralizeBakedVertexColors');
     expect(look).toContain('tintSprites');
+    const surf = readFileSync(resolve(__dirname, '../src/proto3d/voxel-surface.ts'), 'utf8');
+    expect(surf).toContain('do not multiply baked Gouraud');
+    expect(surf).toContain('never as a self-glow');
     expect(VOXEL_SUNBEAM_INTENSITY).toBeGreaterThan(0);
     const geom = readFileSync(resolve(__dirname, '../src/proto3d/voxel-geom.ts'), 'utf8');
     expect(geom).toContain('GAME_DEPTH_LAYERS = 3');
@@ -164,6 +168,68 @@ describe('lab light menu and HTML', () => {
     expect(hrefs.at(-1)).toContain('light=lab');
     syncLabLightQuery(false);
     expect(hrefs.at(-1)).not.toMatch(/[?&]light=/);
+  });
+});
+
+describe('lab+voxel does not keep the PR #40 bake', () => {
+  it('wipes baked vertex colours to white and disables vertexColors', () => {
+    const geo = new THREE.PlaneGeometry(1, 1);
+    const colors = new Float32Array(geo.attributes.position.count * 3).fill(0.7);
+    geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    const mat = new THREE.MeshBasicMaterial({ vertexColors: true });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.userData.kind = 'wall';
+    mesh.userData.voxelMesh = true;
+    neutralizeBakedVertexColors(mesh);
+    expect(mat.vertexColors).toBe(false);
+    const col = geo.attributes.color;
+    expect(col.getX(0)).toBe(1);
+    expect(col.getY(0)).toBe(1);
+    expect(col.getZ(0)).toBe(1);
+  });
+
+  it('registerVoxelMesh skips the Gouraud bake while skipSurfaceBake is on', () => {
+    const lighting = new VertexLightingManager(floor1, floor1Sconces, {
+      floor: 1,
+      bright: 1,
+      oil: () => 2
+    });
+    lighting.skipSurfaceBake = true;
+    lighting.setPartyPosition(1, 7);
+    const geo = new THREE.PlaneGeometry(2, 2);
+    const baked = new Float32Array(geo.attributes.position.count * 3).fill(0.85);
+    geo.setAttribute('color', new THREE.BufferAttribute(baked, 3));
+    const mat = new THREE.MeshBasicMaterial({ vertexColors: true });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.userData.kind = 'wall';
+    mesh.userData.voxelMesh = true;
+    mesh.userData.lightX = 1;
+    mesh.userData.lightY = 6;
+    lighting.registerVoxelMesh(mesh);
+    expect(mat.vertexColors, 'lab must not re-enable vertex colours').toBe(false);
+    expect(geo.attributes.color.getX(0)).toBe(1);
+  });
+
+  it('Classic registerVoxelMesh still bakes when skipSurfaceBake is off', () => {
+    const lighting = new VertexLightingManager(floor1, floor1Sconces, {
+      floor: 1,
+      bright: 1,
+      oil: () => 2
+    });
+    lighting.setPartyPosition(19, 5);
+    const geo = new THREE.PlaneGeometry(2, 2);
+    const mat = new THREE.MeshBasicMaterial({ vertexColors: false });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.userData.kind = 'wall';
+    mesh.userData.voxelMesh = true;
+    mesh.userData.lightX = 19;
+    mesh.userData.lightY = 8;
+    lighting.registerVoxelMesh(mesh);
+    expect(mat.vertexColors).toBe(true);
+    const r = geo.attributes.color.getX(0);
+    const g = geo.attributes.color.getY(0);
+    const b = geo.attributes.color.getZ(0);
+    expect((r + g + b) / 3).toBeCloseTo(lighting.ambientBrightness(), 2);
   });
 });
 

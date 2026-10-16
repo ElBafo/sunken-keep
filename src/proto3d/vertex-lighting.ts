@@ -319,9 +319,16 @@ export class VertexLightingManager {
    * Bake a voxel wall with the same shadeVertex as the painted plane.
    * Local Z is projected to 0 so relief cubes take the original wall's
    * brightness and warmth — no extra voxel light.
+   *
+   * Lab look owns per-pixel lighting: do not bake Gouraud or enable vertex
+   * colours, or the PR #40 bake multiplies on top of the lab lights.
    */
   registerVoxelMesh(mesh: THREE.Mesh): void {
     this.unregisterVoxelMesh(mesh);
+    if (this.skipSurfaceBake && !mesh.userData.lanternProp) {
+      neutralizeBakedVertexColors(mesh);
+      return;
+    }
     mesh.updateWorldMatrix(true, false);
     const geometry = mesh.geometry;
     if (!geometry?.attributes.position) return;
@@ -748,5 +755,31 @@ export class VertexLightingManager {
       if (!face.nearSconce) return;
       this.bakeFace(face, this.flicker);
     });
+  }
+}
+
+/** Lab look: identity vertex colours so a stale PR #40 bake cannot multiply. */
+export function neutralizeBakedVertexColors(mesh: THREE.Mesh): void {
+  const geometry = mesh.geometry;
+  const pos = geometry?.attributes.position;
+  if (!pos) return;
+  let colors = geometry.attributes.color as THREE.BufferAttribute | undefined;
+  if (!colors) {
+    colors = new THREE.BufferAttribute(new Float32Array(pos.count * 3), 3);
+    geometry.setAttribute('color', colors);
+  }
+  for (let i = 0; i < colors.count; i++) colors.setXYZ(i, 1, 1, 1);
+  colors.needsUpdate = true;
+  const mat = mesh.material;
+  const mats = Array.isArray(mat) ? mat : [mat];
+  for (const m of mats) {
+    if (
+      m instanceof THREE.MeshBasicMaterial ||
+      m instanceof THREE.MeshLambertMaterial ||
+      m instanceof THREE.MeshStandardMaterial
+    ) {
+      m.vertexColors = false;
+      m.needsUpdate = true;
+    }
   }
 }
