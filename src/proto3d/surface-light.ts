@@ -30,10 +30,34 @@ export type LightDebugMode =
   | 'torch'
   | 'ambient'
   | 'lighting'
+  | 'light'
   | 'nofog'
   | 'nomip'
   | 'nopalette'
   | 'nodust';
+
+const LIGHT_DEBUG_MODES: readonly LightDebugMode[] = [
+  'final',
+  'albedo',
+  'lantern',
+  'torch',
+  'ambient',
+  'lighting',
+  'light',
+  'nofog',
+  'nomip',
+  'nopalette',
+  'nodust'
+];
+
+export function parseLightDebugMode(raw: string | null | undefined): LightDebugMode | null {
+  if (!raw) return null;
+  if (raw === '1' || raw === 'true') return null;
+  if ((LIGHT_DEBUG_MODES as readonly string[]).includes(raw)) {
+    return raw === 'light' ? 'lighting' : (raw as LightDebugMode);
+  }
+  return null;
+}
 
 /**
  * Painted albedo × lighting factor. Never add ambient onto the texel —

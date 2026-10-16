@@ -217,7 +217,7 @@ describe('lantern: steep floors, soft props', () => {
   });
 
   it('QA wall at (4,5) has no lantern-torch valley toward the (6,4) S sconce', () => {
-    expect(FACE_SEGMENTS).toBe(1);
+    expect(FACE_SEGMENTS).toBe(8);
     const lighting = new VertexLightingManager(floor1, floor1Sconces, {
       floor: 1,
       bright: 1,
@@ -238,7 +238,7 @@ describe('lantern: steep floors, soft props', () => {
 
   it('multiplies MeshBasic by a lighting factor (no fragment wall shader)', () => {
     const src = readFileSync(resolve(__dirname, '../src/proto3d/vertex-lighting.ts'), 'utf8');
-    expect(FACE_SEGMENTS, 'no tessellation tax once the dip is known to be albedo').toBe(1);
+    expect(FACE_SEGMENTS, '8-seg Gouraud keeps torch glow on side walls (matches main)').toBe(8);
     expect(src).toContain('sourceLight(tileX');
     expect(src).not.toContain('patchSurfaceLightMaterial');
     expect(src).toContain('if (this.lightDebug === \'albedo\') return [1, 1, 1]');

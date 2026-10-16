@@ -43,6 +43,7 @@ type Proto3d = {
   frameStats: () => { n: number; mean: number; p95: number };
   columnLumas: (y0: number, y1: number) => number[];
   setLightDebug: (mode: string) => void;
+  getLightDebug: () => string;
 };
 
 test.use(devices['iPhone 15']);
@@ -646,6 +647,46 @@ test('proto3d lighting: tile-light frozen, wall terms diagnosed', async ({ page 
   expect(tileLight.lairFrom195, 'lair unlit from (19,5)').toBe(false);
   expect(lairFrom196, 'lair unlit from (19,6)').toBe(false);
 
+  // Lit-wall brightness must stay within 1 Testie level (8 luma) of main.
+  // 8-seg Gouraud keeps torch glow on side walls; FACE_SEGMENTS=1 was 3–4 levels darker.
+  const litWalls: Array<[number, number, number, string, number]> = [
+    [2, 1, 1, '(2,1)E torch side wall', 0.04],
+    [4, 5, 1, '(4,5)E torch side wall', 0.04],
+    [5, 5, 1, '(5,5)E torch side wall', 0.04],
+    [1, 4, 2, 'row-5 south wall (1,4)S', 0.08]
+  ];
+  // Brick-highlight p90 on main (8-seg Gouraud, oil 2, flicker frame 2). 1 level = 8 luma.
+  const mainBrickP90: Record<string, number> = {
+    '(2,1)E torch side wall': 133,
+    '(4,5)E torch side wall': 117,
+    '(5,5)E torch side wall': 137,
+    'row-5 south wall (1,4)S': 87
+  };
+  for (const [x, y, dir, name, x0] of litWalls) {
+    const stats = await page.evaluate(
+      ([px, py, pd, xStart]) => {
+        const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+        p.setOil(2);
+        p.setPosition(px, py, pd);
+        p.setFlickerFrame(2);
+        const canvas = document.getElementById('render-canvas') as HTMLCanvasElement;
+        const w = canvas.width;
+        const h = canvas.height;
+        return p.regionContrast(w * xStart, h * 0.22, w * 0.28, h * 0.62);
+      },
+      [x, y, dir, x0] as const
+    );
+    console.log('LIT_WALL', name, stats);
+    await page.screenshot({
+      path: `${OUT}/lit_wall_${x}_${y}_${dir}.png`,
+      fullPage: false
+    });
+    expect(
+      Math.abs(stats.p90 - mainBrickP90[name]),
+      `${name} brick glow within 1 level of main (p90 ${stats.p90} vs ${mainBrickP90[name]})`
+    ).toBeLessThanOrEqual(8);
+  }
+
   const spots: Array<[number, number, number, string]> = [
     [2, 1, 1, 'lighting_dip_2_1_east.png'],
     [4, 5, 1, 'lighting_dip_4_5_east.png'],
@@ -848,5 +889,35 @@ test('proto3d lighting: tile-light frozen, wall terms diagnosed', async ({ page 
   expect(frames.n, 'collected frame samples').toBeGreaterThan(20);
   expect(frames.mean, 'vertex bake — not the ~80ms fragment-ALU regression').toBeLessThan(60);
   expect(frames.p95, 'worst frames stay below the 80ms fragment regression').toBeLessThan(78);
+});
+
+test('proto3d ?debug=light renders lighting factor only', async ({ page }) => {
+  test.setTimeout(60000);
+  mkdirSync(OUT, { recursive: true });
+  await page.goto(`${BASE_URL}/proto3d.html?test=1&debug=light`);
+  await page.waitForFunction(
+    () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
+    null,
+    { timeout: 25000 }
+  );
+  await page.locator('#tap-to-start').click();
+  await page.waitForTimeout(400);
+  const info = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    p.setOil(2);
+    p.setPosition(2, 1, 1);
+    p.setFlickerFrame(2);
+    const canvas = document.getElementById('render-canvas') as HTMLCanvasElement;
+    const w = canvas.width;
+    const h = canvas.height;
+    return {
+      mode: p.getLightDebug(),
+      wall: p.regionContrast(w * 0.04, h * 0.22, w * 0.28, h * 0.62)
+    };
+  });
+  console.log('DEBUG_LIGHT', info);
+  expect(info.mode, '?debug=light selects lighting-only').toBe('lighting');
+  expect(info.wall.p50, 'lighting factor is a high cream field, not brick albedo').toBeGreaterThan(180);
+  await page.locator('#canvas-container').screenshot({ path: `${OUT}/debug_light_21e.png` });
 });
 

@@ -30,7 +30,7 @@ import {
 } from './constants';
 import { DressingMark } from './dressing';
 import { isLightPassable, LightReach, partyReach, reachAt, sconceOrigin, sconceReach } from './light-grid';
-import { FLOOR_DISK_Y, LightDebugMode, NONFLOOR_HEIGHT_PENALTY } from './surface-light';
+import { FLOOR_DISK_Y, LightDebugMode, NONFLOOR_HEIGHT_PENALTY, parseLightDebugMode } from './surface-light';
 import { FloorData, Sconce } from './types';
 
 interface CachedFace {
@@ -189,7 +189,7 @@ export class VertexLightingManager {
   }
 
   setLightDebug(mode: LightDebugMode) {
-    this.lightDebug = mode;
+    this.lightDebug = parseLightDebugMode(mode) ?? mode;
     for (const face of this.faces) this.bakeFace(face, this.flicker);
   }
 

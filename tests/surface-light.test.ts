@@ -9,12 +9,21 @@ import {
   createSurfaceLightShared,
   applyAlbedoLight,
   SURFACE_LIGHT_CACHE_KEY,
-  SURFACE_LIGHT_GLSL
+  SURFACE_LIGHT_GLSL,
+  parseLightDebugMode
 } from '../src/proto3d/surface-light';
 
 // debug modes 1 = albedo, 2 = lighting factor
 
 describe('surface-light helpers (unused on walls after diagnosis)', () => {
+  it('parses ?debug=light as lighting-only', () => {
+    expect(parseLightDebugMode('light')).toBe('lighting');
+    expect(parseLightDebugMode('lighting')).toBe('lighting');
+    expect(parseLightDebugMode('albedo')).toBe('albedo');
+    expect(parseLightDebugMode('1')).toBeNull();
+    expect(parseLightDebugMode(null)).toBeNull();
+  });
+
   it('marks dungeon surfaces and skips props', () => {
     expect(isSurfaceLitKind('wall')).toBe(true);
     expect(isSurfaceLitKind('floor')).toBe(true);

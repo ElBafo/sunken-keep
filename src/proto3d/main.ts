@@ -69,7 +69,7 @@ import { SceneBuilder } from './scene-builder';
 import { SpriteManager } from './sprites';
 import { TorchSystem, torchWorldPos } from './torches';
 import { Sconce, Tile } from './types';
-import { type LightDebugMode } from './surface-light';
+import { parseLightDebugMode, type LightDebugMode } from './surface-light';
 import { VertexLightingManager } from './vertex-lighting';
 import { WaterSystem } from './water';
 import { DarkFx } from './dark-fx';
@@ -422,7 +422,9 @@ class Game {
     await this.renderer.loadPalette();
     if (params.get('palette') === '0') this.renderer.setPaletteEnabled(false);
     const fpsEl = document.getElementById('fps-counter');
-    if (params.get('debug') === '1') {
+    const debugParam = params.get('debug');
+    const lightDebug = parseLightDebugMode(debugParam);
+    if (debugParam === '1' || lightDebug) {
       const el = fpsEl ?? document.createElement('div');
       el.id = 'fps-counter';
       el.textContent = 'FPS: --';
@@ -510,6 +512,7 @@ class Game {
     this.torches.setParty(this.player.x, this.player.y, this.player.dir);
     this.vertexLighting.registerScene(this.renderer.scene);
     this.vertexLighting.updateAllMeshes(this.renderer.scene);
+    if (lightDebug) this.applyLightDebug(lightDebug);
 
     this.darkFx = new DarkFx();
     void this.darkFx.load(this.renderer.scene, floor1, this.spriteManager);
@@ -3002,7 +3005,7 @@ class Game {
         this.renderer.render();
       },
       setLightDebug: (mode: LightDebugMode) => {
-        this.applyLightDebug(mode);
+        this.applyLightDebug(parseLightDebugMode(mode) ?? mode);
         this.renderer.render();
       },
       getLightDebug: () => this.lightDebug,
@@ -3401,24 +3404,27 @@ class Game {
   }
 
   private applyLightDebug(mode: LightDebugMode) {
-    this.lightDebug = mode;
-    this.vertexLighting.setLightDebug(mode);
+    const resolved = parseLightDebugMode(mode) ?? mode;
+    this.lightDebug = resolved;
+    this.vertexLighting.setLightDebug(resolved);
     const scene = this.renderer.scene;
     const isolate =
-      mode === 'albedo' ||
-      mode === 'lantern' ||
-      mode === 'torch' ||
-      mode === 'ambient' ||
-      mode === 'lighting' ||
-      mode === 'nofog';
+      resolved === 'albedo' ||
+      resolved === 'lantern' ||
+      resolved === 'torch' ||
+      resolved === 'ambient' ||
+      resolved === 'lighting' ||
+      resolved === 'nofog';
     if (isolate) {
       scene.fog = null;
     } else {
       this.atmosphere.applyFog(scene, this.renderer.renderer);
     }
-    this.renderer.setPaletteEnabled(mode !== 'nopalette' && mode !== 'albedo' && mode !== 'lighting');
-    const wantMips = mode !== 'nomip';
-    const hideMaps = mode === 'lighting';
+    this.renderer.setPaletteEnabled(
+      resolved !== 'nopalette' && resolved !== 'albedo' && resolved !== 'lighting'
+    );
+    const wantMips = resolved !== 'nomip';
+    const hideMaps = resolved === 'lighting';
     scene.traverse((obj) => {
       // Duck-type: the full Vite build can split three.module so instanceof Mesh misses.
       const mesh = obj as THREE.Mesh;
@@ -3444,7 +3450,7 @@ class Game {
         map.needsUpdate = true;
       }
     });
-    this.atmosphere.setQuality(isolate || mode === 'nodust' ? 'low' : this.quality);
+    this.atmosphere.setQuality(isolate || resolved === 'nodust' ? 'low' : this.quality);
   }
 
   gameLoop() {

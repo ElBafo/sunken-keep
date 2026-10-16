@@ -170,11 +170,8 @@ export const SWAP_ARM_MS = 3000;
 export const HERO_VOICES = true;
 export const HERO_HURT_VOICE_GAP = 0.6;
 /** 585-layout sizes live in art/ui/layout585/layout585.json (view, oilBar, hands, log). */
-/**
- * Wall/floor/ceiling quads. One segment: the (2,1)E dip lives in the painted
- * albedo, not Gouraud, so extra verts only cost. Cheaper than the 8-seg grid.
- */
-export const FACE_SEGMENTS = 1;
+/** Wall/floor/ceiling quads. 8 keeps torch glow on side walls (Gouraud). */
+export const FACE_SEGMENTS = 8;
 export const CUTOUT_ALPHA_TEST = 0.5;
 
 /** Unit normal into the room and Y-rotation so a PlaneGeometry faces that way. */
