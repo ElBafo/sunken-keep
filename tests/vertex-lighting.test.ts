@@ -16,6 +16,16 @@ import { monsterBodyVisible } from '../src/proto3d/dark-fx';
 import { floor1, floor1Sconces } from '../src/proto3d/floor-data';
 import { lanternFalloff, partyDistTiles, partyFalloff, VertexLightingManager } from '../src/proto3d/vertex-lighting';
 
+function valleyDip(lumas: number[]): number {
+  let worst = 0;
+  for (let i = 1; i < lumas.length - 1; i++) {
+    const left = Math.max(...lumas.slice(0, i));
+    const right = Math.max(...lumas.slice(i + 1));
+    worst = Math.max(worst, Math.min(left, right) - lumas[i]);
+  }
+  return worst;
+}
+
 const DESK = { x: 12, y: 9, wy: 0.34 };
 const RACK = { x: 9, y: 10, wy: 0.4 };
 const LAMP = { x: 13, y: 9 };
@@ -207,7 +217,7 @@ describe('lantern: steep floors, soft props', () => {
   });
 
   it('QA wall at (4,5) has no lantern-torch valley toward the (6,4) S sconce', () => {
-    expect(FACE_SEGMENTS).toBeGreaterThanOrEqual(8);
+    expect(FACE_SEGMENTS).toBe(8);
     const lighting = new VertexLightingManager(floor1, floor1Sconces, {
       floor: 1,
       bright: 1,
@@ -223,13 +233,106 @@ describe('lantern: steep floors, soft props', () => {
     }
     expect(lumas[0], 'lantern on the near wall').toBeGreaterThan(0.2);
     expect(lumas[lumas.length - 1], 'torch under the (6,4) sconce').toBeGreaterThan(0.7);
-    let worstDip = 0;
-    for (let i = 1; i < lumas.length - 1; i++) {
-      const left = Math.max(...lumas.slice(0, i));
-      const right = Math.max(...lumas.slice(i + 1));
-      worstDip = Math.max(worstDip, Math.min(left, right) - lumas[i]);
+    expect(valleyDip(lumas), `lantern-torch wall dip`).toBeLessThanOrEqual(0.04);
+  });
+
+  it('multiplies MeshBasic by a lighting factor (no fragment wall shader)', () => {
+    const src = readFileSync(resolve(__dirname, '../src/proto3d/vertex-lighting.ts'), 'utf8');
+    expect(FACE_SEGMENTS, '8-seg Gouraud keeps torch glow on side walls (matches main)').toBe(8);
+    expect(src).toContain('sourceLight(tileX');
+    expect(src).not.toContain('patchSurfaceLightMaterial');
+    expect(src).toContain('if (this.lightDebug === \'albedo\') return [1, 1, 1]');
+  });
+
+  it('isolates albedo as white vertex colour so the (2,1)E dip can be compared to texture', () => {
+    const lighting = new VertexLightingManager(floor1, floor1Sconces, {
+      floor: 1,
+      bright: 1,
+      oil: () => 2
+    });
+    lighting.setPartyPosition(2, 1);
+    const wx = 2 * CELL_SIZE;
+    const wz = 1 * CELL_SIZE - CELL_SIZE / 2;
+    const lit = lighting.sampleVertex(wx, 0.88, wz, 2, 1, false, false, true);
+    expect(lit.luma).toBeGreaterThan(0.05);
+    lighting.setLightDebug('albedo');
+    const albedo = lighting.sampleVertex(wx, 0.88, wz, 2, 1, false, false, true);
+    expect(albedo.rgb).toEqual([1, 1, 1]);
+    lighting.setLightDebug('ambient');
+    const amb = lighting.sampleVertex(wx, 0.88, wz, 2, 1, false, false, true);
+    expect(amb.luma).toBeCloseTo(lighting.ambientBrightness(), 3);
+    lighting.setLightDebug('lantern');
+    const lantern = lighting.sampleVertex(wx, 0.88, wz, 2, 1, false, false, true);
+    expect(lantern.luma).toBeGreaterThan(0.05);
+    lighting.setLightDebug('torch');
+    const torch = lighting.sampleVertex(wx, 0.88, wz, 2, 1, false, false, true);
+    expect(torch.luma).toBeGreaterThan(lantern.luma);
+  });
+
+  it('has no lantern-torch valley at the QA viewpoints', () => {
+    const lighting = new VertexLightingManager(floor1, floor1Sconces, {
+      floor: 1,
+      bright: 1,
+      oil: () => 2
+    });
+
+    const alongX = (partyX: number, partyY: number, x0: number, x1: number, wz: number, tileY: number) => {
+      lighting.setPartyPosition(partyX, partyY);
+      const lumas: number[] = [];
+      const steps = 20;
+      for (let i = 0; i <= steps; i++) {
+        const x = x0 + ((x1 - x0) * i) / steps;
+        const tileX = Math.floor(x + 1e-6);
+        lumas.push(lighting.sampleVertex(x * CELL_SIZE, 0.88, wz, tileX, tileY, false, false, true).luma);
+      }
+      return lumas;
+    };
+    const alongZ = (partyX: number, partyY: number, z0: number, z1: number, wx: number, tileX: number) => {
+      lighting.setPartyPosition(partyX, partyY);
+      const lumas: number[] = [];
+      const steps = 20;
+      for (let i = 0; i <= steps; i++) {
+        const z = z0 + ((z1 - z0) * i) / steps;
+        const tileY = Math.floor(z + 1e-6);
+        lumas.push(lighting.sampleVertex(wx, 0.88, z * CELL_SIZE, tileX, tileY, false, false, true).luma);
+      }
+      return lumas;
+    };
+
+    const spots: Array<{ name: string; lumas: number[] }> = [
+      {
+        name: '(2,1) east — north wall toward torch (4,1)',
+        lumas: alongX(2, 1, 2, 3.6, 1 * CELL_SIZE - CELL_SIZE / 2, 1)
+      },
+      {
+        name: '(4,5) east — north wall toward torch (6,4)',
+        lumas: alongX(4, 5, 4, 6, 5 * CELL_SIZE - CELL_SIZE / 2, 5)
+      },
+      {
+        // Own square (3,5) is outside torch flood (origin 6,5). Sample the
+        // receding north wall that actually mixes lantern + torch.
+        name: '(3,5) east — north wall of (4,5)–(6,5) toward torch (6,4)',
+        lumas: alongX(3, 5, 4, 6, 5 * CELL_SIZE - CELL_SIZE / 2, 5)
+      },
+      {
+        name: '(1,4) south — west wall toward torch (0,6)',
+        lumas: alongZ(1, 4, 4, 6, 1 * CELL_SIZE - CELL_SIZE / 2, 1)
+      },
+      {
+        name: '(3,2) north — east wall toward door (4,2) / torch (4,1)',
+        lumas: alongZ(3, 2, 2, 1, 3 * CELL_SIZE + CELL_SIZE / 2, 3)
+      },
+      {
+        name: '(3,3) north — east wall toward door (4,2) / torch (4,1)',
+        lumas: alongZ(3, 3, 3, 1, 3 * CELL_SIZE + CELL_SIZE / 2, 3)
+      }
+    ];
+
+    for (const { name, lumas } of spots) {
+      const dip = valleyDip(lumas);
+      expect(dip, `${name} dip ${dip.toFixed(3)}`).toBeLessThanOrEqual(0.04);
+      expect(Math.max(...lumas), `${name} has some light`).toBeGreaterThan(0.12);
     }
-    expect(worstDip, `lantern-torch wall dip ${worstDip.toFixed(3)}`).toBeLessThanOrEqual(0.04);
   });
 
   it('keeps gameplay tile-light on max() so no floor-1 square flips dark/lit', () => {

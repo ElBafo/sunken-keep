@@ -29,10 +29,21 @@ type Proto3d = {
   getPosition: () => { x: number; y: number; dir: number };
   torchStates: () => Array<{ x: number; y: number; face: string; lit: boolean; capped: boolean }>;
   tileBrightness: (x: number, y: number) => number;
+  sourceLight: (x: number, y: number) => number;
   regionStats: (x0: number, y0: number, x1: number, y1: number) => { luma: number; fogRatio: number; n: number };
+  regionContrast: (
+    x0: number,
+    y0: number,
+    x1: number,
+    y1: number
+  ) => { n: number; p10: number; p50: number; p90: number; ratio: number };
   sprites: () => Array<{ item?: string; x: number; y: number; kind: string }>;
   getBag: () => Array<{ item: string; count: number }>;
   useBagSlot: (i: number) => void;
+  frameStats: () => { n: number; mean: number; p95: number };
+  columnLumas: (y0: number, y1: number) => number[];
+  setLightDebug: (mode: string) => void;
+  getLightDebug: () => string;
 };
 
 test.use(devices['iPhone 15']);
@@ -598,3 +609,315 @@ test('proto3d lighting: screen luma of the 3D view', async ({ page }) => {
   expect(floor3Ratio, '?ambientFloor=3 ≤ 40% of torch-lit').toBeLessThanOrEqual(0.4);
   expect(relightGain, 'relighting a dead torch raises nearby view luma ≥ 50%').toBeGreaterThanOrEqual(1.5);
 });
+
+test('proto3d lighting: tile-light frozen, wall terms diagnosed', async ({ page }) => {
+  test.setTimeout(90000);
+  mkdirSync(OUT, { recursive: true });
+
+  await page.goto(`${BASE_URL}/proto3d.html?test=1&debug=1`);
+  await page.waitForFunction(
+    () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
+    null,
+    { timeout: 25000 }
+  );
+  await page.locator('#tap-to-start').click();
+  await page.waitForTimeout(400);
+
+  const tileLight = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    p.setOil(2);
+    p.setPosition(19, 5, 0);
+    return {
+      ambient: p.getAmbient(),
+      luma198: p.tileBrightness(19, 8),
+      source198: p.sourceLight(19, 8),
+      lairFrom195: p.isSquareLit(19, 7)
+    };
+  });
+  await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    p.setPosition(19, 6, 0);
+  });
+  const lairFrom196 = await page.evaluate(
+    () => (window as unknown as { __proto3d: Proto3d }).__proto3d.isSquareLit(19, 7)
+  );
+  console.log('TILE_LIGHT freeze', tileLight, 'lairFrom196', lairFrom196);
+  expect(tileLight.luma198, '(19,8) stays ambient').toBeCloseTo(0.05848, 4);
+  expect(tileLight.source198, '(19,8) gameplay sourceLight stays 0').toBe(0);
+  expect(tileLight.lairFrom195, 'lair unlit from (19,5)').toBe(false);
+  expect(lairFrom196, 'lair unlit from (19,6)').toBe(false);
+
+  // Lit-wall brightness must stay within 1 Testie level (8 luma) of main.
+  // 8-seg Gouraud keeps torch glow on side walls; FACE_SEGMENTS=1 was 3–4 levels darker.
+  const litWalls: Array<[number, number, number, string, number]> = [
+    [2, 1, 1, '(2,1)E torch side wall', 0.04],
+    [4, 5, 1, '(4,5)E torch side wall', 0.04],
+    [5, 5, 1, '(5,5)E torch side wall', 0.04],
+    [1, 4, 2, 'row-5 south wall (1,4)S', 0.08]
+  ];
+  // Brick-highlight p90 on main (8-seg Gouraud, oil 2, flicker frame 2). 1 level = 8 luma.
+  const mainBrickP90: Record<string, number> = {
+    '(2,1)E torch side wall': 133,
+    '(4,5)E torch side wall': 117,
+    '(5,5)E torch side wall': 137,
+    'row-5 south wall (1,4)S': 87
+  };
+  for (const [x, y, dir, name, x0] of litWalls) {
+    const stats = await page.evaluate(
+      ([px, py, pd, xStart]) => {
+        const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+        p.setOil(2);
+        p.setPosition(px, py, pd);
+        p.setFlickerFrame(2);
+        const canvas = document.getElementById('render-canvas') as HTMLCanvasElement;
+        const w = canvas.width;
+        const h = canvas.height;
+        return p.regionContrast(w * xStart, h * 0.22, w * 0.28, h * 0.62);
+      },
+      [x, y, dir, x0] as const
+    );
+    console.log('LIT_WALL', name, stats);
+    await page.screenshot({
+      path: `${OUT}/lit_wall_${x}_${y}_${dir}.png`,
+      fullPage: false
+    });
+    expect(
+      Math.abs(stats.p90 - mainBrickP90[name]),
+      `${name} brick glow within 1 level of main (p90 ${stats.p90} vs ${mainBrickP90[name]})`
+    ).toBeLessThanOrEqual(8);
+  }
+
+  const spots: Array<[number, number, number, string]> = [
+    [2, 1, 1, 'lighting_dip_2_1_east.png'],
+    [4, 5, 1, 'lighting_dip_4_5_east.png'],
+    [3, 5, 1, 'lighting_dip_3_5_east.png'],
+    [1, 4, 2, 'lighting_dip_1_4_south.png'],
+    [3, 2, 0, 'lighting_dip_3_2_north.png'],
+    [3, 3, 0, 'lighting_dip_3_3_north.png'],
+    // Pell east wall at (14,10), lantern only — 1 / 2 / 3 squares including the far piece.
+    [13, 10, 1, 'lantern_wall_1sq_east.png'],
+    [12, 10, 1, 'lantern_wall_2sq_east.png'],
+    [11, 10, 1, 'lantern_wall_3sq_east.png']
+  ];
+
+  for (const [x, y, dir, file] of spots) {
+    await page.evaluate(
+      ([px, py, pd]) => {
+        const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+        p.setPosition(px, py, pd);
+        p.setFlickerFrame(2);
+      },
+      [x, y, dir] as const
+    );
+    await page.waitForTimeout(120);
+    await page.screenshot({ path: `${OUT}/${file}`, fullPage: false });
+    console.log('SHOT', file);
+  }
+
+  // Mid-wall strip at (4,5) east: lantern near, torch down the pantry hall.
+  const strip = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    p.setPosition(4, 5, 1);
+    p.setFlickerFrame(2);
+    const canvas = document.getElementById('render-canvas') as HTMLCanvasElement;
+    const lumas = p.columnLumas(canvas.height * 0.32, canvas.height * 0.58);
+    const a = Math.floor(lumas.length * 0.12);
+    const b = Math.ceil(lumas.length * 0.88);
+    const mid = lumas.slice(a, b);
+    const smooth: number[] = [];
+    const r = 4;
+    for (let i = 0; i < mid.length; i++) {
+      let s = 0;
+      let n = 0;
+      for (let j = i - r; j <= i + r; j++) {
+        if (j >= 0 && j < mid.length) {
+          s += mid[j];
+          n++;
+        }
+      }
+      smooth.push(s / n);
+    }
+    let dip = 0;
+    for (let i = 1; i < smooth.length - 1; i++) {
+      const left = Math.max(...smooth.slice(0, i));
+      const right = Math.max(...smooth.slice(i + 1));
+      dip = Math.max(dip, Math.min(left, right) - smooth[i]);
+    }
+    return { dip, n: smooth.length, min: Math.min(...smooth), max: Math.max(...smooth) };
+  });
+  console.log('WALL STRIP (4,5) east', strip);
+  expect(strip.max, 'torch/lantern still light the wall').toBeGreaterThan(40);
+  expect(strip.dip, 'no dark valley between lantern and torch on screen').toBeLessThan(28);
+
+  // Close wall: mortar stays dark vs brick (multiply, not an ambient floor on the texel).
+  const brick1 = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    p.setOil(2);
+    p.setPosition(13, 10, 1);
+    p.setFlickerFrame(2);
+    const canvas = document.getElementById('render-canvas') as HTMLCanvasElement;
+    const w = canvas.width;
+    const h = canvas.height;
+    return p.regionContrast(w * 0.04, h * 0.24, w * 0.96, h * 0.66);
+  });
+  console.log('BRICK CONTRAST 1sq', brick1);
+  expect(brick1.n, 'sampled the close lantern wall').toBeGreaterThan(80);
+  expect(brick1.p10, 'mortar gaps are not lifted to ambient grey (~15)').toBeLessThan(8);
+  expect(brick1.p90, 'painted brick still reads above the gaps').toBeGreaterThan(40);
+  expect(brick1.ratio, 'mortar/brick luma ratio stays (not flattened)').toBeLessThan(0.25);
+
+  // Far wall at 3 squares is beyond the oil pool: albedo × ambient, never max(texel, ambient).
+  const brick3 = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    p.setPosition(11, 10, 1);
+    p.setFlickerFrame(2);
+    const canvas = document.getElementById('render-canvas') as HTMLCanvasElement;
+    const w = canvas.width;
+    const h = canvas.height;
+    return p.regionContrast(w * 0.04, h * 0.38, w * 0.54, h * 0.56);
+  });
+  console.log('BRICK CONTRAST 3sq far wall', brick3);
+  expect(brick3.n, 'sampled the far lantern wall').toBeGreaterThan(40);
+  expect(brick3.p10, 'far-wall mortar stays unlifted').toBeLessThan(6);
+  expect(brick3.p50, 'far wall is not a flat ambient-grey slab').toBeLessThan(10);
+  expect(brick3.p90, 'painted far-wall bricks still vary vs mortar').toBeGreaterThan(brick3.p10 + 5);
+
+  // (2,1)E: Testie's "levels" dip is painted mortar in albedo, not a lighting valley.
+  const termDip = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    const canvas = document.getElementById('render-canvas') as HTMLCanvasElement;
+    const dipOf = (mode: string) => {
+      p.setPosition(2, 1, 1);
+      p.setFlickerFrame(2);
+      p.setLightDebug(mode);
+      const lumas = p.columnLumas(canvas.height * 0.22, canvas.height * 0.62);
+      const left = lumas.slice(Math.floor(canvas.width * 0.02), Math.ceil(canvas.width * 0.28));
+      const k = 4;
+      const sm: number[] = [];
+      for (let i = 0; i < left.length; i++) {
+        let s = 0;
+        let n = 0;
+        for (let j = i - k; j <= i + k; j++) {
+          if (j >= 0 && j < left.length) {
+            s += left[j];
+            n++;
+          }
+        }
+        sm.push(s / n);
+      }
+      const a = Math.floor(sm.length * 0.08);
+      const b = Math.ceil(sm.length * 0.92);
+      const mid = sm.slice(a, b);
+      let dip = 0;
+      for (let i = 1; i < mid.length - 1; i++) {
+        const leftMax = Math.max(...mid.slice(0, i));
+        const rightMax = Math.max(...mid.slice(i + 1));
+        dip = Math.max(dip, Math.min(leftMax, rightMax) - mid[i]);
+      }
+      return { dip, min: Math.min(...mid), max: Math.max(...mid), levels8: dip / 8 };
+    };
+    const albedo = dipOf('albedo');
+    const lantern = dipOf('lantern');
+    const torch = dipOf('torch');
+    const ambient = dipOf('ambient');
+    const lighting = dipOf('lighting');
+    const nofog = dipOf('nofog');
+    const nopalette = dipOf('nopalette');
+    const nodust = dipOf('nodust');
+    const nomip = dipOf('nomip');
+    const final = dipOf('final');
+    return { albedo, lantern, torch, ambient, lighting, nofog, nopalette, nodust, nomip, final };
+  });
+  console.log('TERM_DIP (2,1)E', termDip);
+  expect(termDip.albedo.levels8, '(2,1)E dip lives in albedo / mortar').toBeGreaterThan(0.5);
+  expect(
+    Math.abs(termDip.final.dip - termDip.albedo.dip),
+    'final dip matches albedo, not a lighting valley'
+  ).toBeLessThan(4);
+  expect(termDip.lighting.max, 'lighting factor on walls is a high flat field').toBeGreaterThan(180);
+  expect(termDip.ambient.max, 'ambient-only is a dim floor, not the mortar valley').toBeLessThan(40);
+  expect(termDip.lantern.levels8, 'lantern-only is falloff, not the mortar valley').toBeLessThan(
+    termDip.albedo.levels8
+  );
+  expect(
+    Math.abs(termDip.torch.dip - termDip.albedo.dip),
+    'torch-only still shows the albedo mortar dip'
+  ).toBeLessThan(4);
+  expect(
+    Math.abs(termDip.nofog.dip - termDip.final.dip),
+    'fog is not the dip (no vignette / AO overlay in proto3d)'
+  ).toBeLessThan(2);
+  expect(Math.abs(termDip.nopalette.dip - termDip.final.dip), 'palette is not the dip').toBeLessThan(3);
+  expect(Math.abs(termDip.nodust.dip - termDip.final.dip), 'dust is not the dip').toBeLessThan(2);
+  expect(Math.abs(termDip.nomip.dip - termDip.final.dip), 'mips are not the dip').toBeLessThan(3);
+
+  const termShots: Array<[string, string]> = [
+    ['albedo', 'band_diag_21e_albedo_view.png'],
+    ['lantern', 'band_diag_21e_lantern_view.png'],
+    ['torch', 'band_diag_21e_torch_view.png'],
+    ['ambient', 'band_diag_21e_ambient_view.png'],
+    ['lighting', 'band_diag_21e_lighting_view.png'],
+    ['nofog', 'band_diag_21e_nofog_view.png'],
+    ['nopalette', 'band_diag_21e_nopalette_view.png'],
+    ['nodust', 'band_diag_21e_nodust_view.png'],
+    ['nomip', 'band_diag_21e_nomip_view.png'],
+    ['final', 'band_diag_21e_final_view.png']
+  ];
+  for (const [mode, file] of termShots) {
+    await page.evaluate((m) => {
+      const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+      p.setPosition(2, 1, 1);
+      p.setFlickerFrame(2);
+      p.setLightDebug(m);
+    }, mode);
+    await page.waitForTimeout(80);
+    await page.locator('#canvas-container').screenshot({ path: `${OUT}/${file}` });
+    console.log('SHOT', file);
+  }
+  await page.evaluate(() => {
+    (window as unknown as { __proto3d: Proto3d }).__proto3d.setLightDebug('final');
+  });
+
+  await page.evaluate(() => {
+    (window as unknown as { __proto3d: Proto3d }).__proto3d.setPosition(4, 5, 1);
+  });
+  await page.waitForTimeout(1600);
+  const frames = await page.evaluate(
+    () => (window as unknown as { __proto3d: Proto3d }).__proto3d.frameStats()
+  );
+  console.log('FRAME_STATS (4,5) east', frames);
+  expect(frames.n, 'collected frame samples').toBeGreaterThan(20);
+  expect(frames.mean, 'vertex bake — not the ~80ms fragment-ALU regression').toBeLessThan(60);
+  expect(frames.p95, 'worst frames stay below the 80ms fragment regression').toBeLessThan(78);
+});
+
+test('proto3d ?debug=light renders lighting factor only', async ({ page }) => {
+  test.setTimeout(60000);
+  mkdirSync(OUT, { recursive: true });
+  await page.goto(`${BASE_URL}/proto3d.html?test=1&debug=light`);
+  await page.waitForFunction(
+    () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
+    null,
+    { timeout: 25000 }
+  );
+  await page.locator('#tap-to-start').click();
+  await page.waitForTimeout(400);
+  const info = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    p.setOil(2);
+    p.setPosition(2, 1, 1);
+    p.setFlickerFrame(2);
+    const canvas = document.getElementById('render-canvas') as HTMLCanvasElement;
+    const w = canvas.width;
+    const h = canvas.height;
+    return {
+      mode: p.getLightDebug(),
+      wall: p.regionContrast(w * 0.04, h * 0.22, w * 0.28, h * 0.62)
+    };
+  });
+  console.log('DEBUG_LIGHT', info);
+  expect(info.mode, '?debug=light selects lighting-only').toBe('lighting');
+  expect(info.wall.p50, 'lighting factor is a high cream field, not brick albedo').toBeGreaterThan(180);
+  await page.locator('#canvas-container').screenshot({ path: `${OUT}/debug_light_21e.png` });
+});
+

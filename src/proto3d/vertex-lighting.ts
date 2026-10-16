@@ -30,12 +30,13 @@ import {
 } from './constants';
 import { DressingMark } from './dressing';
 import { isLightPassable, LightReach, partyReach, reachAt, sconceOrigin, sconceReach } from './light-grid';
+import { FLOOR_DISK_Y, LightDebugMode, NONFLOOR_HEIGHT_PENALTY, parseLightDebugMode } from './surface-light';
 import { FloorData, Sconce } from './types';
 
 interface CachedFace {
   mesh: THREE.Mesh;
   worldPos: Float32Array;
-  colors: THREE.BufferAttribute;
+  colors: THREE.BufferAttribute | null;
   isDark: boolean;
   isProp: boolean;
   isWall: boolean;
@@ -124,9 +125,9 @@ export function partyDistTiles(
   // wall quads dip below y 0.28, and treating those verts as floor punched a
   // party-centered dark oval into the mid-wall that slid when strafing.
   if (opts?.prop || opts?.wall) return d;
-  // Floor disk: 2D reach. Untagged non-floor verts keep the +0.55 penalty.
-  if (wy < 0.28) return horiz;
-  return d + 0.55;
+  // Floor disk: 2D reach. Untagged non-floor verts keep the height penalty.
+  if (wy < FLOOR_DISK_Y) return horiz;
+  return d + NONFLOOR_HEIGHT_PENALTY;
 }
 
 function parseBright(value: number): number {
@@ -150,6 +151,7 @@ export class VertexLightingManager {
   private bright = 1;
   private oilFn: () => number = () => 1;
   private carriedTorch = false;
+  private lightDebug: LightDebugMode = 'final';
 
   constructor(
     floorData: FloorData,
@@ -184,6 +186,15 @@ export class VertexLightingManager {
 
   hasCarriedTorch(): boolean {
     return this.carriedTorch;
+  }
+
+  setLightDebug(mode: LightDebugMode) {
+    this.lightDebug = parseLightDebugMode(mode) ?? mode;
+    for (const face of this.faces) this.bakeFace(face, this.flicker);
+  }
+
+  getLightDebug(): LightDebugMode {
+    return this.lightDebug;
   }
 
   setBright(value: number) {
@@ -239,6 +250,12 @@ export class VertexLightingManager {
 
       obj.updateWorldMatrix(true, false);
       const geometry = obj.geometry;
+      const { tileX, tileY } = this.lightTileOf(obj);
+      const tile = this.floorData.tiles[tileY]?.[tileX];
+      const isDark = tile?.floorNDark || false;
+      const isWall = isWallLike(obj.userData.kind);
+      const lightGround = !!obj.userData.lightGround || !!obj.userData.rubble;
+
       if (!geometry.attributes.color) {
         const colors = new Float32Array(geometry.attributes.position.count * 3);
         geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -263,21 +280,17 @@ export class VertexLightingManager {
         worldPos[i * 3 + 2] = v.z;
       }
 
-      const { tileX, tileY } = this.lightTileOf(obj);
-      const tile = this.floorData.tiles[tileY]?.[tileX];
-      const isDark = tile?.floorNDark || false;
-
       this.faces.push({
         mesh: obj,
         worldPos,
         colors: geometry.attributes.color as THREE.BufferAttribute,
         isDark,
         isProp: !!obj.userData.lanternProp,
-        isWall: isWallLike(obj.userData.kind),
+        isWall,
         nearSconce: this.nearAnySconce(tileX, tileY, radiusTiles),
         tileX,
         tileY,
-        lightGround: !!obj.userData.lightGround || !!obj.userData.rubble
+        lightGround
       });
     });
   }
@@ -415,12 +428,16 @@ export class VertexLightingManager {
     isProp = false,
     isWall = false
   ): [number, number, number] {
+    if (this.lightDebug === 'albedo') return [1, 1, 1];
     const ambient = this.floorAmbient();
     const ambientRgb: [number, number, number] = [
       ambient * AMBIENT_RGB[0],
       ambient * AMBIENT_RGB[1],
       ambient * AMBIENT_RGB[2]
     ];
+    const skipLantern = this.lightDebug === 'torch' || this.lightDebug === 'ambient';
+    const skipTorch = this.lightDebug === 'lantern' || this.lightDebug === 'ambient';
+    const skipAmbient = this.lightDebug === 'lantern' || this.lightDebug === 'torch';
     // Screen-combine lantern + torch on wall/floor/ceiling shading only.
     // Lantern props keep max(). Gameplay tile-light is sourceLight() (max()).
     const geometry = !isProp;
@@ -435,7 +452,7 @@ export class VertexLightingManager {
       prop: isProp,
       wall: isWall
     });
-    if (reachAt(this.partyCells, tileX, tileY) !== undefined) {
+    if (!skipLantern && reachAt(this.partyCells, tileX, tileY) !== undefined) {
       if (isProp && this.oilFn() > 0) {
         add(PROP_LANTERN_INTENSITY * lanternFalloff(partyDist, PROP_LANTERN_RADIUS_TILES), lantern.rgb);
       } else if (isWall) {
@@ -450,7 +467,7 @@ export class VertexLightingManager {
       }
     }
 
-    if (!isDark) {
+    if (!skipTorch && !isDark) {
       const radius = SCONCE_RADIUS_TILES * CELL_SIZE;
       for (const s of this.sconceWorld) {
         if (reachAt(s.reach, tileX, tileY) === undefined) continue;
@@ -471,7 +488,9 @@ export class VertexLightingManager {
       }
     }
 
-    const lit: [number, number, number] = geometry
+    // Lighting factor for MeshBasic (texture × this). Ambient floors the
+    // factor, it is never added onto albedo (that would lift mortar gaps).
+    const lit: [number, number, number] = geometry && !skipAmbient
       ? [
           Math.max(ambientRgb[0], rgb[0]),
           Math.max(ambientRgb[1], rgb[1]),
@@ -512,6 +531,7 @@ export class VertexLightingManager {
 
   private bakeFace(face: CachedFace, flick: number) {
     const { worldPos, colors } = face;
+    if (!colors) return;
     const n = colors.count;
     const groundX = face.tileX * CELL_SIZE;
     const groundZ = face.tileY * CELL_SIZE;
@@ -547,7 +567,8 @@ export class VertexLightingManager {
     this.flickerFrame = wrapped;
     this.flicker = next;
     for (const face of this.faces) {
-      if (face.nearSconce) this.bakeFace(face, this.flicker);
+      if (!face.nearSconce) continue;
+      this.bakeFace(face, this.flicker);
     }
   }
 
@@ -559,7 +580,8 @@ export class VertexLightingManager {
     if (q === this.flicker) return;
     this.flicker = q;
     for (const face of this.faces) {
-      if (face.nearSconce) this.bakeFace(face, this.flicker);
+      if (!face.nearSconce) continue;
+      this.bakeFace(face, this.flicker);
     }
   }
 }

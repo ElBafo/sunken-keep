@@ -69,6 +69,7 @@ import { SceneBuilder } from './scene-builder';
 import { SpriteManager } from './sprites';
 import { TorchSystem, torchWorldPos } from './torches';
 import { Sconce, Tile } from './types';
+import { parseLightDebugMode, type LightDebugMode } from './surface-light';
 import { VertexLightingManager } from './vertex-lighting';
 import { WaterSystem } from './water';
 import { DarkFx } from './dark-fx';
@@ -171,6 +172,8 @@ class Game {
   fpsFrames = 0;
   fpsLastTime = 0;
   lastFps = 0;
+  lastFrameMs = 0;
+  private frameSamples: number[] = [];
   private doorUnlockTimer = 0;
   private pendingUnlock: { x: number; y: number } | null = null;
   private flags = new Set<string>();
@@ -204,6 +207,9 @@ class Game {
   private caveInCrashed = false;
   private wantOpeningCaveIn = false;
   private oilDisplay = OIL_START;
+  private lightDebug: LightDebugMode = 'final';
+  private wallMipFilters = new Map<THREE.Texture, THREE.MinificationTextureFilter>();
+  private wallMaps = new Map<THREE.Material, THREE.Texture | null>();
   private oilGlugTimers: number[] = [];
   private worldBoot: Promise<void> = Promise.resolve();
   private stageFitWired = false;
@@ -416,7 +422,9 @@ class Game {
     await this.renderer.loadPalette();
     if (params.get('palette') === '0') this.renderer.setPaletteEnabled(false);
     const fpsEl = document.getElementById('fps-counter');
-    if (params.get('debug') === '1') {
+    const debugParam = params.get('debug');
+    const lightDebug = parseLightDebugMode(debugParam);
+    if (debugParam === '1' || lightDebug) {
       const el = fpsEl ?? document.createElement('div');
       el.id = 'fps-counter';
       el.textContent = 'FPS: --';
@@ -504,6 +512,7 @@ class Game {
     this.torches.setParty(this.player.x, this.player.y, this.player.dir);
     this.vertexLighting.registerScene(this.renderer.scene);
     this.vertexLighting.updateAllMeshes(this.renderer.scene);
+    if (lightDebug) this.applyLightDebug(lightDebug);
 
     this.darkFx = new DarkFx();
     void this.darkFx.load(this.renderer.scene, floor1, this.spriteManager);
@@ -2785,6 +2794,33 @@ class Game {
         }
         return { luma: n ? sum / n : 0, fogRatio: n ? fog / n : 0, n };
       },
+      /** Painted-texel contrast in a screen box. Mortar/brick ratio stays if light only multiplies. */
+      regionContrast: (x0: number, y0: number, x1: number, y1: number) => {
+        this.renderer.render();
+        const gl = this.renderer.renderer.getContext();
+        const w = this.renderer.canvas.width;
+        const h = this.renderer.canvas.height;
+        const pixels = new Uint8Array(w * h * 4);
+        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+        const xMin = Math.max(0, Math.floor(x0));
+        const xMax = Math.min(w, Math.ceil(x1));
+        const yMin = Math.max(0, Math.floor(y0));
+        const yMax = Math.min(h, Math.ceil(y1));
+        const lumas: number[] = [];
+        for (let y = yMin; y < yMax; y++) {
+          for (let x = xMin; x < xMax; x++) {
+            const i = ((h - 1 - y) * w + x) * 4;
+            lumas.push((pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3);
+          }
+        }
+        lumas.sort((a, b) => a - b);
+        const at = (p: number) =>
+          lumas.length ? lumas[Math.min(lumas.length - 1, Math.floor(p * (lumas.length - 1)))] : 0;
+        const p10 = at(0.1);
+        const p50 = at(0.5);
+        const p90 = at(0.9);
+        return { n: lumas.length, p10, p50, p90, ratio: p90 > 0 ? p10 / p90 : 0 };
+      },
       faceKinds: () => {
         const out: Array<{ kind: string; lightX: number; lightY: number; face?: string }> = [];
         this.renderer.scene.traverse((obj) => {
@@ -2859,6 +2895,46 @@ class Game {
         return sum / (w * h);
       },
       fps: () => this.lastFps,
+      frameMs: () => this.lastFrameMs,
+      frameStats: () => {
+        const s = this.frameSamples;
+        if (s.length === 0) return { n: 0, mean: 0, p95: 0 };
+        const sorted = [...s].sort((a, b) => a - b);
+        const sum = s.reduce((a, b) => a + b, 0);
+        return {
+          n: s.length,
+          mean: sum / s.length,
+          p95: sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))]
+        };
+      },
+      columnLumas: (y0: number, y1: number) => {
+        this.renderer.render();
+        const gl = this.renderer.renderer.getContext();
+        const w = this.renderer.canvas.width;
+        const h = this.renderer.canvas.height;
+        const pixels = new Uint8Array(w * h * 4);
+        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+        const yMin = Math.max(0, Math.floor(y0));
+        const yMax = Math.min(h, Math.ceil(y1));
+        const lumas = new Array<number>(w).fill(0);
+        const counts = new Array<number>(w).fill(0);
+        for (let y = yMin; y < yMax; y++) {
+          for (let x = 0; x < w; x++) {
+            const i = ((h - 1 - y) * w + x) * 4;
+            lumas[x] += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+            counts[x] += 1;
+          }
+        }
+        return lumas.map((sum, x) => (counts[x] ? sum / counts[x] : 0));
+      },
+      sampleVertex: (
+        wx: number,
+        wy: number,
+        wz: number,
+        tileX: number,
+        tileY: number,
+        isWall = false
+      ) => this.vertexLighting.sampleVertex(wx, wy, wz, tileX, tileY, false, false, isWall),
       quality: () => this.quality,
       setQuality: (q: QualityLevel) => {
         this.quality = q;
@@ -2928,6 +3004,11 @@ class Game {
         this.vertexLighting.setFlickerFrame(frame);
         this.renderer.render();
       },
+      setLightDebug: (mode: LightDebugMode) => {
+        this.applyLightDebug(parseLightDebugMode(mode) ?? mode);
+        this.renderer.render();
+      },
+      getLightDebug: () => this.lightDebug,
       darkFx: () => this.darkFx.snapshot(),
       lightFacingTorch: () => this.handleFacingTorch(),
       snuffFacing: () => {
@@ -3322,10 +3403,65 @@ class Game {
     titleCanvas?.addEventListener('touchstart', onStageTap, { passive: true });
   }
 
+  private applyLightDebug(mode: LightDebugMode) {
+    const resolved = parseLightDebugMode(mode) ?? mode;
+    this.lightDebug = resolved;
+    this.vertexLighting.setLightDebug(resolved);
+    const scene = this.renderer.scene;
+    const isolate =
+      resolved === 'albedo' ||
+      resolved === 'lantern' ||
+      resolved === 'torch' ||
+      resolved === 'ambient' ||
+      resolved === 'lighting' ||
+      resolved === 'nofog';
+    if (isolate) {
+      scene.fog = null;
+    } else {
+      this.atmosphere.applyFog(scene, this.renderer.renderer);
+    }
+    this.renderer.setPaletteEnabled(
+      resolved !== 'nopalette' && resolved !== 'albedo' && resolved !== 'lighting'
+    );
+    const wantMips = resolved !== 'nomip';
+    const hideMaps = resolved === 'lighting';
+    scene.traverse((obj) => {
+      // Duck-type: the full Vite build can split three.module so instanceof Mesh misses.
+      const mesh = obj as THREE.Mesh;
+      if (!mesh.isMesh) return;
+      const mat = mesh.material;
+      const mats = Array.isArray(mat) ? mat : [mat];
+      for (const m of mats) {
+        const basic = m as THREE.MeshBasicMaterial;
+        if (!this.wallMaps.has(basic) && 'map' in basic) this.wallMaps.set(basic, basic.map);
+        if (hideMaps) {
+          if (basic.map) {
+            basic.map = null;
+            basic.needsUpdate = true;
+          }
+        } else if (this.wallMaps.has(basic) && basic.map !== this.wallMaps.get(basic)) {
+          basic.map = this.wallMaps.get(basic) ?? null;
+          basic.needsUpdate = true;
+        }
+        const map = basic.map;
+        if (!map) continue;
+        if (!this.wallMipFilters.has(map)) this.wallMipFilters.set(map, map.minFilter);
+        map.minFilter = wantMips ? this.wallMipFilters.get(map)! : THREE.NearestFilter;
+        map.needsUpdate = true;
+      }
+    });
+    this.atmosphere.setQuality(isolate || resolved === 'nodust' ? 'low' : this.quality);
+  }
+
   gameLoop() {
     const now = performance.now();
     const deltaTime = now - this.lastTime;
     this.lastTime = now;
+    this.lastFrameMs = deltaTime;
+    if (deltaTime > 0 && deltaTime < 1000) {
+      this.frameSamples.push(deltaTime);
+      if (this.frameSamples.length > 180) this.frameSamples.splice(0, this.frameSamples.length - 180);
+    }
     const dtSec = Math.min(0.05, deltaTime / 1000);
     this.bubble?.update(now);
     this.flushBarks(now);

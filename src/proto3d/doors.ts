@@ -38,7 +38,7 @@ function keyOf(x: number, y: number): string {
 }
 
 function makeDoorGeometry(): THREE.PlaneGeometry {
-  // Same segment density as walls so vertex lighting bands match neighbouring faces.
+  // Same tessellation as walls; lantern+torch light is per-fragment on both.
   return new THREE.PlaneGeometry(CELL_SIZE, CELL_SIZE, FACE_SEGMENTS, FACE_SEGMENTS);
 }
 
@@ -46,7 +46,7 @@ function doorMaterial(
   map: THREE.Texture,
   opts: { alphaTest: number }
 ): THREE.MeshBasicMaterial {
-  // Same flags as wall faces so fog, vertex colours and sconce warmth match.
+  // Same flags as wall faces so fog and per-fragment sconce warmth match.
   return new THREE.MeshBasicMaterial({
     map,
     vertexColors: true,
