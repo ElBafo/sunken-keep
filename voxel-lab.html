@@ -63,16 +63,7 @@
       pointer-events: auto;
     }
     #ooze-ui {
-      position: fixed;
-      left: 8px;
-      right: 8px;
-      bottom: max(72px, calc(env(safe-area-inset-bottom) + 60px));
-      z-index: 5;
-      pointer-events: auto;
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 8px;
+      display: contents;
     }
     #look {
       pointer-events: auto;
@@ -113,7 +104,7 @@
     }
     #hint {
       position: fixed;
-      bottom: max(168px, calc(env(safe-area-inset-bottom) + 156px));
+      bottom: max(88px, calc(env(safe-area-inset-bottom) + 76px));
       left: 0;
       right: 0;
       text-align: center;
@@ -177,18 +168,18 @@
           <input id="slider-warmth" type="range" min="0" max="100" value="100" step="1" />
         </label>
       </div>
+      <span id="ooze-ui">
+        <button id="btn-ooze-res" class="lab" type="button" aria-pressed="true">Res 32</button>
+        <button id="btn-ooze-mat" class="lab" type="button" aria-pressed="true">Wet stone</button>
+        <button id="btn-ooze-anim" class="lab" type="button">Anim idle</button>
+        <button id="btn-ooze-dist" class="lab" type="button" aria-pressed="true">1 square</button>
+        <button id="btn-ooze-view" class="lab" type="button" aria-pressed="true">Game cam</button>
+        <button id="btn-ooze-compare" class="lab" type="button" aria-pressed="false">Compare sprite</button>
+        <button id="btn-ooze-reset" class="lab" type="button">Reset ooze</button>
+      </span>
     </div>
   </div>
   <div id="hint">Gray Ooze lab (not in the game) · drag to look · step / turn with the arrows · tap Pell’s lamp</div>
-  <div id="ooze-ui">
-    <button id="btn-ooze-res" class="lab" type="button" aria-pressed="true">Res 32</button>
-    <button id="btn-ooze-mat" class="lab" type="button" aria-pressed="true">Wet stone</button>
-    <button id="btn-ooze-anim" class="lab" type="button">Anim idle</button>
-    <button id="btn-ooze-dist" class="lab" type="button" aria-pressed="true">1 square</button>
-    <button id="btn-ooze-view" class="lab" type="button" aria-pressed="true">Game cam</button>
-    <button id="btn-ooze-compare" class="lab" type="button" aria-pressed="false">Compare sprite</button>
-    <button id="btn-ooze-reset" class="lab" type="button">Reset ooze</button>
-  </div>
   <div id="move">
     <button id="btn-left" class="lab turn" type="button" aria-label="Turn left">Turn Left</button>
     <button id="btn-back" class="lab" type="button" aria-label="Step back">▼</button>
