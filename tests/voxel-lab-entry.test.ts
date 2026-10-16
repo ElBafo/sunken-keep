@@ -55,4 +55,12 @@ describe('voxel-lab is a standalone Vite page', () => {
     expect(index).not.toContain('voxel-lab');
     expect(proto).not.toContain('voxel-lab');
   });
+
+  it('does not import proto3d wall-mount cull or share the game camera', () => {
+    const labMain = readFileSync(resolve(__dirname, '../src/voxel-lab/main.ts'), 'utf8');
+    expect(labMain).not.toContain('wall-near-cull');
+    expect(labMain).not.toContain('proto3d/torches');
+    expect(labMain).not.toContain('proto3d/main');
+    expect(labMain).toContain("from './constants'");
+  });
 });

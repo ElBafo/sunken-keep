@@ -9,7 +9,7 @@ import {
 import { FloorData, Tile } from './types';
 import { isBlockingProp } from './wall-props';
 
-const MOVE_DURATION = 180;
+export const MOVE_DURATION = 180;
 
 const DIRS = [
   [0, -1],
@@ -19,6 +19,23 @@ const DIRS = [
 ] as const;
 
 export type MoveResult = 'ok' | 'busy' | 'bounds' | 'wall' | 'secret' | 'door' | 'monster';
+
+/** Place any camera as proto3d does at a grid cell (back-offset, pitch, eye height). */
+export function poseGridCamera(
+  camera: THREE.Camera,
+  gridX: number,
+  gridY: number,
+  rotY: number,
+  bob = 0
+) {
+  const [ox, oz] = cameraOffsetXZ(rotY);
+  camera.position.set(gridX * CELL_SIZE + ox, CAMERA_EYE_HEIGHT + bob, gridY * CELL_SIZE + oz);
+  camera.rotation.order = 'YXZ';
+  camera.rotation.x = CAMERA_PITCH;
+  camera.rotation.y = rotY;
+  camera.rotation.z = 0;
+  camera.updateMatrixWorld();
+}
 
 export class Player {
   x: number;
@@ -107,17 +124,7 @@ export class Player {
   }
 
   poseCamera(gridX: number, gridY: number, rotY: number, bob = 0) {
-    const [ox, oz] = cameraOffsetXZ(rotY);
-    this.camera.position.set(
-      gridX * CELL_SIZE + ox,
-      CAMERA_EYE_HEIGHT + bob,
-      gridY * CELL_SIZE + oz
-    );
-    this.camera.rotation.order = 'YXZ';
-    this.camera.rotation.x = CAMERA_PITCH;
-    this.camera.rotation.y = rotY;
-    this.camera.rotation.z = 0;
-    this.camera.updateMatrixWorld();
+    poseGridCamera(this.camera, gridX, gridY, rotY, bob);
   }
 
   updateCameraPosition(_t: number = 1) {

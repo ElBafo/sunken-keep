@@ -15,7 +15,7 @@ import {
 } from './constants';
 import { loadSpriteTexture } from './atlas';
 import { Sconce } from './types';
-import { cameraSpaceDepth, nearPlaneCulled, objectNearPlaneCulled } from './wall-near-cull';
+import { cameraSpaceDepth, nearPlaneCulled, objectNearPlaneCulled, planeNearCulled } from './wall-near-cull';
 
 export type TorchVisualState = 'lit' | 'dead' | 'capped';
 
@@ -115,13 +115,18 @@ export function sconceCulledByNearPlane(depth: number): boolean {
   return nearPlaneCulled(depth);
 }
 
-/** Hide the whole sconce (bracket + flame) once any mesh hits the near plane. */
+/** Hide the whole sconce once any plane *corner* hits the near band. */
 export function sconceCulledByCamera(s: Sconce, camera: THREE.Camera): boolean {
+  camera.updateMatrixWorld();
   const poses = torchBracketPoses(s);
+  const { rotY } = FACE_INTO_ROOM[s.face];
+  const w = SCONCE_WIDTH_TILES * CELL_SIZE;
+  const h = SCONCE_HEIGHT_TILES * CELL_SIZE;
+  const flameH = 0.3125 * CELL_SIZE;
   return (
-    sconceCulledByNearPlane(sconceCameraDepth(poses.side.x, poses.side.y, poses.side.z, camera)) ||
-    sconceCulledByNearPlane(sconceCameraDepth(poses.front.x, poses.front.y, poses.front.z, camera)) ||
-    sconceCulledByNearPlane(sconceCameraDepth(poses.flame.x, poses.flame.y, poses.flame.z, camera))
+    planeNearCulled(poses.side.x, poses.side.y, poses.side.z, rotY - Math.PI / 2, w, h, camera) ||
+    planeNearCulled(poses.front.x, poses.front.y, poses.front.z, rotY, w, h, camera) ||
+    planeNearCulled(poses.flame.x, poses.flame.y, poses.flame.z, rotY, w, flameH, camera)
   );
 }
 
@@ -310,8 +315,8 @@ export class TorchSystem {
   }
 
   private sconceHidden(visual: TorchVisual): boolean {
-    // Near-band only. At rest in the room / adjacent square the side-wall
-    // bracket must stay up (grid-own-square hide is for dressing, not sconces).
+    // Live camera AABB, every frame including mid-tween. Grid pose is unused:
+    // player.x stays on the FROM square until the 180ms step ends.
     return objectNearPlaneCulled(visual.group, this.camera);
   }
 
@@ -360,13 +365,13 @@ export class TorchSystem {
     // Hide is camera near-band only; grid pose is unused.
   }
 
-  update(now: number, partyX?: number, partyY?: number, dir?: number) {
+  update(now: number, partyX?: number, partyY?: number, dir?: number, destCamera?: THREE.Camera) {
     if (partyX !== undefined && partyY !== undefined && dir !== undefined) {
       this.setParty(partyX, partyY, dir);
     }
     const cam = this.camera.position;
     for (const visual of this.visuals) {
-      const hide = this.sconceHidden(visual);
+      const hide = this.sconceHidden(visual) || (!!destCamera && objectNearPlaneCulled(visual.group, destCamera));
       visual.group.visible = !hide;
       const dx = cam.x - visual.flame.position.x;
       const dz = cam.z - visual.flame.position.z;

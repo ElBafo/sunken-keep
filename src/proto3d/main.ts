@@ -35,7 +35,7 @@ import {
 import { floor1, floor1CaveIn, floor1Sconces } from './floor-data';
 import { oilFlaskPlan, OIL_FLASK_FADE_SEC } from './oil-flask';
 import { InputManager } from './input';
-import { MoveResult, Player } from './player';
+import { MoveResult, Player, poseGridCamera } from './player';
 import { loadProgress, persistEnabled, saveProgress } from './progress';
 import {
   hasAnySave,
@@ -68,6 +68,7 @@ import { PixelRenderer } from './renderer';
 import { SceneBuilder } from './scene-builder';
 import { SpriteManager } from './sprites';
 import { TorchSystem, torchWorldPos } from './torches';
+import { listVisibleNearBand } from './wall-near-cull';
 import { Sconce, Tile } from './types';
 import { VertexLightingManager } from './vertex-lighting';
 import { WaterSystem } from './water';
@@ -212,6 +213,10 @@ class Game {
   private lastBarkTrigger: string | null = null;
   private pendingNewGameReset = false;
   private enteringPlay = false;
+  private nearBandLogging = false;
+  private nearBandLogStart = 0;
+  private nearBandLog: Array<{ t: number; items: Array<{ kind: string; x: number; y: number }> }> = [];
+  private destCullCamera: THREE.Camera | null = null;
   private floor1PrefetchStarted = false;
   private skipPlayAt = 0;
   private skipToPlayableMs: number | null = null;
@@ -635,6 +640,8 @@ class Game {
       if (this.player.moveToX !== this.player.x || this.player.moveToY !== this.player.y) {
         this.fireTileStepUi(this.player.moveToX, this.player.moveToY);
       }
+      // Hide wall mounts for the dest pose on the tap, not on the next rAF.
+      this.cullWallMounts(performance.now());
       return;
     }
     if (result === 'secret') {
@@ -647,6 +654,37 @@ class Game {
       if (this.isCombatAwake()) this.applyEvents(this.combat.bump(x, y, this.nowSec()));
     }
     this.audioManager.playUi('bump');
+  }
+
+  /** Live camera + destination pose. Every frame and on the move tap. */
+  private destCullCam(): THREE.Camera | undefined {
+    if (!this.player.isMoving) return undefined;
+    if (!this.destCullCamera) this.destCullCamera = this.player.camera.clone();
+    const dest = this.destCullCamera;
+    dest.projectionMatrix.copy(this.player.camera.projectionMatrix);
+    dest.projectionMatrixInverse.copy(this.player.camera.projectionMatrixInverse);
+    poseGridCamera(
+      dest,
+      this.player.moveToX,
+      this.player.moveToY,
+      (-this.player.moveToDir * Math.PI) / 2,
+      0
+    );
+    return dest;
+  }
+
+  private cullWallMounts(now: number) {
+    const dest = this.destCullCam();
+    this.dressing.update(now, this.player.x, this.player.y, this.player.dir, this.player.camera, dest);
+    this.props.layoutAdjacent(
+      this.player.x,
+      this.player.y,
+      this.spriteManager.integerAdjacentScale(),
+      this.player.dir,
+      this.player.camera,
+      dest
+    );
+    this.torches.update(now, this.player.x, this.player.y, this.player.dir, dest);
   }
 
   playFootstep(x: number, y: number) {
@@ -3233,6 +3271,25 @@ class Game {
           : { x: this.player.x, y: this.player.y, dir: this.player.dir };
         return { result, before, after: dest };
       },
+      tryMoveBackward: () => {
+        const before = { x: this.player.x, y: this.player.y };
+        const result = this.player.moveBackward();
+        this.handleMove(result);
+        const dest = this.player.isMoving
+          ? { x: this.player.moveToX, y: this.player.moveToY, dir: this.player.moveToDir }
+          : { x: this.player.x, y: this.player.y, dir: this.player.dir };
+        return { result, before, after: dest };
+      },
+      beginNearBandLog: () => {
+        this.nearBandLog = [];
+        this.nearBandLogStart = performance.now();
+        this.nearBandLogging = true;
+      },
+      endNearBandLog: () => {
+        this.nearBandLogging = false;
+        return this.nearBandLog.slice();
+      },
+      nearBandVisible: () => listVisibleNearBand(this.renderer.scene, this.player.camera),
       tryTurnLeft: () => {
         if (this.caveInBusy) {
           this.skipCaveIn();
@@ -3370,20 +3427,17 @@ class Game {
     }
 
     this.sceneBuilder.doors.update(now);
-    this.dressing.update(now, this.player.x, this.player.y, this.player.dir, this.player.camera);
+    this.cullWallMounts(now);
     this.water.update(now);
     this.atmosphere.update(dtSec, now, this.renderer.camera);
     this.audioManager.updateListener(this.player.x, this.player.y, this.player.dir);
-    this.props.layoutAdjacent(
-      this.player.x,
-      this.player.y,
-      this.spriteManager.integerAdjacentScale(),
-      this.player.dir,
-      this.player.camera
-    );
     this.audioManager.update(now, this.player.x * CELL_SIZE, this.player.y * CELL_SIZE);
-
-    this.torches.update(now, this.player.x, this.player.y, this.player.dir);
+    if (this.nearBandLogging) {
+      const items = listVisibleNearBand(this.renderer.scene, this.player.camera);
+      if (items.length) {
+        this.nearBandLog.push({ t: now - this.nearBandLogStart, items });
+      }
+    }
     this.spriteManager.update(now, this.player.x, this.player.y, this.player.dir);
     this.darkFx.update(now, this.vertexLighting, this.spriteManager, this.audioManager, this.player.x, this.player.y);
     this.vertexLighting.setFlickerTime(now);
