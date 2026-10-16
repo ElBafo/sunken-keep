@@ -42,7 +42,7 @@ const STYLE = `
   top: 8px;
   right: 8px;
   z-index: 9000;
-  width: min(292px, calc(100vw - 16px));
+  width: min(260px, calc(100vw - 16px));
   max-height: calc(100dvh - 16px);
   overflow: auto;
   background: rgba(8, 6, 4, 0.88);
@@ -54,7 +54,11 @@ const STYLE = `
   pointer-events: auto;
   touch-action: manipulation;
 }
-#dev-panel.collapsed { width: auto; }
+#dev-panel.collapsed {
+  width: auto;
+  max-width: 46%;
+  padding: 6px 8px;
+}
 #dev-panel header {
   display: flex;
   align-items: center;
@@ -77,7 +81,7 @@ const STYLE = `
 #dev-panel button.sel { background: #6a3c14; border-color: #d4a04a; color: #fff3c8; }
 #dev-panel textarea {
   width: 100%;
-  min-height: 72px;
+  min-height: 56px;
   margin-top: 6px;
   background: #140f0a;
   color: #d8ccb0;
@@ -127,17 +131,23 @@ export class DevPanel {
 
     this.root = document.createElement('div');
     this.root.id = 'dev-panel';
-    this.root.innerHTML = `<header><span>DEV · iPhone Air</span></header>`;
-    const min = btn('_', 'dev-collapse');
+    this.root.classList.add('collapsed');
+    this.root.innerHTML = `<header><span id="dev-title">DEV</span></header>`;
+    const min = btn('+', 'dev-collapse');
+    min.setAttribute('aria-expanded', 'false');
     this.root.querySelector('header')!.appendChild(min);
     min.addEventListener('click', () => {
       this.root.classList.toggle('collapsed');
+      const collapsed = this.root.classList.contains('collapsed');
       const body = this.root.querySelector('.dev-body') as HTMLElement | null;
-      if (body) body.hidden = this.root.classList.contains('collapsed');
+      if (body) body.hidden = collapsed;
+      min.textContent = collapsed ? '+' : '–';
+      min.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
     });
 
     const body = document.createElement('div');
     body.className = 'dev-body';
+    body.hidden = true;
     this.statsEl = document.createElement('div');
     this.statsEl.className = 'stats';
     this.statsEl.id = 'dev-stats';
@@ -208,6 +218,12 @@ export class DevPanel {
   refresh(): void {
     const snap = this.snapshot();
     const win = frameWindowStats(this.samples);
+    const title = this.root.querySelector('#dev-title');
+    if (title) {
+      title.textContent = this.root.classList.contains('collapsed')
+        ? `DEV · ${snap.res === 'native' ? snap.pixelW : snap.res} · ${snap.fps || '--'}fps`
+        : 'DEV · iPhone Air';
+    }
     this.statsEl.textContent =
       `${snap.res === 'native' ? `native ${snap.pixelW}` : snap.res}×${snap.pixelH} · ${snap.light}` +
       ` · voxel ${snap.voxel ? 'on' : 'off'} · ${snap.compare ? `${snap.enemy} ${snap.dist}sq` : 'free'}\n` +

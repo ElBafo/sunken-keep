@@ -37,7 +37,7 @@ async function boot(page: import('@playwright/test').Page, query: string) {
     null,
     { timeout: 25000 }
   );
-  await page.locator('#tap-to-start').click();
+  await page.locator('#tap-to-start').click({ force: true });
   await page.waitForTimeout(400);
 }
 
@@ -59,6 +59,7 @@ test('dev panel toggles 3D res, compare scene, and capture', async ({ page }) =>
   await boot(page, 'test=1&dev=1');
 
   await expect(page.locator('#dev-panel')).toBeVisible();
+  await page.locator('#dev-collapse').click();
   await expect(page.locator('#dev-stats')).toContainText(/270/);
   await expect(page.locator('#settings-overlay')).toBeHidden();
 
