@@ -79,7 +79,7 @@ function sconceWorldPos(s: Sconce): Omit<SconceWorld, 'reach'> {
   };
 }
 
-function smoothFalloff(distTiles: number, radius: number): number {
+export function smoothFalloff(distTiles: number, radius: number): number {
   if (radius <= 0 || distTiles >= radius) return 0;
   const t = 1 - distTiles / radius;
   return t * t * (3 - 2 * t);
@@ -317,7 +317,10 @@ export class VertexLightingManager {
     return { radius: EMBER_RADIUS_TILES, intensity: EMBER_INTENSITY, rgb: EMBER_RGB };
   }
 
-  /** Combined torch + lantern weight at a tile (no ambient, no sunbeam). */
+  /**
+   * Gameplay / monster-visibility tile-light (no ambient, no sunbeam).
+   * One source wins via Math.max — never the wall/floor/ceiling screen-blend.
+   */
   sourceLight(tileX: number, tileY: number): number {
     const wx = tileX * CELL_SIZE;
     const wy = 0.08;
@@ -377,7 +380,8 @@ export class VertexLightingManager {
     return Math.min(1, a * avg * this.bright);
   }
 
-  private accum(
+  /** Props / gameplay: one light wins. */
+  private maxAccum(
     rgb: [number, number, number],
     weight: number,
     color: [number, number, number]
@@ -386,6 +390,18 @@ export class VertexLightingManager {
     rgb[0] = Math.max(rgb[0], weight * color[0]);
     rgb[1] = Math.max(rgb[1], weight * color[1]);
     rgb[2] = Math.max(rgb[2], weight * color[2]);
+  }
+
+  /** Wall/floor/ceiling: lantern and torch screen-combine so the seam does not go dark. */
+  private screenAccum(
+    rgb: [number, number, number],
+    weight: number,
+    color: [number, number, number]
+  ) {
+    if (weight <= 0) return;
+    rgb[0] = 1 - (1 - rgb[0]) * (1 - Math.min(1, weight * color[0]));
+    rgb[1] = 1 - (1 - rgb[1]) * (1 - Math.min(1, weight * color[1]));
+    rgb[2] = 1 - (1 - rgb[2]) * (1 - Math.min(1, weight * color[2]));
   }
 
   private shadeVertex(
@@ -400,11 +416,19 @@ export class VertexLightingManager {
     isWall = false
   ): [number, number, number] {
     const ambient = this.floorAmbient();
-    const rgb: [number, number, number] = [
+    const ambientRgb: [number, number, number] = [
       ambient * AMBIENT_RGB[0],
       ambient * AMBIENT_RGB[1],
       ambient * AMBIENT_RGB[2]
     ];
+    // Screen-combine lantern + torch on wall/floor/ceiling shading only.
+    // Lantern props keep max(). Gameplay tile-light is sourceLight() (max()).
+    const geometry = !isProp;
+    const rgb: [number, number, number] = geometry ? [0, 0, 0] : [ambientRgb[0], ambientRgb[1], ambientRgb[2]];
+    const add = (weight: number, color: [number, number, number]) => {
+      if (geometry) this.screenAccum(rgb, weight, color);
+      else this.maxAccum(rgb, weight, color);
+    };
 
     const lantern = this.lanternSpec();
     const partyDist = partyDistTiles(wx, wy, wz, this.partyX, this.partyY, {
@@ -413,24 +437,16 @@ export class VertexLightingManager {
     });
     if (reachAt(this.partyCells, tileX, tileY) !== undefined) {
       if (isProp && this.oilFn() > 0) {
-        this.accum(
-          rgb,
-          PROP_LANTERN_INTENSITY * lanternFalloff(partyDist, PROP_LANTERN_RADIUS_TILES),
-          lantern.rgb
-        );
+        add(PROP_LANTERN_INTENSITY * lanternFalloff(partyDist, PROP_LANTERN_RADIUS_TILES), lantern.rgb);
       } else if (isWall) {
         const wallRadius = this.oilFn() > 0 ? WALL_LANTERN_RADIUS_TILES : lantern.radius;
         const wallIntensity = this.oilFn() > 0 ? WALL_LANTERN_INTENSITY : lantern.intensity;
-        this.accum(rgb, wallIntensity * smoothFalloff(partyDist, wallRadius), lantern.rgb);
+        add(wallIntensity * smoothFalloff(partyDist, wallRadius), lantern.rgb);
       } else {
-        this.accum(rgb, lantern.intensity * partyFalloff(partyDist, lantern.radius), lantern.rgb);
+        add(lantern.intensity * partyFalloff(partyDist, lantern.radius), lantern.rgb);
       }
       if (this.carriedTorch) {
-        this.accum(
-          rgb,
-          CARRIED_TORCH_INTENSITY * partyFalloff(partyDist, CARRIED_TORCH_RADIUS_TILES),
-          TORCH_RGB
-        );
+        add(CARRIED_TORCH_INTENSITY * partyFalloff(partyDist, CARRIED_TORCH_RADIUS_TILES), TORCH_RGB);
       }
     }
 
@@ -444,22 +460,29 @@ export class VertexLightingManager {
         const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
         if (dist >= radius) continue;
         const w = TORCH_INTENSITY * smoothFalloff(dist / CELL_SIZE, SCONCE_RADIUS_TILES) * flick;
-        this.accum(rgb, w, TORCH_RGB);
+        add(w, TORCH_RGB);
       }
 
       for (const beam of this.sunbeams) {
         const dx = wx / CELL_SIZE - beam.x;
         const dz = wz / CELL_SIZE - beam.y;
         const dist = Math.sqrt(dx * dx + dz * dz);
-        this.accum(rgb, SUNBEAM_INTENSITY * smoothFalloff(dist, SUNBEAM_RADIUS_TILES), SUNBEAM_RGB);
+        add(SUNBEAM_INTENSITY * smoothFalloff(dist, SUNBEAM_RADIUS_TILES), SUNBEAM_RGB);
       }
     }
 
+    const lit: [number, number, number] = geometry
+      ? [
+          Math.max(ambientRgb[0], rgb[0]),
+          Math.max(ambientRgb[1], rgb[1]),
+          Math.max(ambientRgb[2], rgb[2])
+        ]
+      : rgb;
     const mul = this.bright;
     return [
-      Math.min(1, rgb[0] * mul),
-      Math.min(1, rgb[1] * mul),
-      Math.min(1, rgb[2] * mul)
+      Math.min(1, lit[0] * mul),
+      Math.min(1, lit[1] * mul),
+      Math.min(1, lit[2] * mul)
     ];
   }
 

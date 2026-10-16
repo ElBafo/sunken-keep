@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { loadSpriteTexture } from './atlas';
 import { fetchJsonCached, loadTextureCached } from './asset-cache';
 import { CELL_SIZE, FACE_INTO_ROOM, hideWallProp, tileBedY } from './constants';
+import { applyWallMountNearCull } from './wall-near-cull';
 import { faceHash } from './texture-variants';
 import { FloorData, Sconce, Tile } from './types';
 
@@ -155,24 +156,26 @@ export class Dressing {
     this.scatterWear(floorData);
   }
 
-  update(now: number, partyX?: number, partyY?: number, dir?: number) {
+  update(now: number, partyX?: number, partyY?: number, dir?: number, camera?: THREE.Camera) {
     void now;
     for (const shaft of this.shafts) {
       const mat = shaft.material as THREE.MeshBasicMaterial;
       mat.opacity = 0.88;
     }
     if (partyX !== undefined && partyY !== undefined && dir !== undefined) {
-      this.cullOwnSquareDecals(partyX, partyY, dir);
+      this.cullOwnSquareDecals(partyX, partyY, dir, camera);
     }
   }
 
-  private cullOwnSquareDecals(partyX: number, partyY: number, dir: number) {
+  private cullOwnSquareDecals(partyX: number, partyY: number, dir: number, camera?: THREE.Camera) {
     this.group.traverse((obj) => {
       if (!(obj instanceof THREE.Mesh)) return;
+      if (obj.userData.kind === 'water-edge') return;
       const face = obj.userData.face;
       if (face !== 'N' && face !== 'E' && face !== 'S' && face !== 'W') return;
       if (typeof obj.userData.wallX !== 'number' || typeof obj.userData.wallY !== 'number') return;
       obj.visible = !hideWallProp(obj.userData.wallX, obj.userData.wallY, face, partyX, partyY, dir);
+      if (camera) applyWallMountNearCull(obj, camera);
     });
   }
 

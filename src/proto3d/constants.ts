@@ -14,6 +14,15 @@ export const CAMERA_PITCH = (cameraSpec.pitchDeg * Math.PI) / 180;
 export const CAMERA_FOV = cameraSpec.fov;
 export const CAMERA_NEAR = cameraSpec.near;
 export const CAMERA_FAR = cameraSpec.far;
+/**
+ * Hide a wall-mounted object (sconce, wall prop, decal, …) when any of its
+ * drawn meshes sits closer than this camera-space depth. Backing into a
+ * DoubleSide plane puts it on the near clip — one frame of huge pixels.
+ * Visual only: never mute torch loops or other audio.
+ */
+export const WALL_MOUNT_NEAR_CULL = CAMERA_NEAR + 0.5;
+/** @alias WALL_MOUNT_NEAR_CULL — kept for sconce tests and earlier call sites. */
+export const SCONCE_NEAR_CULL = WALL_MOUNT_NEAR_CULL;
 /** Logical 3D view size in pixels [width, height]. */
 export const CAMERA_VIEW = cameraSpec.view as [number, number];
 /** Visual-only: draw monsters this many tiles toward the party from square centre. */
@@ -68,7 +77,13 @@ export const MIRROR_BAKED_SCONCE_LEAN = false;
 export const SCONCE_WIDTH_TILES = 0.25;
 export const SCONCE_HEIGHT_TILES = 0.5;
 export const SCONCE_WALL_OFFSET_TILES = 0.015;
-/** Front bracket / flame sit this far off the wall (artist spec). */
+/**
+ * Flush wall-mount inset (world units): just enough to beat z-fighting.
+ * Shared by sconces and wallPropPlanePose. Light/audio still use
+ * SCONCE_FRONT_OFFSET_TILES so gameplay pools stay put.
+ */
+export const WALL_MOUNT_INSET = Math.max(SCONCE_WALL_OFFSET_TILES * CELL_SIZE, 0.08);
+/** Light / audio origin in front of the wall (artist spec). Visual meshes sit at WALL_MOUNT_INSET. */
 export const SCONCE_FRONT_OFFSET_TILES = 0.14;
 /** Calm flame sprites (flame_calm_1..4). */
 export const SCONCE_ANIM_FPS = 5;
@@ -155,7 +170,8 @@ export const SWAP_ARM_MS = 3000;
 export const HERO_VOICES = true;
 export const HERO_HURT_VOICE_GAP = 0.6;
 /** 585-layout sizes live in art/ui/layout585/layout585.json (view, oilBar, hands, log). */
-export const FACE_SEGMENTS = 4;
+/** Wall/floor/ceiling quads. 8 keeps lantern↔torch seams from banding. */
+export const FACE_SEGMENTS = 8;
 export const CUTOUT_ALPHA_TEST = 0.5;
 
 /** Unit normal into the room and Y-rotation so a PlaneGeometry faces that way. */

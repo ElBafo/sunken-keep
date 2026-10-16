@@ -13,6 +13,7 @@ import {
   wallPropVisible,
   type PropWall
 } from './wall-props';
+import { applyWallMountNearCull } from './wall-near-cull';
 
 const WOOD_COLOR = 0x3a2414;
 
@@ -289,8 +290,11 @@ export class PropBuilder {
     this.markWallProp(plane, x, y, face, 'lamp_capped_wall');
   }
 
-  /** Wall-mounted props stay on their face; hide when the camera sits on that wall. */
-  layoutAdjacent(playerX: number, playerY: number, _adjacentScale = 1, dir = 0) {
+  /**
+   * Wall-mounted props stay on their face; hide when the camera sits on that wall.
+   * Near-plane cull is visual-only and never force-shows a #32-hidden mesh.
+   */
+  layoutAdjacent(playerX: number, playerY: number, _adjacentScale = 1, dir = 0, camera?: THREE.Camera) {
     this.group.traverse((obj) => {
       if (!obj.userData.wallMounted) return;
       const gx = obj.userData.gridX as number;
@@ -298,6 +302,7 @@ export class PropBuilder {
       const face = obj.userData.propWall as PropWall;
       if (!isWallFace(face)) return;
       obj.visible = wallPropVisible(playerX, playerY, dir, gx, gy, face);
+      if (obj.visible && camera) applyWallMountNearCull(obj, camera);
     });
   }
 
@@ -333,6 +338,12 @@ export class PropBuilder {
     });
     return out;
   }
+}
+
+/** DoubleSide jar-rack plane on the west wall of that floor square. */
+export function jarRackPlanePose(x: number, y: number): { x: number; y: number; z: number } {
+  const wallX = x * CELL_SIZE - CELL_SIZE / 2 + 0.18;
+  return { x: wallX + 0.16, y: 0.39, z: y * CELL_SIZE };
 }
 
 export function isFloorProp(tile: Tile | undefined): boolean {

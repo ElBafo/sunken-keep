@@ -55,9 +55,12 @@ describe('wall vs floor props', () => {
   it('interacts from the adjacent square facing it and from its own square facing E only', () => {
     expect(canInteractProp(13, 8, 2, 13, 9, lamp)).toBe(true);
     expect(canInteractProp(13, 10, 0, 13, 9, lamp)).toBe(true);
+    expect(canInteractProp(12, 9, 1, 13, 9, lamp)).toBe(true);
     expect(canInteractProp(13, 9, 1, 13, 9, lamp)).toBe(true);
     expect(canInteractProp(13, 9, 3, 13, 9, lamp)).toBe(false);
     expect(canInteractProp(13, 9, 0, 13, 9, lamp)).toBe(false);
+    const fromDesk = interactPropAt(floor1.tiles, floor1.width, floor1.height, 12, 9, 1);
+    expect(fromDesk?.tile.prop).toBe('lamp_capped');
     const own = interactPropAt(floor1.tiles, floor1.width, floor1.height, 13, 9, 1);
     expect(own?.tile.prop).toBe('lamp_capped');
     const miss = interactPropAt(floor1.tiles, floor1.width, floor1.height, 13, 9, 0);
