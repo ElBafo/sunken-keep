@@ -4,6 +4,8 @@ import {
   CHEST_FRONT_FILE,
   CHEST_SIDE_FILE,
   CHEST_TOP_FILE,
+  CONTACT_Y,
+  SHADOW_PATCH_FILE,
   SLIME_SPRITE_FILE,
   TORCH_COLOR
 } from './constants';
@@ -107,7 +109,7 @@ export function buildTexturedChest(maps: ChestFaceMaps): THREE.Group {
   return group;
 }
 
-export function applySlimeSeeThrough(slime: THREE.Mesh, on: boolean, contact?: THREE.Mesh): void {
+export function applySlimeSeeThrough(slime: THREE.Mesh, on: boolean): void {
   const mat = slime.material as THREE.MeshPhysicalMaterial;
   const order = on ? SLIME_RENDER_ORDER_GHOST : SLIME_RENDER_ORDER_SOLID;
   slime.renderOrder = order;
@@ -127,10 +129,6 @@ export function applySlimeSeeThrough(slime: THREE.Mesh, on: boolean, contact?: T
   mat.needsUpdate = true;
   if (slime.customDepthMaterial) slime.customDepthMaterial.needsUpdate = true;
   if (slime.customDistanceMaterial) slime.customDistanceMaterial.needsUpdate = true;
-  if (contact) {
-    const cMat = contact.material as THREE.MeshBasicMaterial;
-    cMat.opacity = on ? 0.35 : 1;
-  }
 }
 
 function artUrl(file: string): string {
@@ -158,36 +156,29 @@ async function loadArtPng(file: string): Promise<{ img: HTMLImageElement; data: 
   return { img, data, texture };
 }
 
+export function prepShadowPatchTexture(tex: THREE.Texture): THREE.Texture {
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearFilter;
+  tex.generateMipmaps = false;
+  tex.needsUpdate = true;
+  return tex;
+}
+
 export function makeContactShadow(opts: {
   name: string;
   width: number;
   depth: number;
   x: number;
   z: number;
-  map?: THREE.Texture;
+  map: THREE.Texture;
 }): THREE.Mesh {
-  let map = opts.map;
-  if (!map && typeof document !== 'undefined') {
-    const canvas = document.createElement('canvas');
-    canvas.width = 64;
-    canvas.height = 64;
-    const ctx = canvas.getContext('2d');
-    if (ctx) {
-      const g = ctx.createRadialGradient(32, 32, 3, 32, 32, 30);
-      g.addColorStop(0, 'rgba(0,0,0,0.62)');
-      g.addColorStop(0.45, 'rgba(0,0,0,0.28)');
-      g.addColorStop(1, 'rgba(0,0,0,0)');
-      ctx.fillStyle = g;
-      ctx.fillRect(0, 0, 64, 64);
-      map = new THREE.CanvasTexture(canvas);
-      map.needsUpdate = true;
-    }
-  }
+  const map = prepShadowPatchTexture(opts.map);
   const mat = new THREE.MeshBasicMaterial({
-    map: map ?? undefined,
-    color: map ? 0xffffff : 0x000000,
+    map,
+    color: 0xffffff,
     transparent: true,
-    opacity: map ? 1 : 0.35,
+    opacity: 1,
     depthWrite: false,
     depthTest: true,
     polygonOffset: true,
@@ -196,7 +187,7 @@ export function makeContactShadow(opts: {
   });
   const mesh = new THREE.Mesh(new THREE.PlaneGeometry(opts.width, opts.depth), mat);
   mesh.rotation.x = -Math.PI / 2;
-  mesh.position.set(opts.x, 0.014, opts.z);
+  mesh.position.set(opts.x, CONTACT_Y, opts.z);
   mesh.name = opts.name;
   mesh.userData.noShadow = true;
   mesh.castShadow = false;
@@ -283,11 +274,12 @@ export function createActorKeyLight(shadowMapSize: number): THREE.SpotLight {
 }
 
 export async function buildLabActors(): Promise<LabActors> {
-  const [frontPng, sidePng, topPng, slimePng] = await Promise.all([
+  const [frontPng, sidePng, topPng, slimePng, patchPng] = await Promise.all([
     loadArtPng(CHEST_FRONT_FILE),
     loadArtPng(CHEST_SIDE_FILE),
     loadArtPng(CHEST_TOP_FILE),
-    loadArtPng(SLIME_SPRITE_FILE)
+    loadArtPng(SLIME_SPRITE_FILE),
+    loadArtPng(SHADOW_PATCH_FILE)
   ]);
   const maps: ChestFaceMaps = {
     front: prepChestTexture(frontPng.texture),
@@ -299,20 +291,23 @@ export async function buildLabActors(): Promise<LabActors> {
   const chest = buildTexturedChest(maps);
   const chestBox = chest.children[0] as THREE.Mesh;
   const slimeBuilt = buildSlime(slimePng.texture, slimePng.img);
-  const { w, d, size } = CHEST_VOXELS;
+  const patch = prepShadowPatchTexture(patchPng.texture);
+  const { w, size } = CHEST_VOXELS;
   const chestContact = makeContactShadow({
     name: 'lab-chest-contact',
-    width: w * size * 1.35,
-    depth: d * size * 1.45,
+    width: w * size * 1.55,
+    depth: (w * size * 1.55) / 2,
     x: CHEST_POS[0],
-    z: CHEST_POS[2]
+    z: CHEST_POS[2],
+    map: patch
   });
   const slimeContact = makeContactShadow({
     name: 'lab-slime-contact',
-    width: 0.82,
-    depth: 0.42,
+    width: 1.02,
+    depth: 0.51,
     x: SLIME_POS[0],
-    z: SLIME_POS[2]
+    z: SLIME_POS[2],
+    map: patch
   });
   group.add(chest, slimeBuilt.mesh, chestContact, slimeContact);
 
@@ -327,7 +322,7 @@ export async function buildLabActors(): Promise<LabActors> {
     seeThrough: false,
     setSeeThrough: (on: boolean) => {
       actors.seeThrough = on;
-      applySlimeSeeThrough(actors.slime, on, actors.slimeContact);
+      applySlimeSeeThrough(actors.slime, on);
     }
   };
   return actors;

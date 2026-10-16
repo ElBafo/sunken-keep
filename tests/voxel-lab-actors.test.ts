@@ -10,6 +10,7 @@ import {
   chestFaceMaterialList,
   makeContactShadow,
   prepChestTexture,
+  prepShadowPatchTexture,
   SLIME_ALPHA_TEST_SHADOW,
   SLIME_ALPHA_TEST_SOLID,
   SLIME_GHOST_OPACITY,
@@ -21,6 +22,8 @@ import {
   CHEST_FRONT_FILE,
   CHEST_SIDE_FILE,
   CHEST_TOP_FILE,
+  CONTACT_Y,
+  SHADOW_PATCH_FILE,
   SLIME_SPRITE_FILE
 } from '../src/voxel-lab/constants';
 
@@ -78,20 +81,36 @@ describe('textured chest box', () => {
     expect(list[2].map).not.toBe(list[4].map);
   });
 
-  it('plants a noShadow contact blob under an actor', () => {
+  it('plants the painted shadow patch above the floor, LinearFilter, painted alpha', () => {
+    const map = fakeMap();
     const blob = makeContactShadow({
       name: 'lab-chest-contact',
       width: 0.8,
-      depth: 0.5,
+      depth: 0.4,
       x: 3,
       z: 2,
-      map: fakeMap()
+      map
     });
+    const mat = blob.material as THREE.MeshBasicMaterial;
     expect(blob.name).toBe('lab-chest-contact');
     expect(blob.userData.noShadow).toBe(true);
     expect(blob.castShadow).toBe(false);
     expect(blob.receiveShadow).toBe(false);
-    expect(blob.rotation.x).toBeCloseTo(-Math.PI / 2, 5);
+    expect(blob.position.y).toBe(CONTACT_Y);
+    expect(blob.position.y).toBeGreaterThan(0.03);
+    expect(mat.transparent).toBe(true);
+    expect(mat.depthWrite).toBe(false);
+    expect(mat.opacity).toBe(1);
+    expect(map.magFilter).toBe(THREE.LinearFilter);
+    expect(map.minFilter).toBe(THREE.LinearFilter);
+    expect(map.generateMipmaps).toBe(false);
+  });
+
+  it('prepShadowPatchTexture is linear, not nearest', () => {
+    const tex = fakeMap();
+    prepShadowPatchTexture(tex);
+    expect(tex.magFilter).toBe(THREE.LinearFilter);
+    expect(tex.minFilter).toBe(THREE.LinearFilter);
   });
 });
 
@@ -161,9 +180,12 @@ describe('lab actors stay on the voxel-lab page', () => {
     expect(existsSync(resolve(root, 'public', CHEST_SIDE_FILE))).toBe(true);
     expect(existsSync(resolve(root, 'public', CHEST_TOP_FILE))).toBe(true);
     expect(existsSync(resolve(root, 'public', SLIME_SPRITE_FILE))).toBe(true);
+    expect(existsSync(resolve(root, 'public', SHADOW_PATCH_FILE))).toBe(true);
     expect(actors).toContain('CHEST_FRONT_FILE');
     expect(actors).toContain('CHEST_SIDE_FILE');
     expect(actors).toContain('CHEST_TOP_FILE');
+    expect(actors).toContain('SHADOW_PATCH_FILE');
+    expect(actors).not.toContain('createRadialGradient');
     expect(actors).toContain('customDepthMaterial');
     expect(actors).not.toContain('src/proto3d');
     expect(main).not.toContain("from '../proto3d");
