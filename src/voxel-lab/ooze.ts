@@ -321,7 +321,7 @@ export async function createOozeLab(): Promise<OozeLab> {
 
   const restX = CELL * 1.42;
   const restZ = 1.82;
-  const compareX = CELL * 1.86;
+  const compareX = CELL * 1.74;
 
   const group = new THREE.Group();
   group.name = 'lab-gray-ooze';
@@ -361,10 +361,10 @@ export async function createOozeLab(): Promise<OozeLab> {
 
   const contact = makeContactShadow({
     name: 'lab-ooze-contact',
-    width: 1.45,
-    depth: 0.85,
+    width: 1.18,
+    depth: 0.64,
     x: 0,
-    z: 0.04,
+    z: 0.03,
     map: patch
   });
   group.add(contact);
@@ -476,8 +476,8 @@ export async function createOozeLab(): Promise<OozeLab> {
   let deathDone = false;
   let animT0 = 0;
   let spriteLod: LodName = 'close';
-  let orbitYaw = 0.55;
-  let orbitPitch = 0.28;
+  let orbitYaw = 0.18;
+  let orbitPitch = 0.46;
   const restPos = { x: restX, z: restZ };
 
   const pack = (): ResPack => packs.get(res) ?? [...packs.values()][0];
@@ -685,8 +685,8 @@ export async function createOozeLab(): Promise<OozeLab> {
         camera.rotation.order = 'YXZ';
         camera.rotation.set(CAMERA_PITCH, 0, 0);
       } else if (view === 'orbit') {
-        const lookY = 0.22;
-        const r = 2.15;
+        const lookY = 0.28;
+        const r = 2.35;
         const py = 0.45 + orbitPitch * 1.1;
         camera.position.set(
           group.position.x + Math.sin(orbitYaw) * r,

@@ -62,7 +62,7 @@ describe('procedural volume is a low irregular leak, not a jelly dome', () => {
     const def = loadDef();
     const built = buildMonsterVolume(def, 32);
     const { floor, mid } = floorVsMidOccupancy(built);
-    expect(built.peakHeight).toBeLessThan(0.7);
+    expect(built.peakHeight).toBeLessThan(0.85);
     expect(built.peakHeight).toBeGreaterThan(0.28);
     expect(built.width).toBeGreaterThan(built.peakHeight * 1.6);
     expect(floor).toBeGreaterThan(mid * 1.25);

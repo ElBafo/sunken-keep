@@ -17,21 +17,21 @@
     { "id": 10, "name": "rust_dark", "hex": "#3a1c10", "group": "rust" }
   ],
   "body": {
-    "acrossMeters": 1.15,
-    "spreadMeters": 1.52,
-    "heightMeters": 0.52,
+    "acrossMeters": 1.18,
+    "spreadMeters": 1.48,
+    "heightMeters": 0.6,
     "noiseSeed": 17,
     "noiseAmplitude": 0.34,
     "noiseFrequency": 2.35,
     "floorLeak": 0.28,
     "glintChance": 0.028,
     "lobes": [
-      { "x": 0.0, "z": 0.02, "rx": 0.46, "rz": 0.4, "h": 0.5, "falloff": 1.85 },
-      { "x": 0.3, "z": -0.12, "rx": 0.32, "rz": 0.24, "h": 0.24, "falloff": 2.2 },
-      { "x": -0.28, "z": 0.16, "rx": 0.34, "rz": 0.3, "h": 0.2, "falloff": 2.35 },
-      { "x": 0.08, "z": 0.32, "rx": 0.24, "rz": 0.28, "h": 0.16, "falloff": 2.7 },
-      { "x": -0.14, "z": -0.3, "rx": 0.26, "rz": 0.22, "h": 0.13, "falloff": 2.8 },
-      { "x": 0.22, "z": 0.18, "rx": 0.18, "rz": 0.2, "h": 0.11, "falloff": 3.1 }
+      { "x": 0.0, "z": 0.02, "rx": 0.44, "rz": 0.38, "h": 0.58, "falloff": 1.7 },
+      { "x": 0.3, "z": -0.12, "rx": 0.3, "rz": 0.22, "h": 0.28, "falloff": 2.15 },
+      { "x": -0.28, "z": 0.16, "rx": 0.32, "rz": 0.28, "h": 0.24, "falloff": 2.2 },
+      { "x": 0.08, "z": 0.3, "rx": 0.22, "rz": 0.26, "h": 0.18, "falloff": 2.55 },
+      { "x": -0.14, "z": -0.3, "rx": 0.24, "rz": 0.2, "h": 0.15, "falloff": 2.7 },
+      { "x": 0.2, "z": 0.16, "rx": 0.16, "rz": 0.18, "h": 0.14, "falloff": 2.9 }
     ],
     "drips": [
       { "x": 0.2, "z": -0.08, "top": 0.3, "radius": 0.032, "jitter": 0.012 },
@@ -53,9 +53,9 @@
       "type": "skull",
       "palette": "bone",
       "stain": "bone_stain",
-      "x": -0.22,
-      "y": 0.1,
-      "z": 0.06,
+      "x": -0.2,
+      "y": 0.18,
+      "z": 0.04,
       "rotY": 1.15,
       "scale": 1
     },
@@ -83,12 +83,12 @@
       "type": "hilt",
       "palette": "rust",
       "dark": "rust_dark",
-      "x": 0.14,
-      "y": 0.16,
-      "z": 0.08,
+      "x": 0.16,
+      "y": 0.22,
+      "z": 0.06,
       "rotY": 0.35,
-      "rotZ": 0.55,
-      "length": 0.24
+      "rotZ": 0.62,
+      "length": 0.3
     }
   ],
   "compareSprite": {

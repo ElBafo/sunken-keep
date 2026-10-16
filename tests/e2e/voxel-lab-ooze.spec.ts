@@ -91,7 +91,7 @@ test('gray ooze lab toggles, framing, and cost grid', async ({ page }) => {
   expect(idle.hasFaceStamp).toBe(false);
   expect(idle.contact).toBe(true);
   expect(idle.spriteSource).toBe('gray_ooze');
-  expect(idle.peakHeight).toBeLessThan(0.7);
+  expect(idle.peakHeight).toBeLessThan(0.85);
   expect(idle.width).toBeGreaterThan(idle.peakHeight * 1.4);
   expect(idle.spriteLod).toBe('close');
 
