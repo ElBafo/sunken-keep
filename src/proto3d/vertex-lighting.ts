@@ -30,7 +30,18 @@ import {
 } from './constants';
 import { DressingMark } from './dressing';
 import { isLightPassable, LightReach, partyReach, reachAt, sconceOrigin, sconceReach } from './light-grid';
-import { FLOOR_DISK_Y, LightDebugMode, NONFLOOR_HEIGHT_PENALTY, parseLightDebugMode } from './surface-light';
+import {
+  FLOOR_DISK_Y,
+  LightDebugMode,
+  NONFLOOR_HEIGHT_PENALTY,
+  parseLightDebugMode,
+  SURFACE_MAX_SUNBEAMS,
+  SURFACE_MAX_TORCHES,
+  lightDebugSkips,
+  lightDebugUniform,
+  type SurfaceLightLocal,
+  type SurfaceLightShared
+} from './surface-light';
 import { FloorData, Sconce } from './types';
 
 interface CachedFace {
@@ -362,6 +373,81 @@ export class VertexLightingManager {
 
   isSquareLit(tileX: number, tileY: number): boolean {
     return this.sourceLight(tileX, tileY) >= DARK_LIGHT_THRESHOLD;
+  }
+
+  /**
+   * Visual tint for painted sprites in voxel mode: torch warmth + wall lantern
+   * falloff (same as walls). Does not change sourceLight / isSquareLit.
+   */
+  wallTintRgb(tileX: number, tileY: number): [number, number, number] {
+    const tile = this.floorData.tiles[tileY]?.[tileX];
+    const isDark = tile?.floorNDark || false;
+    return this.shadeVertex(
+      tileX * CELL_SIZE,
+      CELL_SIZE * 0.5,
+      tileY * CELL_SIZE,
+      tileX,
+      tileY,
+      isDark,
+      this.flicker,
+      false,
+      true
+    );
+  }
+
+  fillSurfaceShared(shared: SurfaceLightShared): void {
+    const ambient = this.floorAmbient();
+    shared.uAmbientRgb.value.set(
+      ambient * AMBIENT_RGB[0],
+      ambient * AMBIENT_RGB[1],
+      ambient * AMBIENT_RGB[2]
+    );
+    shared.uBright.value = this.bright;
+    shared.uFlicker.value = this.flicker;
+    shared.uPartyX.value = this.partyX;
+    shared.uPartyY.value = this.partyY;
+    shared.uOil.value = this.oilFn() > 0 ? 1 : 0;
+    const lantern = this.lanternSpec();
+    shared.uLanternRgb.value.set(lantern.rgb[0], lantern.rgb[1], lantern.rgb[2]);
+    shared.uLanternIntensity.value = lantern.intensity;
+    shared.uLanternRadius.value = lantern.radius;
+    shared.uWallLanternIntensity.value = this.oilFn() > 0 ? WALL_LANTERN_INTENSITY : lantern.intensity;
+    shared.uWallLanternRadius.value = this.oilFn() > 0 ? WALL_LANTERN_RADIUS_TILES : lantern.radius;
+    shared.uCarriedTorch.value = this.carriedTorch ? 1 : 0;
+    shared.uSunbeamCount.value = Math.min(SURFACE_MAX_SUNBEAMS, this.sunbeams.length);
+    for (let i = 0; i < SURFACE_MAX_SUNBEAMS; i++) {
+      const beam = this.sunbeams[i];
+      if (beam) shared.uSunbeamPos.value[i].set(beam.x, beam.y);
+      else shared.uSunbeamPos.value[i].set(0, 0);
+    }
+    shared.uDebugMode.value = lightDebugUniform(this.lightDebug);
+    const skip = lightDebugSkips(this.lightDebug);
+    shared.uSkipLantern.value = skip.lantern;
+    shared.uSkipTorch.value = skip.torch;
+    shared.uSkipAmbient.value = skip.ambient;
+  }
+
+  fillSurfaceLocal(
+    local: SurfaceLightLocal,
+    tileX: number,
+    tileY: number,
+    isWall: boolean,
+    isDark: boolean,
+    lightGround: boolean
+  ): void {
+    local.uPartyReach.value = reachAt(this.partyCells, tileX, tileY) !== undefined ? 1 : 0;
+    local.uIsWall.value = isWall ? 1 : 0;
+    local.uIsDark.value = isDark ? 1 : 0;
+    local.uLightGround.value = lightGround ? 1 : 0;
+    local.uGroundPos.value.set(tileX * CELL_SIZE, 0.08, tileY * CELL_SIZE);
+    let n = 0;
+    for (const s of this.sconceWorld) {
+      if (n >= SURFACE_MAX_TORCHES) break;
+      if (reachAt(s.reach, tileX, tileY) === undefined) continue;
+      local.uTorchPos.value[n].set(s.x, s.y, s.z);
+      n += 1;
+    }
+    local.uTorchCount.value = n;
   }
 
   calculateBrightness(tileX: number, tileY: number, isDark: boolean): number {

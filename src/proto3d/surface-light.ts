@@ -13,6 +13,9 @@ import {
   WALL_LANTERN_RADIUS_TILES
 } from './constants';
 
+/** Voxel mode: 3D falloff from the ceiling so shafts read as strong as wall torches. */
+export const VOXEL_SUNBEAM_INTENSITY = SUNBEAM_INTENSITY * 2.15;
+
 /** Max lit sconces that can reach one wall/floor tile (sconce radius is 2.5). */
 export const SURFACE_MAX_TORCHES = 4;
 export const SURFACE_MAX_SUNBEAMS = 4;
@@ -57,6 +60,24 @@ export function parseLightDebugMode(raw: string | null | undefined): LightDebugM
     return raw === 'light' ? 'lighting' : (raw as LightDebugMode);
   }
   return null;
+}
+
+export function lightDebugUniform(mode: LightDebugMode): number {
+  if (mode === 'albedo') return 1;
+  if (mode === 'lighting') return 2;
+  return 0;
+}
+
+export function lightDebugSkips(mode: LightDebugMode): {
+  lantern: number;
+  torch: number;
+  ambient: number;
+} {
+  return {
+    lantern: mode === 'torch' || mode === 'ambient' ? 1 : 0,
+    torch: mode === 'lantern' || mode === 'ambient' ? 1 : 0,
+    ambient: mode === 'lantern' || mode === 'torch' ? 1 : 0
+  };
 }
 
 /**
@@ -112,6 +133,10 @@ export interface SurfaceLightShared {
   uHeightPenalty: { value: number };
   uCoreFrac: { value: number };
   uDebugMode: { value: number };
+  uSunbeam3D: { value: number };
+  uSkipLantern: { value: number };
+  uSkipTorch: { value: number };
+  uSkipAmbient: { value: number };
 }
 
 export interface SurfaceLightLocal {
@@ -156,7 +181,11 @@ export function createSurfaceLightShared(): SurfaceLightShared {
     uFloorDiskY: { value: FLOOR_DISK_Y },
     uHeightPenalty: { value: NONFLOOR_HEIGHT_PENALTY },
     uCoreFrac: { value: PARTY_FALLOFF_CORE_FRAC },
-    uDebugMode: { value: 0 }
+    uDebugMode: { value: 0 },
+    uSunbeam3D: { value: 0 },
+    uSkipLantern: { value: 0 },
+    uSkipTorch: { value: 0 },
+    uSkipAmbient: { value: 0 }
   };
 }
 
@@ -208,6 +237,10 @@ uniform float uFloorDiskY;
 uniform float uHeightPenalty;
 uniform float uCoreFrac;
 uniform float uDebugMode;
+uniform float uSunbeam3D;
+uniform float uSkipLantern;
+uniform float uSkipTorch;
+uniform float uSkipAmbient;
 uniform float uPartyReach;
 uniform float uIsWall;
 uniform float uIsDark;
@@ -246,11 +279,20 @@ void surfScreenAccum(inout vec3 rgb, float weight, vec3 color) {
   rgb = 1.0 - (1.0 - rgb) * (1.0 - min(vec3(1.0), weight * color));
 }
 
+float surfSunbeamDist(vec3 wp, vec2 beam) {
+  if (uSunbeam3D > 0.5) {
+    vec3 bp = vec3(beam.x * uCellSize, uCellSize, beam.y * uCellSize);
+    return length(wp - bp) / uCellSize;
+  }
+  vec2 d = vec2(wp.x / uCellSize, wp.z / uCellSize) - beam;
+  return length(d);
+}
+
 vec3 surfaceLightRgb(vec3 worldPos) {
   vec3 wp = mix(worldPos, uGroundPos, step(0.5, uLightGround));
   vec3 rgb = vec3(0.0);
 
-  if (uPartyReach > 0.5) {
+  if (uSkipLantern < 0.5 && uPartyReach > 0.5) {
     float partyDist = surfPartyDist(wp);
     if (uIsWall > 0.5) {
       float rad = uOil > 0.5 ? uWallLanternRadius : uLanternRadius;
@@ -264,7 +306,7 @@ vec3 surfaceLightRgb(vec3 worldPos) {
     }
   }
 
-  if (uIsDark < 0.5) {
+  if (uSkipTorch < 0.5 && uIsDark < 0.5) {
     float torchWorldR = uTorchRadius * uCellSize;
     if (uTorchCount > 0.5) {
       float dist = length(wp - uTorchPos[0]);
@@ -291,26 +333,23 @@ vec3 surfaceLightRgb(vec3 worldPos) {
       }
     }
     if (uSunbeamCount > 0.5) {
-      vec2 d0 = vec2(wp.x / uCellSize, wp.z / uCellSize) - uSunbeamPos[0];
-      surfScreenAccum(rgb, uSunbeamIntensity * surfSmoothFalloff(length(d0), uSunbeamRadius), uSunbeamRgb);
+      surfScreenAccum(rgb, uSunbeamIntensity * surfSmoothFalloff(surfSunbeamDist(wp, uSunbeamPos[0]), uSunbeamRadius), uSunbeamRgb);
     }
     if (uSunbeamCount > 1.5) {
-      vec2 d1 = vec2(wp.x / uCellSize, wp.z / uCellSize) - uSunbeamPos[1];
-      surfScreenAccum(rgb, uSunbeamIntensity * surfSmoothFalloff(length(d1), uSunbeamRadius), uSunbeamRgb);
+      surfScreenAccum(rgb, uSunbeamIntensity * surfSmoothFalloff(surfSunbeamDist(wp, uSunbeamPos[1]), uSunbeamRadius), uSunbeamRgb);
     }
     if (uSunbeamCount > 2.5) {
-      vec2 d2 = vec2(wp.x / uCellSize, wp.z / uCellSize) - uSunbeamPos[2];
-      surfScreenAccum(rgb, uSunbeamIntensity * surfSmoothFalloff(length(d2), uSunbeamRadius), uSunbeamRgb);
+      surfScreenAccum(rgb, uSunbeamIntensity * surfSmoothFalloff(surfSunbeamDist(wp, uSunbeamPos[2]), uSunbeamRadius), uSunbeamRgb);
     }
     if (uSunbeamCount > 3.5) {
-      vec2 d3 = vec2(wp.x / uCellSize, wp.z / uCellSize) - uSunbeamPos[3];
-      surfScreenAccum(rgb, uSunbeamIntensity * surfSmoothFalloff(length(d3), uSunbeamRadius), uSunbeamRgb);
+      surfScreenAccum(rgb, uSunbeamIntensity * surfSmoothFalloff(surfSunbeamDist(wp, uSunbeamPos[3]), uSunbeamRadius), uSunbeamRgb);
     }
   }
 
   // Lighting *factor* (0–1). Ambient is a floor on this factor only.
   // Applied as albedo * lighting — never added onto the texel.
-  vec3 lighting = min(vec3(1.0), max(uAmbientRgb, rgb) * uBright);
+  vec3 lit = uSkipAmbient > 0.5 ? rgb : max(uAmbientRgb, rgb);
+  vec3 lighting = min(vec3(1.0), lit * uBright);
   return lighting;
 }
 

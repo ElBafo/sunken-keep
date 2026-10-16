@@ -41,6 +41,8 @@ describe('surface-light helpers (unused on walls after diagnosis)', () => {
     expect(SURFACE_LIGHT_GLSL).toContain('surfScreenAccum');
     expect(SURFACE_LIGHT_GLSL).toContain('surfSmoothFalloff');
     expect(SURFACE_LIGHT_GLSL).toContain('surfPartyFalloff');
+    expect(SURFACE_LIGHT_GLSL).toContain('surfSunbeamDist');
+    expect(SURFACE_LIGHT_GLSL).toContain('uSunbeam3D');
     const src = readFileSync(resolve(__dirname, '../src/proto3d/surface-light.ts'), 'utf8');
     expect(src).toContain('diffuseColor.rgb = applySurfaceLight(albedo, vSurfWorldPos)');
     expect(src).toContain('return albedo * lighting');

@@ -64,6 +64,8 @@ import { SpeechBubble } from './bubble';
 import { StoryProgress } from './story-progress';
 import { copyForOpenNote, resolveLocale, saveLocale, StoryText, type Locale, type OpenNoteRef } from './i18n';
 import { qualityFromSearch, QualityLevel } from './quality';
+import type { VoxelMode } from './voxel-mode';
+import { syncVoxelQuery, voxelFromSearch } from './voxel-opt-in';
 import { PixelRenderer } from './renderer';
 import { SceneBuilder } from './scene-builder';
 import { SpriteManager } from './sprites';
@@ -152,6 +154,8 @@ class Game {
   inventory!: InventoryUi;
   noteReader!: NoteReader;
   settingsMenu!: SettingsMenu;
+  private voxel: VoxelMode | null = null;
+  private voxelWanted = false;
   private pendingPotion: 'potion_red' | 'potion_blue' | 'potion_green' | null = null;
   private lootSnap: Array<{ x: number; y: number; item?: string; chest?: boolean; chestItems?: string[]; chestOpen?: boolean }> = [];
   lastMessage = '';
@@ -257,10 +261,19 @@ class Game {
     this.skipTitle = params.get('test') === '1' && params.get('title') !== '1';
     this.wantDebugReader = debugReaderRequested(params);
 
+    this.voxelWanted = voxelFromSearch(params);
     this.settingsMenu = new SettingsMenu(this.story, {
       getLayout: () => getLayoutMode(),
       setLayout: (mode) => this.setLayoutMode(mode),
-      playUi: (name) => this.audioManager?.playUi(name)
+      playUi: (name) => this.audioManager?.playUi(name),
+      getVoxel: () => this.voxelWanted,
+      setVoxel: (on) => {
+        this.voxelWanted = on;
+        syncVoxelQuery(on);
+        if (on) void this.enableVoxel();
+        else this.voxel?.disable();
+        this.settingsMenu.refreshLabels();
+      }
     });
     this.fitStage();
     void applyLetterboxStone();
@@ -518,6 +531,7 @@ class Game {
     this.vertexLighting.registerScene(this.renderer.scene);
     this.vertexLighting.updateAllMeshes(this.renderer.scene);
     if (lightDebug) this.applyLightDebug(lightDebug);
+    if (this.voxelWanted) await this.enableVoxel();
 
     this.darkFx = new DarkFx();
     void this.darkFx.load(this.renderer.scene, floor1, this.spriteManager);
@@ -572,6 +586,29 @@ class Game {
       const next = syncLayoutQuery(mode, new URL(window.location.href));
       window.history.replaceState(null, '', `${next.pathname}${next.search}${next.hash}`);
     }
+  }
+
+  private syncVoxelParty(x = this.player.x, y = this.player.y) {
+    this.voxel?.setParty(x, y);
+  }
+
+  private async enableVoxel() {
+    if (!this.renderer || !this.vertexLighting || !this.spriteManager) return;
+    if (!this.voxel) {
+      const { VoxelMode } = await import('./voxel-mode');
+      this.voxel = new VoxelMode({
+        scene: this.renderer.scene,
+        lighting: this.vertexLighting,
+        sprites: this.spriteManager,
+        floorData: floor1,
+        renderer: this.renderer.renderer,
+        getPalette: () => this.renderer.paletteEnabled,
+        setPalette: (on) => this.renderer.setPaletteEnabled(on)
+      });
+    }
+    this.voxel.setParty(this.player.x, this.player.y);
+    this.voxel.enable();
+    if (this.lightDebug && this.lightDebug !== 'final') this.applyLightDebug(this.lightDebug);
   }
 
   private beginTitleBackgroundLoads() {
@@ -651,6 +688,7 @@ class Game {
       }
       // Hide wall mounts for the dest pose on the tap, not on the next rAF.
       this.cullWallMounts(performance.now());
+      this.syncVoxelParty(this.player.moveToX, this.player.moveToY);
       return;
     }
     if (result === 'secret') {
@@ -1443,6 +1481,7 @@ class Game {
     this.syncEquipmentToCombat();
     this.syncPartyHud();
     this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
+    this.syncVoxelParty();
     this.torches.setParty(this.player.x, this.player.y, this.player.dir);
     this.syncCarriedLight();
     this.vertexLighting.relight();
@@ -2043,6 +2082,7 @@ class Game {
     this.syncEquipmentToCombat();
     this.syncPartyHud();
     this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
+    this.syncVoxelParty();
     this.torches.setParty(this.player.x, this.player.y, this.player.dir);
     this.syncCarriedLight();
     this.vertexLighting.relight();
@@ -2417,6 +2457,7 @@ class Game {
     tile.secretOpen = true;
     this.flags.add('secret_found');
     this.sceneBuilder.setSecretOpen(this.renderer.scene, x, y, true);
+    this.voxel?.invalidateCell(x, y);
     this.spriteManager.resetItems(floor1);
     this.refreshOccupancy();
     this.vertexLighting.relight();
@@ -2652,6 +2693,7 @@ class Game {
         this.player.setPosition(x, y, dir);
         this.combat?.setPartyPos(this.player.x, this.player.y, this.player.dir);
         this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
+        this.syncVoxelParty();
         this.syncCarriedLight();
         this.torches.setParty(this.player.x, this.player.y, this.player.dir);
         this.torches.update(performance.now(), this.player.x, this.player.y, this.player.dir);
@@ -2933,6 +2975,16 @@ class Game {
         return sum / (w * h);
       },
       fps: () => this.lastFps,
+      draws: () => this.renderer.lastSceneDraws,
+      voxel: () => this.voxel?.enabled === true,
+      setVoxel: (on: boolean) => {
+        this.voxelWanted = on;
+        syncVoxelQuery(on);
+        if (on) return this.enableVoxel();
+        this.voxel?.disable();
+        return Promise.resolve();
+      },
+      voxelStats: () => this.voxel?.stats() ?? { enabled: false, voxels: 0, triangles: 0, active: 0 },
       frameMs: () => this.lastFrameMs,
       frameStats: () => {
         const s = this.frameSamples;
@@ -3478,7 +3530,10 @@ class Game {
       this.atmosphere.applyFog(scene, this.renderer.renderer);
     }
     this.renderer.setPaletteEnabled(
-      resolved !== 'nopalette' && resolved !== 'albedo' && resolved !== 'lighting'
+      resolved !== 'nopalette' &&
+        resolved !== 'albedo' &&
+        resolved !== 'lighting' &&
+        !this.voxel?.enabled
     );
     const wantMips = resolved !== 'nomip';
     const hideMaps = resolved === 'lighting';
@@ -3508,6 +3563,7 @@ class Game {
       }
     });
     this.atmosphere.setQuality(isolate || resolved === 'nodust' ? 'low' : this.quality);
+    this.voxel?.syncLights();
   }
 
   gameLoop() {
@@ -3542,6 +3598,7 @@ class Game {
         this.combat?.noteStep(this.nowSec());
         this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
         this.vertexLighting.updateAllMeshes(this.renderer.scene);
+        this.syncVoxelParty();
         this.audioManager.checkBones(this.player.x, this.player.y);
         this.updateDoorButton();
       }
@@ -3577,6 +3634,7 @@ class Game {
     this.spriteManager.update(now, this.player.x, this.player.y, this.player.dir);
     this.darkFx.update(now, this.vertexLighting, this.spriteManager, this.audioManager, this.player.x, this.player.y);
     this.vertexLighting.setFlickerTime(now);
+    this.voxel?.syncLights();
     this.hud?.draw(this.nowMs());
     if (!paused) {
       this.fireSlimeReveal();
@@ -3593,7 +3651,11 @@ class Game {
     this.fpsFrames++;
     if (now - this.fpsLastTime >= 1000) {
       const fps = Math.round((this.fpsFrames * 1000) / (now - this.fpsLastTime));
-      if (this.fpsCounter) this.fpsCounter.textContent = `FPS: ${fps}`;
+      if (this.fpsCounter) {
+        const draws = this.renderer.lastSceneDraws;
+        const vx = this.voxel?.enabled ? ` · vx ${this.voxel.stats().voxels}` : '';
+        this.fpsCounter.textContent = `FPS: ${fps} · ${draws} draws${vx}`;
+      }
       this.lastFps = fps;
       this.fpsFrames = 0;
       this.fpsLastTime = now;

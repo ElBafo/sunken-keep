@@ -113,6 +113,21 @@ export interface VolumeFromPixels {
   roughness: Uint8Array;
 }
 
+/** Packed PBR: R = clearcoat (wet), G = roughness, A = specular intensity. */
+export function packPbrRgba(roughness: Uint8Array): Uint8Array {
+  const rgba = new Uint8Array(roughness.length * 4);
+  for (let i = 0; i < roughness.length; i++) {
+    const rough = roughness[i];
+    const wet = rough <= ROUGH_WET;
+    const matte = rough >= ROUGH_MATTE;
+    rgba[i * 4] = wet ? 90 : 0;
+    rgba[i * 4 + 1] = rough;
+    rgba[i * 4 + 2] = rough;
+    rgba[i * 4 + 3] = wet ? 70 : matte ? 6 : 36;
+  }
+  return rgba;
+}
+
 /**
  * One voxel column per opaque texel. Image y=0 is the top of the PNG;
  * voxel v=0 is the bottom of the wall / south edge of a floor tile.

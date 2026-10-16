@@ -551,15 +551,21 @@
       margin: 0 0 8px;
       font-size: 13px;
     }
-    #settings-layout-row {
+    #settings-layout-row,
+    #settings-voxel-row {
       display: flex;
       gap: 8px;
     }
-    #settings-layout-hint {
+    #settings-layout-hint,
+    #settings-voxel-hint {
       margin: 10px 0 14px;
       color: #918d7d;
       font-size: 11px;
       line-height: 1.35;
+    }
+    #settings-voxel-label {
+      margin: 0 0 8px;
+      font-size: 13px;
     }
     .settings-btn {
       min-width: 44px;
@@ -577,7 +583,8 @@
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
     }
-    #settings-layout-row .settings-btn { flex: 1; }
+    #settings-layout-row .settings-btn,
+    #settings-voxel-row .settings-btn { flex: 1; }
     .settings-btn.selected {
       color: #ffbe5a;
     }
@@ -641,6 +648,12 @@
           <button id="btn-layout-edge" class="settings-btn" type="button" aria-pressed="false">Edge</button>
         </div>
         <p id="settings-layout-hint">Prototype. Saved on this phone.</p>
+        <p id="settings-voxel-label">Voxels</p>
+        <div id="settings-voxel-row">
+          <button id="btn-voxel-on" class="settings-btn" type="button" aria-pressed="false">On</button>
+          <button id="btn-voxel-off" class="settings-btn" type="button" aria-pressed="true">Off</button>
+        </div>
+        <p id="settings-voxel-hint">Near walls as cubes. Prototype.</p>
         <button id="btn-settings-close" class="settings-btn" type="button">Resume</button>
       </div>
     </div>
