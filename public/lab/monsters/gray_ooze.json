@@ -1,0 +1,108 @@
+{
+  "id": "gray_ooze",
+  "title": "Gray Ooze",
+  "note": "Lab-only voxel art-direction test. Not a commitment to voxel enemies. No face, no eyes, no jelly dome.",
+  "resolutions": [16, 32, 48],
+  "defaultResolution": 32,
+  "palette": [
+    { "id": 1, "name": "goo_shadow", "hex": "#1a1c17", "group": "goo" },
+    { "id": 2, "name": "goo_dark", "hex": "#24271f", "group": "goo" },
+    { "id": 3, "name": "goo_mid", "hex": "#2f3329", "group": "goo" },
+    { "id": 4, "name": "goo_lit", "hex": "#3c4036", "group": "goo" },
+    { "id": 5, "name": "goo_film", "hex": "#4a4e42", "group": "goo" },
+    { "id": 6, "name": "goo_glint", "hex": "#6e7464", "group": "glint" },
+    { "id": 7, "name": "bone", "hex": "#b4a888", "group": "bone" },
+    { "id": 8, "name": "bone_stain", "hex": "#8a7c62", "group": "bone" },
+    { "id": 9, "name": "rust", "hex": "#5c301c", "group": "rust" },
+    { "id": 10, "name": "rust_dark", "hex": "#3a1c10", "group": "rust" }
+  ],
+  "body": {
+    "acrossMeters": 1.15,
+    "spreadMeters": 1.52,
+    "heightMeters": 0.52,
+    "noiseSeed": 17,
+    "noiseAmplitude": 0.34,
+    "noiseFrequency": 2.35,
+    "floorLeak": 0.28,
+    "glintChance": 0.028,
+    "lobes": [
+      { "x": 0.0, "z": 0.02, "rx": 0.46, "rz": 0.4, "h": 0.5, "falloff": 1.85 },
+      { "x": 0.3, "z": -0.12, "rx": 0.32, "rz": 0.24, "h": 0.24, "falloff": 2.2 },
+      { "x": -0.28, "z": 0.16, "rx": 0.34, "rz": 0.3, "h": 0.2, "falloff": 2.35 },
+      { "x": 0.08, "z": 0.32, "rx": 0.24, "rz": 0.28, "h": 0.16, "falloff": 2.7 },
+      { "x": -0.14, "z": -0.3, "rx": 0.26, "rz": 0.22, "h": 0.13, "falloff": 2.8 },
+      { "x": 0.22, "z": 0.18, "rx": 0.18, "rz": 0.2, "h": 0.11, "falloff": 3.1 }
+    ],
+    "drips": [
+      { "x": 0.2, "z": -0.08, "top": 0.3, "radius": 0.032, "jitter": 0.012 },
+      { "x": -0.16, "z": 0.1, "top": 0.26, "radius": 0.028, "jitter": 0.01 },
+      { "x": 0.06, "z": 0.22, "top": 0.2, "radius": 0.024, "jitter": 0.014 },
+      { "x": -0.04, "z": -0.2, "top": 0.18, "radius": 0.022, "jitter": 0.01 },
+      { "x": 0.32, "z": 0.04, "top": 0.14, "radius": 0.02, "jitter": 0.016 }
+    ],
+    "splatters": [
+      { "x": 0.48, "z": 0.12, "r": 0.11 },
+      { "x": -0.44, "z": -0.18, "r": 0.1 },
+      { "x": 0.18, "z": -0.52, "r": 0.09 },
+      { "x": -0.22, "z": 0.5, "r": 0.12 },
+      { "x": 0.52, "z": -0.28, "r": 0.08 }
+    ]
+  },
+  "stamps": [
+    {
+      "type": "skull",
+      "palette": "bone",
+      "stain": "bone_stain",
+      "x": -0.22,
+      "y": 0.1,
+      "z": 0.06,
+      "rotY": 1.15,
+      "scale": 1
+    },
+    {
+      "type": "bone",
+      "palette": "bone_stain",
+      "x": 0.2,
+      "y": 0.05,
+      "z": -0.16,
+      "rotY": 0.55,
+      "length": 0.26,
+      "axis": "x"
+    },
+    {
+      "type": "bone",
+      "palette": "bone",
+      "x": -0.06,
+      "y": 0.04,
+      "z": 0.24,
+      "rotY": -0.4,
+      "length": 0.22,
+      "axis": "z"
+    },
+    {
+      "type": "hilt",
+      "palette": "rust",
+      "dark": "rust_dark",
+      "x": 0.14,
+      "y": 0.16,
+      "z": 0.08,
+      "rotY": 0.35,
+      "rotZ": 0.55,
+      "length": 0.24
+    }
+  ],
+  "compareSprite": {
+    "folder": "art/dungeon/monsters_v2",
+    "filePattern": "gray_ooze_{lod}.png",
+    "fallbackPattern": "slime_idle_1_{lod}.png",
+    "sizesKey": "slime",
+    "worldHeight": 0.39
+  },
+  "animations": {
+    "idle": { "pulse": 0.04, "hz": 0.28 },
+    "move": { "travelCells": 1, "periodMs": 2800, "pulse": 0.06, "lean": 0.1 },
+    "lunge": { "durationMs": 740, "pulse": 0.58, "lean": 0.52 },
+    "hit": { "durationMs": 560, "debris": 18, "pulse": 0.1 },
+    "death": { "durationMs": 2200, "sink": 0.94, "spread": 0.88, "debris": 28 }
+  }
+}

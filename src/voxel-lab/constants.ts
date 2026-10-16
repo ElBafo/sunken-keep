@@ -11,6 +11,12 @@ export const EYE_HEIGHT = 0.94 * (CELL / 2);
 export const CAMERA_FOV = 80;
 export const CAMERA_NEAR = 0.05;
 export const CAMERA_FAR = 28;
+/** Same look-down as proto3d camera.json (pitchDeg −3.5). */
+export const CAMERA_PITCH = (-3.5 * Math.PI) / 180;
+/** proto3d camera sits at the back of its square. */
+export const CAMERA_BACK_OFFSET_TILES = 0.5;
+/** Visual-only: monsters sit this many tiles toward the party. */
+export const MONSTER_OFFSET_TOWARD_PARTY = 0.25;
 
 /** Relief: darker mortar ~1 cm, bright stone ~3 cm. */
 export const DEPTH_LAYERS = 3;
@@ -94,3 +100,14 @@ export const SHADOW_PATCH_FILE = 'voxel-lab/shadow_patch.png';
 export const CONTACT_Y = 0.036;
 /** Game slime sprite, loaded by URL only — do not import proto3d. */
 export const SLIME_SPRITE_FILE = 'art/dungeon/monsters_v2/slime_idle_1_near.png';
+
+/** Lab-only Gray Ooze experiment — not wired into proto3d. */
+export const OOZE_DEF_FILE = 'lab/monsters/gray_ooze.json';
+export const OOZE_SPRITE_FOLDER = 'art/dungeon/monsters_v2';
+export const OOZE_SPRITE_PREFIX = 'gray_ooze';
+export const OOZE_SPRITE_FALLBACK = 'slime_idle_1';
+export const MONSTER_SIZES_FILE = 'art/dungeon/monsters_v2/sizes.json';
+export const OOZE_RESOLUTIONS = [16, 32, 48] as const;
+export const OOZE_DEFAULT_RES = 32;
+export const DEBRIS_POOL = 28;
+export const SPRITE_SURFACE_LIFT = 0.04;
