@@ -83,6 +83,10 @@ export const FLAME_FILES = [
 export const SCONCE_FILE = 'torch/bracket_lit_front.png';
 export const LAMP_FILE = '../atmo/lamp_capped.png';
 
-/** Game sprites, loaded by URL only — do not import proto3d. */
-export const CHEST_SPRITE_FILE = 'art/dungeon/item_chest_near.png';
+/** Lab-only chest faces (hand-cut). Swap these files to retarget the box. */
+export const CHEST_FRONT_FILE = 'voxel-lab/chest_front.png';
+export const CHEST_SIDE_FILE = 'voxel-lab/chest_side.png';
+export const CHEST_TOP_FILE = 'voxel-lab/chest_top.png';
+export const CHEST_BOTTOM_COLOR = 0x1a120c;
+/** Game slime sprite, loaded by URL only — do not import proto3d. */
 export const SLIME_SPRITE_FILE = 'art/dungeon/monsters_v2/slime_idle_1_near.png';

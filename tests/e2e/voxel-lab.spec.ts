@@ -33,6 +33,10 @@ type Lab = {
     slimeOpacity: number;
     slimeHasDepthMat: boolean;
     slimeDepthAlphaTest: number;
+    chestHasFrontMap: boolean;
+    chestHasSideMap: boolean;
+    chestHasTopMap: boolean;
+    contactCount: number;
   };
 };
 
@@ -68,6 +72,11 @@ test('voxel-lab turn buttons and visible shadow toggle', async ({ page }) => {
   await expect(page.locator('#btn-see-through')).toHaveText('See-through slime');
   await expect(page.locator('#slider-warmth')).toBeVisible();
 
+  const firstLuma = await page.evaluate(() =>
+    (window as unknown as { __voxelLab: Lab }).__voxelLab.meanLuma({ y0: 0.12, y1: 0.45 })
+  );
+  expect(firstLuma, 'first load with shadows on is not solid black').toBeGreaterThan(0.06);
+
   const onState = await page.evaluate(() => {
     const lab = (window as unknown as { __voxelLab: Lab }).__voxelLab;
     lab.setShadows(true);
@@ -82,8 +91,12 @@ test('voxel-lab turn buttons and visible shadow toggle', async ({ page }) => {
     (window as unknown as { __voxelLab: Lab }).__voxelLab.debugActors()
   );
   expect(actorsOn.chestName).toBe('lab-chest');
-  expect(actorsOn.chestMeshes).toBeGreaterThanOrEqual(3);
-  expect(actorsOn.chestCast).toBeGreaterThanOrEqual(3);
+  expect(actorsOn.chestMeshes).toBeGreaterThanOrEqual(1);
+  expect(actorsOn.chestCast).toBeGreaterThanOrEqual(1);
+  expect(actorsOn.chestHasFrontMap).toBe(true);
+  expect(actorsOn.chestHasSideMap).toBe(true);
+  expect(actorsOn.chestHasTopMap).toBe(true);
+  expect(actorsOn.contactCount).toBeGreaterThanOrEqual(2);
   expect(actorsOn.slimeName).toBe('lab-slime');
   expect(actorsOn.slimeCast).toBe(true);
   expect(actorsOn.slimeHasDepthMat).toBe(true);

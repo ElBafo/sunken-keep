@@ -5,11 +5,13 @@ export type ShadowLight = {
   shadow?: { map: { dispose: () => void } | null };
 };
 
-type ShadowMesh = Object3D & {
+export type ShadowMesh = Object3D & {
   isMesh?: boolean;
   castShadow: boolean;
   receiveShadow: boolean;
   material?: Material | Material[];
+  customDepthMaterial?: Material;
+  customDistanceMaterial?: Material;
   userData: { noShadow?: boolean; castWhenOn?: boolean; receiveWhenOn?: boolean };
 };
 
@@ -17,6 +19,10 @@ type ShadowMesh = Object3D & {
  * Toggle lab shadows in a way Three.js actually honours after the first
  * compile: renderer.shadowMap, every light.castShadow, every mesh
  * cast/receive flag, and material.needsUpdate so shaders recompile.
+ *
+ * Also bump customDepthMaterial / customDistanceMaterial — WebKit otherwise
+ * first-frames casters (chest, slime, crate, pillar, ceiling) solid black
+ * until something later sets needsUpdate (e.g. the see-through toggle).
  */
 export function applyShadowToggle(opts: {
   on: boolean;
@@ -64,9 +70,21 @@ export function applyShadowToggle(opts: {
   return { meshCast, meshReceive, lightCast };
 }
 
-function bumpMaterials(mesh: ShadowMesh): void {
-  const mats = Array.isArray(mesh.material) ? mesh.material : mesh.material ? [mesh.material] : [];
-  for (const mat of mats) {
-    mat.needsUpdate = true;
+/** Recompile all mesh + custom depth/distance materials after shadow maps exist. */
+export function recompileShadowShaders(roots: Object3D[]): void {
+  for (const root of roots) {
+    root.traverse((obj) => {
+      const mesh = obj as ShadowMesh;
+      if (mesh.isMesh) bumpMaterials(mesh);
+    });
   }
+}
+
+export function bumpMaterials(mesh: ShadowMesh): void {
+  const mats: Material[] = [];
+  if (Array.isArray(mesh.material)) mats.push(...mesh.material);
+  else if (mesh.material) mats.push(mesh.material);
+  if (mesh.customDepthMaterial) mats.push(mesh.customDepthMaterial);
+  if (mesh.customDistanceMaterial) mats.push(mesh.customDistanceMaterial);
+  for (const mat of mats) mat.needsUpdate = true;
 }

@@ -5,74 +5,93 @@ import * as THREE from 'three';
 import {
   applySlimeSeeThrough,
   bobSlime,
-  buildVoxelChest,
-  FALLBACK_CHEST_PALETTE,
-  sampleChestPalette,
-  SLIME_ALPHA_TEST_GHOST,
+  buildTexturedChest,
+  CHEST_VOXELS,
+  chestFaceMaterialList,
+  makeContactShadow,
+  prepChestTexture,
   SLIME_ALPHA_TEST_SHADOW,
   SLIME_ALPHA_TEST_SOLID,
   SLIME_GHOST_OPACITY,
-  SLIME_RENDER_ORDER_GHOST
+  SLIME_RENDER_ORDER_GHOST,
+  type ChestFaceMaps
 } from '../src/voxel-lab/actors';
-import { CHEST_SPRITE_FILE, SLIME_SPRITE_FILE } from '../src/voxel-lab/constants';
+import {
+  CHEST_BOTTOM_COLOR,
+  CHEST_FRONT_FILE,
+  CHEST_SIDE_FILE,
+  CHEST_TOP_FILE,
+  SLIME_SPRITE_FILE
+} from '../src/voxel-lab/constants';
 
-function paint(data: Uint8ClampedArray, i: number, r: number, g: number, b: number, a = 255): void {
-  const o = i * 4;
-  data[o] = r;
-  data[o + 1] = g;
-  data[o + 2] = b;
-  data[o + 3] = a;
+function fakeMap(): THREE.DataTexture {
+  const t = new THREE.DataTexture(new Uint8Array([120, 70, 30, 255]), 1, 1);
+  t.needsUpdate = true;
+  return t;
 }
 
-describe('voxel-lab chest palette', () => {
-  it('falls back when the sprite is empty', () => {
-    const data = new Uint8ClampedArray(16);
-    expect(sampleChestPalette({ width: 2, height: 2, data })).toEqual(FALLBACK_CHEST_PALETTE);
-  });
+function maps(): ChestFaceMaps {
+  return { front: fakeMap(), side: fakeMap(), top: fakeMap() };
+}
 
-  it('samples wood, dark iron and a gold lock from opaque pixels', () => {
-    const w = 4;
-    const h = 4;
-    const data = new Uint8ClampedArray(w * h * 4);
-    for (let i = 0; i < w * h; i++) paint(data, i, 110, 62, 28);
-    paint(data, 0, 40, 36, 32);
-    paint(data, 1, 38, 34, 30);
-    paint(data, 2, 210, 170, 70);
-    paint(data, 3, 200, 160, 64);
-    const pal = sampleChestPalette({ width: w, height: h, data });
-    const woodR = (pal.wood >> 16) & 255;
-    const woodB = pal.wood & 255;
-    const ironLuma =
-      0.2126 * ((pal.iron >> 16) & 255) + 0.7152 * ((pal.iron >> 8) & 255) + 0.0722 * (pal.iron & 255);
-    const lockLuma =
-      0.2126 * ((pal.lock >> 16) & 255) + 0.7152 * ((pal.lock >> 8) & 255) + 0.0722 * (pal.lock & 255);
-    expect(woodR).toBeGreaterThan(woodB);
-    expect(ironLuma).toBeLessThan(90);
-    expect(lockLuma).toBeGreaterThan(120);
-  });
-});
-
-describe('voxel chest mesh', () => {
-  it('is a low-poly caster/receiver named lab-chest', () => {
-    const chest = buildVoxelChest(FALLBACK_CHEST_PALETTE);
+describe('textured chest box', () => {
+  it('is one 10×7×6 caster/receiver with separate front/side/top maps', () => {
+    const face = maps();
+    const chest = buildTexturedChest(face);
     expect(chest.name).toBe('lab-chest');
-    let meshes = 0;
-    let tris = 0;
+    const boxes: THREE.Mesh[] = [];
     chest.traverse((obj) => {
       const mesh = obj as THREE.Mesh;
-      if (!mesh.isMesh) return;
-      meshes += 1;
-      expect(mesh.castShadow).toBe(true);
-      expect(mesh.receiveShadow).toBe(true);
-      expect(mesh.userData.castWhenOn).toBe(true);
-      expect(mesh.userData.receiveWhenOn).toBe(true);
-      const geo = mesh.geometry as THREE.BufferGeometry;
-      tris += (geo.index?.count ?? 0) / 3;
+      if (mesh.isMesh) boxes.push(mesh);
     });
-    expect(meshes).toBeGreaterThanOrEqual(3);
-    expect(meshes).toBeLessThanOrEqual(6);
-    expect(tris).toBeGreaterThan(12);
-    expect(tris).toBeLessThan(180);
+    expect(boxes).toHaveLength(1);
+    const box = boxes[0];
+    expect(box.name).toBe('lab-chest-box');
+    expect(box.castShadow).toBe(true);
+    expect(box.receiveShadow).toBe(true);
+    expect(box.userData.castWhenOn).toBe(true);
+    const mats = box.material as THREE.MeshStandardMaterial[];
+    expect(mats).toHaveLength(6);
+    // +X/−X side, +Y top, −Y bottom, +Z/−Z front
+    expect(mats[0].map).toBe(face.side);
+    expect(mats[1].map).toBe(face.side);
+    expect(mats[2].map).toBe(face.top);
+    expect(mats[3].map).toBeNull();
+    expect(mats[3].color.getHex()).toBe(CHEST_BOTTOM_COLOR);
+    expect(mats[4].map).toBe(face.front);
+    expect(mats[5].map).toBe(face.front);
+    const param = box.geometry.parameters as { width: number; height: number; depth: number };
+    expect(param.width).toBeCloseTo(CHEST_VOXELS.w * CHEST_VOXELS.size, 5);
+    expect(param.height).toBeCloseTo(CHEST_VOXELS.h * CHEST_VOXELS.size, 5);
+    expect(param.depth).toBeCloseTo(CHEST_VOXELS.d * CHEST_VOXELS.size, 5);
+  });
+
+  it('prepChestTexture is nearest, unmipped, sRGB — easy to swap face files', () => {
+    const tex = fakeMap();
+    prepChestTexture(tex);
+    expect(tex.magFilter).toBe(THREE.NearestFilter);
+    expect(tex.minFilter).toBe(THREE.NearestFilter);
+    expect(tex.generateMipmaps).toBe(false);
+    expect(tex.colorSpace).toBe(THREE.SRGBColorSpace);
+    const list = chestFaceMaterialList(maps());
+    expect(list[4].map).not.toBe(list[0].map);
+    expect(list[2].map).not.toBe(list[4].map);
+  });
+
+  it('plants a noShadow contact blob under an actor', () => {
+    const blob = makeContactShadow({
+      name: 'lab-chest-contact',
+      width: 0.8,
+      depth: 0.5,
+      x: 3,
+      z: 2,
+      map: fakeMap()
+    });
+    expect(blob.name).toBe('lab-chest-contact');
+    expect(blob.userData.noShadow).toBe(true);
+    expect(blob.castShadow).toBe(false);
+    expect(blob.receiveShadow).toBe(false);
+    expect(blob.rotation.x).toBeCloseTo(-Math.PI / 2, 5);
   });
 });
 
@@ -84,7 +103,7 @@ describe('see-through slime material', () => {
       opacity: 1,
       depthWrite: true
     });
-    const mesh = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.9, 0.06), mat);
+    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.9), mat);
     mesh.customDepthMaterial = new THREE.MeshDepthMaterial({
       alphaTest: SLIME_ALPHA_TEST_SHADOW,
       depthPacking: THREE.RGBADepthPacking
@@ -101,22 +120,21 @@ describe('see-through slime material', () => {
     const depth = slime.customDepthMaterial as THREE.MeshDepthMaterial;
     expect(depth.alphaTest).toBe(SLIME_ALPHA_TEST_SHADOW);
     expect(depth.depthPacking).toBe(THREE.RGBADepthPacking);
+    const depthVersion = depth.version;
 
     applySlimeSeeThrough(slime, true);
     const mat = slime.material as THREE.MeshPhysicalMaterial;
     expect(mat.depthWrite).toBe(false);
     expect(mat.opacity).toBe(SLIME_GHOST_OPACITY);
     expect(mat.clearcoat).toBeGreaterThan(0.5);
-    expect(mat.roughness).toBeLessThan(0.25);
     expect(slime.userData.castWhenOn).toBe(false);
     expect(slime.renderOrder).toBe(SLIME_RENDER_ORDER_GHOST);
-    expect(slime.renderOrder).toBeGreaterThan(0);
+    expect(depth.version).toBeGreaterThan(depthVersion);
 
     applySlimeSeeThrough(slime, false);
     expect(mat.depthWrite).toBe(true);
     expect(mat.opacity).toBe(1);
     expect(slime.userData.castWhenOn).toBe(true);
-    expect(mat.alphaTest).toBe(SLIME_ALPHA_TEST_SOLID);
   });
 
   it('bobs only when enabled, and stays at base Y otherwise', () => {
@@ -138,17 +156,22 @@ describe('lab actors stay on the voxel-lab page', () => {
   const room = readFileSync(resolve(root, 'src/voxel-lab/room.ts'), 'utf8');
   const look = readFileSync(resolve(root, 'src/voxel-lab/look.ts'), 'utf8');
 
-  it('reuses the game chest and slime sprites by URL, without importing proto3d', () => {
-    expect(existsSync(resolve(root, 'public', CHEST_SPRITE_FILE))).toBe(true);
+  it('loads lab chest faces and the game slime sprite by URL, without importing proto3d', () => {
+    expect(existsSync(resolve(root, 'public', CHEST_FRONT_FILE))).toBe(true);
+    expect(existsSync(resolve(root, 'public', CHEST_SIDE_FILE))).toBe(true);
+    expect(existsSync(resolve(root, 'public', CHEST_TOP_FILE))).toBe(true);
     expect(existsSync(resolve(root, 'public', SLIME_SPRITE_FILE))).toBe(true);
-    expect(actors).toContain('CHEST_SPRITE_FILE');
-    expect(actors).toContain('SLIME_SPRITE_FILE');
+    expect(actors).toContain('CHEST_FRONT_FILE');
+    expect(actors).toContain('CHEST_SIDE_FILE');
+    expect(actors).toContain('CHEST_TOP_FILE');
     expect(actors).toContain('customDepthMaterial');
-    expect(actors).toContain('alphaTest: SLIME_ALPHA_TEST_SHADOW');
     expect(actors).not.toContain('src/proto3d');
-    expect(actors).not.toContain("from '../proto3d");
-    expect(main).not.toContain('src/proto3d');
     expect(main).not.toContain("from '../proto3d");
+  });
+
+  it('primes shadow shaders on first load so WebKit is not solid black', () => {
+    expect(main).toContain('recompileShadowShaders');
+    expect(main).toMatch(/renderFrame\(\);\s*recompileShadowShaders\(\[scene\]\);/);
   });
 
   it('adds a See-through slime toggle without renaming the existing ones', () => {

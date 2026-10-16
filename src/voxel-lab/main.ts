@@ -30,14 +30,16 @@ import {
   TORCH_INTENSITY
 } from './constants';
 import {
+  ACTOR_KEY_INTENSITY,
   bobSlime,
   buildLabActors,
+  createActorKeyLight,
   faceSlimeToCamera,
   type LabActors
 } from './actors';
 import { lookColors } from './look';
 import { buildRoom, loadFlameTextures } from './room';
-import { applyShadowToggle } from './shadows';
+import { applyShadowToggle, recompileShadowShaders } from './shadows';
 
 THREE.ColorManagement.enabled = true;
 
@@ -88,10 +90,20 @@ type LabApi = {
     slimeHasDepthMat: boolean;
     slimeDepthAlphaTest: number;
     slimeHasDistanceMat: boolean;
+    chestHasFrontMap: boolean;
+    chestHasSideMap: boolean;
+    chestHasTopMap: boolean;
+    contactCount: number;
   };
 };
 
 const STATS_WINDOW_MS = 2000;
+
+function chestFaceHasMap(mesh: THREE.Mesh, index: number): boolean {
+  const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+  const mat = mats[index] as THREE.MeshStandardMaterial | undefined;
+  return !!mat?.map;
+}
 
 function isMobile(): boolean {
   return window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 700;
@@ -262,6 +274,12 @@ async function boot(): Promise<void> {
   camera.add(lanternSpot.target);
   scene.add(camera);
 
+  // Off-screen west key so chest/slime umbras land on the open floor in view.
+  // Existing north torches, crate/pillar spots, colours and toggles stay put.
+  const actorKey = createActorKeyLight(shadowSize);
+  scene.add(actorKey);
+  scene.add(actorKey.target);
+
   loading.textContent = 'Meshing voxels…';
   const [room, flames, actors]: [Awaited<ReturnType<typeof buildRoom>>, THREE.Texture[], LabActors] =
     await Promise.all([buildRoom(), loadFlameTextures(), buildLabActors()]);
@@ -324,6 +342,7 @@ async function boot(): Promise<void> {
         { light: torchB, active: true },
         { light: torchSpotA, active: true },
         { light: torchSpotB, active: true },
+        { light: actorKey, active: true },
         { light: lampLight, active: lampLit },
         { light: lanternSpot, active: lanternOn }
       ],
@@ -373,6 +392,7 @@ async function boot(): Promise<void> {
     paint(torchB, look.torch);
     paint(torchSpotA, look.torch);
     paint(torchSpotB, look.torch);
+    paint(actorKey, look.torch);
     paint(lanternLight, look.lantern);
     paint(lanternSpot, look.lantern);
     paint(lampLight, look.lamp);
@@ -728,11 +748,22 @@ async function boot(): Promise<void> {
         slimeAlphaTest: slimeMat.alphaTest,
         slimeHasDepthMat: !!depthMat,
         slimeDepthAlphaTest: depthMat?.alphaTest ?? 0,
-        slimeHasDistanceMat: !!distMat
+        slimeHasDistanceMat: !!distMat,
+        chestHasFrontMap: chestFaceHasMap(actors.chestBox, 4),
+        chestHasSideMap: chestFaceHasMap(actors.chestBox, 0),
+        chestHasTopMap: chestFaceHasMap(actors.chestBox, 2),
+        contactCount: [actors.chestContact, actors.slimeContact].filter(Boolean).length
       };
     }
   };
   (window as unknown as { __voxelLab: LabApi }).__voxelLab = api;
+
+  // Allocate shadow maps, then recompile (incl. customDepthMaterial) so WebKit
+  // does not first-frame chest/slime/crate/pillar/ceiling as solid black.
+  renderFrame();
+  recompileShadowShaders([scene]);
+  renderer.shadowMap.needsUpdate = true;
+  renderFrame();
 
   loading.classList.add('hidden');
 
@@ -753,6 +784,7 @@ async function boot(): Promise<void> {
     torchB.intensity = TORCH_INTENSITY * flickB;
     torchSpotA.intensity = 10 * flickA;
     torchSpotB.intensity = 10 * flickB;
+    actorKey.intensity = ACTOR_KEY_INTENSITY * flickA;
     if (lampLit) {
       lampLight.intensity =
         LAMP_INTENSITY * (1 + flicker * (0.03 * Math.sin(t * 2.4) + 0.02 * Math.sin(t * 7.1)));
