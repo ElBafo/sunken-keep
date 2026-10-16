@@ -66,12 +66,16 @@
       left: 50%;
       transform: translateX(-50%);
       display: flex;
-      gap: 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 10px;
       z-index: 5;
+      width: max-content;
+      max-width: calc(100% - 16px);
     }
     #hint {
       position: fixed;
-      bottom: max(76px, calc(env(safe-area-inset-bottom) + 64px));
+      bottom: max(88px, calc(env(safe-area-inset-bottom) + 76px));
       left: 0;
       right: 0;
       text-align: center;
@@ -98,6 +102,13 @@
     }
     button.lab:active { background: rgba(40, 32, 20, 0.95); }
     button.lab[aria-pressed="false"] { color: #8a8070; }
+    button.lab.turn {
+      min-width: 88px;
+      min-height: 48px;
+      padding: 10px 12px;
+      font-size: 12px;
+      line-height: 1.2;
+    }
     #loading {
       position: fixed;
       inset: 0;
@@ -123,10 +134,12 @@
       <button id="btn-mode" class="lab" type="button" aria-pressed="true">Voxels</button>
     </div>
   </div>
-  <div id="hint">Drag to look · step with the arrows · tap Pell’s lamp</div>
+  <div id="hint">Drag to look · step / turn with the arrows · tap Pell’s lamp</div>
   <div id="move">
+    <button id="btn-left" class="lab turn" type="button" aria-label="Turn left">Turn Left</button>
     <button id="btn-back" class="lab" type="button" aria-label="Step back">▼</button>
     <button id="btn-fwd" class="lab" type="button" aria-label="Step forward">▲</button>
+    <button id="btn-right" class="lab turn" type="button" aria-label="Turn right">Turn Right</button>
   </div>
   <script type="module" src="/src/voxel-lab/main.ts"></script>
 </body>

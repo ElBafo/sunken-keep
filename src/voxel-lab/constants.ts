@@ -17,11 +17,14 @@ export const DEPTH_LAYERS = 3;
 export const LAYER_SIZE = 0.01;
 
 export const MOVE_MS = 260;
+/** 90° turns — same ease window as proto3d (180 ms). */
+export const TURN_MS = 180;
 export const LOOK_SENS = 0.00135;
 export const PITCH_MAX = 0.72;
 
-export const SHADOW_MAP_MOBILE = 128;
-export const SHADOW_MAP_DESKTOP = 256;
+/** Cubemap faces; 128 was too coarse for brick relief + sconce silhouettes. */
+export const SHADOW_MAP_MOBILE = 256;
+export const SHADOW_MAP_DESKTOP = 512;
 
 export const TORCH_COLOR = 0xff9a48;
 export const TORCH_INTENSITY = 10;
@@ -38,7 +41,7 @@ export const LANTERN_FLICKER = 0.03;
 export const LANTERN_FLICKER_MS = 3500;
 /** Camera-local: +X right, +Y up, −Z forward. Slightly below eye, right hand. */
 export const LANTERN_HOLD: readonly [number, number, number] = [0.16, -0.07, -0.22];
-export const LANTERN_SHADOW_MAP = 128;
+export const LANTERN_SHADOW_MAP = 256;
 
 export const MAT_DRY = 0;
 export const MAT_WET = 1;

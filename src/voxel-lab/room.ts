@@ -146,6 +146,29 @@ function tileJobs(): TileJob[] {
   return jobs;
 }
 
+function makeOccluder(
+  name: string,
+  map: THREE.Texture,
+  w: number,
+  h: number,
+  d: number,
+  x: number,
+  y: number,
+  z: number
+): THREE.Mesh {
+  const mat = new THREE.MeshStandardMaterial({
+    map,
+    roughness: 0.78,
+    metalness: 0
+  });
+  const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
+  mesh.name = name;
+  mesh.position.set(x, y, z);
+  mesh.castShadow = true;
+  mesh.receiveShadow = true;
+  return mesh;
+}
+
 function spriteMat(map: THREE.Texture, additive = false): THREE.SpriteMaterial {
   return new THREE.SpriteMaterial({
     map,
@@ -245,8 +268,9 @@ export async function buildRoom(): Promise<BuiltRoom> {
     const mesh = new THREE.Mesh(geo, mat);
     mesh.position.set(x, y, z);
     mesh.rotation.y = rotY;
-    mesh.castShadow = false;
-    mesh.receiveShadow = false;
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    mesh.name = 'sconce';
     propsGroup.add(mesh);
 
     const flame = new THREE.Sprite(spriteMat(sconce.texture));
@@ -275,14 +299,26 @@ export async function buildRoom(): Promise<BuiltRoom> {
   lampMesh.position.set(CELL * 1.5, 1.22, 0.08);
   lampMesh.userData.isLamp = true;
   lampMesh.name = 'pell-lamp';
+  lampMesh.castShadow = true;
+  lampMesh.receiveShadow = true;
   const lampHit = new THREE.Mesh(
     new THREE.PlaneGeometry(lampW * 1.6, lampH * 1.5),
     new THREE.MeshBasicMaterial({ visible: false, side: THREE.DoubleSide })
   );
   lampHit.position.copy(lampMesh.position);
   lampHit.userData.isLamp = true;
+  lampHit.userData.noShadow = true;
   lampHit.name = 'pell-lamp-hit';
+  lampHit.castShadow = false;
+  lampHit.receiveShadow = false;
   propsGroup.add(lampMesh, lampHit);
+
+  // Obvious occluders so the Shadows toggle is not a no-op on a phone.
+  const wallTex = pngs.get(WALL_FILES[0])!.texture;
+  const floorTex = pngs.get(FLOOR_FILES[0])!.texture;
+  const crate = makeOccluder('lab-crate', floorTex, 0.72, 0.55, 0.72, 2.35, 0.275, 1.45);
+  const pillar = makeOccluder('lab-pillar', wallTex, 0.42, 2.15, 0.42, 5.52, 1.075, 2.15);
+  propsGroup.add(crate, pillar);
 
   flatGroup.visible = false;
 

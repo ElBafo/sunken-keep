@@ -17,6 +17,7 @@ import {
   LANTERN_SHADOW_MAP,
   LOOK_SENS,
   MOVE_MS,
+  TURN_MS,
   PITCH_MAX,
   ROOM_TILES,
   SHADOW_MAP_DESKTOP,
@@ -26,6 +27,7 @@ import {
   TORCH_INTENSITY
 } from './constants';
 import { buildRoom, loadFlameTextures } from './room';
+import { applyShadowToggle } from './shadows';
 
 THREE.ColorManagement.enabled = true;
 
@@ -42,10 +44,20 @@ type LabApi = {
   lantern: boolean;
   mode: 'voxel' | 'flat';
   lampLit: boolean;
+  shadowMapEnabled: boolean;
   setShadows: (on: boolean) => void;
   setLantern: (on: boolean) => void;
   setMode: (mode: 'voxel' | 'flat') => void;
   setLamp: (on: boolean) => void;
+  turnLeft: () => void;
+  turnRight: () => void;
+  meanLuma: () => number;
+  debugShadowState: () => {
+    shadowMapEnabled: boolean;
+    lightCast: number;
+    meshCast: number;
+    meshReceive: number;
+  };
 };
 
 const STATS_WINDOW_MS = 2000;
@@ -66,6 +78,8 @@ async function boot(): Promise<void> {
   const btnMode = document.getElementById('btn-mode') as HTMLButtonElement;
   const btnFwd = document.getElementById('btn-fwd') as HTMLButtonElement;
   const btnBack = document.getElementById('btn-back') as HTMLButtonElement;
+  const btnLeft = document.getElementById('btn-left') as HTMLButtonElement;
+  const btnRight = document.getElementById('btn-right') as HTMLButtonElement;
   const loading = document.getElementById('loading')!;
 
   const preserveBuffer = new URLSearchParams(location.search).get('test') === '1';
@@ -89,9 +103,10 @@ async function boot(): Promise<void> {
   const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, CAMERA_NEAR, CAMERA_FAR);
   camera.rotation.order = 'YXZ';
 
-  const ambient = new THREE.HemisphereLight(0x2a241c, 0x080605, 0.22);
+  // Keep fill dim so torch/lantern umbras read as real shadows on a phone.
+  const ambient = new THREE.HemisphereLight(0x2a241c, 0x080605, 0.08);
   scene.add(ambient);
-  scene.add(new THREE.AmbientLight(0x1c1814, 0.08));
+  scene.add(new THREE.AmbientLight(0x1c1814, 0.03));
 
   const shadowSize = isMobile() ? SHADOW_MAP_MOBILE : SHADOW_MAP_DESKTOP;
   const makeTorch = (x: number, y: number, z: number): THREE.PointLight => {
@@ -99,10 +114,13 @@ async function boot(): Promise<void> {
     light.position.set(x, y, z);
     light.castShadow = true;
     light.shadow.mapSize.set(shadowSize, shadowSize);
-    light.shadow.camera.near = 0.08;
+    light.shadow.camera.near = 0.05;
     light.shadow.camera.far = TORCH_DISTANCE;
-    light.shadow.bias = -0.004;
-    light.shadow.radius = 2;
+    light.shadow.camera.updateProjectionMatrix();
+    light.shadow.bias = -0.0006;
+    light.shadow.normalBias = 0.02;
+    light.shadow.radius = 1;
+    light.shadow.intensity = 1;
     scene.add(light);
     return light;
   };
@@ -114,20 +132,26 @@ async function boot(): Promise<void> {
   lampLight.position.set(CELL * 1.5, 1.35, 0.35);
   lampLight.castShadow = true;
   lampLight.shadow.mapSize.set(shadowSize, shadowSize);
-  lampLight.shadow.camera.near = 0.1;
+  lampLight.shadow.camera.near = 0.05;
   lampLight.shadow.camera.far = LAMP_DISTANCE;
-  lampLight.shadow.bias = -0.003;
-  lampLight.shadow.radius = 2;
+  lampLight.shadow.camera.updateProjectionMatrix();
+  lampLight.shadow.bias = -0.0006;
+  lampLight.shadow.normalBias = 0.02;
+  lampLight.shadow.radius = 1;
+  lampLight.shadow.intensity = 1;
   scene.add(lampLight);
 
   const lanternLight = new THREE.PointLight(LANTERN_COLOR, LANTERN_INTENSITY, LANTERN_DISTANCE, 2);
   lanternLight.position.set(LANTERN_HOLD[0], LANTERN_HOLD[1], LANTERN_HOLD[2]);
   lanternLight.castShadow = true;
   lanternLight.shadow.mapSize.set(LANTERN_SHADOW_MAP, LANTERN_SHADOW_MAP);
-  lanternLight.shadow.camera.near = 0.08;
+  lanternLight.shadow.camera.near = 0.05;
   lanternLight.shadow.camera.far = LANTERN_DISTANCE;
-  lanternLight.shadow.bias = -0.004;
-  lanternLight.shadow.radius = 2;
+  lanternLight.shadow.camera.updateProjectionMatrix();
+  lanternLight.shadow.bias = -0.0006;
+  lanternLight.shadow.normalBias = 0.02;
+  lanternLight.shadow.radius = 1;
+  lanternLight.shadow.intensity = 1;
   camera.add(lanternLight);
   scene.add(camera);
 
@@ -180,12 +204,22 @@ async function boot(): Promise<void> {
   window.addEventListener('resize', resize);
   window.visualViewport?.addEventListener('resize', resize);
 
+  const syncShadows = (): ReturnType<typeof applyShadowToggle> =>
+    applyShadowToggle({
+      on: shadowsOn,
+      renderer,
+      lights: [
+        { light: torchA, active: true },
+        { light: torchB, active: true },
+        { light: lampLight, active: lampLit },
+        { light: lanternLight, active: lanternOn }
+      ],
+      roots: [scene]
+    });
+
   const setShadows = (on: boolean): void => {
     shadowsOn = on;
-    torchA.castShadow = on;
-    torchB.castShadow = on;
-    lampLight.castShadow = on && lampLit;
-    lanternLight.castShadow = on && lanternOn;
+    syncShadows();
     btnShadows.textContent = on ? 'Shadows on' : 'Shadows off';
     btnShadows.setAttribute('aria-pressed', on ? 'true' : 'false');
   };
@@ -193,7 +227,7 @@ async function boot(): Promise<void> {
   const setLantern = (on: boolean): void => {
     lanternOn = on;
     lanternLight.intensity = on ? LANTERN_INTENSITY : 0;
-    lanternLight.castShadow = on && shadowsOn;
+    syncShadows();
     btnLantern.textContent = on ? 'Lantern on' : 'Lantern off';
     btnLantern.setAttribute('aria-pressed', on ? 'true' : 'false');
   };
@@ -209,7 +243,7 @@ async function boot(): Promise<void> {
   const setLamp = (on: boolean): void => {
     lampLit = on;
     lampLight.intensity = on ? LAMP_INTENSITY : 0;
-    lampLight.castShadow = on && shadowsOn;
+    syncShadows();
     const mat = room.lampMesh.material as THREE.MeshStandardMaterial;
     mat.emissive.setHex(on ? 0xffcc88 : 0x000000);
     mat.emissiveIntensity = on ? 1.4 : 0;
@@ -266,6 +300,27 @@ async function boot(): Promise<void> {
     requestAnimationFrame(tick);
   };
 
+  /** 90° in-place turn, same ease as proto3d. dir +1 = left (CCW). */
+  const turn = (dir: 1 | -1): void => {
+    if (moving) return;
+    moving = true;
+    const from = yaw;
+    const to = yaw + dir * (Math.PI / 2);
+    const t0 = performance.now();
+    const tick = (now: number): void => {
+      const t = Math.min(1, (now - t0) / TURN_MS);
+      yaw = from + (to - from) * easeInOut(t);
+      applyCamera();
+      if (t < 1) requestAnimationFrame(tick);
+      else {
+        yaw = to;
+        applyCamera();
+        moving = false;
+      }
+    };
+    requestAnimationFrame(tick);
+  };
+
   btnFwd.addEventListener('click', (e) => {
     e.stopPropagation();
     step(1);
@@ -273,6 +328,14 @@ async function boot(): Promise<void> {
   btnBack.addEventListener('click', (e) => {
     e.stopPropagation();
     step(-1);
+  });
+  btnLeft.addEventListener('click', (e) => {
+    e.stopPropagation();
+    turn(1);
+  });
+  btnRight.addEventListener('click', (e) => {
+    e.stopPropagation();
+    turn(-1);
   });
 
   let dragging = false;
@@ -289,7 +352,7 @@ async function boot(): Promise<void> {
     lastY = downY = y;
   };
   const onMove = (x: number, y: number): void => {
-    if (!dragging) return;
+    if (!dragging || moving) return;
     const dx = x - lastX;
     const dy = y - lastY;
     lastX = x;
@@ -326,6 +389,8 @@ async function boot(): Promise<void> {
   window.addEventListener('keydown', (e) => {
     if (e.key === 'w' || e.key === 'ArrowUp') step(1);
     if (e.key === 's' || e.key === 'ArrowDown') step(-1);
+    if (e.key === 'q' || e.key === 'ArrowLeft') turn(1);
+    if (e.key === 'e' || e.key === 'ArrowRight') turn(-1);
     if (e.key === 'l') setLamp(!lampLit);
   });
 
@@ -352,9 +417,11 @@ async function boot(): Promise<void> {
     lantern: true,
     mode: 'voxel',
     lampLit: false,
+    shadowMapEnabled: true,
     setShadows: (on) => {
       setShadows(on);
       api.shadows = on;
+      api.shadowMapEnabled = renderer.shadowMap.enabled;
     },
     setLantern: (on) => {
       setLantern(on);
@@ -367,6 +434,36 @@ async function boot(): Promise<void> {
     setLamp: (on) => {
       setLamp(on);
       api.lampLit = on;
+    },
+    turnLeft: () => turn(1),
+    turnRight: () => turn(-1),
+    meanLuma: () => {
+      renderer.render(scene, camera);
+      const gl = renderer.getContext();
+      const w = gl.drawingBufferWidth;
+      const h = gl.drawingBufferHeight;
+      const pixels = new Uint8Array(w * h * 4);
+      gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+      let sum = 0;
+      const n = pixels.length / 4;
+      for (let i = 0; i < n; i++) {
+        const o = i * 4;
+        sum += 0.2126 * pixels[o] + 0.7152 * pixels[o + 1] + 0.0722 * pixels[o + 2];
+      }
+      return n > 0 ? sum / n / 255 : 0;
+    },
+    debugShadowState: () => {
+      const counts = { meshCast: 0, meshReceive: 0, lightCast: 0 };
+      scene.traverse((obj) => {
+        const mesh = obj as THREE.Mesh;
+        if (mesh.isMesh) {
+          if (mesh.castShadow) counts.meshCast += 1;
+          if (mesh.receiveShadow) counts.meshReceive += 1;
+        }
+        const light = obj as THREE.Light;
+        if (light.isLight && light.castShadow) counts.lightCast += 1;
+      });
+      return { shadowMapEnabled: renderer.shadowMap.enabled, ...counts };
     }
   };
   (window as unknown as { __voxelLab: LabApi }).__voxelLab = api;
@@ -383,15 +480,19 @@ async function boot(): Promise<void> {
     while (frameSamples.length > 1 && frameSamples[0].t < cutoff) frameSamples.shift();
 
     const t = now * 0.001;
-    torchA.intensity = TORCH_INTENSITY * (1 + 0.07 * Math.sin(t * 6.1) + 0.04 * Math.sin(t * 13.7));
-    torchB.intensity = TORCH_INTENSITY * (1 + 0.07 * Math.sin(t * 5.4 + 1.2) + 0.04 * Math.sin(t * 11.9));
+    const flicker = preserveBuffer ? 0 : 1;
+    torchA.intensity =
+      TORCH_INTENSITY * (1 + flicker * (0.07 * Math.sin(t * 6.1) + 0.04 * Math.sin(t * 13.7)));
+    torchB.intensity =
+      TORCH_INTENSITY * (1 + flicker * (0.07 * Math.sin(t * 5.4 + 1.2) + 0.04 * Math.sin(t * 11.9)));
     if (lampLit) {
       lampLight.intensity =
-        LAMP_INTENSITY * (1 + 0.03 * Math.sin(t * 2.4) + 0.02 * Math.sin(t * 7.1));
+        LAMP_INTENSITY * (1 + flicker * (0.03 * Math.sin(t * 2.4) + 0.02 * Math.sin(t * 7.1)));
     }
     if (lanternOn) {
       lanternLight.intensity =
-        LANTERN_INTENSITY * (1 + LANTERN_FLICKER * Math.sin((now / LANTERN_FLICKER_MS) * Math.PI * 2));
+        LANTERN_INTENSITY *
+        (1 + flicker * LANTERN_FLICKER * Math.sin((now / LANTERN_FLICKER_MS) * Math.PI * 2));
     }
 
     if (now - flameT > 200) {
@@ -417,6 +518,7 @@ async function boot(): Promise<void> {
       api.worstMs = worstMs;
     }
     api.shadows = shadowsOn;
+    api.shadowMapEnabled = renderer.shadowMap.enabled;
     api.lantern = lanternOn;
     api.mode = mode;
     api.lampLit = lampLit;
