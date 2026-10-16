@@ -30,7 +30,18 @@ import {
 } from './constants';
 import { DressingMark } from './dressing';
 import { isLightPassable, LightReach, partyReach, reachAt, sconceOrigin, sconceReach } from './light-grid';
-import { FLOOR_DISK_Y, LightDebugMode, NONFLOOR_HEIGHT_PENALTY, parseLightDebugMode } from './surface-light';
+import {
+  FLOOR_DISK_Y,
+  LightDebugMode,
+  NONFLOOR_HEIGHT_PENALTY,
+  parseLightDebugMode,
+  SURFACE_MAX_SUNBEAMS,
+  SURFACE_MAX_TORCHES,
+  lightDebugSkips,
+  lightDebugUniform,
+  type SurfaceLightLocal,
+  type SurfaceLightShared
+} from './surface-light';
 import { FloorData, Sconce } from './types';
 
 interface CachedFace {
@@ -141,6 +152,8 @@ export class VertexLightingManager {
   private partyX = 0;
   private partyY = 0;
   private faces: CachedFace[] = [];
+  /** Voxel wall clones. Survives registerScene() so cubes keep the painted bake. */
+  private voxelFaces: CachedFace[] = [];
   private sconceWorld: SconceWorld[] = [];
   private partyCells: LightReach = new Map();
   private sunbeams: DressingMark[] = [];
@@ -190,7 +203,7 @@ export class VertexLightingManager {
 
   setLightDebug(mode: LightDebugMode) {
     this.lightDebug = parseLightDebugMode(mode) ?? mode;
-    for (const face of this.faces) this.bakeFace(face, this.flicker);
+    this.eachFace((face) => this.bakeFace(face, this.flicker));
   }
 
   getLightDebug(): LightDebugMode {
@@ -214,16 +227,21 @@ export class VertexLightingManager {
     this.sunbeams = sunbeams;
   }
 
+  private eachFace(fn: (face: CachedFace) => void): void {
+    for (const face of this.faces) fn(face);
+    for (const face of this.voxelFaces) fn(face);
+  }
+
   /** Call after a torch lights or goes out so pools and flicker sets stay in sync. */
   relight() {
     this.rebuildSconceWorld();
     const radiusTiles = SCONCE_RADIUS_TILES + 1;
-    for (const face of this.faces) {
+    this.eachFace((face) => {
       const { tileX, tileY } = this.lightTileOf(face.mesh);
       face.tileX = tileX;
       face.tileY = tileY;
       face.nearSconce = this.nearAnySconce(tileX, tileY, radiusTiles);
-    }
+    });
     this.updateAllMeshes();
   }
 
@@ -295,6 +313,65 @@ export class VertexLightingManager {
     });
   }
 
+  /**
+   * Bake a voxel wall with the same shadeVertex as the painted plane.
+   * Local Z is projected to 0 so relief cubes take the original wall's
+   * brightness and warmth — no extra voxel light.
+   */
+  registerVoxelMesh(mesh: THREE.Mesh): void {
+    this.unregisterVoxelMesh(mesh);
+    mesh.updateWorldMatrix(true, false);
+    const geometry = mesh.geometry;
+    if (!geometry?.attributes.position) return;
+    const pos = geometry.attributes.position;
+    if (!geometry.attributes.color) {
+      geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(pos.count * 3), 3));
+    }
+    const mat = mesh.material;
+    const mats = Array.isArray(mat) ? mat : [mat];
+    for (const m of mats) {
+      if (
+        m instanceof THREE.MeshBasicMaterial ||
+        m instanceof THREE.MeshLambertMaterial ||
+        m instanceof THREE.MeshStandardMaterial
+      ) {
+        m.vertexColors = true;
+        m.needsUpdate = true;
+      }
+    }
+    const worldPos = new Float32Array(pos.count * 3);
+    const v = this.scratch;
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i);
+      v.z = 0;
+      v.applyMatrix4(mesh.matrixWorld);
+      worldPos[i * 3] = v.x;
+      worldPos[i * 3 + 1] = v.y;
+      worldPos[i * 3 + 2] = v.z;
+    }
+    const { tileX, tileY } = this.lightTileOf(mesh);
+    const tile = this.floorData.tiles[tileY]?.[tileX];
+    const radiusTiles = SCONCE_RADIUS_TILES + 1;
+    const face: CachedFace = {
+      mesh,
+      worldPos,
+      colors: geometry.attributes.color as THREE.BufferAttribute,
+      isDark: !!tile?.floorNDark,
+      isProp: !!mesh.userData.lanternProp,
+      isWall: isWallLike(mesh.userData.kind),
+      nearSconce: this.nearAnySconce(tileX, tileY, radiusTiles),
+      tileX,
+      tileY,
+      lightGround: !!mesh.userData.lightGround || !!mesh.userData.rubble
+    };
+    this.voxelFaces.push(face);
+    this.bakeFace(face, this.flicker);
+  }
+
+  unregisterVoxelMesh(mesh: THREE.Mesh): void {
+    this.voxelFaces = this.voxelFaces.filter((face) => face.mesh !== mesh);
+  }
+
   private rebuildSconceWorld() {
     this.sconceWorld = this.sconces
       .filter((s) => s.lit)
@@ -362,6 +439,81 @@ export class VertexLightingManager {
 
   isSquareLit(tileX: number, tileY: number): boolean {
     return this.sourceLight(tileX, tileY) >= DARK_LIGHT_THRESHOLD;
+  }
+
+  /**
+   * Visual tint for painted sprites in voxel mode: torch warmth + wall lantern
+   * falloff (same as walls). Does not change sourceLight / isSquareLit.
+   */
+  wallTintRgb(tileX: number, tileY: number): [number, number, number] {
+    const tile = this.floorData.tiles[tileY]?.[tileX];
+    const isDark = tile?.floorNDark || false;
+    return this.shadeVertex(
+      tileX * CELL_SIZE,
+      CELL_SIZE * 0.5,
+      tileY * CELL_SIZE,
+      tileX,
+      tileY,
+      isDark,
+      this.flicker,
+      false,
+      true
+    );
+  }
+
+  fillSurfaceShared(shared: SurfaceLightShared): void {
+    const ambient = this.floorAmbient();
+    shared.uAmbientRgb.value.set(
+      ambient * AMBIENT_RGB[0],
+      ambient * AMBIENT_RGB[1],
+      ambient * AMBIENT_RGB[2]
+    );
+    shared.uBright.value = this.bright;
+    shared.uFlicker.value = this.flicker;
+    shared.uPartyX.value = this.partyX;
+    shared.uPartyY.value = this.partyY;
+    shared.uOil.value = this.oilFn() > 0 ? 1 : 0;
+    const lantern = this.lanternSpec();
+    shared.uLanternRgb.value.set(lantern.rgb[0], lantern.rgb[1], lantern.rgb[2]);
+    shared.uLanternIntensity.value = lantern.intensity;
+    shared.uLanternRadius.value = lantern.radius;
+    shared.uWallLanternIntensity.value = this.oilFn() > 0 ? WALL_LANTERN_INTENSITY : lantern.intensity;
+    shared.uWallLanternRadius.value = this.oilFn() > 0 ? WALL_LANTERN_RADIUS_TILES : lantern.radius;
+    shared.uCarriedTorch.value = this.carriedTorch ? 1 : 0;
+    shared.uSunbeamCount.value = Math.min(SURFACE_MAX_SUNBEAMS, this.sunbeams.length);
+    for (let i = 0; i < SURFACE_MAX_SUNBEAMS; i++) {
+      const beam = this.sunbeams[i];
+      if (beam) shared.uSunbeamPos.value[i].set(beam.x, beam.y);
+      else shared.uSunbeamPos.value[i].set(0, 0);
+    }
+    shared.uDebugMode.value = lightDebugUniform(this.lightDebug);
+    const skip = lightDebugSkips(this.lightDebug);
+    shared.uSkipLantern.value = skip.lantern;
+    shared.uSkipTorch.value = skip.torch;
+    shared.uSkipAmbient.value = skip.ambient;
+  }
+
+  fillSurfaceLocal(
+    local: SurfaceLightLocal,
+    tileX: number,
+    tileY: number,
+    isWall: boolean,
+    isDark: boolean,
+    lightGround: boolean
+  ): void {
+    local.uPartyReach.value = reachAt(this.partyCells, tileX, tileY) !== undefined ? 1 : 0;
+    local.uIsWall.value = isWall ? 1 : 0;
+    local.uIsDark.value = isDark ? 1 : 0;
+    local.uLightGround.value = lightGround ? 1 : 0;
+    local.uGroundPos.value.set(tileX * CELL_SIZE, 0.08, tileY * CELL_SIZE);
+    let n = 0;
+    for (const s of this.sconceWorld) {
+      if (n >= SURFACE_MAX_TORCHES) break;
+      if (reachAt(s.reach, tileX, tileY) === undefined) continue;
+      local.uTorchPos.value[n].set(s.x, s.y, s.z);
+      n += 1;
+    }
+    local.uTorchCount.value = n;
   }
 
   calculateBrightness(tileX: number, tileY: number, isDark: boolean): number {
@@ -554,9 +706,7 @@ export class VertexLightingManager {
 
   updateAllMeshes(_scene?: THREE.Scene) {
     this.rebuildPartyReach();
-    for (const face of this.faces) {
-      this.bakeFace(face, this.flicker);
-    }
+    this.eachFace((face) => this.bakeFace(face, this.flicker));
   }
 
   /** Pin a flame-frame multiplier for e2e measurement. */
@@ -566,10 +716,10 @@ export class VertexLightingManager {
     if (wrapped === this.flickerFrame && next === this.flicker) return;
     this.flickerFrame = wrapped;
     this.flicker = next;
-    for (const face of this.faces) {
-      if (!face.nearSconce) continue;
+    this.eachFace((face) => {
+      if (!face.nearSconce) return;
       this.bakeFace(face, this.flicker);
-    }
+    });
   }
 
   /** Slow ±3% sine on torch warmth; skip if the quantized value has not moved. */
@@ -579,9 +729,9 @@ export class VertexLightingManager {
     const q = Math.round(next * 200) / 200;
     if (q === this.flicker) return;
     this.flicker = q;
-    for (const face of this.faces) {
-      if (!face.nearSconce) continue;
+    this.eachFace((face) => {
+      if (!face.nearSconce) return;
       this.bakeFace(face, this.flicker);
-    }
+    });
   }
 }

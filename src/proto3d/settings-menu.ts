@@ -13,11 +13,17 @@ export class SettingsMenu {
   private hintEl: HTMLElement | null = null;
   private framedBtn: HTMLButtonElement | null = null;
   private edgeBtn: HTMLButtonElement | null = null;
+  private voxelOnBtn: HTMLButtonElement | null = null;
+  private voxelOffBtn: HTMLButtonElement | null = null;
+  private voxelLabelEl: HTMLElement | null = null;
+  private voxelHintEl: HTMLElement | null = null;
   private closeBtn: HTMLButtonElement | null = null;
   private story: StoryText;
   private getLayout: () => LayoutMode;
   private setLayout: (mode: LayoutMode) => void;
   private playUi: (name: string) => void;
+  private getVoxel: () => boolean;
+  private setVoxel: (on: boolean) => void;
 
   constructor(
     story: StoryText,
@@ -25,12 +31,16 @@ export class SettingsMenu {
       getLayout: () => LayoutMode;
       setLayout: (mode: LayoutMode) => void;
       playUi: (name: string) => void;
+      getVoxel?: () => boolean;
+      setVoxel?: (on: boolean) => void;
     }
   ) {
     this.story = story;
     this.getLayout = hooks.getLayout;
     this.setLayout = hooks.setLayout;
     this.playUi = hooks.playUi;
+    this.getVoxel = hooks.getVoxel ?? (() => false);
+    this.setVoxel = hooks.setVoxel ?? (() => {});
   }
 
   mount() {
@@ -40,6 +50,10 @@ export class SettingsMenu {
     this.hintEl = document.getElementById('settings-layout-hint');
     this.framedBtn = document.getElementById('btn-layout-framed') as HTMLButtonElement | null;
     this.edgeBtn = document.getElementById('btn-layout-edge') as HTMLButtonElement | null;
+    this.voxelOnBtn = document.getElementById('btn-voxel-on') as HTMLButtonElement | null;
+    this.voxelOffBtn = document.getElementById('btn-voxel-off') as HTMLButtonElement | null;
+    this.voxelLabelEl = document.getElementById('settings-voxel-label');
+    this.voxelHintEl = document.getElementById('settings-voxel-hint');
     this.closeBtn = document.getElementById('btn-settings-close') as HTMLButtonElement | null;
     if (!this.host || this.host.dataset.bound) return;
     this.host.dataset.bound = '1';
@@ -52,6 +66,16 @@ export class SettingsMenu {
       e.preventDefault();
       e.stopPropagation();
       this.choose('edge');
+    });
+    this.voxelOnBtn?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.chooseVoxel(true);
+    });
+    this.voxelOffBtn?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.chooseVoxel(false);
     });
     this.closeBtn?.addEventListener('click', (e) => {
       e.preventDefault();
@@ -79,6 +103,14 @@ export class SettingsMenu {
     if (this.closeBtn) {
       this.closeBtn.textContent = this.story.uiText('buttons.resume') || this.story.uiText('journal.close') || 'Close';
     }
+    if (this.voxelLabelEl) this.voxelLabelEl.textContent = this.story.uiText('settings.voxel') || '3D walls';
+    if (this.voxelHintEl) {
+      this.voxelHintEl.textContent =
+        this.story.uiText('settings.voxel_hint') || 'Stone you can almost touch. Phone may sweat.';
+    }
+    if (this.voxelOnBtn) this.voxelOnBtn.textContent = this.story.uiText('settings.on') || 'On';
+    if (this.voxelOffBtn) this.voxelOffBtn.textContent = this.story.uiText('settings.off') || 'Off';
+    this.refreshChoice();
   }
 
   private refreshChoice() {
@@ -87,6 +119,18 @@ export class SettingsMenu {
     this.edgeBtn?.classList.toggle('selected', mode === 'edge');
     this.framedBtn?.setAttribute('aria-pressed', mode === 'framed' ? 'true' : 'false');
     this.edgeBtn?.setAttribute('aria-pressed', mode === 'edge' ? 'true' : 'false');
+    const voxel = this.getVoxel();
+    this.voxelOnBtn?.classList.toggle('selected', voxel);
+    this.voxelOffBtn?.classList.toggle('selected', !voxel);
+    this.voxelOnBtn?.setAttribute('aria-pressed', voxel ? 'true' : 'false');
+    this.voxelOffBtn?.setAttribute('aria-pressed', voxel ? 'false' : 'true');
+  }
+
+  private chooseVoxel(on: boolean) {
+    if (this.getVoxel() === on) return;
+    this.playUi('ui_button');
+    this.setVoxel(on);
+    this.refreshChoice();
   }
 
   private choose(mode: LayoutMode) {
