@@ -12,10 +12,10 @@ import {
  * Mid-room, slightly toward the camera so a west-side key light throws
  * umbras onto the open floor to the right of each actor (not under/behind).
  */
-export const CHEST_POS: readonly [number, number, number] = [3.22, 0, 2.08];
-export const SLIME_POS: readonly [number, number, number] = [4.16, 0, 2.24];
+export const CHEST_POS: readonly [number, number, number] = [3.38, 0, 1.82];
+export const SLIME_POS: readonly [number, number, number] = [3.58, 0, 2.52];
 /** Yaw so front + a sliver of the painted side read from the start view. */
-export const CHEST_YAW = 0.46;
+export const CHEST_YAW = 0.42;
 
 /** 10×7×6 voxel box, one cell ≈ 6.2 cm. */
 export const CHEST_VOXELS = { w: 10, h: 7, d: 6, size: 0.062 } as const;
@@ -30,12 +30,12 @@ export const SLIME_THICKNESS = 0.06;
 export const SLIME_BOB_AMP = 0.028;
 export const SLIME_BOB_HZ = 0.35;
 
-/** Off-screen west of the camera; shines across the actors onto visible floor. */
-export const ACTOR_KEY_POS: readonly [number, number, number] = [0.82, 1.58, 3.52];
-export const ACTOR_KEY_TARGET: readonly [number, number, number] = [3.7, 0.04, 1.9];
-export const ACTOR_KEY_ANGLE = Math.PI / 4.4;
-export const ACTOR_KEY_DISTANCE = 8.2;
-export const ACTOR_KEY_INTENSITY = 11;
+/** Left and behind the camera; umbras fall right/north onto open floor in view. */
+export const ACTOR_KEY_POS: readonly [number, number, number] = [0.95, 1.78, 4.42];
+export const ACTOR_KEY_TARGET: readonly [number, number, number] = [3.55, 0.03, 1.65];
+export const ACTOR_KEY_ANGLE = Math.PI / 4.0;
+export const ACTOR_KEY_DISTANCE = 8.5;
+export const ACTOR_KEY_INTENSITY = 13;
 
 export type ChestFaceMaps = {
   front: THREE.Texture;
@@ -276,8 +276,8 @@ export function createActorKeyLight(shadowMapSize: number): THREE.SpotLight {
   spot.shadow.normalBias = 0.014;
   spot.shadow.radius = 1;
   spot.shadow.intensity = 1;
-  spot.shadow.camera.near = 0.35;
-  spot.shadow.camera.far = 8;
+  spot.shadow.camera.near = 0.3;
+  spot.shadow.camera.far = 9;
   spot.shadow.camera.updateProjectionMatrix();
   return spot;
 }
