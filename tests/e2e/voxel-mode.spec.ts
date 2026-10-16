@@ -27,9 +27,10 @@ const POSES = [
   { x: 3, y: 14, dir: 3, file: 'start' },
   { x: 1, y: 6, dir: 3, file: 'torch_corridor' },
   { x: 6, y: 7, dir: 3, file: 'chest_torch_wall' },
-  { x: 19, y: 3, dir: 2, file: 'lair_from_19_3' },
   { x: 11, y: 3, dir: 0, file: 'crack_sunbeam' },
-  { x: 15, y: 10, dir: 1, file: 'stairs_down' }
+  { x: 16, y: 9, dir: 2, file: 'stairs_down' },
+  { x: 19, y: 3, dir: 2, file: 'lair_from_19_3' },
+  { x: 19, y: 6, dir: 2, file: 'lair_neck' }
 ] as const;
 
 test('voxel mode screenshots, freeze, and fps vs default', async ({ page }) => {

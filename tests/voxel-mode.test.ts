@@ -148,6 +148,9 @@ describe('voxel lighting keeps gameplay rules', () => {
     const src = readFileSync(resolve(__dirname, '../src/proto3d/voxel-mode.ts'), 'utf8');
     expect(src).toContain('uSunbeam3D.value = 1');
     expect(src).toContain('VOXEL_SUNBEAM_INTENSITY');
+    const look = readFileSync(resolve(__dirname, '../src/proto3d/voxel-surface.ts'), 'utf8');
+    expect(look).toContain('applyVoxelLook(albedo, vSurfWorldPos, vMapUv)');
+    expect(look).toContain('vec3 applyVoxelLook(vec3 albedo, vec3 worldPos, vec2 uv)');
   });
 });
 

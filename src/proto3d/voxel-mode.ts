@@ -255,13 +255,15 @@ export class VoxelMode {
         this.active.add(entry.key);
         this.ensureVoxel(entry);
         const origMat = asBasic(entry.mesh.material);
-        if (origMat) origMat.visible = false;
         if (entry.voxel) {
+          if (origMat) origMat.visible = false;
           entry.voxel.visible = true;
           this.voxelMeshes += 1;
           const geo = entry.voxel.geometry;
           const idx = geo.getIndex();
           this.triangles += idx ? idx.count / 3 : 0;
+        } else if (origMat) {
+          origMat.visible = true;
         }
       } else {
         this.active.delete(entry.key);
