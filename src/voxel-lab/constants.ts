@@ -82,3 +82,15 @@ export const FLAME_FILES = [
 
 export const SCONCE_FILE = 'torch/bracket_lit_front.png';
 export const LAMP_FILE = '../atmo/lamp_capped.png';
+
+/** Lab-only chest faces (hand-cut). Swap these files to retarget the box. */
+export const CHEST_FRONT_FILE = 'voxel-lab/chest_front.png';
+export const CHEST_SIDE_FILE = 'voxel-lab/chest_side.png';
+export const CHEST_TOP_FILE = 'voxel-lab/chest_top.png';
+export const CHEST_BOTTOM_COLOR = 0x1a120c;
+/** Painted floor contact (64×32). Independent of the Shadows toggle. */
+export const SHADOW_PATCH_FILE = 'voxel-lab/shadow_patch.png';
+/** Above 3 cm floor relief so the patch does not z-fight. */
+export const CONTACT_Y = 0.036;
+/** Game slime sprite, loaded by URL only — do not import proto3d. */
+export const SLIME_SPRITE_FILE = 'art/dungeon/monsters_v2/slime_idle_1_near.png';

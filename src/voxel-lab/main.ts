@@ -29,9 +29,17 @@ import {
   TORCH_DISTANCE,
   TORCH_INTENSITY
 } from './constants';
+import {
+  ACTOR_KEY_INTENSITY,
+  bobSlime,
+  buildLabActors,
+  createActorKeyLight,
+  faceSlimeToCamera,
+  type LabActors
+} from './actors';
 import { lookColors } from './look';
 import { buildRoom, loadFlameTextures } from './room';
-import { applyShadowToggle } from './shadows';
+import { applyShadowToggle, recompileShadowShaders } from './shadows';
 
 THREE.ColorManagement.enabled = true;
 
@@ -51,12 +59,14 @@ type LabApi = {
   shadowMapEnabled: boolean;
   warmth: number;
   matchGame: boolean;
+  seeThrough: boolean;
   setShadows: (on: boolean) => void;
   setLantern: (on: boolean) => void;
   setMode: (mode: 'voxel' | 'flat') => void;
   setLamp: (on: boolean) => void;
   setWarmth: (warmth: number) => void;
   setMatchGame: (on: boolean) => void;
+  setSeeThrough: (on: boolean) => void;
   turnLeft: () => void;
   turnRight: () => void;
   meanLuma: (band?: { y0?: number; y1?: number }) => number;
@@ -67,9 +77,38 @@ type LabApi = {
     meshCast: number;
     meshReceive: number;
   };
+  debugActors: () => {
+    chestName: string;
+    chestMeshes: number;
+    chestCast: number;
+    slimeName: string;
+    slimeCast: boolean;
+    slimeSeeThrough: boolean;
+    slimeDepthWrite: boolean;
+    slimeOpacity: number;
+    slimeAlphaTest: number;
+    slimeHasDepthMat: boolean;
+    slimeDepthAlphaTest: number;
+    slimeHasDistanceMat: boolean;
+    chestHasFrontMap: boolean;
+    chestHasSideMap: boolean;
+    chestHasTopMap: boolean;
+    contactCount: number;
+    chestX: number;
+    chestZ: number;
+    slimeX: number;
+    slimeZ: number;
+    slimeH: number;
+  };
 };
 
 const STATS_WINDOW_MS = 2000;
+
+function chestFaceHasMap(mesh: THREE.Mesh, index: number): boolean {
+  const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+  const mat = mats[index] as THREE.MeshStandardMaterial | undefined;
+  return !!mat?.map;
+}
 
 function isMobile(): boolean {
   return window.matchMedia('(pointer: coarse)').matches || window.innerWidth < 700;
@@ -90,6 +129,7 @@ async function boot(): Promise<void> {
   const btnLeft = document.getElementById('btn-left') as HTMLButtonElement;
   const btnRight = document.getElementById('btn-right') as HTMLButtonElement;
   const btnMatch = document.getElementById('btn-match') as HTMLButtonElement;
+  const btnSeeThrough = document.getElementById('btn-see-through') as HTMLButtonElement;
   const sliderWarmth = document.getElementById('slider-warmth') as HTMLInputElement;
   const loading = document.getElementById('loading')!;
 
@@ -239,10 +279,16 @@ async function boot(): Promise<void> {
   camera.add(lanternSpot.target);
   scene.add(camera);
 
+  // Off-screen west key so chest/slime umbras land on the open floor in view.
+  // Existing north torches, crate/pillar spots, colours and toggles stay put.
+  const actorKey = createActorKeyLight(shadowSize);
+  scene.add(actorKey);
+  scene.add(actorKey.target);
+
   loading.textContent = 'Meshing voxels…';
-  const room = await buildRoom();
-  const flames = await loadFlameTextures();
-  scene.add(room.voxelGroup, room.flatGroup, room.propsGroup);
+  const [room, flames, actors]: [Awaited<ReturnType<typeof buildRoom>>, THREE.Texture[], LabActors] =
+    await Promise.all([buildRoom(), loadFlameTextures(), buildLabActors()]);
+  scene.add(room.voxelGroup, room.flatGroup, room.propsGroup, actors.group);
 
   for (const flame of room.torchFlames) {
     flame.material = new THREE.SpriteMaterial({
@@ -268,6 +314,7 @@ async function boot(): Promise<void> {
   let lampLit = false;
   let warmth = 1;
   let matchGame = false;
+  let seeThrough = false;
 
   const camPos = (gx: number, gz: number): THREE.Vector3 =>
     new THREE.Vector3((gx + 0.5) * CELL, EYE_HEIGHT, (gz + 0.5) * CELL);
@@ -300,6 +347,7 @@ async function boot(): Promise<void> {
         { light: torchB, active: true },
         { light: torchSpotA, active: true },
         { light: torchSpotB, active: true },
+        { light: actorKey, active: true },
         { light: lampLight, active: lampLit },
         { light: lanternSpot, active: lanternOn }
       ],
@@ -349,6 +397,7 @@ async function boot(): Promise<void> {
     paint(torchB, look.torch);
     paint(torchSpotA, look.torch);
     paint(torchSpotB, look.torch);
+    paint(actorKey, look.torch);
     paint(lanternLight, look.lantern);
     paint(lanternSpot, look.lantern);
     paint(lampLight, look.lamp);
@@ -436,6 +485,14 @@ async function boot(): Promise<void> {
     applyLook();
   };
 
+  const setSeeThrough = (on: boolean): void => {
+    seeThrough = on;
+    actors.setSeeThrough(on);
+    syncShadows();
+    btnSeeThrough.textContent = on ? 'See-through on' : 'See-through slime';
+    btnSeeThrough.setAttribute('aria-pressed', on ? 'true' : 'false');
+  };
+
   btnShadows.addEventListener('click', (e) => {
     e.stopPropagation();
     setShadows(!shadowsOn);
@@ -451,6 +508,10 @@ async function boot(): Promise<void> {
   btnMatch.addEventListener('click', (e) => {
     e.stopPropagation();
     setMatchGame(!matchGame);
+  });
+  btnSeeThrough.addEventListener('click', (e) => {
+    e.stopPropagation();
+    setSeeThrough(!seeThrough);
   });
   sliderWarmth.addEventListener('pointerdown', (e) => e.stopPropagation());
   sliderWarmth.addEventListener('input', (e) => {
@@ -595,6 +656,7 @@ async function boot(): Promise<void> {
   setLamp(false);
   setWarmth(1);
   setMatchGame(false);
+  setSeeThrough(false);
 
   let flameT = 0;
   let lastFrame = performance.now();
@@ -617,6 +679,7 @@ async function boot(): Promise<void> {
     shadowMapEnabled: true,
     warmth: 1,
     matchGame: false,
+    seeThrough: false,
     setShadows: (on) => {
       setShadows(on);
       api.shadows = on;
@@ -642,6 +705,10 @@ async function boot(): Promise<void> {
       setMatchGame(on);
       api.matchGame = on;
     },
+    setSeeThrough: (on) => {
+      setSeeThrough(on);
+      api.seeThrough = on;
+    },
     turnLeft: () => turn(1),
     turnRight: () => turn(-1),
     meanLuma: (band) => samplePixels(band).luma,
@@ -661,9 +728,52 @@ async function boot(): Promise<void> {
         if (light.isLight && light.castShadow) counts.lightCast += 1;
       });
       return { shadowMapEnabled: renderer.shadowMap.enabled, ...counts };
+    },
+    debugActors: () => {
+      const slimeMat = actors.slime.material as THREE.MeshPhysicalMaterial;
+      const depthMat = actors.slime.customDepthMaterial as THREE.MeshDepthMaterial | undefined;
+      const distMat = actors.slime.customDistanceMaterial as THREE.MeshDistanceMaterial | undefined;
+      let chestMeshes = 0;
+      let chestCast = 0;
+      actors.chest.traverse((obj) => {
+        const mesh = obj as THREE.Mesh;
+        if (!mesh.isMesh) return;
+        chestMeshes += 1;
+        if (mesh.castShadow) chestCast += 1;
+      });
+      return {
+        chestName: actors.chest.name,
+        chestMeshes,
+        chestCast,
+        slimeName: actors.slime.name,
+        slimeCast: actors.slime.castShadow,
+        slimeSeeThrough: seeThrough,
+        slimeDepthWrite: slimeMat.depthWrite,
+        slimeOpacity: slimeMat.opacity,
+        slimeAlphaTest: slimeMat.alphaTest,
+        slimeHasDepthMat: !!depthMat,
+        slimeDepthAlphaTest: depthMat?.alphaTest ?? 0,
+        slimeHasDistanceMat: !!distMat,
+        chestHasFrontMap: chestFaceHasMap(actors.chestBox, 4),
+        chestHasSideMap: chestFaceHasMap(actors.chestBox, 0),
+        chestHasTopMap: chestFaceHasMap(actors.chestBox, 2),
+        contactCount: [actors.chestContact, actors.slimeContact].filter(Boolean).length,
+        chestX: actors.chest.position.x,
+        chestZ: actors.chest.position.z,
+        slimeX: actors.slime.position.x,
+        slimeZ: actors.slime.position.z,
+        slimeH: actors.slimeBaseY * 2
+      };
     }
   };
   (window as unknown as { __voxelLab: LabApi }).__voxelLab = api;
+
+  // Allocate shadow maps, then recompile (incl. customDepthMaterial) so WebKit
+  // does not first-frame chest/slime/crate/pillar/ceiling as solid black.
+  renderFrame();
+  recompileShadowShaders([scene]);
+  renderer.shadowMap.needsUpdate = true;
+  renderFrame();
 
   loading.classList.add('hidden');
 
@@ -684,6 +794,7 @@ async function boot(): Promise<void> {
     torchB.intensity = TORCH_INTENSITY * flickB;
     torchSpotA.intensity = 10 * flickA;
     torchSpotB.intensity = 10 * flickB;
+    actorKey.intensity = ACTOR_KEY_INTENSITY * flickA;
     if (lampLit) {
       lampLight.intensity =
         LAMP_INTENSITY * (1 + flicker * (0.03 * Math.sin(t * 2.4) + 0.02 * Math.sin(t * 7.1)));
@@ -701,6 +812,9 @@ async function boot(): Promise<void> {
         (spr.material as THREE.SpriteMaterial).map = frame;
       }
     }
+
+    faceSlimeToCamera(actors.slime, camera);
+    bobSlime(actors.slime, actors.slimeBaseY, now, !preserveBuffer);
 
     const draws = renderFrame();
     api.draws = draws;
@@ -721,6 +835,7 @@ async function boot(): Promise<void> {
     api.lampLit = lampLit;
     api.warmth = warmth;
     api.matchGame = matchGame;
+    api.seeThrough = seeThrough;
     if (now - lastHud >= 200) {
       lastHud = now;
       statsEl.innerHTML =

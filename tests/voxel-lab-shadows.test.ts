@@ -101,6 +101,29 @@ describe('applyShadowToggle', () => {
     expect(floor.receiveShadow).toBe(true);
   });
 
+  it('recompiles customDepthMaterial and customDistanceMaterial (WebKit first-frame black)', () => {
+    const renderer = { shadowMap: { enabled: false, needsUpdate: false } };
+    const mat: FakeMat = { needsUpdate: false };
+    const depth: FakeMat = { needsUpdate: false };
+    const dist: FakeMat = { needsUpdate: false };
+    const faces: FakeMat[] = [{ needsUpdate: false }, { needsUpdate: false }];
+    const slime = mesh({ material: mat });
+    (slime as { customDepthMaterial: FakeMat }).customDepthMaterial = depth;
+    (slime as { customDistanceMaterial: FakeMat }).customDistanceMaterial = dist;
+    const chest = mesh({ material: faces });
+    applyShadowToggle({
+      on: true,
+      renderer,
+      lights: [],
+      roots: [group([slime, chest])] as never
+    });
+    expect(mat.needsUpdate).toBe(true);
+    expect(depth.needsUpdate).toBe(true);
+    expect(dist.needsUpdate).toBe(true);
+    expect(faces[0].needsUpdate).toBe(true);
+    expect(faces[1].needsUpdate).toBe(true);
+  });
+
   it('does not let inactive lights cast even when shadows are on', () => {
     const renderer = { shadowMap: { enabled: false, needsUpdate: false } };
     const lamp: ShadowLight = { castShadow: false, shadow: { map: null } };
