@@ -196,6 +196,7 @@ describe('voxel mode keeps raycasts on original planes', () => {
     const index = readFileSync(resolve(__dirname, '../index.html'), 'utf8');
     expect(proto).toContain('id="btn-voxel-on"');
     expect(index).toContain('id="btn-voxel-on"');
+    expect(proto).toContain('id="btn-lab-light-on"');
     expect(proto).toContain('src="/src/proto3d/main.ts"');
     expect(proto).not.toContain('voxel-lab.html');
     expect(proto).not.toContain('src/voxel-lab');

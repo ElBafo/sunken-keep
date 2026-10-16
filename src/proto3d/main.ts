@@ -64,8 +64,20 @@ import { SpeechBubble } from './bubble';
 import { StoryProgress } from './story-progress';
 import { copyForOpenNote, resolveLocale, saveLocale, StoryText, type Locale, type OpenNoteRef } from './i18n';
 import { qualityFromSearch, QualityLevel } from './quality';
+import type { LabLook } from './lab-look';
+import { LAB_LANTERN_RGB, LAB_TORCH_RGB, labLightFromSearch, syncLabLightQuery } from './lab-light';
 import type { VoxelMode } from './voxel-mode';
 import { syncVoxelQuery, voxelFromSearch } from './voxel-opt-in';
+import {
+  COMPARE_PARTY,
+  compareEnemyTile,
+  devFromSearch,
+  type DevDist,
+  type DevEnemy,
+  type DevResMode
+} from './dev-opt-in';
+import type { DevOoze } from './dev-ooze';
+import type { DevPanel } from './dev-panel';
 import { PixelRenderer } from './renderer';
 import { SceneBuilder } from './scene-builder';
 import { SpriteManager } from './sprites';
@@ -156,6 +168,17 @@ class Game {
   settingsMenu!: SettingsMenu;
   private voxel: VoxelMode | null = null;
   private voxelWanted = false;
+  private labLook: LabLook | null = null;
+  private labWanted = false;
+  private devWanted = false;
+  private devPanel: DevPanel | null = null;
+  private devOoze: DevOoze | null = null;
+  private devCompare = false;
+  private devEnemy: DevEnemy = 'slime';
+  private devDist: DevDist = 1;
+  private devHiddenMonsters: Array<{ sprite: { hidden?: boolean; object: { visible: boolean } }; hidden: boolean; visible: boolean }> =
+    [];
+  private devCompareSlimeId = '__dev_compare_slime';
   private pendingPotion: 'potion_red' | 'potion_blue' | 'potion_green' | null = null;
   private lootSnap: Array<{ x: number; y: number; item?: string; chest?: boolean; chestItems?: string[]; chestOpen?: boolean }> = [];
   lastMessage = '';
@@ -262,6 +285,8 @@ class Game {
     this.wantDebugReader = debugReaderRequested(params);
 
     this.voxelWanted = voxelFromSearch(params);
+    this.labWanted = labLightFromSearch(params);
+    this.devWanted = devFromSearch(params);
     this.settingsMenu = new SettingsMenu(this.story, {
       getLayout: () => getLayoutMode(),
       setLayout: (mode) => this.setLayoutMode(mode),
@@ -272,6 +297,18 @@ class Game {
         syncVoxelQuery(on);
         if (on) void this.enableVoxel();
         else this.voxel?.disable();
+        if (this.labLook?.enabled) this.labLook.refresh();
+        this.settingsMenu.refreshLabels();
+      },
+      getLabLight: () => this.labWanted,
+      setLabLight: (on) => {
+        this.labWanted = on;
+        syncLabLightQuery(on);
+        if (on) void this.enableLabLook();
+        else {
+          this.labLook?.disable();
+          this.voxel?.syncLights();
+        }
         this.settingsMenu.refreshLabels();
       }
     });
@@ -531,7 +568,9 @@ class Game {
     this.vertexLighting.registerScene(this.renderer.scene);
     this.vertexLighting.updateAllMeshes(this.renderer.scene);
     if (lightDebug) this.applyLightDebug(lightDebug);
+    if (this.labWanted) await this.enableLabLook();
     if (this.voxelWanted) await this.enableVoxel();
+    if (this.devWanted) await this.mountDevPanel();
 
     this.darkFx = new DarkFx();
     void this.darkFx.load(this.renderer.scene, floor1, this.spriteManager);
@@ -600,12 +639,199 @@ class Game {
         scene: this.renderer.scene,
         lighting: this.vertexLighting,
         sprites: this.spriteManager,
-        renderer: this.renderer.renderer
+        renderer: this.renderer.renderer,
+        decorateVoxel: (mesh) => {
+          if (this.labLook?.enabled) this.labLook.patchMesh(mesh);
+          else this.vertexLighting.registerVoxelMesh(mesh);
+        },
+        ownsSpriteTint: () => !this.labLook?.enabled
       });
     }
     this.voxel.setParty(this.player.x, this.player.y);
     this.voxel.enable();
+    if (this.labLook?.enabled) this.labLook.refresh();
     if (this.lightDebug && this.lightDebug !== 'final') this.applyLightDebug(this.lightDebug);
+  }
+
+  private async enableLabLook() {
+    if (!this.renderer || !this.vertexLighting || !this.spriteManager) return;
+    if (!this.labLook) {
+      const { LabLook } = await import('./lab-look');
+      this.labLook = new LabLook({
+        scene: this.renderer.scene,
+        lighting: this.vertexLighting,
+        sprites: this.spriteManager,
+        renderer: this.renderer
+      });
+    }
+    this.labLook.enable();
+    if (this.lightDebug && this.lightDebug !== 'final') this.applyLightDebug(this.lightDebug);
+  }
+
+  private async mountDevPanel() {
+    if (this.devPanel || !this.renderer) return;
+    const { mountDevPanel } = await import('./dev-panel');
+    this.devPanel = await mountDevPanel({
+      getRes: () => this.renderer.internalRes,
+      setRes: (mode: DevResMode) => {
+        this.renderer.setInternalResolution(mode);
+        this.devPanel?.refresh();
+      },
+      pixelSize: () => this.renderer.internalBufferSize(),
+      getLight: () => (this.labLook?.enabled ? 'lab' : 'classic'),
+      setLight: async (mode) => {
+        await this.setLabLightDev(mode === 'lab');
+        this.devPanel?.refresh();
+      },
+      getVoxel: () => this.voxel?.enabled === true,
+      setVoxel: async (on) => {
+        await this.setVoxelDev(on);
+        this.devPanel?.refresh();
+      },
+      getCompare: () => this.devCompare,
+      setCompare: async (on) => {
+        await this.setDevCompare(on);
+        this.devPanel?.refresh();
+      },
+      getEnemy: () => this.devEnemy,
+      setEnemy: async (enemy) => {
+        this.devEnemy = enemy;
+        if (this.devCompare) await this.syncDevCompareActors();
+        this.devPanel?.refresh();
+      },
+      getDist: () => this.devDist,
+      setDist: async (dist) => {
+        this.devDist = dist;
+        if (this.devCompare) await this.syncDevCompareActors();
+        this.devPanel?.refresh();
+      },
+      captureViewPng: () => this.renderer.captureViewPng(),
+      fps: () => this.lastFps,
+      draws: () => this.renderer.lastSceneDraws,
+      palette: () => this.renderer.paletteEnabled
+    });
+  }
+
+  private async setLabLightDev(on: boolean) {
+    this.labWanted = on;
+    syncLabLightQuery(on);
+    if (on) await this.enableLabLook();
+    else {
+      this.labLook?.disable();
+      this.voxel?.syncLights();
+    }
+    this.settingsMenu?.refreshLabels();
+    this.tintDevOoze();
+  }
+
+  private async setVoxelDev(on: boolean) {
+    this.voxelWanted = on;
+    syncVoxelQuery(on);
+    if (on) await this.enableVoxel();
+    else this.voxel?.disable();
+    if (this.labLook?.enabled) this.labLook.refresh();
+    this.settingsMenu?.refreshLabels();
+  }
+
+  private async setDevCompare(on: boolean) {
+    this.devCompare = on;
+    if (on) {
+      this.stashDevMonsters();
+      this.holdComparePose(true);
+      await this.syncDevCompareActors();
+    } else {
+      this.clearDevCompareActors();
+      this.restoreDevMonsters();
+    }
+  }
+
+  private holdComparePose(force = false) {
+    if (!this.devCompare && !force) return;
+    const { x, y, dir } = COMPARE_PARTY;
+    if (!force && this.player.x === x && this.player.y === y && this.player.dir === dir) return;
+    this.player.setPosition(x, y, dir);
+    this.combat?.setPartyPos(x, y, dir);
+    this.vertexLighting.setPartyPosition(x, y);
+    this.syncVoxelParty();
+    this.syncCarriedLight();
+    this.torches.setParty(x, y, dir);
+    this.spriteManager.layoutBillboards(x, y, dir);
+  }
+
+  private stashDevMonsters() {
+    if (this.devHiddenMonsters.length) return;
+    for (const s of this.spriteManager.sprites) {
+      if (s.kind !== 'monster' || s.monsterId === this.devCompareSlimeId) continue;
+      this.devHiddenMonsters.push({ sprite: s, hidden: !!s.hidden, visible: s.object.visible });
+      s.hidden = true;
+      s.object.visible = false;
+    }
+  }
+
+  private restoreDevMonsters() {
+    for (const rec of this.devHiddenMonsters) {
+      rec.sprite.hidden = rec.hidden;
+      rec.sprite.object.visible = rec.visible && !rec.hidden;
+    }
+    this.devHiddenMonsters = [];
+    this.spriteManager.layoutBillboards(this.player.x, this.player.y, this.player.dir);
+  }
+
+  private clearDevCompareActors() {
+    const slime = this.spriteManager.sprites.find((s) => s.monsterId === this.devCompareSlimeId);
+    if (slime) {
+      slime.hidden = true;
+      slime.object.visible = false;
+    }
+    this.devOoze?.setVisible(false);
+  }
+
+  private async syncDevCompareActors() {
+    const tile = compareEnemyTile(this.devDist);
+    const { x, y } = COMPARE_PARTY;
+    if (this.devEnemy === 'slime') {
+      this.devOoze?.setVisible(false);
+      let slime = this.spriteManager.sprites.find((s) => s.monsterId === this.devCompareSlimeId) ?? undefined;
+      if (!slime) {
+        slime =
+          (await this.spriteManager.addLiveMonster(
+            this.renderer.scene,
+            'slime',
+            tile.x,
+            tile.y,
+            this.devCompareSlimeId
+          )) ?? undefined;
+      }
+      if (slime) {
+        slime.x = tile.x;
+        slime.y = tile.y;
+        slime.hidden = false;
+        slime.forceLit = true;
+        slime.object.visible = true;
+      }
+    } else {
+      const slime = this.spriteManager.sprites.find((s) => s.monsterId === this.devCompareSlimeId);
+      if (slime) {
+        slime.hidden = true;
+        slime.object.visible = false;
+      }
+      if (!this.devOoze) {
+        const { createDevOoze } = await import('./dev-ooze');
+        this.devOoze = await createDevOoze(this.renderer.scene);
+      }
+      this.devOoze.place(tile.x, tile.y, x, y);
+      this.tintDevOoze();
+      this.devOoze.setVisible(true);
+    }
+    this.spriteManager.layoutBillboards(x, y, COMPARE_PARTY.dir);
+  }
+
+  private tintDevOoze() {
+    if (!this.devOoze) return;
+    const tile = compareEnemyTile(this.devDist);
+    const look = this.labLook?.enabled ? { torch: LAB_TORCH_RGB, lantern: LAB_LANTERN_RGB } : undefined;
+    const rgb = this.vertexLighting.wallTintRgb(tile.x, tile.y, look);
+    this.devOoze.setTint(rgb[0], rgb[1], rgb[2]);
   }
 
   private beginTitleBackgroundLoads() {
@@ -2142,6 +2368,7 @@ class Game {
       this.vertexLighting?.registerScene(this.renderer.scene);
       this.vertexLighting?.relight();
       this.voxel?.refresh();
+      this.labLook?.refresh();
     }
   }
 
@@ -2153,6 +2380,7 @@ class Game {
     this.vertexLighting.relight();
     this.vertexLighting.updateAllMeshes(this.renderer.scene);
     this.voxel?.refresh();
+    this.labLook?.refresh();
   }
 
   private syncCaveInWorld() {
@@ -2457,6 +2685,7 @@ class Game {
     this.flags.add('secret_found');
     this.sceneBuilder.setSecretOpen(this.renderer.scene, x, y, true);
     this.voxel?.invalidateCell(x, y);
+    this.labLook?.refresh();
     this.spriteManager.resetItems(floor1);
     this.refreshOccupancy();
     this.vertexLighting.relight();
@@ -2997,6 +3226,17 @@ class Game {
         return Promise.resolve();
       },
       voxelStats: () => this.voxel?.stats() ?? { enabled: false, voxels: 0, triangles: 0, active: 0 },
+      labLight: () => this.labLook?.enabled === true,
+      setLabLight: (on: boolean) => {
+        this.labWanted = on;
+        syncLabLightQuery(on);
+        if (on) return this.enableLabLook();
+        this.labLook?.disable();
+        this.voxel?.syncLights();
+        return Promise.resolve();
+      },
+      labStats: () => this.labLook?.stats() ?? { enabled: false, patched: 0 },
+      paletteEnabled: () => this.renderer.paletteEnabled,
       frameMs: () => this.lastFrameMs,
       frameStats: () => {
         const s = this.frameSamples;
@@ -3407,6 +3647,37 @@ class Game {
       setLayoutMode: (mode: LayoutMode) => this.setLayoutMode(mode),
       settingsOpen: () => this.settingsMenu?.open === true,
       toggleSettings: () => this.settingsMenu.toggle(),
+      dev: () => ({
+        open: !!this.devPanel,
+        res: this.renderer?.internalRes ?? 270,
+        pixels: this.renderer?.internalBufferSize() ?? { w: 0, h: 0 },
+        light: this.labLook?.enabled ? 'lab' : 'classic',
+        voxel: this.voxel?.enabled === true,
+        compare: this.devCompare,
+        enemy: this.devEnemy,
+        dist: this.devDist,
+        overlay: !!document.getElementById('dev-panel'),
+        lastCapture: this.devPanel?.lastCapture
+          ? { slug: this.devPanel.lastCapture.slug, meta: this.devPanel.lastCapture.meta }
+          : null
+      }),
+      setDevRes: (mode: DevResMode) => {
+        this.renderer.setInternalResolution(mode);
+        this.devPanel?.refresh();
+      },
+      setDevCompare: (on: boolean) => this.setDevCompare(on),
+      setDevEnemy: async (enemy: DevEnemy) => {
+        this.devEnemy = enemy;
+        if (this.devCompare) await this.syncDevCompareActors();
+        this.devPanel?.refresh();
+      },
+      setDevDist: async (dist: DevDist) => {
+        this.devDist = dist;
+        if (this.devCompare) await this.syncDevCompareActors();
+        this.devPanel?.refresh();
+      },
+      captureDevView: () => this.devPanel?.capture() ?? null,
+      cycleDevAll: () => this.devPanel?.cycleAll() ?? '',
       tryMoveForward: () => {
         const before = { x: this.player.x, y: this.player.y };
         const result = this.player.moveForward();
@@ -3542,7 +3813,10 @@ class Game {
       this.atmosphere.applyFog(scene, this.renderer.renderer);
     }
     this.renderer.setPaletteEnabled(
-      resolved !== 'nopalette' && resolved !== 'albedo' && resolved !== 'lighting'
+      !this.labLook?.enabled &&
+        resolved !== 'nopalette' &&
+        resolved !== 'albedo' &&
+        resolved !== 'lighting'
     );
     const wantMips = resolved !== 'nomip';
     const hideMaps = resolved === 'lighting';
@@ -3573,6 +3847,7 @@ class Game {
     });
     this.atmosphere.setQuality(isolate || resolved === 'nodust' ? 'low' : this.quality);
     this.voxel?.syncLights();
+    this.labLook?.sync();
   }
 
   gameLoop() {
@@ -3584,6 +3859,7 @@ class Game {
       this.frameSamples.push(deltaTime);
       if (this.frameSamples.length > 180) this.frameSamples.splice(0, this.frameSamples.length - 180);
     }
+    this.devPanel?.noteFrame(now, deltaTime);
     const dtSec = Math.min(0.05, deltaTime / 1000);
     this.bubble?.update(now);
     this.flushBarks(now);
@@ -3640,10 +3916,13 @@ class Game {
         this.nearBandLog.push({ t: now - this.nearBandLogStart, items });
       }
     }
+    this.holdComparePose();
+    this.devOoze?.update(now);
     this.spriteManager.update(now, this.player.x, this.player.y, this.player.dir);
     this.darkFx.update(now, this.vertexLighting, this.spriteManager, this.audioManager, this.player.x, this.player.y);
     this.vertexLighting.setFlickerTime(now);
     this.voxel?.syncLights();
+    this.labLook?.sync();
     this.hud?.draw(this.nowMs());
     if (!paused) {
       this.fireSlimeReveal();
@@ -3668,6 +3947,7 @@ class Game {
       this.lastFps = fps;
       this.fpsFrames = 0;
       this.fpsLastTime = now;
+      this.devPanel?.refresh();
     }
 
     requestAnimationFrame(() => this.gameLoop());

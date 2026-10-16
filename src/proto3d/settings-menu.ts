@@ -17,6 +17,10 @@ export class SettingsMenu {
   private voxelOffBtn: HTMLButtonElement | null = null;
   private voxelLabelEl: HTMLElement | null = null;
   private voxelHintEl: HTMLElement | null = null;
+  private labOnBtn: HTMLButtonElement | null = null;
+  private labOffBtn: HTMLButtonElement | null = null;
+  private labLabelEl: HTMLElement | null = null;
+  private labHintEl: HTMLElement | null = null;
   private closeBtn: HTMLButtonElement | null = null;
   private story: StoryText;
   private getLayout: () => LayoutMode;
@@ -24,6 +28,8 @@ export class SettingsMenu {
   private playUi: (name: string) => void;
   private getVoxel: () => boolean;
   private setVoxel: (on: boolean) => void;
+  private getLabLight: () => boolean;
+  private setLabLight: (on: boolean) => void;
 
   constructor(
     story: StoryText,
@@ -33,6 +39,8 @@ export class SettingsMenu {
       playUi: (name: string) => void;
       getVoxel?: () => boolean;
       setVoxel?: (on: boolean) => void;
+      getLabLight?: () => boolean;
+      setLabLight?: (on: boolean) => void;
     }
   ) {
     this.story = story;
@@ -41,6 +49,8 @@ export class SettingsMenu {
     this.playUi = hooks.playUi;
     this.getVoxel = hooks.getVoxel ?? (() => false);
     this.setVoxel = hooks.setVoxel ?? (() => {});
+    this.getLabLight = hooks.getLabLight ?? (() => false);
+    this.setLabLight = hooks.setLabLight ?? (() => {});
   }
 
   mount() {
@@ -54,6 +64,10 @@ export class SettingsMenu {
     this.voxelOffBtn = document.getElementById('btn-voxel-off') as HTMLButtonElement | null;
     this.voxelLabelEl = document.getElementById('settings-voxel-label');
     this.voxelHintEl = document.getElementById('settings-voxel-hint');
+    this.labOnBtn = document.getElementById('btn-lab-light-on') as HTMLButtonElement | null;
+    this.labOffBtn = document.getElementById('btn-lab-light-off') as HTMLButtonElement | null;
+    this.labLabelEl = document.getElementById('settings-lab-light-label');
+    this.labHintEl = document.getElementById('settings-lab-light-hint');
     this.closeBtn = document.getElementById('btn-settings-close') as HTMLButtonElement | null;
     if (!this.host || this.host.dataset.bound) return;
     this.host.dataset.bound = '1';
@@ -76,6 +90,16 @@ export class SettingsMenu {
       e.preventDefault();
       e.stopPropagation();
       this.chooseVoxel(false);
+    });
+    this.labOnBtn?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.chooseLabLight(true);
+    });
+    this.labOffBtn?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.chooseLabLight(false);
     });
     this.closeBtn?.addEventListener('click', (e) => {
       e.preventDefault();
@@ -110,6 +134,14 @@ export class SettingsMenu {
     }
     if (this.voxelOnBtn) this.voxelOnBtn.textContent = this.story.uiText('settings.on') || 'On';
     if (this.voxelOffBtn) this.voxelOffBtn.textContent = this.story.uiText('settings.off') || 'Off';
+    if (this.labLabelEl) this.labLabelEl.textContent = this.story.uiText('settings.lab_light') || 'Lighting';
+    if (this.labHintEl) {
+      this.labHintEl.textContent =
+        this.story.uiText('settings.lab_light_hint') ||
+        'Lab: warm pools, glossy stone. Classic: the painted look.';
+    }
+    if (this.labOnBtn) this.labOnBtn.textContent = this.story.uiText('settings.lab_light_lab') || 'Lab';
+    if (this.labOffBtn) this.labOffBtn.textContent = this.story.uiText('settings.lab_light_classic') || 'Classic';
     this.refreshChoice();
   }
 
@@ -124,6 +156,18 @@ export class SettingsMenu {
     this.voxelOffBtn?.classList.toggle('selected', !voxel);
     this.voxelOnBtn?.setAttribute('aria-pressed', voxel ? 'true' : 'false');
     this.voxelOffBtn?.setAttribute('aria-pressed', voxel ? 'false' : 'true');
+    const lab = this.getLabLight();
+    this.labOnBtn?.classList.toggle('selected', lab);
+    this.labOffBtn?.classList.toggle('selected', !lab);
+    this.labOnBtn?.setAttribute('aria-pressed', lab ? 'true' : 'false');
+    this.labOffBtn?.setAttribute('aria-pressed', lab ? 'false' : 'true');
+  }
+
+  private chooseLabLight(on: boolean) {
+    if (this.getLabLight() === on) return;
+    this.playUi('ui_button');
+    this.setLabLight(on);
+    this.refreshChoice();
   }
 
   private chooseVoxel(on: boolean) {

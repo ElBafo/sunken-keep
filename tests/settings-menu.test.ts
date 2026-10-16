@@ -82,13 +82,21 @@ function stubDom() {
   add('settings-layout-hint');
   add('btn-layout-framed');
   add('btn-layout-edge');
+  add('settings-voxel-label');
+  add('settings-voxel-hint');
+  const voxelOn = add('btn-voxel-on');
+  const voxelOff = add('btn-voxel-off');
+  add('settings-lab-light-label');
+  add('settings-lab-light-hint');
+  const labOn = add('btn-lab-light-on');
+  const labOff = add('btn-lab-light-off');
   add('btn-settings-close');
   const menuBtn = add('btn-menu');
   vi.stubGlobal('document', {
     getElementById: (id: string) => nodes.get(id) ?? null,
     body: { classList: { add: () => {}, remove: () => {} } }
   });
-  return { overlay, menuBtn };
+  return { overlay, menuBtn, voxelOn, voxelOff, labOn, labOff };
 }
 
 function wireMenuButton(btn: FakeEl, onTap: () => void) {
@@ -150,5 +158,37 @@ describe('settings menu touch open', () => {
     menuBtn.dispatch('pointerup');
     menuBtn.dispatch('click');
     expect(menu.open).toBe(true);
+  });
+
+  it('toggles lighting Lab/Classic and 3D walls independently', () => {
+    const { labOn, labOff, voxelOn, voxelOff } = stubDom();
+    let voxel = false;
+    let lab = false;
+    const menu = new SettingsMenu({ uiText: (k) => k } as unknown as StoryText, {
+      getLayout: () => 'framed',
+      setLayout: () => {},
+      playUi: () => {},
+      getVoxel: () => voxel,
+      setVoxel: (on) => {
+        voxel = on;
+      },
+      getLabLight: () => lab,
+      setLabLight: (on) => {
+        lab = on;
+      }
+    });
+    menu.mount();
+    labOn.dispatch('click');
+    expect(lab, 'Lab lighting on').toBe(true);
+    expect(voxel).toBe(false);
+    voxelOn.dispatch('click');
+    expect(lab, 'lighting stays Lab').toBe(true);
+    expect(voxel, '3D walls on').toBe(true);
+    labOff.dispatch('click');
+    expect(lab, 'Classic lighting').toBe(false);
+    expect(voxel, '3D walls stay on').toBe(true);
+    voxelOff.dispatch('click');
+    expect(lab).toBe(false);
+    expect(voxel).toBe(false);
   });
 });

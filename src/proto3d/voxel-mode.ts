@@ -52,16 +52,23 @@ export class VoxelMode {
   triangles = 0;
   voxelMeshes = 0;
 
+  private decorateVoxel?: (mesh: THREE.Mesh, mat: THREE.MeshBasicMaterial) => void;
+  private ownsSpriteTint: () => boolean;
+
   constructor(opts: {
     scene: THREE.Scene;
     lighting: VertexLightingManager;
     sprites: SpriteManager;
     renderer: THREE.WebGLRenderer;
+    decorateVoxel?: (mesh: THREE.Mesh, mat: THREE.MeshBasicMaterial) => void;
+    ownsSpriteTint?: () => boolean;
   }) {
     this.scene = opts.scene;
     this.lighting = opts.lighting;
     this.sprites = opts.sprites;
     this.renderer = opts.renderer;
+    this.decorateVoxel = opts.decorateVoxel;
+    this.ownsSpriteTint = opts.ownsSpriteTint ?? (() => true);
     this.group.name = 'voxel-mode';
   }
 
@@ -72,13 +79,13 @@ export class VoxelMode {
     this.scene.add(this.group);
     this.collect();
     this.stream();
-    this.tintSprites(true);
+    if (this.ownsSpriteTint()) this.tintSprites(true);
   }
 
   disable(): void {
     if (!this.enabled) return;
     this.enabled = false;
-    this.tintSprites(false);
+    if (this.ownsSpriteTint()) this.tintSprites(false);
     this.clearVoxels();
     this.entries = [];
     this.active.clear();
@@ -95,7 +102,7 @@ export class VoxelMode {
     this.active.clear();
     this.collect();
     this.stream();
-    this.tintSprites(true);
+    if (this.ownsSpriteTint()) this.tintSprites(true);
   }
 
   setParty(x: number, y: number): void {
@@ -106,6 +113,7 @@ export class VoxelMode {
 
   syncLights(): void {
     if (!this.enabled) return;
+    if (!this.ownsSpriteTint()) return;
     this.tintSprites(true);
   }
 
@@ -224,7 +232,8 @@ export class VoxelMode {
       noPick: true
     };
     this.group.add(voxel);
-    this.lighting.registerVoxelMesh(voxel);
+    if (this.decorateVoxel) this.decorateVoxel(voxel, mat);
+    else this.lighting.registerVoxelMesh(voxel);
     entry.voxel = voxel;
   }
 
