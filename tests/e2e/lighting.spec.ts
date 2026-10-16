@@ -29,10 +29,13 @@ type Proto3d = {
   getPosition: () => { x: number; y: number; dir: number };
   torchStates: () => Array<{ x: number; y: number; face: string; lit: boolean; capped: boolean }>;
   tileBrightness: (x: number, y: number) => number;
+  sourceLight: (x: number, y: number) => number;
   regionStats: (x0: number, y0: number, x1: number, y1: number) => { luma: number; fogRatio: number; n: number };
   sprites: () => Array<{ item?: string; x: number; y: number; kind: string }>;
   getBag: () => Array<{ item: string; count: number }>;
   useBagSlot: (i: number) => void;
+  frameStats: () => { n: number; mean: number; p95: number };
+  columnLumas: (y0: number, y1: number) => number[];
 };
 
 test.use(devices['iPhone 15']);
@@ -598,3 +601,111 @@ test('proto3d lighting: screen luma of the 3D view', async ({ page }) => {
   expect(floor3Ratio, '?ambientFloor=3 ≤ 40% of torch-lit').toBeLessThanOrEqual(0.4);
   expect(relightGain, 'relighting a dead torch raises nearby view luma ≥ 50%').toBeGreaterThanOrEqual(1.5);
 });
+
+test('proto3d lighting: per-pixel lantern+torch, no wall dip, tile-light frozen', async ({ page }) => {
+  test.setTimeout(90000);
+  mkdirSync(OUT, { recursive: true });
+
+  await page.goto(`${BASE_URL}/proto3d.html?test=1&debug=1`);
+  await page.waitForFunction(
+    () => (window as unknown as { __proto3d?: { ready?: boolean } }).__proto3d?.ready === true,
+    null,
+    { timeout: 25000 }
+  );
+  await page.locator('#tap-to-start').click();
+  await page.waitForTimeout(400);
+
+  const tileLight = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    p.setOil(2);
+    p.setPosition(19, 5, 0);
+    return {
+      ambient: p.getAmbient(),
+      luma198: p.tileBrightness(19, 8),
+      source198: p.sourceLight(19, 8),
+      lairFrom195: p.isSquareLit(19, 7)
+    };
+  });
+  await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    p.setPosition(19, 6, 0);
+  });
+  const lairFrom196 = await page.evaluate(
+    () => (window as unknown as { __proto3d: Proto3d }).__proto3d.isSquareLit(19, 7)
+  );
+  console.log('TILE_LIGHT freeze', tileLight, 'lairFrom196', lairFrom196);
+  expect(tileLight.luma198, '(19,8) stays ambient').toBeCloseTo(0.05848, 4);
+  expect(tileLight.source198, '(19,8) gameplay sourceLight stays 0').toBe(0);
+  expect(tileLight.lairFrom195, 'lair unlit from (19,5)').toBe(false);
+  expect(lairFrom196, 'lair unlit from (19,6)').toBe(false);
+
+  const spots: Array<[number, number, number, string]> = [
+    [2, 1, 1, 'lighting_dip_2_1_east.png'],
+    [4, 5, 1, 'lighting_dip_4_5_east.png'],
+    [3, 5, 1, 'lighting_dip_3_5_east.png'],
+    [1, 4, 2, 'lighting_dip_1_4_south.png'],
+    [3, 2, 0, 'lighting_dip_3_2_north.png'],
+    [3, 3, 0, 'lighting_dip_3_3_north.png']
+  ];
+
+  for (const [x, y, dir, file] of spots) {
+    await page.evaluate(
+      ([px, py, pd]) => {
+        const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+        p.setPosition(px, py, pd);
+        p.setFlickerFrame(2);
+      },
+      [x, y, dir] as const
+    );
+    await page.waitForTimeout(120);
+    await page.screenshot({ path: `${OUT}/${file}`, fullPage: false });
+    console.log('SHOT', file);
+  }
+
+  // Mid-wall strip at (4,5) east: lantern near, torch down the pantry hall.
+  const strip = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    p.setPosition(4, 5, 1);
+    p.setFlickerFrame(2);
+    const canvas = document.getElementById('render-canvas') as HTMLCanvasElement;
+    const lumas = p.columnLumas(canvas.height * 0.32, canvas.height * 0.58);
+    const a = Math.floor(lumas.length * 0.12);
+    const b = Math.ceil(lumas.length * 0.88);
+    const mid = lumas.slice(a, b);
+    const smooth: number[] = [];
+    const r = 4;
+    for (let i = 0; i < mid.length; i++) {
+      let s = 0;
+      let n = 0;
+      for (let j = i - r; j <= i + r; j++) {
+        if (j >= 0 && j < mid.length) {
+          s += mid[j];
+          n++;
+        }
+      }
+      smooth.push(s / n);
+    }
+    let dip = 0;
+    for (let i = 1; i < smooth.length - 1; i++) {
+      const left = Math.max(...smooth.slice(0, i));
+      const right = Math.max(...smooth.slice(i + 1));
+      dip = Math.max(dip, Math.min(left, right) - smooth[i]);
+    }
+    return { dip, n: smooth.length, min: Math.min(...smooth), max: Math.max(...smooth) };
+  });
+  console.log('WALL STRIP (4,5) east', strip);
+  expect(strip.max, 'torch/lantern still light the wall').toBeGreaterThan(40);
+  expect(strip.dip, 'no dark valley between lantern and torch on screen').toBeLessThan(28);
+
+  await page.evaluate(() => {
+    (window as unknown as { __proto3d: Proto3d }).__proto3d.setPosition(4, 5, 1);
+  });
+  await page.waitForTimeout(1600);
+  const frames = await page.evaluate(
+    () => (window as unknown as { __proto3d: Proto3d }).__proto3d.frameStats()
+  );
+  console.log('FRAME_STATS (4,5) east', frames);
+  expect(frames.n, 'collected frame samples').toBeGreaterThan(20);
+  expect(frames.mean, 'phone-class frame time stays interactive').toBeLessThan(50);
+});
+

@@ -171,6 +171,8 @@ class Game {
   fpsFrames = 0;
   fpsLastTime = 0;
   lastFps = 0;
+  lastFrameMs = 0;
+  private frameSamples: number[] = [];
   private doorUnlockTimer = 0;
   private pendingUnlock: { x: number; y: number } | null = null;
   private flags = new Set<string>();
@@ -2859,6 +2861,46 @@ class Game {
         return sum / (w * h);
       },
       fps: () => this.lastFps,
+      frameMs: () => this.lastFrameMs,
+      frameStats: () => {
+        const s = this.frameSamples;
+        if (s.length === 0) return { n: 0, mean: 0, p95: 0 };
+        const sorted = [...s].sort((a, b) => a - b);
+        const sum = s.reduce((a, b) => a + b, 0);
+        return {
+          n: s.length,
+          mean: sum / s.length,
+          p95: sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.95))]
+        };
+      },
+      columnLumas: (y0: number, y1: number) => {
+        this.renderer.render();
+        const gl = this.renderer.renderer.getContext();
+        const w = this.renderer.canvas.width;
+        const h = this.renderer.canvas.height;
+        const pixels = new Uint8Array(w * h * 4);
+        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+        const yMin = Math.max(0, Math.floor(y0));
+        const yMax = Math.min(h, Math.ceil(y1));
+        const lumas = new Array<number>(w).fill(0);
+        const counts = new Array<number>(w).fill(0);
+        for (let y = yMin; y < yMax; y++) {
+          for (let x = 0; x < w; x++) {
+            const i = ((h - 1 - y) * w + x) * 4;
+            lumas[x] += (pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3;
+            counts[x] += 1;
+          }
+        }
+        return lumas.map((sum, x) => (counts[x] ? sum / counts[x] : 0));
+      },
+      sampleVertex: (
+        wx: number,
+        wy: number,
+        wz: number,
+        tileX: number,
+        tileY: number,
+        isWall = false
+      ) => this.vertexLighting.sampleVertex(wx, wy, wz, tileX, tileY, false, false, isWall),
       quality: () => this.quality,
       setQuality: (q: QualityLevel) => {
         this.quality = q;
@@ -3326,6 +3368,11 @@ class Game {
     const now = performance.now();
     const deltaTime = now - this.lastTime;
     this.lastTime = now;
+    this.lastFrameMs = deltaTime;
+    if (deltaTime > 0 && deltaTime < 1000) {
+      this.frameSamples.push(deltaTime);
+      if (this.frameSamples.length > 180) this.frameSamples.splice(0, this.frameSamples.length - 180);
+    }
     const dtSec = Math.min(0.05, deltaTime / 1000);
     this.bubble?.update(now);
     this.flushBarks(now);

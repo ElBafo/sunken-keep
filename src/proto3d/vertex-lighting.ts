@@ -30,12 +30,24 @@ import {
 } from './constants';
 import { DressingMark } from './dressing';
 import { isLightPassable, LightReach, partyReach, reachAt, sconceOrigin, sconceReach } from './light-grid';
+import {
+  createSurfaceLightLocal,
+  createSurfaceLightShared,
+  FLOOR_DISK_Y,
+  isSurfaceLitKind,
+  NONFLOOR_HEIGHT_PENALTY,
+  patchSurfaceLightMaterial,
+  SURFACE_MAX_SUNBEAMS,
+  SURFACE_MAX_TORCHES,
+  SurfaceLightLocal,
+  SurfaceLightShared
+} from './surface-light';
 import { FloorData, Sconce } from './types';
 
 interface CachedFace {
   mesh: THREE.Mesh;
   worldPos: Float32Array;
-  colors: THREE.BufferAttribute;
+  colors: THREE.BufferAttribute | null;
   isDark: boolean;
   isProp: boolean;
   isWall: boolean;
@@ -43,6 +55,7 @@ interface CachedFace {
   tileX: number;
   tileY: number;
   lightGround: boolean;
+  surface?: SurfaceLightLocal;
 }
 
 /** Walls, doors, and ceilings share the soft lantern pool (not the floor disk). */
@@ -124,9 +137,9 @@ export function partyDistTiles(
   // wall quads dip below y 0.28, and treating those verts as floor punched a
   // party-centered dark oval into the mid-wall that slid when strafing.
   if (opts?.prop || opts?.wall) return d;
-  // Floor disk: 2D reach. Untagged non-floor verts keep the +0.55 penalty.
-  if (wy < 0.28) return horiz;
-  return d + 0.55;
+  // Floor disk: 2D reach. Untagged non-floor verts keep the height penalty.
+  if (wy < FLOOR_DISK_Y) return horiz;
+  return d + NONFLOOR_HEIGHT_PENALTY;
 }
 
 function parseBright(value: number): number {
@@ -150,6 +163,7 @@ export class VertexLightingManager {
   private bright = 1;
   private oilFn: () => number = () => 1;
   private carriedTorch = false;
+  private shared: SurfaceLightShared = createSurfaceLightShared();
 
   constructor(
     floorData: FloorData,
@@ -239,6 +253,38 @@ export class VertexLightingManager {
 
       obj.updateWorldMatrix(true, false);
       const geometry = obj.geometry;
+      const { tileX, tileY } = this.lightTileOf(obj);
+      const tile = this.floorData.tiles[tileY]?.[tileX];
+      const isDark = tile?.floorNDark || false;
+      const isWall = isWallLike(obj.userData.kind);
+      const lightGround = !!obj.userData.lightGround || !!obj.userData.rubble;
+      const surfaceKind = isSurfaceLitKind(obj.userData.kind);
+
+      if (surfaceKind && obj.material instanceof THREE.MeshBasicMaterial) {
+        const local =
+          (obj.material.userData.surfaceLightLocal as SurfaceLightLocal | undefined) ??
+          createSurfaceLightLocal();
+        local.uIsWall.value = isWall ? 1 : 0;
+        local.uIsDark.value = isDark ? 1 : 0;
+        local.uLightGround.value = lightGround ? 1 : 0;
+        local.uGroundPos.value.set(tileX * CELL_SIZE, 0.08, tileY * CELL_SIZE);
+        patchSurfaceLightMaterial(obj.material, this.shared, local);
+        this.faces.push({
+          mesh: obj,
+          worldPos: new Float32Array(0),
+          colors: null,
+          isDark,
+          isProp: false,
+          isWall,
+          nearSconce: this.nearAnySconce(tileX, tileY, radiusTiles),
+          tileX,
+          tileY,
+          lightGround,
+          surface: local
+        });
+        return;
+      }
+
       if (!geometry.attributes.color) {
         const colors = new Float32Array(geometry.attributes.position.count * 3);
         geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
@@ -263,21 +309,17 @@ export class VertexLightingManager {
         worldPos[i * 3 + 2] = v.z;
       }
 
-      const { tileX, tileY } = this.lightTileOf(obj);
-      const tile = this.floorData.tiles[tileY]?.[tileX];
-      const isDark = tile?.floorNDark || false;
-
       this.faces.push({
         mesh: obj,
         worldPos,
         colors: geometry.attributes.color as THREE.BufferAttribute,
         isDark,
         isProp: !!obj.userData.lanternProp,
-        isWall: isWallLike(obj.userData.kind),
+        isWall,
         nearSconce: this.nearAnySconce(tileX, tileY, radiusTiles),
         tileX,
         tileY,
-        lightGround: !!obj.userData.lightGround || !!obj.userData.rubble
+        lightGround
       });
     });
   }
@@ -511,7 +553,12 @@ export class VertexLightingManager {
   }
 
   private bakeFace(face: CachedFace, flick: number) {
+    if (face.surface) {
+      this.syncSurfaceFace(face);
+      return;
+    }
     const { worldPos, colors } = face;
+    if (!colors) return;
     const n = colors.count;
     const groundX = face.tileX * CELL_SIZE;
     const groundZ = face.tileY * CELL_SIZE;
@@ -532,8 +579,50 @@ export class VertexLightingManager {
     colors.needsUpdate = true;
   }
 
+  private syncSharedUniforms() {
+    const ambient = this.floorAmbient();
+    this.shared.uAmbientRgb.value.set(
+      ambient * AMBIENT_RGB[0],
+      ambient * AMBIENT_RGB[1],
+      ambient * AMBIENT_RGB[2]
+    );
+    this.shared.uBright.value = this.bright;
+    this.shared.uFlicker.value = this.flicker;
+    this.shared.uPartyX.value = this.partyX;
+    this.shared.uPartyY.value = this.partyY;
+    this.shared.uOil.value = this.oilFn() > 0 ? 1 : 0;
+    const lantern = this.lanternSpec();
+    this.shared.uLanternRgb.value.set(lantern.rgb[0], lantern.rgb[1], lantern.rgb[2]);
+    this.shared.uLanternIntensity.value = lantern.intensity;
+    this.shared.uLanternRadius.value = lantern.radius;
+    this.shared.uCarriedTorch.value = this.carriedTorch ? 1 : 0;
+    const beamN = Math.min(SURFACE_MAX_SUNBEAMS, this.sunbeams.length);
+    this.shared.uSunbeamCount.value = beamN;
+    for (let i = 0; i < beamN; i++) {
+      this.shared.uSunbeamPos.value[i].set(this.sunbeams[i].x, this.sunbeams[i].y);
+    }
+  }
+
+  private syncSurfaceFace(face: CachedFace) {
+    const local = face.surface;
+    if (!local) return;
+    local.uPartyReach.value = reachAt(this.partyCells, face.tileX, face.tileY) !== undefined ? 1 : 0;
+    local.uIsDark.value = face.isDark ? 1 : 0;
+    let n = 0;
+    if (!face.isDark) {
+      for (const s of this.sconceWorld) {
+        if (reachAt(s.reach, face.tileX, face.tileY) === undefined) continue;
+        local.uTorchPos.value[n].set(s.x, s.y, s.z);
+        n += 1;
+        if (n >= SURFACE_MAX_TORCHES) break;
+      }
+    }
+    local.uTorchCount.value = n;
+  }
+
   updateAllMeshes(_scene?: THREE.Scene) {
     this.rebuildPartyReach();
+    this.syncSharedUniforms();
     for (const face of this.faces) {
       this.bakeFace(face, this.flicker);
     }
@@ -546,8 +635,10 @@ export class VertexLightingManager {
     if (wrapped === this.flickerFrame && next === this.flicker) return;
     this.flickerFrame = wrapped;
     this.flicker = next;
+    this.shared.uFlicker.value = next;
     for (const face of this.faces) {
-      if (face.nearSconce) this.bakeFace(face, this.flicker);
+      if (face.surface || !face.nearSconce) continue;
+      this.bakeFace(face, this.flicker);
     }
   }
 
@@ -558,8 +649,10 @@ export class VertexLightingManager {
     const q = Math.round(next * 200) / 200;
     if (q === this.flicker) return;
     this.flicker = q;
+    this.shared.uFlicker.value = q;
     for (const face of this.faces) {
-      if (face.nearSconce) this.bakeFace(face, this.flicker);
+      if (face.surface || !face.nearSconce) continue;
+      this.bakeFace(face, this.flicker);
     }
   }
 }
