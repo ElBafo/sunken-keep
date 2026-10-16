@@ -57,8 +57,34 @@
     #toggles {
       margin-left: auto;
       display: flex;
+      flex-wrap: wrap;
+      justify-content: flex-end;
       gap: 8px;
       pointer-events: auto;
+    }
+    #look {
+      pointer-events: auto;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+      background: rgba(0, 0, 0, 0.82);
+      padding: 8px 10px;
+      border-radius: 8px;
+    }
+    #look label {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      color: #e8d8a0;
+    }
+    #slider-warmth {
+      width: 150px;
+      height: 44px;
+      accent-color: #e8d8a0;
+      cursor: pointer;
     }
     #move {
       position: fixed;
@@ -132,6 +158,12 @@
       <button id="btn-shadows" class="lab" type="button" aria-pressed="true">Shadows on</button>
       <button id="btn-lantern" class="lab" type="button" aria-pressed="true">Lantern on</button>
       <button id="btn-mode" class="lab" type="button" aria-pressed="true">Voxels</button>
+      <button id="btn-match" class="lab" type="button" aria-pressed="false">Match game</button>
+      <div id="look">
+        <label for="slider-warmth">Light warmth
+          <input id="slider-warmth" type="range" min="0" max="100" value="100" step="1" />
+        </label>
+      </div>
     </div>
   </div>
   <div id="hint">Drag to look · step / turn with the arrows · tap Pell’s lamp</div>

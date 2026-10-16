@@ -50,6 +50,8 @@ test('voxel-lab turn buttons and visible shadow toggle', async ({ page }) => {
   expect(rightBox!.width).toBeGreaterThanOrEqual(44);
 
   await expect(page.locator('#stats')).toContainText('fps');
+  await expect(page.locator('#btn-match')).toHaveText('Match game');
+  await expect(page.locator('#slider-warmth')).toBeVisible();
 
   const onState = await page.evaluate(() => {
     const lab = (window as unknown as { __voxelLab: Lab }).__voxelLab;
