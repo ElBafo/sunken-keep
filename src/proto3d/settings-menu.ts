@@ -103,9 +103,10 @@ export class SettingsMenu {
     if (this.closeBtn) {
       this.closeBtn.textContent = this.story.uiText('buttons.resume') || this.story.uiText('journal.close') || 'Close';
     }
-    if (this.voxelLabelEl) this.voxelLabelEl.textContent = this.story.uiText('settings.voxel') || 'Voxels';
+    if (this.voxelLabelEl) this.voxelLabelEl.textContent = this.story.uiText('settings.voxel') || '3D walls';
     if (this.voxelHintEl) {
-      this.voxelHintEl.textContent = this.story.uiText('settings.voxel_hint') || 'Near walls as cubes. Prototype.';
+      this.voxelHintEl.textContent =
+        this.story.uiText('settings.voxel_hint') || 'Stone you can almost touch. Phone may sweat.';
     }
     if (this.voxelOnBtn) this.voxelOnBtn.textContent = this.story.uiText('settings.on') || 'On';
     if (this.voxelOffBtn) this.voxelOffBtn.textContent = this.story.uiText('settings.off') || 'Off';

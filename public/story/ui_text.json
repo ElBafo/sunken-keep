@@ -298,8 +298,8 @@
    "layout_framed": "Framed",
    "layout_edge": "Edge",
    "layout_hint": "Prototype. Saved on this phone.",
-   "voxel": "Voxels",
-   "voxel_hint": "Near walls as cubes. Prototype."
+   "voxel": "3D walls",
+   "voxel_hint": "Stone you can almost touch. Phone may sweat."
   },
   "tap_to_start": "Tap to start"
  },

@@ -152,6 +152,8 @@ export class VertexLightingManager {
   private partyX = 0;
   private partyY = 0;
   private faces: CachedFace[] = [];
+  /** Voxel wall clones. Survives registerScene() so cubes keep the painted bake. */
+  private voxelFaces: CachedFace[] = [];
   private sconceWorld: SconceWorld[] = [];
   private partyCells: LightReach = new Map();
   private sunbeams: DressingMark[] = [];
@@ -201,7 +203,7 @@ export class VertexLightingManager {
 
   setLightDebug(mode: LightDebugMode) {
     this.lightDebug = parseLightDebugMode(mode) ?? mode;
-    for (const face of this.faces) this.bakeFace(face, this.flicker);
+    this.eachFace((face) => this.bakeFace(face, this.flicker));
   }
 
   getLightDebug(): LightDebugMode {
@@ -225,16 +227,21 @@ export class VertexLightingManager {
     this.sunbeams = sunbeams;
   }
 
+  private eachFace(fn: (face: CachedFace) => void): void {
+    for (const face of this.faces) fn(face);
+    for (const face of this.voxelFaces) fn(face);
+  }
+
   /** Call after a torch lights or goes out so pools and flicker sets stay in sync. */
   relight() {
     this.rebuildSconceWorld();
     const radiusTiles = SCONCE_RADIUS_TILES + 1;
-    for (const face of this.faces) {
+    this.eachFace((face) => {
       const { tileX, tileY } = this.lightTileOf(face.mesh);
       face.tileX = tileX;
       face.tileY = tileY;
       face.nearSconce = this.nearAnySconce(tileX, tileY, radiusTiles);
-    }
+    });
     this.updateAllMeshes();
   }
 
@@ -304,6 +311,65 @@ export class VertexLightingManager {
         lightGround
       });
     });
+  }
+
+  /**
+   * Bake a voxel wall with the same shadeVertex as the painted plane.
+   * Local Z is projected to 0 so relief cubes take the original wall's
+   * brightness and warmth — no extra voxel light.
+   */
+  registerVoxelMesh(mesh: THREE.Mesh): void {
+    this.unregisterVoxelMesh(mesh);
+    mesh.updateWorldMatrix(true, false);
+    const geometry = mesh.geometry;
+    if (!geometry?.attributes.position) return;
+    const pos = geometry.attributes.position;
+    if (!geometry.attributes.color) {
+      geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(pos.count * 3), 3));
+    }
+    const mat = mesh.material;
+    const mats = Array.isArray(mat) ? mat : [mat];
+    for (const m of mats) {
+      if (
+        m instanceof THREE.MeshBasicMaterial ||
+        m instanceof THREE.MeshLambertMaterial ||
+        m instanceof THREE.MeshStandardMaterial
+      ) {
+        m.vertexColors = true;
+        m.needsUpdate = true;
+      }
+    }
+    const worldPos = new Float32Array(pos.count * 3);
+    const v = this.scratch;
+    for (let i = 0; i < pos.count; i++) {
+      v.fromBufferAttribute(pos, i);
+      v.z = 0;
+      v.applyMatrix4(mesh.matrixWorld);
+      worldPos[i * 3] = v.x;
+      worldPos[i * 3 + 1] = v.y;
+      worldPos[i * 3 + 2] = v.z;
+    }
+    const { tileX, tileY } = this.lightTileOf(mesh);
+    const tile = this.floorData.tiles[tileY]?.[tileX];
+    const radiusTiles = SCONCE_RADIUS_TILES + 1;
+    const face: CachedFace = {
+      mesh,
+      worldPos,
+      colors: geometry.attributes.color as THREE.BufferAttribute,
+      isDark: !!tile?.floorNDark,
+      isProp: !!mesh.userData.lanternProp,
+      isWall: isWallLike(mesh.userData.kind),
+      nearSconce: this.nearAnySconce(tileX, tileY, radiusTiles),
+      tileX,
+      tileY,
+      lightGround: !!mesh.userData.lightGround || !!mesh.userData.rubble
+    };
+    this.voxelFaces.push(face);
+    this.bakeFace(face, this.flicker);
+  }
+
+  unregisterVoxelMesh(mesh: THREE.Mesh): void {
+    this.voxelFaces = this.voxelFaces.filter((face) => face.mesh !== mesh);
   }
 
   private rebuildSconceWorld() {
@@ -640,9 +706,7 @@ export class VertexLightingManager {
 
   updateAllMeshes(_scene?: THREE.Scene) {
     this.rebuildPartyReach();
-    for (const face of this.faces) {
-      this.bakeFace(face, this.flicker);
-    }
+    this.eachFace((face) => this.bakeFace(face, this.flicker));
   }
 
   /** Pin a flame-frame multiplier for e2e measurement. */
@@ -652,10 +716,10 @@ export class VertexLightingManager {
     if (wrapped === this.flickerFrame && next === this.flicker) return;
     this.flickerFrame = wrapped;
     this.flicker = next;
-    for (const face of this.faces) {
-      if (!face.nearSconce) continue;
+    this.eachFace((face) => {
+      if (!face.nearSconce) return;
       this.bakeFace(face, this.flicker);
-    }
+    });
   }
 
   /** Slow ±3% sine on torch warmth; skip if the quantized value has not moved. */
@@ -665,9 +729,9 @@ export class VertexLightingManager {
     const q = Math.round(next * 200) / 200;
     if (q === this.flicker) return;
     this.flicker = q;
-    for (const face of this.faces) {
-      if (!face.nearSconce) continue;
+    this.eachFace((face) => {
+      if (!face.nearSconce) return;
       this.bakeFace(face, this.flicker);
-    }
+    });
   }
 }

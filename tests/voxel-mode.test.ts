@@ -4,13 +4,17 @@ import { resolve } from 'path';
 import { DEPTH_LAYERS, FACE_INSET, LAYER_SIZE } from '../src/voxel-lab/constants';
 import { greedyMesh } from '../src/voxel-lab/mesher';
 import { volumeFromImageData } from '../src/voxel-lab/classify';
-import { CELL_SIZE, SUNBEAM_INTENSITY, WALL_BOTTOM, WALL_TOP } from '../src/proto3d/constants';
+import { CELL_SIZE, WALL_BOTTOM, WALL_TOP } from '../src/proto3d/constants';
 import { floor1, floor1Sconces } from '../src/proto3d/floor-data';
 import { VertexLightingManager } from '../src/proto3d/vertex-lighting';
-import { VOXEL_SUNBEAM_INTENSITY, SURFACE_LIGHT_GLSL } from '../src/proto3d/surface-light';
 import {
+  GAME_DEPTH_LAYERS,
+  GAME_LAYER_SIZE,
   MAX_RELIEF,
+  VOXEL_MAX_AXIS,
   VOXEL_PLANE_INSET,
+  collapseDepth,
+  downsampleImageData,
   reliefStaysInSolid,
   voxelInwardSign,
   voxelLocalPos
@@ -34,14 +38,14 @@ describe('voxel opt-in', () => {
     expect(voxelFromSearch(new URLSearchParams('voxel=true'))).toBe(true);
   });
 
-  it('builds ahead at 4 and holds until 5 so a step does not pop', () => {
-    expect(VOXEL_ENTER_CHEB).toBe(4);
-    expect(VOXEL_LEAVE_CHEB).toBe(5);
-    expect(voxelLodWants(4, false)).toBe(true);
-    expect(voxelLodWants(5, false)).toBe(false);
-    expect(voxelLodWants(5, true)).toBe(true);
-    expect(voxelLodWants(6, true)).toBe(false);
-    expect(chebyshev(3, 14, 3, 10)).toBe(4);
+  it('builds ahead at 3 and holds until 4 so a step does not pop', () => {
+    expect(VOXEL_ENTER_CHEB).toBe(3);
+    expect(VOXEL_LEAVE_CHEB).toBe(4);
+    expect(voxelLodWants(3, false)).toBe(true);
+    expect(voxelLodWants(4, false)).toBe(false);
+    expect(voxelLodWants(4, true)).toBe(true);
+    expect(voxelLodWants(5, true)).toBe(false);
+    expect(chebyshev(3, 14, 3, 11)).toBe(3);
     expect(surfaceChebyshev(3, 14, 2, 14, 3, 14)).toBe(0);
   });
 
@@ -69,8 +73,9 @@ describe('voxel relief stays in the wall square', () => {
     const front = voxelLocalPos(0, 0, 0, 8, 8, CELL_SIZE, WALL_TOP - WALL_BOTTOM, 1);
     expect(front[2]).toBeCloseTo(VOXEL_PLANE_INSET, 6);
     expect(front[2]).toBeGreaterThan(0);
-    const back = voxelLocalPos(0, 0, DEPTH_LAYERS, 8, 8, CELL_SIZE, WALL_TOP - WALL_BOTTOM, 1);
+    const back = voxelLocalPos(0, 0, GAME_DEPTH_LAYERS, 8, 8, CELL_SIZE, WALL_TOP - WALL_BOTTOM, 1);
     expect(back[2]).toBeLessThan(CELL_SIZE / 2);
+    expect(back[2]).toBeCloseTo(GAME_DEPTH_LAYERS * GAME_LAYER_SIZE + VOXEL_PLANE_INSET, 6);
   });
 
   it('greedy wall mesh never crosses the original plane into a walkable square', () => {
@@ -141,16 +146,39 @@ describe('voxel lighting keeps gameplay rules', () => {
     expect((lair[0] + lair[1] + lair[2]) / 3).toBeCloseTo(lighting.ambientBrightness(), 2);
   });
 
-  it('crack shafts use 3D falloff from the ceiling in the voxel shader', () => {
-    expect(SURFACE_LIGHT_GLSL).toContain('surfSunbeamDist');
-    expect(SURFACE_LIGHT_GLSL).toContain('uSunbeam3D');
-    expect(VOXEL_SUNBEAM_INTENSITY).toBeCloseTo(SUNBEAM_INTENSITY * 2.15, 5);
+  it('voxel walls use the painted vertex bake, not a separate light', () => {
     const src = readFileSync(resolve(__dirname, '../src/proto3d/voxel-mode.ts'), 'utf8');
-    expect(src).toContain('uSunbeam3D.value = 1');
-    expect(src).toContain('VOXEL_SUNBEAM_INTENSITY');
-    const look = readFileSync(resolve(__dirname, '../src/proto3d/voxel-surface.ts'), 'utf8');
-    expect(look).toContain('applyVoxelLook(albedo, vSurfWorldPos, vMapUv)');
-    expect(look).toContain('vec3 applyVoxelLook(vec3 albedo, vec3 worldPos, vec2 uv)');
+    expect(src).not.toContain('setPalette(false)');
+    expect(src).not.toContain('VOXEL_SUNBEAM_INTENSITY');
+    expect(src).not.toContain('uSunbeam3D');
+    expect(src).not.toContain('patchVoxelLookMaterial');
+    expect(src).toContain('registerVoxelMesh');
+    expect(src).toContain('tintSprites');
+    expect(src).not.toContain("raw.startsWith('door')) return 'wall'");
+    const lighting = readFileSync(resolve(__dirname, '../src/proto3d/vertex-lighting.ts'), 'utf8');
+    expect(lighting).toContain('registerVoxelMesh');
+    expect(lighting).toContain('v.z = 0');
+    const debug = readFileSync(resolve(__dirname, '../src/proto3d/main.ts'), 'utf8');
+    expect(debug).not.toMatch(/setPaletteEnabled\([\s\S]*!this\.voxel\?\.enabled/);
+  });
+});
+
+describe('voxel occupancy is downsampled for the game', () => {
+  it('caps axis and depth below the lab volume', () => {
+    expect(VOXEL_MAX_AXIS).toBe(32);
+    expect(GAME_DEPTH_LAYERS).toBeLessThan(DEPTH_LAYERS);
+    expect(GAME_LAYER_SIZE).toBeLessThan(LAYER_SIZE);
+    const src = {
+      width: 64,
+      height: 64,
+      data: new Uint8ClampedArray(64 * 64 * 4).fill(128)
+    };
+    const down = downsampleImageData(src);
+    expect(down.width).toBeLessThanOrEqual(VOXEL_MAX_AXIS);
+    expect(down.height).toBeLessThanOrEqual(VOXEL_MAX_AXIS);
+    const volume = new Uint8Array(8 * 8 * 3).fill(1);
+    const collapsed = collapseDepth(volume, [8, 8, 3], GAME_DEPTH_LAYERS);
+    expect(collapsed.dims[2]).toBe(GAME_DEPTH_LAYERS);
   });
 });
 
@@ -173,5 +201,18 @@ describe('voxel mode keeps raycasts on original planes', () => {
     expect(proto).not.toContain('src/voxel-lab');
     expect(index).not.toContain('voxel-lab.html');
     expect(index).not.toContain('src/voxel-lab');
+    expect(proto).toContain('3D walls');
+    expect(index).toContain('Stone you can almost touch. Phone may sweat.');
+  });
+
+  it('uses 3D walls labels and the phone-may-sweat hint', () => {
+    const en = JSON.parse(readFileSync(resolve(__dirname, '../public/story/ui_text.json'), 'utf8'));
+    const el = JSON.parse(readFileSync(resolve(__dirname, '../public/story/el/ui_text.el.json'), 'utf8'));
+    expect(en.step4_title_saves.settings.voxel).toBe('3D walls');
+    expect(en.step4_title_saves.settings.voxel_hint).toBe('Stone you can almost touch. Phone may sweat.');
+    expect(el.step4_title_saves.settings.voxel).toBe('3D τοίχοι');
+    expect(el.step4_title_saves.settings.voxel_hint).toBe('Πέτρα που σχεδόν την αγγίζεις. Το κινητό ίσως ιδρώσει.');
+    expect(el.step4_title_saves.settings.on).toBe('Ναι');
+    expect(el.step4_title_saves.settings.off).toBe('Όχι');
   });
 });

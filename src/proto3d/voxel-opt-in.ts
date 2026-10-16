@@ -1,9 +1,9 @@
 /** Opt-in voxel walls. Tiny, always imported — default path must not load the lab page. */
 
 /** Build voxel geometry at this Chebyshev distance (build-ahead). */
-export const VOXEL_ENTER_CHEB = 4;
+export const VOXEL_ENTER_CHEB = 3;
 /** Keep voxels until the party is this far (hysteresis so stepping does not pop). */
-export const VOXEL_LEAVE_CHEB = 5;
+export const VOXEL_LEAVE_CHEB = 4;
 
 export function voxelFromSearch(params: URLSearchParams): boolean {
   const v = params.get('voxel');

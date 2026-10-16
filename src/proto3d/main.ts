@@ -600,10 +600,7 @@ class Game {
         scene: this.renderer.scene,
         lighting: this.vertexLighting,
         sprites: this.spriteManager,
-        floorData: floor1,
-        renderer: this.renderer.renderer,
-        getPalette: () => this.renderer.paletteEnabled,
-        setPalette: (on) => this.renderer.setPaletteEnabled(on)
+        renderer: this.renderer.renderer
       });
     }
     this.voxel.setParty(this.player.x, this.player.y);
@@ -2144,6 +2141,7 @@ class Game {
       this.sceneBuilder.setDustBurst(this.renderer.scene, x, y, null);
       this.vertexLighting?.registerScene(this.renderer.scene);
       this.vertexLighting?.relight();
+      this.voxel?.refresh();
     }
   }
 
@@ -2154,6 +2152,7 @@ class Game {
     this.vertexLighting.registerScene(this.renderer.scene);
     this.vertexLighting.relight();
     this.vertexLighting.updateAllMeshes(this.renderer.scene);
+    this.voxel?.refresh();
   }
 
   private syncCaveInWorld() {
@@ -2859,6 +2858,9 @@ class Game {
         const yMin = Math.max(0, Math.floor(y0));
         const yMax = Math.min(h, Math.ceil(y1));
         let sum = 0;
+        let sumR = 0;
+        let sumG = 0;
+        let sumB = 0;
         let fog = 0;
         let n = 0;
         for (let y = yMin; y < yMax; y++) {
@@ -2868,11 +2870,21 @@ class Game {
             const g = pixels[i + 1];
             const b = pixels[i + 2];
             sum += (r + g + b) / 3;
+            sumR += r;
+            sumG += g;
+            sumB += b;
             if (r < 14 && g < 14 && b < 14) fog++;
             n++;
           }
         }
-        return { luma: n ? sum / n : 0, fogRatio: n ? fog / n : 0, n };
+        return {
+          luma: n ? sum / n : 0,
+          fogRatio: n ? fog / n : 0,
+          n,
+          r: n ? sumR / n : 0,
+          g: n ? sumG / n : 0,
+          b: n ? sumB / n : 0
+        };
       },
       /** Painted-texel contrast in a screen box. Mortar/brick ratio stays if light only multiplies. */
       regionContrast: (x0: number, y0: number, x1: number, y1: number) => {
@@ -3530,10 +3542,7 @@ class Game {
       this.atmosphere.applyFog(scene, this.renderer.renderer);
     }
     this.renderer.setPaletteEnabled(
-      resolved !== 'nopalette' &&
-        resolved !== 'albedo' &&
-        resolved !== 'lighting' &&
-        !this.voxel?.enabled
+      resolved !== 'nopalette' && resolved !== 'albedo' && resolved !== 'lighting'
     );
     const wantMips = resolved !== 'nomip';
     const hideMaps = resolved === 'lighting';

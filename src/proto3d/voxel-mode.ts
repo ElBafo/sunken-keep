@@ -1,17 +1,7 @@
 import * as THREE from 'three';
-import { isSurfaceLitKind, VOXEL_SUNBEAM_INTENSITY, type SurfaceLightLocal } from './surface-light';
-import { floorFlipX, floorQuarterTurns } from './texture-variants';
-import { FloorData } from './types';
 import type { VertexLightingManager } from './vertex-lighting';
-import {
-  disposeVoxelGeomCache,
-  emptyRaycast,
-  getPbrForTexture,
-  getVoxelGeometry,
-  type VoxelKind
-} from './voxel-geom';
+import { disposeVoxelGeomCache, emptyRaycast, getVoxelGeometry, type VoxelKind } from './voxel-geom';
 import { surfaceChebyshev, voxelLodWants } from './voxel-opt-in';
-import { makeVoxelLocal, makeVoxelShared, patchVoxelLookMaterial, unpatchVoxelLookMaterial } from './voxel-surface';
 import type { SpriteManager } from './sprites';
 
 interface SurfaceEntry {
@@ -22,10 +12,6 @@ interface SurfaceEntry {
   tileY: number;
   cellX: number;
   cellY: number;
-  isWall: boolean;
-  isDark: boolean;
-  lightGround: boolean;
-  local: SurfaceLightLocal;
   voxel: THREE.Mesh | null;
 }
 
@@ -36,31 +22,19 @@ function asBasic(mat: THREE.Material | THREE.Material[]): THREE.MeshBasicMateria
 }
 
 function voxelKindOf(kind: unknown): VoxelKind | null {
-  if (kind === 'floor' || kind === 'water-deep' || kind === 'water-shallow' || kind === 'water-surface') {
-    return 'floor';
-  }
-  if (kind === 'ceiling') return 'ceiling';
   if (kind === 'wall' || kind === 'secret') return 'wall';
-  if (typeof kind === 'string' && kind.startsWith('door')) return 'wall';
   return null;
 }
 
-function canVoxelize(mesh: THREE.Mesh, floorData: FloorData): boolean {
+function canVoxelize(mesh: THREE.Mesh): boolean {
   if (mesh.userData.voxelMesh || mesh.userData.rubble) return false;
   if (mesh.userData.skipVertexLighting) return false;
   const raw = mesh.userData.kind;
   if (typeof raw === 'string' && raw.startsWith('door')) return false;
-  const kind = voxelKindOf(raw);
-  if (!kind) return false;
+  if (!voxelKindOf(raw)) return false;
   const mat = asBasic(mesh.material);
   if (!mat?.map) return false;
   if (mat.alphaTest > 0) return false;
-  if (kind === 'floor') {
-    const x = mesh.userData.lightX;
-    const y = mesh.userData.lightY;
-    const tile = floorData.tiles[y]?.[x];
-    if (tile?.deepWater || tile?.shallowWater) return false;
-  }
   return true;
 }
 
@@ -69,17 +43,12 @@ export class VoxelMode {
   private scene: THREE.Scene;
   private lighting: VertexLightingManager;
   private sprites: SpriteManager;
-  private floorData: FloorData;
   private renderer: THREE.WebGLRenderer;
-  private shared = makeVoxelShared();
   private group = new THREE.Group();
   private entries: SurfaceEntry[] = [];
   private active = new Set<string>();
   private partyX = 0;
   private partyY = 0;
-  private paletteWas = true;
-  private setPalette: (on: boolean) => void;
-  private getPalette: () => boolean;
   triangles = 0;
   voxelMeshes = 0;
 
@@ -87,18 +56,12 @@ export class VoxelMode {
     scene: THREE.Scene;
     lighting: VertexLightingManager;
     sprites: SpriteManager;
-    floorData: FloorData;
     renderer: THREE.WebGLRenderer;
-    getPalette: () => boolean;
-    setPalette: (on: boolean) => void;
   }) {
     this.scene = opts.scene;
     this.lighting = opts.lighting;
     this.sprites = opts.sprites;
-    this.floorData = opts.floorData;
     this.renderer = opts.renderer;
-    this.getPalette = opts.getPalette;
-    this.setPalette = opts.setPalette;
     this.group.name = 'voxel-mode';
   }
 
@@ -106,13 +69,9 @@ export class VoxelMode {
     if (this.enabled) return;
     this.enabled = true;
     this.renderer.shadowMap.enabled = false;
-    this.paletteWas = this.getPalette();
-    this.setPalette(false);
     this.scene.add(this.group);
     this.collect();
-    for (const entry of this.entries) this.patchEntry(entry);
     this.stream();
-    this.syncLights();
     this.tintSprites(true);
   }
 
@@ -120,25 +79,23 @@ export class VoxelMode {
     if (!this.enabled) return;
     this.enabled = false;
     this.tintSprites(false);
-    for (const entry of this.entries) {
-      const mat = asBasic(entry.mesh.material);
-      if (mat) {
-        mat.visible = true;
-        unpatchVoxelLookMaterial(mat);
-      }
-      if (entry.voxel) {
-        this.group.remove(entry.voxel);
-        const vm = asBasic(entry.voxel.material);
-        vm?.dispose();
-        entry.voxel = null;
-      }
-    }
+    this.clearVoxels();
     this.entries = [];
     this.active.clear();
     this.scene.remove(this.group);
-    this.setPalette(this.paletteWas);
     this.voxelMeshes = 0;
     this.triangles = 0;
+  }
+
+  /** Re-collect after the scene graph changes (rubble, rebuilt walls). */
+  refresh(): void {
+    if (!this.enabled) return;
+    this.clearVoxels();
+    this.entries = [];
+    this.active.clear();
+    this.collect();
+    this.stream();
+    this.tintSprites(true);
   }
 
   setParty(x: number, y: number): void {
@@ -149,19 +106,6 @@ export class VoxelMode {
 
   syncLights(): void {
     if (!this.enabled) return;
-    this.lighting.fillSurfaceShared(this.shared);
-    this.shared.uSunbeam3D.value = 1;
-    this.shared.uSunbeamIntensity.value = VOXEL_SUNBEAM_INTENSITY;
-    for (const entry of this.entries) {
-      this.lighting.fillSurfaceLocal(
-        entry.local,
-        entry.tileX,
-        entry.tileY,
-        entry.isWall,
-        entry.isDark,
-        entry.lightGround
-      );
-    }
     this.tintSprites(true);
   }
 
@@ -169,10 +113,7 @@ export class VoxelMode {
     for (const entry of this.entries) {
       if (entry.cellX !== cellX || entry.cellY !== cellY) continue;
       this.active.delete(entry.key);
-      if (entry.voxel) {
-        this.group.remove(entry.voxel);
-        entry.voxel = null;
-      }
+      this.dropVoxel(entry);
       const mat = asBasic(entry.mesh.material);
       if (mat) mat.visible = true;
     }
@@ -198,43 +139,24 @@ export class VoxelMode {
     this.scene.traverse((obj) => {
       const mesh = obj as THREE.Mesh;
       if (!mesh.isMesh) return;
-      if (!isSurfaceLitKind(mesh.userData.kind)) return;
+      if (!canVoxelize(mesh)) return;
       const kind = voxelKindOf(mesh.userData.kind);
       if (!kind) return;
-      const tileX =
-        typeof mesh.userData.lightX === 'number' ? mesh.userData.lightX : 0;
-      const tileY =
-        typeof mesh.userData.lightY === 'number' ? mesh.userData.lightY : 0;
-      const cellX =
-        typeof mesh.userData.cellX === 'number' ? mesh.userData.cellX : tileX;
-      const cellY =
-        typeof mesh.userData.cellY === 'number' ? mesh.userData.cellY : tileY;
-      const tile = this.floorData.tiles[tileY]?.[tileX];
-      const key = mesh.uuid;
+      const tileX = typeof mesh.userData.lightX === 'number' ? mesh.userData.lightX : 0;
+      const tileY = typeof mesh.userData.lightY === 'number' ? mesh.userData.lightY : 0;
+      const cellX = typeof mesh.userData.cellX === 'number' ? mesh.userData.cellX : tileX;
+      const cellY = typeof mesh.userData.cellY === 'number' ? mesh.userData.cellY : tileY;
       this.entries.push({
         mesh,
-        key,
+        key: mesh.uuid,
         kind,
         tileX,
         tileY,
         cellX,
         cellY,
-        isWall:
-          kind === 'wall' ||
-          (typeof mesh.userData.kind === 'string' && mesh.userData.kind.startsWith('door')),
-        isDark: !!tile?.floorNDark,
-        lightGround: !!mesh.userData.lightGround || !!mesh.userData.rubble,
-        local: makeVoxelLocal(),
         voxel: null
       });
     });
-  }
-
-  private patchEntry(entry: SurfaceEntry): void {
-    const mat = asBasic(entry.mesh.material);
-    if (!mat) return;
-    const pbr = getPbrForTexture(mat.map);
-    patchVoxelLookMaterial(mat, this.shared, entry.local, pbr);
   }
 
   private stream(): void {
@@ -250,7 +172,7 @@ export class VoxelMode {
         entry.tileY
       );
       const was = this.active.has(entry.key);
-      const want = canVoxelize(entry.mesh, this.floorData) && voxelLodWants(dist, was);
+      const want = canVoxelize(entry.mesh) && voxelLodWants(dist, was);
       if (want) {
         this.active.add(entry.key);
         this.ensureVoxel(entry);
@@ -278,21 +200,19 @@ export class VoxelMode {
     if (entry.voxel) return;
     const srcMat = asBasic(entry.mesh.material);
     if (!srcMat?.map) return;
-    const turns =
-      entry.kind === 'wall' ? 0 : floorQuarterTurns(entry.tileX, entry.tileY, entry.kind === 'ceiling' ? 'C' : 'F');
-    const flip = entry.kind !== 'wall' && floorFlipX(entry.tileX, entry.tileY, entry.kind === 'ceiling' ? 'C' : 'F');
     const cached = getVoxelGeometry(srcMat.map, entry.kind, {
-      turns,
-      flip,
+      turns: 0,
+      flip: false,
       face: entry.mesh.userData.face
     });
     if (!cached) return;
     const mat = srcMat.clone();
     mat.userData = { ...srcMat.userData };
-    delete mat.userData.voxelLookUniforms;
     mat.visible = true;
-    patchVoxelLookMaterial(mat, this.shared, entry.local, cached.pbr);
-    const voxel = new THREE.Mesh(cached.geometry, mat);
+    mat.vertexColors = true;
+    mat.needsUpdate = true;
+    const geo = cached.geometry.clone();
+    const voxel = new THREE.Mesh(geo, mat);
     voxel.position.copy(entry.mesh.position);
     voxel.quaternion.copy(entry.mesh.quaternion);
     voxel.scale.copy(entry.mesh.scale);
@@ -304,7 +224,26 @@ export class VoxelMode {
       noPick: true
     };
     this.group.add(voxel);
+    this.lighting.registerVoxelMesh(voxel);
     entry.voxel = voxel;
+  }
+
+  private dropVoxel(entry: SurfaceEntry): void {
+    if (!entry.voxel) return;
+    this.lighting.unregisterVoxelMesh(entry.voxel);
+    this.group.remove(entry.voxel);
+    entry.voxel.geometry.dispose();
+    const vm = asBasic(entry.voxel.material);
+    vm?.dispose();
+    entry.voxel = null;
+  }
+
+  private clearVoxels(): void {
+    for (const entry of this.entries) {
+      const mat = asBasic(entry.mesh.material);
+      if (mat) mat.visible = true;
+      this.dropVoxel(entry);
+    }
   }
 
   private tintSprites(on: boolean): void {

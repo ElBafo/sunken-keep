@@ -1,13 +1,19 @@
 import * as THREE from 'three';
 import { packPbrRgba, volumeFromImageData } from '../voxel-lab/classify';
-import { DEPTH_LAYERS, FACE_INSET, LAYER_SIZE } from '../voxel-lab/constants';
+import { FACE_INSET } from '../voxel-lab/constants';
 import { greedyMesh, type MeshArrays } from '../voxel-lab/mesher';
 import { CELL_SIZE, WALL_BOTTOM, WALL_TOP } from './constants';
 import { flipUVsX, rotateUVs } from './texture-variants';
 
+/** Game-local occupancy (lab DEPTH_LAYERS/LAYER_SIZE stay on the lab page). */
+export const GAME_DEPTH_LAYERS = 2;
+export const GAME_LAYER_SIZE = 0.008;
+/** Cap greedy resolution so a wall is tens of thousands of tris, not hundreds. */
+export const VOXEL_MAX_AXIS = 32;
+
 /** Keep relief inside the solid: front of the volume sits this far behind the original plane. */
 export const VOXEL_PLANE_INSET = 0.0006;
-export const MAX_RELIEF = DEPTH_LAYERS * LAYER_SIZE + VOXEL_PLANE_INSET + FACE_INSET;
+export const MAX_RELIEF = GAME_DEPTH_LAYERS * GAME_LAYER_SIZE + VOXEL_PLANE_INSET + FACE_INSET;
 
 export type VoxelKind = 'wall' | 'floor' | 'ceiling';
 
@@ -35,7 +41,7 @@ export function voxelLocalPos(
   return [
     -width / 2 + u * (width / W),
     -height / 2 + v * (height / H),
-    inwardSign * (d * LAYER_SIZE + VOXEL_PLANE_INSET)
+    inwardSign * (d * GAME_LAYER_SIZE + VOXEL_PLANE_INSET)
   ];
 }
 
@@ -102,8 +108,49 @@ function remapWallUvs(geo: THREE.BufferGeometry, midY: number): void {
 
 export interface CachedVoxelGeom {
   geometry: THREE.BufferGeometry;
-  pbr: THREE.DataTexture;
   triangles: number;
+}
+
+export function downsampleImageData(
+  image: { width: number; height: number; data: ArrayLike<number> },
+  maxAxis = VOXEL_MAX_AXIS
+): { width: number; height: number; data: Uint8ClampedArray } {
+  const scale = Math.max(1, Math.ceil(Math.max(image.width, image.height) / maxAxis));
+  const w = Math.max(1, Math.ceil(image.width / scale));
+  const h = Math.max(1, Math.ceil(image.height / scale));
+  const data = new Uint8ClampedArray(w * h * 4);
+  const ox = scale > 1 ? (scale - 1) >> 1 : 0;
+  const oy = ox;
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const sx = Math.min(image.width - 1, x * scale + ox);
+      const sy = Math.min(image.height - 1, y * scale + oy);
+      const si = (sy * image.width + sx) * 4;
+      const di = (y * w + x) * 4;
+      data[di] = image.data[si];
+      data[di + 1] = image.data[si + 1];
+      data[di + 2] = image.data[si + 2];
+      data[di + 3] = image.data[si + 3];
+    }
+  }
+  return { width: w, height: h, data };
+}
+
+export function collapseDepth(
+  volume: Uint8Array,
+  dims: [number, number, number],
+  newD: number
+): { volume: Uint8Array; dims: [number, number, number] } {
+  const [W, H, D] = dims;
+  if (newD >= D) return { volume, dims };
+  const out = new Uint8Array(W * H * newD);
+  for (let d = 0; d < D; d++) {
+    const nd = Math.min(newD - 1, Math.floor((d * newD) / D));
+    for (let i = 0; i < W * H; i++) {
+      if (volume[i + d * W * H]) out[i + nd * W * H] = 1;
+    }
+  }
+  return { volume: out, dims: [W, H, newD] };
 }
 
 const geomCache = new Map<string, CachedVoxelGeom>();
@@ -179,16 +226,20 @@ export function getVoxelGeometry(
 
   const image = imageDataFromMap(map);
   if (!image) return null;
-  const src = volumeFromImageData(image);
-  const built = buildVolumeForKind(src, kind);
+  const src = volumeFromImageData(downsampleImageData(image));
+  const collapsed = collapseDepth(src.volume, src.dims, GAME_DEPTH_LAYERS);
+  const built = buildVolumeForKind(
+    { volume: collapsed.volume, dims: collapsed.dims, voxelCount: 0, roughness: src.roughness },
+    kind
+  );
   const [W, H] = built.dims;
   const width = CELL_SIZE;
   const height = kind === 'wall' ? WALL_TOP - WALL_BOTTOM : CELL_SIZE;
   const toWorld = (u: number, v: number, d: number) =>
     voxelLocalPos(u, v, d, W, H, width, height, inward);
   const meshed = greedyMesh(built.volume, built.dims, toWorld, {
-    cullNeg: [false, false, inward < 0],
-    cullPos: [false, false, inward > 0]
+    cullNeg: [true, true, false],
+    cullPos: [true, true, true]
   });
   const geometry = geometryFrom(meshed.mesh);
   if (!geometry) return null;
@@ -196,12 +247,7 @@ export function getVoxelGeometry(
   if (flip) flipUVsX(geometry);
   if (turns) rotateUVs(geometry, turns);
 
-  let pbr = pbrCache.get(map.uuid);
-  if (!pbr) {
-    pbr = pbrTextureForRoughness(src.roughness, src.dims[0], src.dims[1]);
-    pbrCache.set(map.uuid, pbr);
-  }
-  const cached = { geometry, pbr, triangles: meshed.triangles };
+  const cached = { geometry, triangles: meshed.triangles };
   geomCache.set(key, cached);
   return cached;
 }
