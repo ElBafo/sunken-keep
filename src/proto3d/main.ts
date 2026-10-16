@@ -3494,6 +3494,16 @@ class Game {
       listAutosaves: () => listAutosaves(),
       fireVisibilityAutosave: () => this.tryAutosave('quiet'),
       openSecret: (x: number, y: number) => this.openSecretAt(x, y),
+      closeSecret: (x: number, y: number) => {
+        const tile = this.player.tileAt(x, y);
+        if (!tile?.secret || !tile.secretOpen) return false;
+        tile.secretOpen = false;
+        this.sceneBuilder.setSecretOpen(this.renderer.scene, x, y, false);
+        this.resyncSecretGeometry();
+        this.spriteManager.resetItems(floor1);
+        this.refreshOccupancy();
+        return true;
+      },
       secretOpen: (x: number, y: number) => !!this.player.tileAt(x, y)?.secretOpen,
       secretPassage: (x: number, y: number) => {
         const want = neighborFacesIntoCell(floor1, x, y);

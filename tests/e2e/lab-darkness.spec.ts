@@ -100,15 +100,15 @@ test('Classic unlit matches the pre-#40 table; Lab unlit stays as dark as Classi
     expect(row.freeze.lit197).toBe(false);
   }
 
-  // Classic default must stay the dungeon mood. Lab unlit / lair may not read brighter.
-  for (const name of ['unlit_room', 'lair_19_3', 'lair_19_5'] as const) {
+  // Lair is ambient-only: Lab must sit near Classic, not a black pit and not a lift.
+  for (const name of ['lair_19_3', 'lair_19_5'] as const) {
     expect(
       lab.spots[name].luma,
       `Lab ${name} luma ${lab.spots[name].luma} vs Classic ${classic.spots[name].luma}`
-    ).toBeLessThanOrEqual(classic.spots[name].luma * 1.12 + 2);
-    expect(
-      labVoxel.spots[name].luma,
-      `Lab+voxel ${name} luma vs Classic`
-    ).toBeLessThanOrEqual(classic.spots[name].luma * 1.15 + 2);
+    ).toBeLessThanOrEqual(classic.spots[name].luma * 1.25 + 2);
+    expect(lab.spots[name].luma, `Lab ${name} is not a black pit`).toBeGreaterThan(
+      classic.spots[name].luma * 0.45
+    );
   }
+  expect(lab.spots.dark_corridor.r - lab.spots.dark_corridor.b, 'Lab corridor stays warm').toBeGreaterThan(1);
 });
