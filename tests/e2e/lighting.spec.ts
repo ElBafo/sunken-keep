@@ -31,6 +31,12 @@ type Proto3d = {
   tileBrightness: (x: number, y: number) => number;
   sourceLight: (x: number, y: number) => number;
   regionStats: (x0: number, y0: number, x1: number, y1: number) => { luma: number; fogRatio: number; n: number };
+  regionContrast: (
+    x0: number,
+    y0: number,
+    x1: number,
+    y1: number
+  ) => { n: number; p10: number; p50: number; p90: number; ratio: number };
   sprites: () => Array<{ item?: string; x: number; y: number; kind: string }>;
   getBag: () => Array<{ item: string; count: number }>;
   useBagSlot: (i: number) => void;
@@ -645,7 +651,11 @@ test('proto3d lighting: per-pixel lantern+torch, no wall dip, tile-light frozen'
     [3, 5, 1, 'lighting_dip_3_5_east.png'],
     [1, 4, 2, 'lighting_dip_1_4_south.png'],
     [3, 2, 0, 'lighting_dip_3_2_north.png'],
-    [3, 3, 0, 'lighting_dip_3_3_north.png']
+    [3, 3, 0, 'lighting_dip_3_3_north.png'],
+    // Pell east wall at (14,10), lantern only — 1 / 2 / 3 squares including the far piece.
+    [13, 10, 1, 'lantern_wall_1sq_east.png'],
+    [12, 10, 1, 'lantern_wall_2sq_east.png'],
+    [11, 10, 1, 'lantern_wall_3sq_east.png']
   ];
 
   for (const [x, y, dir, file] of spots) {
@@ -696,6 +706,37 @@ test('proto3d lighting: per-pixel lantern+torch, no wall dip, tile-light frozen'
   console.log('WALL STRIP (4,5) east', strip);
   expect(strip.max, 'torch/lantern still light the wall').toBeGreaterThan(40);
   expect(strip.dip, 'no dark valley between lantern and torch on screen').toBeLessThan(28);
+
+  // Close wall: mortar stays dark vs brick (multiply, not an ambient floor on the texel).
+  const brick1 = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    p.setOil(2);
+    p.setPosition(13, 10, 1);
+    p.setFlickerFrame(2);
+    const canvas = document.getElementById('render-canvas') as HTMLCanvasElement;
+    const w = canvas.width;
+    const h = canvas.height;
+    return p.regionContrast(w * 0.28, h * 0.22, w * 0.72, h * 0.72);
+  });
+  console.log('BRICK CONTRAST 1sq', brick1);
+  expect(brick1.n, 'sampled the close lantern wall').toBeGreaterThan(80);
+  expect(brick1.ratio, 'mortar/brick luma ratio stays (not flattened)').toBeLessThan(0.45);
+  expect(brick1.p10, 'mortar gaps stay darker than an ambient-grey lift').toBeLessThan(brick1.p90 * 0.45);
+
+  // Far wall at 3 squares is beyond the oil pool: albedo × ambient, never max(texel, ambient).
+  const brick3 = await page.evaluate(() => {
+    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+    p.setPosition(11, 10, 1);
+    p.setFlickerFrame(2);
+    const canvas = document.getElementById('render-canvas') as HTMLCanvasElement;
+    const w = canvas.width;
+    const h = canvas.height;
+    return p.regionContrast(w * 0.38, h * 0.28, w * 0.62, h * 0.52);
+  });
+  console.log('BRICK CONTRAST 3sq far wall', brick3);
+  expect(brick3.n, 'sampled the far lantern wall').toBeGreaterThan(40);
+  expect(brick3.p90, 'far wall is not lifted to ambient grey').toBeLessThan(14);
+  expect(brick3.ratio, 'far-wall mortar still darker than brick').toBeLessThan(0.55);
 
   await page.evaluate(() => {
     (window as unknown as { __proto3d: Proto3d }).__proto3d.setPosition(4, 5, 1);

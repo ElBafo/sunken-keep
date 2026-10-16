@@ -22,7 +22,18 @@ export const FLOOR_DISK_Y = 0.28;
 export const NONFLOOR_HEIGHT_PENALTY = 0.55;
 export const PARTY_FALLOFF_CORE_FRAC = 0.45;
 
-export const SURFACE_LIGHT_CACHE_KEY = 'surf-light-frag-v1';
+export const SURFACE_LIGHT_CACHE_KEY = 'surf-light-frag-v2';
+
+/**
+ * Painted albedo × lighting factor. Never add ambient onto the texel —
+ * that lifts dark mortar gaps to a flat grey.
+ */
+export function applyAlbedoLight(
+  albedo: [number, number, number],
+  lighting: [number, number, number]
+): [number, number, number] {
+  return [albedo[0] * lighting[0], albedo[1] * lighting[1], albedo[2] * lighting[2]];
+}
 
 /** Dungeon geometry that must light per pixel (not gameplay tile-light, not props). */
 export function isSurfaceLitKind(kind: unknown): boolean {
@@ -259,8 +270,15 @@ vec3 surfaceLightRgb(vec3 worldPos) {
     }
   }
 
-  vec3 lit = max(uAmbientRgb, rgb);
-  return min(vec3(1.0), lit * uBright);
+  // Lighting *factor* (0–1). Ambient is a floor on this factor only.
+  // Applied as albedo * lighting — never added onto the texel.
+  vec3 lighting = min(vec3(1.0), max(uAmbientRgb, rgb) * uBright);
+  return lighting;
+}
+
+vec3 applySurfaceLight(vec3 albedo, vec3 worldPos) {
+  vec3 lighting = surfaceLightRgb(worldPos);
+  return albedo * lighting;
 }
 `;
 
@@ -298,7 +316,10 @@ varying vec3 vSurfWorldPos;`
       .replace(
         '#include <color_fragment>',
         `#include <color_fragment>
-diffuseColor.rgb *= surfaceLightRgb(vSurfWorldPos);`
+{
+  vec3 albedo = diffuseColor.rgb;
+  diffuseColor.rgb = applySurfaceLight(albedo, vSurfWorldPos);
+}`
       );
   };
 }

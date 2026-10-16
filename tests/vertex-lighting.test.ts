@@ -240,9 +240,9 @@ describe('lantern: steep floors, soft props', () => {
     const surf = readFileSync(resolve(__dirname, '../src/proto3d/surface-light.ts'), 'utf8');
     const src = readFileSync(resolve(__dirname, '../src/proto3d/vertex-lighting.ts'), 'utf8');
     expect(FACE_SEGMENTS, 'tessellation is unused once lighting is per pixel').toBe(1);
-    expect(surf).toContain('surfaceLightRgb(vSurfWorldPos)');
+    expect(surf).toContain('applySurfaceLight(albedo, vSurfWorldPos)');
     expect(surf).toContain('surfScreenAccum');
-    expect(surf).toContain('diffuseColor.rgb *= surfaceLightRgb');
+    expect(surf).toContain('albedo * lighting');
     expect(src).toContain('patchSurfaceLightMaterial');
     expect(src).toContain('isSurfaceLitKind');
     expect(src).toContain('sourceLight(tileX');

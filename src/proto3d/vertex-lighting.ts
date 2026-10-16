@@ -513,6 +513,8 @@ export class VertexLightingManager {
       }
     }
 
+    // Lighting factor for MeshBasic (texture × this). Ambient floors the
+    // factor, it is never added onto albedo (that would lift mortar gaps).
     const lit: [number, number, number] = geometry
       ? [
           Math.max(ambientRgb[0], rgb[0]),

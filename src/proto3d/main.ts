@@ -2787,6 +2787,33 @@ class Game {
         }
         return { luma: n ? sum / n : 0, fogRatio: n ? fog / n : 0, n };
       },
+      /** Painted-texel contrast in a screen box. Mortar/brick ratio stays if light only multiplies. */
+      regionContrast: (x0: number, y0: number, x1: number, y1: number) => {
+        this.renderer.render();
+        const gl = this.renderer.renderer.getContext();
+        const w = this.renderer.canvas.width;
+        const h = this.renderer.canvas.height;
+        const pixels = new Uint8Array(w * h * 4);
+        gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+        const xMin = Math.max(0, Math.floor(x0));
+        const xMax = Math.min(w, Math.ceil(x1));
+        const yMin = Math.max(0, Math.floor(y0));
+        const yMax = Math.min(h, Math.ceil(y1));
+        const lumas: number[] = [];
+        for (let y = yMin; y < yMax; y++) {
+          for (let x = xMin; x < xMax; x++) {
+            const i = ((h - 1 - y) * w + x) * 4;
+            lumas.push((pixels[i] + pixels[i + 1] + pixels[i + 2]) / 3);
+          }
+        }
+        lumas.sort((a, b) => a - b);
+        const at = (p: number) =>
+          lumas.length ? lumas[Math.min(lumas.length - 1, Math.floor(p * (lumas.length - 1)))] : 0;
+        const p10 = at(0.1);
+        const p50 = at(0.5);
+        const p90 = at(0.9);
+        return { n: lumas.length, p10, p50, p90, ratio: p90 > 0 ? p10 / p90 : 0 };
+      },
       faceKinds: () => {
         const out: Array<{ kind: string; lightX: number; lightY: number; face?: string }> = [];
         this.renderer.scene.traverse((obj) => {
