@@ -8,24 +8,54 @@ type Proto3d = {
   ready?: boolean;
   setPosition: (x: number, y: number, dir: number) => void;
   tryMoveBackward: () => { result: string; after: { x: number; y: number; dir: number } };
-  tryTurnRight: () => string;
-  meanLuma: () => number;
-  getPosition: () => { x: number; y: number; dir: number };
+  wallClearance: () => number;
+  poseCamera: (gridX: number, gridY: number, rotY: number) => number;
+  poseCameraRaw: (gridX: number, gridY: number, rotY: number) => number;
 };
 
-async function sampleLuma(page: Page, ms = 220) {
-  const samples: number[] = [];
-  const t0 = Date.now();
-  while (Date.now() - t0 < ms) {
-    samples.push(await page.evaluate(() => (window as unknown as { __proto3d: Proto3d }).__proto3d.meanLuma()));
-    await page.waitForTimeout(8);
+/** CAMERA_NEAR 0.08 + 0.05 margin. */
+const MIN_CLEARANCE = 0.13;
+const CAMERA_NEAR = 0.08;
+
+function easeInOutQuad(t: number): number {
+  return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+}
+
+function rot(dir: number): number {
+  return (-dir * Math.PI) / 2;
+}
+
+async function pose(
+  page: Page,
+  gridX: number,
+  gridY: number,
+  fromDir: number,
+  toDir: number,
+  t: number,
+  raw: boolean
+): Promise<number> {
+  const e = easeInOutQuad(t);
+  let fromRot = rot(fromDir);
+  let toRot = rot(toDir);
+  if (Math.abs(toRot - fromRot) > Math.PI) {
+    if (toRot > fromRot) fromRot += Math.PI * 2;
+    else toRot += Math.PI * 2;
   }
-  return samples;
+  const r = fromRot + (toRot - fromRot) * e;
+  const gx = gridX;
+  const gy = gridY;
+  return page.evaluate(
+    ({ gx: x, gy: y, r: rotY, raw: useRaw }) => {
+      const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
+      return useRaw ? p.poseCameraRaw(x, y, rotY) : p.poseCamera(x, y, rotY);
+    },
+    { gx, gy, r, raw }
+  );
 }
 
 test.use(devices['iPhone 15']);
 
-test('backing toward a wall never fills the view with a near-clipped brick plane', async ({ page }) => {
+test('backing toward a wall never puts the near plane through the wall face', async ({ page }) => {
   test.setTimeout(90000);
   mkdirSync(OUT, { recursive: true });
   await page.goto(`${BASE_URL}/proto3d.html?test=1&debug=1`);
@@ -37,48 +67,58 @@ test('backing toward a wall never fills the view with a near-clipped brick plane
   await page.locator('#tap-to-start').click();
   await page.waitForTimeout(400);
 
-  // Alcove south of the unlit (8,5) sconce. Facing south puts the EOB eye on that wall.
   await page.evaluate(() => {
-    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-    p.setPosition(8, 6, 2);
+    (window as unknown as { __proto3d: Proto3d }).__proto3d.setPosition(8, 6, 2);
   });
-  await page.waitForTimeout(80);
+  await page.waitForTimeout(40);
   const alcove = await page.evaluate(
-    () => (window as unknown as { __proto3d: Proto3d }).__proto3d.meanLuma()
+    () => (window as unknown as { __proto3d: Proto3d }).__proto3d.wallClearance()
   );
   await page.screenshot({ path: `${OUT}/wall_clip_8_6_south.png`, fullPage: false });
-  console.log('ALCOVE (8,6) south luma', alcove);
-  expect(alcove, 'rest pose is a room, not a near-clipped brick slab').toBeLessThan(90);
+  console.log('ALCOVE (8,6) south clearance', alcove);
+  expect(alcove, 'rest pose stays off the sconce wall').toBeGreaterThanOrEqual(MIN_CLEARANCE);
 
   // (8,7) is solid; the flash is turning onto south in the walkable alcove.
-  await page.evaluate(() => {
-    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-    p.setPosition(8, 6, 1);
-  });
-  await page.waitForTimeout(40);
-  const turned = await page.evaluate(
-    () => (window as unknown as { __proto3d: Proto3d }).__proto3d.tryTurnRight()
+  let clampedMin = Infinity;
+  let rawMin = Infinity;
+  for (let i = 0; i <= 36; i++) {
+    const t = i / 36;
+    rawMin = Math.min(rawMin, await pose(page, 8, 6, 1, 2, t, true));
+    clampedMin = Math.min(clampedMin, await pose(page, 8, 6, 1, 2, t, false));
+  }
+  await pose(page, 8, 6, 1, 2, 0.97, true);
+  await page.locator('#canvas-container').screenshot({ path: `${OUT}/wall_clip_MAINLIKE_turn_097.png` });
+  await pose(page, 8, 6, 1, 2, 0.97, false);
+  await page.locator('#canvas-container').screenshot({ path: `${OUT}/wall_clip_clamped_turn_097.png` });
+  console.log('TURN (8,6) E→S rawMin', rawMin, 'clampedMin', clampedMin);
+  expect(rawMin, 'unclamped EOB eye clips the sconce wall during the turn').toBeLessThan(CAMERA_NEAR);
+  expect(clampedMin, '0 near-wall frames turning onto the (8,5) sconce wall').toBeGreaterThanOrEqual(
+    MIN_CLEARANCE
   );
-  expect(turned).toBe('ok');
-  const turnSamples = await sampleLuma(page);
-  await page.screenshot({ path: `${OUT}/wall_clip_turn_8_6_south.png`, fullPage: false });
-  const turnPeak = Math.max(...turnSamples);
-  console.log('TURN samples', turnSamples.length, 'peak', turnPeak, 'end', turnSamples[turnSamples.length - 1]);
-  expect(turnPeak, 'no near-clipped brick flash turning onto the (8,5) sconce wall').toBeLessThan(90);
 
-  // Back-step onto a wall-behind square (west wall of (1,7)).
-  await page.evaluate(() => {
-    const p = (window as unknown as { __proto3d: Proto3d }).__proto3d;
-    p.setPosition(2, 7, 1);
-  });
-  await page.waitForTimeout(40);
-  const moved = await page.evaluate(
-    () => (window as unknown as { __proto3d: Proto3d }).__proto3d.tryMoveBackward()
-  );
-  expect(moved.result).toBe('ok');
-  const samples = await sampleLuma(page);
-  await page.screenshot({ path: `${OUT}/wall_clip_back_1_7_east.png`, fullPage: false });
-  const peak = Math.max(...samples);
-  console.log('BACK-STEP samples', samples.length, 'peak', peak, 'end', samples[samples.length - 1]);
-  expect(peak, 'no ~50ms near-clipped brick flash during the back-step').toBeLessThan(90);
+  let backClamped = Infinity;
+  let backRaw = Infinity;
+  for (let i = 0; i <= 36; i++) {
+    const t = i / 36;
+    const e = easeInOutQuad(t);
+    const gx = 2 + (1 - 2) * e;
+    const gy = 7;
+    const r = rot(1);
+    const raw = await page.evaluate(
+      ({ gx: x, gy: y, r: rotY }) =>
+        (window as unknown as { __proto3d: Proto3d }).__proto3d.poseCameraRaw(x, y, rotY),
+      { gx, gy, r }
+    );
+    const clamped = await page.evaluate(
+      ({ gx: x, gy: y, r: rotY }) =>
+        (window as unknown as { __proto3d: Proto3d }).__proto3d.poseCamera(x, y, rotY),
+      { gx, gy, r }
+    );
+    backRaw = Math.min(backRaw, raw);
+    backClamped = Math.min(backClamped, clamped);
+  }
+  await page.locator('#canvas-container').screenshot({ path: `${OUT}/wall_clip_back_1_7_east.png` });
+  console.log('BACK-STEP (2,7)→(1,7)E rawMin', backRaw, 'clampedMin', backClamped);
+  expect(backRaw, 'unclamped back-step clips the west wall').toBeLessThan(CAMERA_NEAR);
+  expect(backClamped, '0 near-wall frames during the back-step').toBeGreaterThanOrEqual(MIN_CLEARANCE);
 });

@@ -1,6 +1,11 @@
 import * as THREE from 'three';
 import { CAMERA_EYE_HEIGHT, CAMERA_PITCH, STEP_BOB_AMPLITUDE } from './constants';
-import { cameraWorldXZ, emitWallPlanes, type WallPlane } from './camera-wall-clear';
+import {
+  cameraWorldXZ,
+  emitWallPlanes,
+  minWallClearance,
+  type WallPlane
+} from './camera-wall-clear';
 import { FloorData, Tile } from './types';
 import { isBlockingProp } from './wall-props';
 
@@ -111,6 +116,10 @@ export class Player {
     this.camera.rotation.y = rotY;
     this.camera.rotation.z = 0;
     this.camera.updateMatrixWorld();
+  }
+
+  wallClearance(): number {
+    return minWallClearance(this.camera.position.x, this.camera.position.z, this.wallPlanes);
   }
 
   updateCameraPosition(_t: number = 1) {

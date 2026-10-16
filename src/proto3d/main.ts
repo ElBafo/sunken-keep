@@ -4,6 +4,8 @@ import { AudioManager } from './audio';
 import {
   BRIGHT_MAX,
   BRIGHT_MIN,
+  CAMERA_EYE_HEIGHT,
+  CAMERA_PITCH,
   CAMERA_SPEC,
   CELL_SIZE,
   DOOR_UNLOCK_LEAD_MS,
@@ -11,6 +13,7 @@ import {
   OIL_MAX,
   OIL_START,
   OIL_TORCH_COST,
+  cameraOffsetXZ,
   parseAmbientFloor,
   STEP_VOLUME,
   SWAP_ARM_MS,
@@ -3241,6 +3244,28 @@ class Game {
           ? { x: this.player.moveToX, y: this.player.moveToY, dir: this.player.moveToDir }
           : { x: this.player.x, y: this.player.y, dir: this.player.dir };
         return { result, before, after: dest };
+      },
+      wallClearance: () => this.player.wallClearance(),
+      cameraXZ: () => ({ x: this.player.camera.position.x, z: this.player.camera.position.z }),
+      poseCamera: (gridX: number, gridY: number, rotY: number) => {
+        this.player.poseCamera(gridX, gridY, rotY);
+        this.renderer.render();
+        return this.player.wallClearance();
+      },
+      poseCameraRaw: (gridX: number, gridY: number, rotY: number) => {
+        const [ox, oz] = cameraOffsetXZ(rotY);
+        this.player.camera.position.set(
+          gridX * CELL_SIZE + ox,
+          CAMERA_EYE_HEIGHT,
+          gridY * CELL_SIZE + oz
+        );
+        this.player.camera.rotation.order = 'YXZ';
+        this.player.camera.rotation.x = CAMERA_PITCH;
+        this.player.camera.rotation.y = rotY;
+        this.player.camera.rotation.z = 0;
+        this.player.camera.updateMatrixWorld();
+        this.renderer.render();
+        return this.player.wallClearance();
       },
       tryTurnLeft: () => {
         if (this.caveInBusy) {
