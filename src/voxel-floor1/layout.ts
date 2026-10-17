@@ -1,6 +1,7 @@
 import { floor1 as rawFloor1 } from '../../public/levels/floor1';
 import type { FaceId } from '../voxel-lab/faces';
 import { CEILING_VARIANTS, FLOOR_VARIANTS, WALL_VARIANTS } from './constants';
+import { KNOT_FACE_NEIGHBORS, knotWallFile } from './knot-walls';
 import { pickVariant } from './variants';
 
 export type FloorTile = {
@@ -205,7 +206,7 @@ export function enumerateFaces(map: FloorMap): FaceJob[] {
           face: spec.face,
           tx: x,
           tz: z,
-          file: pickVariant(WALL_VARIANTS, wx, wz, spec.wallFace),
+          file: knotWallFile(wx, wz, spec.wallFace) ?? pickVariant(WALL_VARIANTS, wx, wz, spec.wallFace),
           kind: 'wall',
           wallX: wx,
           wallY: wz,
@@ -219,4 +220,12 @@ export function enumerateFaces(map: FloorMap): FaceJob[] {
 
 export function chebyshev(ax: number, ay: number, bx: number, by: number): number {
   return Math.max(Math.abs(ax - bx), Math.abs(ay - by));
+}
+
+export function knotBesideSecret(map: FloorMap, x: number, y: number): boolean {
+  if (tileAt(map, x, y)?.secret) return true;
+  for (const [dx, dy] of KNOT_FACE_NEIGHBORS) {
+    if (tileAt(map, x + dx, y + dy)?.secret) return true;
+  }
+  return false;
 }
