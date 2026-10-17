@@ -105,14 +105,16 @@ export function buildBracketOccupancy(capped: boolean): {
   // Gold wrap: ~1/6 of the handle, a short band right under the flame / under the cap.
   fillBox(volume, dims, 6, 38, 9, 10, 41, 13, MAT_GOLD);
   if (capped) {
-    // Dark iron dome, clearly wider than the gold cup, sitting on top so the
-    // gold band still shows as a lip underneath.
-    fillBox(volume, dims, 3, 40, 6, 13, 41, 16, MAT_IRON);
-    fillBox(volume, dims, 3, 40, 6, 3, 41, 16, MAT_RUST);
-    fillBox(volume, dims, 13, 40, 6, 13, 41, 16, MAT_RUST);
-    fillBox(volume, dims, 4, 41, 7, 12, 43, 15, MAT_IRON);
-    fillBox(volume, dims, 5, 43, 8, 11, 45, 14, MAT_IRON);
-    fillBox(volume, dims, 6, 45, 9, 10, 47, 13, MAT_IRON);
+    // Stepped dark-iron dome, wider than the gold cup and proud of it. Gold
+    // stays as a lip at v38. Rust on the front faces so the lid reads on stone.
+    fillBox(volume, dims, 3, 39, 7, 13, 43, 17, MAT_IRON);
+    fillBox(volume, dims, 3, 39, 17, 13, 43, 17, MAT_RUST);
+    fillBox(volume, dims, 3, 39, 7, 3, 43, 17, MAT_RUST);
+    fillBox(volume, dims, 13, 39, 7, 13, 43, 17, MAT_RUST);
+    fillBox(volume, dims, 4, 43, 8, 12, 46, 16, MAT_IRON);
+    fillBox(volume, dims, 4, 43, 16, 12, 46, 16, MAT_RUST);
+    fillBox(volume, dims, 5, 46, 9, 11, 47, 15, MAT_IRON);
+    fillBox(volume, dims, 5, 46, 15, 11, 47, 15, MAT_RUST);
   }
   let voxelCount = 0;
   for (let i = 0; i < volume.length; i++) if (volume[i]) voxelCount += 1;
