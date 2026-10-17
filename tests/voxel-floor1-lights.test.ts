@@ -96,7 +96,7 @@ describe('voxel iron brackets', () => {
     expect(volume.includes(MAT_IRON)).toBe(true);
     expect(volume.includes(MAT_GOLD)).toBe(true);
     const bracket = readFileSync(resolve(__dirname, '../src/voxel-floor1/bracket.ts'), 'utf8');
-    expect(bracket).toContain('MeshLambertMaterial');
+    expect(bracket).toContain('MeshBasicMaterial');
     expect(bracket).toContain('MAT_WOOD');
     expect(bracket).toContain('MAT_GOLD');
     expect(bracket).not.toContain('MAT_BRASS');
@@ -104,9 +104,8 @@ describe('voxel iron brackets', () => {
     const g = (IRON_COLOR >> 8) & 255;
     const b = IRON_COLOR & 255;
     const luma = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-    expect(luma).toBeGreaterThan(0.28);
-    expect(luma).toBeLessThan(0.65);
-    expect(bracket).toContain('emissiveIntensity');
+    expect(luma).toBeGreaterThan(0.35);
+    expect(luma).toBeLessThan(0.7);
   });
 });
 

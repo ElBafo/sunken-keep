@@ -128,20 +128,19 @@ function extract(volume: Uint8Array, id: number): Uint8Array {
   return out;
 }
 
-function matteMat(color: number, emissive: number, emissiveIntensity: number): THREE.MeshLambertMaterial {
-  return new THREE.MeshLambertMaterial({
+function matteMat(color: number): THREE.MeshBasicMaterial {
+  return new THREE.MeshBasicMaterial({
     color,
-    emissive,
-    emissiveIntensity
+    fog: true
   });
 }
 
-const MATS: Record<number, THREE.MeshLambertMaterial> = {
-  // Emissive lift so iron reads mid-grey without the torch point cooking the cup.
-  [MAT_IRON]: matteMat(IRON_COLOR, 0x3e444c, 0.55),
-  [MAT_RUST]: matteMat(RUST_COLOR, 0x14161a, 0.4),
-  [MAT_WOOD]: matteMat(WOOD_COLOR, 0x2a1408, 0.22),
-  [MAT_GOLD]: matteMat(GOLD_COLOR, 0x5a3a08, 0.35)
+const MATS: Record<number, THREE.MeshBasicMaterial> = {
+  // Unlit authored colours — torch point light would blow the cup and hide the plate.
+  [MAT_IRON]: matteMat(IRON_COLOR),
+  [MAT_RUST]: matteMat(RUST_COLOR),
+  [MAT_WOOD]: matteMat(WOOD_COLOR),
+  [MAT_GOLD]: matteMat(GOLD_COLOR)
 };
 
 export function meshBracket(spec: SconceSpec): THREE.Group {
