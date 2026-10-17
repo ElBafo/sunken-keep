@@ -16,7 +16,6 @@ import {
   type OpeningVisual
 } from '../src/voxel-floor1/openings';
 import { floor1Map, openingViews, resetFloor1Doors, tileAt } from '../src/voxel-floor1/layout';
-import { WALL_VARIANTS } from '../src/voxel-floor1/constants';
 import { lookForSecret } from '../src/voxel-floor1/wall-look';
 
 function fakeDoor(locked: boolean): OpeningVisual {
@@ -120,9 +119,9 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     const openings = readFileSync(resolve(dir, 'openings.ts'), 'utf8');
     expect(openings).toContain('door_panel.png');
     expect(openings).toContain('door_open.png');
-    expect(openings).toContain('WALL_VARIANTS');
+    expect(openings).toContain('FLOOR1_WALL_FILES');
     expect(openings).toContain('lookForSecret');
-    expect(openings).toContain('applyWallLook');
+    expect(openings).not.toContain('applyWallLook');
     expect(openings).toContain('recessSecretTell');
     expect(openings).not.toContain('secret_closed.png');
     expect(openings).toContain('greedyMesh');
@@ -153,9 +152,8 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
       expect(view.wallX).toBe(5);
       expect(view.wallY).toBe(1);
       const look = lookForSecret(view.wallX, view.wallY, view.wallFace, view.tx, view.tz);
-      expect(WALL_VARIANTS).toContain(look.file);
+      expect(look.file.startsWith('walls_floor1/')).toBe(true);
       expect(look.bulge).toBe(0);
-      expect(look.key.startsWith('wall:')).toBe(true);
     }
   });
 

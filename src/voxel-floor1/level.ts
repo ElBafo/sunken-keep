@@ -7,14 +7,7 @@ import { CELL, CRACKED_CEILING_FILE, CULL_CHEB, LAYER_SIZE, VOXEL_CHEB } from '.
 import { floor1Sconces, floor1Sunbeams } from './fixtures';
 import { canStep, chebyshev, enumerateFaces, type FaceJob, type FloorMap } from './layout';
 import { isBeamCeiling, loadCrackedCeiling } from './crack';
-import {
-  applyWallLook,
-  bulgePose,
-  bulgeWorld,
-  finishVolume,
-  textureFromPixels,
-  type WallLook
-} from './wall-look';
+import { bulgePose, bulgeWorld, finishVolume, type WallLook } from './wall-look';
 import {
   FAR_BAKE_SEGS,
   farBakeMaterial,
@@ -105,13 +98,13 @@ export async function buildFloor1(
   }
 
   for (const look of usedLooks.values()) {
+    if (look.key === look.file) continue;
     const base = pngs.get(look.file);
     if (!base) continue;
-    const pixels = applyWallLook(base.data, look);
-    const vol = volumeFromImageData(pixels);
+    const vol = volumeFromImageData(base.data);
     finishVolume(vol, look);
     volumes.set(look.key, vol);
-    texByBatch.set(look.key, textureFromPixels(pixels));
+    texByBatch.set(look.key, base.texture);
     voxels += vol.voxelCount;
     roughByBatch.set(look.key, pbrMap(vol.roughness, vol.dims[0], vol.dims[1]));
   }
