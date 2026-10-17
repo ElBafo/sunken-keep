@@ -1,21 +1,55 @@
 import * as THREE from 'three';
-import { CELL, SCONCE_ANIM_FPS, SHAFT_OPACITY, SHAFT_WIDTH_TILES } from './constants';
-import { hideWallProp, sconceIsLit, torchWorldPos, type SconceSpec, type SunbeamSpec } from './fixtures';
+import {
+  BRACKET_VOX,
+  CELL,
+  CUTOUT_ALPHA_TEST,
+  SCONCE_ANIM_FPS,
+  SHAFT_OPACITY,
+  SHAFT_WIDTH_TILES
+} from './constants';
+import { dirToRot, poseGridCamera } from './camera';
+import { sconceIsLit, type SconceSpec, type SunbeamSpec } from './fixtures';
+import { applyWallMountNearCull } from './near-cull';
 import { loadPng } from '../voxel-lab/materials';
-import { flameOnBracket, meshBracket } from './bracket';
+import { cupWorldPos, flameOnBracket, meshBracket } from './bracket';
 
 type TorchVisual = {
   spec: SconceSpec;
   group: THREE.Group;
-  flame: THREE.Sprite | null;
+  flame: THREE.Mesh | null;
 };
+
+export type PropDest = { x: number; y: number; dir: number };
+
+function cutoutFlameMat(map: THREE.Texture): THREE.MeshBasicMaterial {
+  map.premultiplyAlpha = true;
+  map.wrapS = THREE.ClampToEdgeWrapping;
+  map.wrapT = THREE.ClampToEdgeWrapping;
+  map.magFilter = THREE.NearestFilter;
+  map.minFilter = THREE.NearestFilter;
+  map.generateMipmaps = false;
+  map.needsUpdate = true;
+  return new THREE.MeshBasicMaterial({
+    map,
+    color: 0xffffff,
+    transparent: true,
+    premultipliedAlpha: true,
+    alphaTest: CUTOUT_ALPHA_TEST,
+    depthTest: true,
+    depthWrite: true,
+    fog: false,
+    toneMapped: false,
+    side: THREE.DoubleSide
+  });
+}
 
 export async function buildFloor1Props(
   sconces: SconceSpec[],
   sunbeams: SunbeamSpec[]
 ): Promise<{
   group: THREE.Group;
-  update: (px: number, py: number, dir: number, now: number, freeze: boolean) => void;
+  update: (camera: THREE.Camera, now: number, freeze: boolean, dest?: PropDest | null) => void;
+  sconceVisible: (x: number, y: number, face: string) => boolean;
 }> {
   const group = new THREE.Group();
   group.name = 'floor1-props';
@@ -30,30 +64,29 @@ export async function buildFloor1Props(
   ]);
 
   const flames = [flame1.texture, flame2.texture, flame3.texture, flame4.texture];
-  const flameMat = new THREE.SpriteMaterial({
-    map: flames[0],
-    transparent: true,
-    depthWrite: false,
-    fog: false,
-    toneMapped: false,
-    alphaTest: 0.12
-  });
-  const flameW = 0.42;
-  const flameH = 0.62;
+  const flameMat = cutoutFlameMat(flames[0]);
+  const flameW = 24 * BRACKET_VOX;
+  const flameH = 40 * BRACKET_VOX;
+  const flameGeo = new THREE.PlaneGeometry(flameW, flameH);
   const visuals: TorchVisual[] = [];
+  const destCam = new THREE.PerspectiveCamera();
 
   for (const spec of sconces) {
     const g = new THREE.Group();
     g.name = `sconce:${spec.x},${spec.y},${spec.face}`;
+    g.userData.isSconce = true;
     g.add(meshBracket(spec));
 
-    let flame: THREE.Sprite | null = null;
+    let flame: THREE.Mesh | null = null;
     if (flameOnBracket(spec) && sconceIsLit(spec)) {
-      flame = new THREE.Sprite(flameMat);
-      const pos = torchWorldPos(spec);
-      flame.position.set(pos.x, pos.y + 0.06, pos.z);
-      flame.scale.set(flameW, flameH, 1);
+      flame = new THREE.Mesh(flameGeo, flameMat);
+      const pos = cupWorldPos(spec);
+      flame.position.set(pos.x, pos.y + flameH * 0.42, pos.z);
       flame.userData.noShadow = true;
+      flame.userData.isSconce = true;
+      flame.frustumCulled = false;
+      flame.castShadow = false;
+      flame.receiveShadow = false;
       flame.renderOrder = 3;
       g.add(flame);
     }
@@ -99,16 +132,30 @@ export async function buildFloor1Props(
   });
 
   const frameMs = 1000 / SCONCE_ANIM_FPS;
-  const update = (px: number, py: number, dir: number, now: number, freeze: boolean): void => {
+  const update = (camera: THREE.Camera, now: number, freeze: boolean, dest?: PropDest | null): void => {
     const frame = flames[Math.floor((freeze ? 0 : now) / frameMs) % flames.length];
     if (flameMat.map !== frame) {
       flameMat.map = frame;
       flameMat.needsUpdate = true;
     }
+    let destCamera: THREE.Camera | undefined;
+    if (dest) {
+      poseGridCamera(destCam, dest.x, dest.y, dirToRot(dest.dir));
+      destCamera = destCam;
+    }
     for (const v of visuals) {
-      v.group.visible = !hideWallProp(v.spec.x, v.spec.y, v.spec.face, px, py, dir);
+      v.group.visible = true;
+      if (v.flame) v.flame.quaternion.copy(camera.quaternion);
+      applyWallMountNearCull(v.group, camera, destCamera);
     }
   };
 
-  return { group, update };
+  return {
+    group,
+    update,
+    sconceVisible: (x: number, y: number, face: string) => {
+      const v = visuals.find((row) => row.spec.x === x && row.spec.y === y && row.spec.face === face);
+      return v ? v.group.visible : false;
+    }
+  };
 }
