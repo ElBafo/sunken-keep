@@ -70,11 +70,20 @@ export const SCONCE_ANIM_FPS = 5;
 /** Game torch flood radius (tiles). Lab point/spot still do the per-pixel work. */
 export const SCONCE_RADIUS_TILES = 2.5;
 export const TORCH_DISTANCE = SCONCE_RADIUS_TILES * CELL;
+/** Same decay the PointLight and the far bake use (Three.js physically-correct). */
+export const TORCH_DECAY = 2;
 /**
  * Lab uses 8 on a 2.5 m cell with the fill inside the mount — that blows out
  * floor-1 walls. Flame sits ~0.37 m off the wall; keep inverse-square modest.
+ * Far bake uses this same candela value so the pool does not change at the switch.
  */
 export const TORCH_INTENSITY = 3.2;
+/** Linear RGB of TORCH_COLOR — shared by PointLights and the far bake. */
+export const TORCH_RGB: [number, number, number] = [
+  ((TORCH_COLOR >> 16) & 255) / 255,
+  ((TORCH_COLOR >> 8) & 255) / 255,
+  (TORCH_COLOR & 255) / 255
+];
 export const TORCH_SPOT_INTENSITY = 4;
 export const TORCH_SPOT_DISTANCE = 7.5;
 export const TORCH_SPOT_ANGLE = Math.PI / 4.8;

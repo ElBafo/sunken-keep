@@ -1,5 +1,11 @@
 import * as THREE from 'three';
-import { CELL, SCONCE_RADIUS_TILES } from './constants';
+import {
+  SCONCE_RADIUS_TILES,
+  TORCH_DECAY,
+  TORCH_DISTANCE,
+  TORCH_INTENSITY,
+  TORCH_RGB
+} from './constants';
 import {
   floodReach,
   sconceIsLit,
@@ -8,16 +14,8 @@ import {
   torchWorldPos,
   type SconceSpec
 } from './fixtures';
-import { GAME_TORCH_RGB } from '../voxel-lab/look';
 import type { FloorMap } from './layout';
 
-/**
- * Classic TORCH_INTENSITY. Far surfaces are MeshBasic-style: texture × this
- * warm factor, falling off from the flame. Not a halo, not an untextured add.
- */
-export const BAKE_GAIN = 1.45;
-/** Classic FLOOR_AMBIENT[1] — unlit stone stays dark but readable. */
-export const FAR_AMBIENT = 0.068;
 export const FAR_TORCH_SLOTS = 3;
 
 export type FarTorch = {
@@ -50,14 +48,23 @@ export function tileInTorchFlood(tx: number, tz: number, torches: FarTorch[]): b
   return false;
 }
 
-/** Classic smoothstep. Same 2.5-tile cutoff; brighter mid-pool than t². */
-export function smoothFalloff(distTiles: number, radius: number): number {
-  if (radius <= 0 || distTiles >= radius) return 0;
-  const t = 1 - distTiles / radius;
-  return t * t * (3 - 2 * t);
+/**
+ * Same windowed inverse-square as Three.js PointLight (getDistanceAttenuation).
+ * Shared with the near real lights so the pool does not change size at the switch.
+ */
+export function torchAttenuation(
+  distMeters: number,
+  range = TORCH_DISTANCE,
+  decay = TORCH_DECAY
+): number {
+  if (range > 0 && distMeters >= range) return 0;
+  const distanceFalloff = 1 / Math.max(Math.pow(distMeters, decay), 0.01);
+  if (range <= 0) return distanceFalloff;
+  const window = Math.min(1, Math.max(0, 1 - Math.pow(distMeters / range, 4)));
+  return distanceFalloff * window * window;
 }
 
-/** Per-torch falloff on a reachable tile. Channels map to the 3 lit floor-1 torches. */
+/** Per-torch PointLight attenuation on a reachable tile. Unreachable → 0 (stays dark). */
 export function bakeWeights(
   tx: number,
   tz: number,
@@ -71,7 +78,7 @@ export function bakeWeights(
   for (let i = 0; i < torches.length && i < FAR_TORCH_SLOTS; i++) {
     if (!torches[i].reach.has(key)) continue;
     const d = Math.hypot(wx - torches[i].pos.x, wy - torches[i].pos.y, wz - torches[i].pos.z);
-    w[i] = smoothFalloff(d / CELL, SCONCE_RADIUS_TILES);
+    w[i] = torchAttenuation(d);
   }
   return w;
 }
@@ -207,15 +214,15 @@ export function geometryWithBake(
   return g;
 }
 
-const FAR_FACTOR = `max( vec3( ${FAR_AMBIENT.toFixed(3)} ), min( vec3( 1.0 ), uFarColor * max( dot( vFarW, uFarBlend ), 0.0 ) ) )`;
+/** Lambert irradiance from the shared PointLight: color × intensity × attenuation. No ambient floor. */
+const FAR_IRRADIANCE = `uFarColor * max( dot( vFarW, uFarBlend ), 0.0 )`;
 
 export function patchBakeMaterial(mat: THREE.Material): void {
-  // Classic MeshBasic: texture × torch factor. Same numbers, no halo.
   mat.userData.uFarColor = {
-    value: new THREE.Vector3(GAME_TORCH_RGB[0], GAME_TORCH_RGB[1], GAME_TORCH_RGB[2]).multiplyScalar(BAKE_GAIN)
+    value: new THREE.Vector3(TORCH_RGB[0], TORCH_RGB[1], TORCH_RGB[2]).multiplyScalar(TORCH_INTENSITY)
   };
   mat.userData.uFarBlend = { value: new THREE.Vector3() };
-  mat.customProgramCacheKey = () => 'floor1-far-bake-v6';
+  mat.customProgramCacheKey = () => 'floor1-far-bake-v7';
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uFarColor = mat.userData.uFarColor;
     shader.uniforms.uFarBlend = mat.userData.uFarBlend;
@@ -242,16 +249,16 @@ uniform vec3 uFarColor;
 uniform vec3 uFarBlend;`
     );
     if (shader.fragmentShader.includes('vec3 outgoingLight = reflectedLight.indirectDiffuse;')) {
-      // MeshBasic far flats: Classic texture × torch factor at any view distance.
+      // MeshBasic far flats: same Lambert term as the near PointLight. Unlit → black.
       shader.fragmentShader = shader.fragmentShader.replace(
         'vec3 outgoingLight = reflectedLight.indirectDiffuse;',
-        `vec3 outgoingLight = reflectedLight.indirectDiffuse * ${FAR_FACTOR};`
+        `vec3 outgoingLight = reflectedLight.indirectDiffuse * ${FAR_IRRADIANCE} * RECIPROCAL_PI;`
       );
     } else {
-      // MeshPhysical: lift after clearcoat so the baked pool is not crushed.
+      // MeshPhysical: add the same Lambert term after clearcoat. Do not max() with a floor.
       shader.fragmentShader = shader.fragmentShader.replace(
         '#include <opaque_fragment>',
-        `outgoingLight = max( outgoingLight, diffuseColor.rgb * ${FAR_FACTOR} );
+        `outgoingLight += diffuseColor.rgb * ${FAR_IRRADIANCE} * RECIPROCAL_PI;
 #include <opaque_fragment>`
       );
     }

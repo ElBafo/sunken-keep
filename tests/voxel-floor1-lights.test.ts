@@ -22,12 +22,15 @@ import {
   MAX_ACTIVE_SUNBEAMS,
   MAX_ACTIVE_TORCHES,
   SCONCE_RADIUS_TILES,
-  TORCH_INTENSITY
+  TORCH_DECAY,
+  TORCH_DISTANCE,
+  TORCH_INTENSITY,
+  TORCH_RGB
 } from '../src/voxel-floor1/constants';
 import { floor1Map, enumerateFaces, isWalkableTile, tileAt } from '../src/voxel-floor1/layout';
 import { buildBracketOccupancy, MAT_IRON } from '../src/voxel-floor1/bracket';
 import { compositeCrackedCeiling, crackedCeilingHasGap, isBeamCeiling } from '../src/voxel-floor1/crack';
-import { bakeWeights, FAR_AMBIENT, litFarTorches, smoothFalloff, tileInTorchFlood } from '../src/voxel-floor1/bake';
+import { bakeWeights, litFarTorches, tileInTorchFlood, torchAttenuation } from '../src/voxel-floor1/bake';
 
 describe('voxel-floor1 torches match the game sconce table', () => {
   it('uses floor1.sconces at the same squares and walls', () => {
@@ -137,9 +140,21 @@ describe('far torch bake lights the painted texture', () => {
     expect(south?.reach.has('3,5')).toBe(false);
     expect(tileInTorchFlood(6, 5, torches)).toBe(true);
     expect(tileInTorchFlood(3, 14, torches)).toBe(false);
-    expect(smoothFalloff(0, SCONCE_RADIUS_TILES)).toBe(1);
-    expect(smoothFalloff(SCONCE_RADIUS_TILES, SCONCE_RADIUS_TILES)).toBe(0);
-    expect(smoothFalloff(1.25, SCONCE_RADIUS_TILES)).toBeCloseTo(0.5, 5);
+  });
+
+  it('shares PointLight colour, range and inverse-square decay with the near lights', () => {
+    expect(TORCH_RGB[0]).toBeCloseTo(1, 5);
+    expect(TORCH_RGB[1]).toBeLessThan(0.65);
+    expect(TORCH_RGB[2]).toBeLessThan(0.35);
+    expect(TORCH_DECAY).toBe(2);
+    expect(TORCH_DISTANCE).toBe(SCONCE_RADIUS_TILES * CELL);
+    expect(torchAttenuation(TORCH_DISTANCE)).toBe(0);
+    expect(torchAttenuation(TORCH_DISTANCE + 0.01)).toBe(0);
+    expect(torchAttenuation(1)).toBeGreaterThan(torchAttenuation(2));
+    expect(torchAttenuation(2)).toBeGreaterThan(torchAttenuation(4));
+    const farPool = bakeWeights(4, 5, 4 * CELL, 0.1, 5 * CELL, litFarTorches(floor1Map, floor1Sconces));
+    const midPool = bakeWeights(5, 5, 5 * CELL, 0.1, 5 * CELL, litFarTorches(floor1Map, floor1Sconces));
+    expect(midPool[0] + midPool[1] + midPool[2]).toBeGreaterThan(farPool[0] + farPool[1] + farPool[2]);
   });
 });
 
@@ -176,14 +191,22 @@ describe('voxel-floor1 still does not import proto3d', () => {
     expect(main).toContain('renderer.setSize(CAMERA_VIEW_W, CAMERA_VIEW_H, false)');
     expect(main).not.toContain('TorchLightPools');
     const bake = readFileSync(resolve(__dirname, '../src/voxel-floor1/bake.ts'), 'utf8');
-    expect(FAR_AMBIENT).toBeCloseTo(0.068, 5);
     expect(bake).toContain('farBakeMaterial');
     expect(bake).toContain('MeshBasicMaterial');
-    expect(bake).toContain('GAME_TORCH_RGB');
+    expect(bake).toContain('TORCH_RGB');
+    expect(bake).toContain('TORCH_INTENSITY');
+    expect(bake).toContain('torchAttenuation');
+    expect(bake).toContain('RECIPROCAL_PI');
     expect(bake).toContain('flatGeometryWithBake');
     expect(bake).toContain('tileInTorchFlood');
     expect(bake).toContain('#include <opaque_fragment>');
+    expect(bake).not.toContain('GAME_TORCH_RGB');
+    expect(bake).not.toContain('FAR_AMBIENT');
+    expect(bake).not.toContain('0.068');
     expect(bake).not.toContain('AdditiveBlending');
+    const lights = readFileSync(resolve(__dirname, '../src/voxel-floor1/lights.ts'), 'utf8');
+    expect(lights).toContain('TORCH_RGB');
+    expect(lights).toContain('TORCH_DECAY');
     const level = readFileSync(resolve(__dirname, '../src/voxel-floor1/level.ts'), 'utf8');
     expect(level).toContain('flatGeometryWithBake');
     expect(level).toContain('tileInTorchFlood');

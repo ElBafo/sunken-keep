@@ -12,9 +12,11 @@ import {
   SUNBEAM_RADIUS_TILES,
   SCONCE_RADIUS_TILES,
   TORCH_COLOR,
+  TORCH_DECAY,
   TORCH_DISTANCE,
   TORCH_FADE_MS,
   TORCH_INTENSITY,
+  TORCH_RGB,
   TORCH_SPOT_ANGLE,
   TORCH_SPOT_DISTANCE,
   TORCH_SPOT_INTENSITY
@@ -29,7 +31,6 @@ import {
   type SconceSpec,
   type SunbeamSpec
 } from './fixtures';
-import { lookColors } from '../voxel-lab/look';
 import type { FloorMap } from './layout';
 
 export type LightStats = {
@@ -81,14 +82,12 @@ export class Floor1Lights {
   constructor(map: FloorMap) {
     this.map = map;
     this.group.name = 'floor1-lights';
-    const look = lookColors(1, false);
     const shadowSize = isMobile() ? SHADOW_MAP_MOBILE : SHADOW_MAP_DESKTOP;
-    const torchRgb = look.torch;
 
     for (let i = 0; i < MAX_ACTIVE_TORCHES; i++) {
-      const point = new THREE.PointLight(TORCH_COLOR, 0, TORCH_DISTANCE, 2);
+      const point = new THREE.PointLight(TORCH_COLOR, 0, TORCH_DISTANCE, TORCH_DECAY);
       point.name = `torch-point-${i}`;
-      point.color.setRGB(torchRgb[0], torchRgb[1], torchRgb[2]);
+      point.color.setRGB(TORCH_RGB[0], TORCH_RGB[1], TORCH_RGB[2]);
       point.castShadow = false;
       point.shadow.mapSize.set(shadowSize, shadowSize);
       point.shadow.camera.near = 0.05;
@@ -99,7 +98,7 @@ export class Floor1Lights {
       point.shadow.radius = 1;
       const spot = new THREE.SpotLight(TORCH_COLOR, 0, TORCH_SPOT_DISTANCE, TORCH_SPOT_ANGLE, 0.32, 1.4);
       spot.name = `torch-spot-${i}`;
-      spot.color.setRGB(torchRgb[0], torchRgb[1], torchRgb[2]);
+      spot.color.setRGB(TORCH_RGB[0], TORCH_RGB[1], TORCH_RGB[2]);
       spot.castShadow = true;
       spot.shadow.mapSize.set(shadowSize, shadowSize);
       spot.shadow.bias = -0.00015;
