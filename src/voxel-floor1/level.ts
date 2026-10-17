@@ -8,6 +8,7 @@ import { floor1Sconces, floor1Sunbeams } from './fixtures';
 import { chebyshev, enumerateFaces, type FaceJob, type FloorMap } from './layout';
 import { isBeamCeiling, loadCrackedCeiling } from './crack';
 import {
+  FAR_BAKE_SEGS,
   farBakeMaterial,
   flatGeometryWithBake,
   geometryWithBake,
@@ -136,22 +137,21 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
     clearGroup(voxelGroup);
     clearGroup(flatGroup);
     const voxelByFile = new Map<string, PreparedFace[]>();
-    const flats: PreparedFace[] = [];
+    const flats: Array<PreparedFace & { segs: number }> = [];
     let voxelFaces = 0;
     for (const face of prepared) {
       const dist = chebyshev(px, py, face.tx, face.tz);
       const inFlood = tileInLightFlood(face.tx, face.tz, torches, beams);
       // Keep each torch/beam pool even when the party is far down the hall.
       if (dist > CULL_CHEB && !inFlood) continue;
-      if (dist <= VOXEL_CHEB || inFlood) {
-        // Flood stays on the near MeshPhysical path at any distance so the
-        // torch-wall hotspot and beam patch do not dim at the far LOD.
+      if (dist <= VOXEL_CHEB) {
         const list = voxelByFile.get(face.file) ?? [];
         list.push(face);
         voxelByFile.set(face.file, list);
         voxelFaces += 1;
       } else {
-        flats.push(face);
+        // Flood stays in view as subdivided MeshBasic, not dense MeshPhysical.
+        flats.push({ ...face, segs: inFlood ? FAR_BAKE_SEGS : 1 });
       }
     }
 
@@ -171,11 +171,10 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
       mesh.castShadow = !isFloor;
       mesh.receiveShadow = true;
       mesh.name = `voxel:${file}`;
-      mesh.frustumCulled = false;
       voxelGroup.add(mesh);
     }
 
-    const flatsByFile = new Map<string, PreparedFace[]>();
+    const flatsByFile = new Map<string, Array<PreparedFace & { segs: number }>>();
     for (const face of flats) {
       const list = flatsByFile.get(face.file) ?? [];
       list.push(face);
@@ -184,7 +183,7 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
     for (const [file, list] of flatsByFile) {
       const mat = farMats.get(file);
       const geo = flatGeometryWithBake(
-        list.map((f) => ({ pose: f.pose, tx: f.tx, tz: f.tz })),
+        list.map((f) => ({ pose: f.pose, tx: f.tx, tz: f.tz, segs: f.segs })),
         torches,
         CELL,
         beams
@@ -222,7 +221,8 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
       return true;
     },
     setBakeBlends: (blends, flick = 1) => {
-      applyBakeBlends([...mats.values(), ...farMats.values()], torches, blends, flick, beams);
+      applyBakeBlends([...mats.values()], torches, blends, flick, beams, 'complement');
+      applyBakeBlends([...farMats.values()], torches, blends, flick, beams, 'full');
     }
   };
 }

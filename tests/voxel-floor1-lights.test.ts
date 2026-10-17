@@ -39,8 +39,10 @@ import { floor1Map, enumerateFaces, isWalkableTile, tileAt } from '../src/voxel-
 import { buildBracketOccupancy, MAT_IRON } from '../src/voxel-floor1/bracket';
 import { compositeCrackedCeiling, crackedCeilingHasGap, isBeamCeiling } from '../src/voxel-floor1/crack';
 import {
+  FAR_BAKE_SEGS,
   bakeBeamWeights,
   bakeWeights,
+  flatGeometryWithBake,
   litFarBeams,
   litFarTorches,
   spotAttenuation,
@@ -49,6 +51,8 @@ import {
   tileInTorchFlood,
   torchAttenuation
 } from '../src/voxel-floor1/bake';
+import { parseLightMode } from '../src/voxel-floor1/lights';
+import { tileFlatPose } from '../src/voxel-lab/faces';
 
 describe('voxel-floor1 torches match the game sconce table', () => {
   it('uses floor1.sconces at the same squares and walls', () => {
@@ -242,6 +246,35 @@ describe('active light cap', () => {
   });
 });
 
+describe('far flood stays on subdivided MeshBasic, not dense voxels', () => {
+  it('subdivides flood flats so the torch-wall hotspot is not a 4-vert miss', () => {
+    expect(FAR_BAKE_SEGS).toBe(8);
+    const torches = litFarTorches(floor1Map, floor1Sconces);
+    const beams = litFarBeams(floor1Map, floor1Sunbeams);
+    const pose = tileFlatPose('W', 1, 6, CELL, 'center');
+    const geo = flatGeometryWithBake([{ pose, tx: 1, tz: 6, segs: FAR_BAKE_SEGS }], torches, CELL, beams);
+    expect(geo).toBeTruthy();
+    const verts = geo!.getAttribute('position').count;
+    expect(verts).toBe((FAR_BAKE_SEGS + 1) * (FAR_BAKE_SEGS + 1));
+    const farW = geo!.getAttribute('aFarW');
+    let maxW = 0;
+    for (let i = 0; i < farW.count; i++) {
+      maxW = Math.max(maxW, farW.getX(i) + farW.getY(i) + farW.getZ(i));
+    }
+    expect(maxW).toBeGreaterThan(2);
+  });
+});
+
+describe('light modes', () => {
+  it('parses ?lights=bake|pool|all', () => {
+    expect(parseLightMode('')).toBe('bake');
+    expect(parseLightMode('test=1&dev=1')).toBe('bake');
+    expect(parseLightMode('?lights=pool')).toBe('pool');
+    expect(parseLightMode('lights=all&test=1')).toBe('all');
+    expect(parseLightMode('lights=nope')).toBe('bake');
+  });
+});
+
 describe('voxel-floor1 still does not import proto3d', () => {
   it('keeps new torch files off proto3d renderer modules', () => {
     const dir = resolve(__dirname, '../src/voxel-floor1');
@@ -265,6 +298,9 @@ describe('voxel-floor1 still does not import proto3d', () => {
     expect(main).toContain('setLookPitch');
     expect(main).toContain('renderer.setSize(CAMERA_VIEW_W, CAMERA_VIEW_H, false)');
     expect(main).not.toContain('TorchLightPools');
+    expect(main).toContain('parseLightMode');
+    expect(main).not.toContain('lastLightKey');
+    expect(main).not.toContain('if (remeshed) syncShadows()');
     const bake = readFileSync(resolve(__dirname, '../src/voxel-floor1/bake.ts'), 'utf8');
     expect(bake).toContain('farBakeMaterial');
     expect(bake).toContain('MeshBasicMaterial');
@@ -281,6 +317,8 @@ describe('voxel-floor1 still does not import proto3d', () => {
     expect(bake).toContain('#include <fog_fragment>');
     expect(bake).toContain('farCover');
     expect(bake).toContain('#include <opaque_fragment>');
+    expect(bake).toContain('FAR_BAKE_SEGS');
+    expect(bake).toContain("kind === 'full'");
     expect(bake).not.toContain('GAME_TORCH_RGB');
     expect(bake).not.toContain('FAR_AMBIENT');
     expect(bake).not.toContain('0.068');
@@ -292,12 +330,20 @@ describe('voxel-floor1 still does not import proto3d', () => {
     expect(lights).toContain('SUNBEAM_DECAY');
     expect(lights).toContain('SUNBEAM_PENUMBRA');
     expect(lights).toContain('beamKey');
+    expect(lights).toContain("mode === 'all'");
+    expect(lights).toContain("mode === 'pool'");
+    expect(lights).toContain('SLOT_HOLD');
+    expect(lights).not.toContain('castShadow = row.blend');
+    expect(lights).not.toContain('slot.spot.castShadow = false');
     const level = readFileSync(resolve(__dirname, '../src/voxel-floor1/level.ts'), 'utf8');
     expect(level).toContain('flatGeometryWithBake');
     expect(level).toContain('tileInLightFlood');
     expect(level).toContain('inFlood');
+    expect(level).toContain('FAR_BAKE_SEGS');
+    expect(level).toContain('dist <= VOXEL_CHEB');
     expect(level).toContain('receiveWhenOn = false');
     expect(level).toContain('frustumCulled = false');
+    expect(level).not.toContain('inFlood) {');
     expect(level).not.toContain('InstancedMesh');
   });
 });
