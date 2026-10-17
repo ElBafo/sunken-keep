@@ -62,7 +62,7 @@ describe('voxel-floor1 sconce near-cull', () => {
       for (let v = 0; v < H; v++) {
         for (let u = 0; u < W; u++) {
           if (!volume[u + v * W + d * W * H]) continue;
-          if (d <= 2) {
+          if (d === 0) {
             if (u < plateUMin) plateUMin = u;
             if (u > plateUMax) plateUMax = u;
             if (v < plateVMin) plateVMin = v;
@@ -80,8 +80,8 @@ describe('voxel-floor1 sconce near-cull', () => {
     expect(plateW).toBeLessThan(0.2);
     expect(plateH).toBeGreaterThan(0.45);
     expect(plateH).toBeLessThan(0.65);
-    expect(plateT).toBeGreaterThan(0.02);
-    expect(plateT).toBeLessThan(0.06);
+    expect(plateT).toBeCloseTo(BRACKET_VOX, 8);
+    expect(plateT).toBeLessThan(2 * BRACKET_VOX);
     expect(offWallWide).toBe(0);
     expect(volume.includes(MAT_WOOD)).toBe(true);
     expect(volume.includes(MAT_GOLD)).toBe(true);
@@ -240,7 +240,8 @@ describe('voxel-floor1 sconce near-cull', () => {
         frontFacesRoom = true;
       }
     }
-    expect(minOut).toBeGreaterThan(wallX + BRACKET_VOX);
+    expect(minOut).toBeGreaterThan(wallX + 0.03);
+    expect(minOut).toBeLessThan(wallX + 0.03 + BRACKET_VOX);
     expect(maxOut).toBeGreaterThan(wallX + 0.04);
     expect(frontFacesRoom).toBe(true);
   });

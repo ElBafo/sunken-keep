@@ -114,12 +114,12 @@ export const SHAFT_OPACITY = 1;
 export const WALL_TEXELS = 128;
 export const BRACKET_VOX = CELL / WALL_TEXELS;
 export const BRACKET_DIMS: [number, number, number] = [16, 48, 22];
-/** Sit the plate 2 texels in front of the wall plane (past the 3 cm stone relief). */
+/** Back of the 1-texel plate just past the 3 cm stone relief. */
 export const BRACKET_WALL_GAP = 2 * BRACKET_VOX;
 /** Gold cup top-centre in occupancy (u, v, d). Flame base anchors here. */
 export const BRACKET_CUP_U = 8.5;
 export const BRACKET_CUP_V = 42;
-export const BRACKET_CUP_D = 14.5;
+export const BRACKET_CUP_D = 11.5;
 export const BRACKET_FLAME_OUT = BRACKET_CUP_D * BRACKET_VOX + BRACKET_WALL_GAP;
 export const BRACKET_FLAME_LIFT = 0.04 + (BRACKET_CUP_V - BRACKET_DIMS[1] / 2) * BRACKET_VOX;
 export const BRACKET_HANDLE_TILT = (18 * Math.PI) / 180;
