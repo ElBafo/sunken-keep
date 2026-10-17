@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {
+  BRACKET_LAYER,
   CAMERA_FAR,
   CAMERA_FOV,
   CAMERA_NEAR,
@@ -162,9 +163,11 @@ async function boot(): Promise<void> {
   const hemi = new THREE.HemisphereLight(0x2a241c, 0x080605, 0.04);
   hemi.color.setRGB(look.ambientSky[0], look.ambientSky[1], look.ambientSky[2]);
   hemi.groundColor.setRGB(look.ambientGround[0], look.ambientGround[1], look.ambientGround[2]);
+  hemi.layers.enable(BRACKET_LAYER);
   scene.add(hemi);
   const fillLight = new THREE.AmbientLight(0x1c1814, 0.015);
   fillLight.color.setRGB(look.ambientFill[0], look.ambientFill[1], look.ambientFill[2]);
+  fillLight.layers.enable(BRACKET_LAYER);
   scene.add(fillLight);
 
   const lanternLight = new THREE.PointLight(LANTERN_COLOR, LANTERN_INTENSITY, LANTERN_DISTANCE, 2);
@@ -197,6 +200,9 @@ async function boot(): Promise<void> {
   lanternSpot.shadow.camera.updateProjectionMatrix();
   camera.add(lanternSpot);
   camera.add(lanternSpot.target);
+  camera.layers.enable(BRACKET_LAYER);
+  lanternLight.layers.enable(BRACKET_LAYER);
+  lanternSpot.layers.enable(BRACKET_LAYER);
   scene.add(camera);
 
   const mover = new GridMover(camera, floor1Map);

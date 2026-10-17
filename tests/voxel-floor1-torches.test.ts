@@ -15,7 +15,7 @@ import {
   WALL_TEXELS
 } from '../src/voxel-floor1/constants';
 import { FACE_INTO_ROOM, floor1Sconces, hideWallProp, sconceRoom, torchWorldPos } from '../src/voxel-floor1/fixtures';
-import { buildBracketOccupancy, meshBracket } from '../src/voxel-floor1/bracket';
+import { buildBracketOccupancy, cupWorldPos, MAT_WOOD, meshBracket } from '../src/voxel-floor1/bracket';
 import { cameraSpaceDepth, nearPlaneCulled, objectNearPlaneCulled } from '../src/voxel-floor1/near-cull';
 
 const lit = floor1Sconces.find((s) => s.x === 0 && s.y === 6)!;
@@ -51,22 +51,37 @@ describe('voxel-floor1 sconce near-cull', () => {
           if (d === 0) plate += 1;
           else {
             offWall += 1;
-            if (u < 5 || u > 10) offWallWide += 1;
+            if (u < 5 || u > 14) offWallWide += 1;
           }
         }
       }
     }
     expect(plate).toBeGreaterThan(20);
-    expect(plate).toBeLessThan(80);
+    expect(plate).toBeLessThan(120);
     expect(offWall).toBeGreaterThan(40);
     expect(offWallWide).toBe(0);
+    expect(volume.includes(MAT_WOOD)).toBe(true);
+    let minV = H;
+    let maxV = 0;
+    for (let d = 0; d < D; d++) {
+      for (let v = 0; v < H; v++) {
+        for (let u = 0; u < W; u++) {
+          if (!volume[u + v * W + d * W * H]) continue;
+          if (v < minV) minV = v;
+          if (v > maxV) maxV = v;
+        }
+      }
+    }
+    const tall = (maxV - minV + 1) * BRACKET_VOX;
+    expect(tall).toBeGreaterThan(0.38);
+    expect(tall).toBeLessThan(0.58);
   });
 
   it('shows the torch at rest in its room looking along the wall', () => {
     const room = sconceRoom(lit);
     expect(room).toEqual({ x: 1, y: 6 });
     const along = makeCam(1, 6, 0);
-    const pos = torchWorldPos(lit);
+    const pos = cupWorldPos(lit);
     const depth = cameraSpaceDepth(pos.x, pos.y, pos.z, along);
     expect(nearPlaneCulled(depth), `along-wall depth ${depth}`).toBe(false);
     const group = meshBracket(lit);

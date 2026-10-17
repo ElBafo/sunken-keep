@@ -113,18 +113,22 @@ export const SHAFT_OPACITY = 1;
 /** Wall `tex3d` PNGs are 128² on a CELL-metre face. Bracket voxels match that. */
 export const WALL_TEXELS = 128;
 export const BRACKET_VOX = CELL / WALL_TEXELS;
-export const BRACKET_DIMS: [number, number, number] = [16, 28, 32];
+export const BRACKET_DIMS: [number, number, number] = [20, 48, 34];
 /** Flush with the stone — a 1-texel plate, not a standing slab. */
 export const BRACKET_WALL_GAP = 0;
-/** Cup centre in occupancy (u, v, d), used for flame / light origin. */
-export const BRACKET_CUP_U = 8;
-export const BRACKET_CUP_V = 18;
-export const BRACKET_CUP_D = 27;
+/** Cup rim centre in occupancy (u, v, d). Body is ~50 cm (32 texels) tall. */
+export const BRACKET_CUP_U = 10;
+export const BRACKET_CUP_V = 38;
+export const BRACKET_CUP_D = 28;
 export const BRACKET_FLAME_OUT = BRACKET_CUP_D * BRACKET_VOX;
 export const BRACKET_FLAME_LIFT = 0.04 + (BRACKET_CUP_V - BRACKET_DIMS[1] / 2) * BRACKET_VOX;
-export const IRON_COLOR = 0x1a120e;
-export const RUST_COLOR = 0x3a2214;
-export const BRASS_COLOR = 0x4a3218;
+/** Keep the point light in the flame, not inside the iron cup. */
+export const BRACKET_LIGHT_FORWARD = 0.1;
+export const BRACKET_LIGHT_UP = 0.18;
+export const IRON_COLOR = 0x0c0908;
+export const WOOD_COLOR = 0x2a1810;
+export const RUST_COLOR = 0x1a100c;
+export const BRACKET_LAYER = 1;
 
 export {
   LANTERN_COLOR,

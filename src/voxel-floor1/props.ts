@@ -8,10 +8,10 @@ import {
   SHAFT_WIDTH_TILES
 } from './constants';
 import { dirToRot, poseGridCamera } from './camera';
-import { sconceIsLit, torchWorldPos, type SconceSpec, type SunbeamSpec } from './fixtures';
+import { sconceIsLit, type SconceSpec, type SunbeamSpec } from './fixtures';
 import { applyWallMountNearCull } from './near-cull';
 import { loadPng } from '../voxel-lab/materials';
-import { flameOnBracket, meshBracket } from './bracket';
+import { cupWorldPos, flameOnBracket, meshBracket } from './bracket';
 
 type TorchVisual = {
   spec: SconceSpec;
@@ -65,8 +65,8 @@ export async function buildFloor1Props(
 
   const flames = [flame1.texture, flame2.texture, flame3.texture, flame4.texture];
   const flameMat = cutoutFlameMat(flames[0]);
-  const flameW = 12 * BRACKET_VOX;
-  const flameH = 20 * BRACKET_VOX;
+  const flameW = 24 * BRACKET_VOX;
+  const flameH = 40 * BRACKET_VOX;
   const flameGeo = new THREE.PlaneGeometry(flameW, flameH);
   const visuals: TorchVisual[] = [];
   const destCam = new THREE.PerspectiveCamera();
@@ -80,8 +80,8 @@ export async function buildFloor1Props(
     let flame: THREE.Mesh | null = null;
     if (flameOnBracket(spec) && sconceIsLit(spec)) {
       flame = new THREE.Mesh(flameGeo, flameMat);
-      const pos = torchWorldPos(spec);
-      flame.position.set(pos.x, pos.y + flameH * 0.28, pos.z);
+      const pos = cupWorldPos(spec);
+      flame.position.set(pos.x, pos.y + flameH * 0.42, pos.z);
       flame.userData.noShadow = true;
       flame.userData.isSconce = true;
       flame.frustumCulled = false;

@@ -15,6 +15,7 @@ import {
 } from '../src/voxel-floor1/fixtures';
 import {
   BRACKET_FLAME_OUT,
+  BRACKET_LIGHT_FORWARD,
   CELL,
   CRACKED_CEILING_FILE,
   CULL_CHEB,
@@ -75,7 +76,7 @@ describe('voxel-floor1 torches match the game sconce table', () => {
     expect(isWalkableTile(tileAt(floor1Map, 1, 6))).toBe(true);
     const pos = torchWorldPos(floor1Sconces[0]);
     const wallX = 0 * CELL + FACE_INTO_ROOM.E.nx * (CELL / 2);
-    expect(pos.x).toBeCloseTo(wallX + BRACKET_FLAME_OUT, 5);
+    expect(pos.x).toBeCloseTo(wallX + BRACKET_FLAME_OUT + BRACKET_LIGHT_FORWARD, 5);
     expect(pos.x).toBeGreaterThan(wallX + 0.2);
   });
 
@@ -93,6 +94,10 @@ describe('voxel iron brackets', () => {
     const { volume, voxelCount } = buildBracketOccupancy(false);
     expect(voxelCount).toBeGreaterThan(30);
     expect(volume.includes(MAT_IRON)).toBe(true);
+    const bracket = readFileSync(resolve(__dirname, '../src/voxel-floor1/bracket.ts'), 'utf8');
+    expect(bracket).toContain('MeshLambertMaterial');
+    expect(bracket).toContain('MAT_WOOD');
+    expect(bracket).not.toContain('MAT_BRASS');
     const r = (IRON_COLOR >> 16) & 255;
     const g = (IRON_COLOR >> 8) & 255;
     const b = IRON_COLOR & 255;
@@ -325,6 +330,7 @@ describe('voxel-floor1 still does not import proto3d', () => {
   it('builds voxel brackets and camera-facing flame sprites', () => {
     const props = readFileSync(resolve(__dirname, '../src/voxel-floor1/props.ts'), 'utf8');
     expect(props).toContain('meshBracket');
+    expect(props).toContain('cupWorldPos');
     expect(props).toContain('alphaTest');
     expect(props).toContain('premultipliedAlpha');
     expect(props).toContain('applyWallMountNearCull');
@@ -332,6 +338,7 @@ describe('voxel-floor1 still does not import proto3d', () => {
     expect(props).not.toContain('THREE.Sprite');
     expect(props).not.toContain('bracket_lit_front');
     const main = readFileSync(resolve(__dirname, '../src/voxel-floor1/main.ts'), 'utf8');
+    expect(main).toContain('BRACKET_LAYER');
     expect(main).toContain('setBakeBlends');
     expect(main).toContain('CAMERA_VIEW_ASPECT');
     expect(main).toContain('CAMERA_VIEW_W');

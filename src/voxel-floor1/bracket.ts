@@ -4,12 +4,13 @@ import {
   BRACKET_CUP_U,
   BRACKET_CUP_V,
   BRACKET_DIMS,
+  BRACKET_LAYER,
   BRACKET_VOX,
   BRACKET_WALL_GAP,
-  BRASS_COLOR,
   CELL,
   IRON_COLOR,
-  RUST_COLOR
+  RUST_COLOR,
+  WOOD_COLOR
 } from './constants';
 import { FACE_INTO_ROOM, sconceIsLit, type SconceSpec } from './fixtures';
 import { geometryFrom } from '../voxel-lab/materials';
@@ -17,7 +18,7 @@ import { greedyMesh } from '../voxel-lab/mesher';
 
 export const MAT_IRON = 1;
 export const MAT_RUST = 2;
-export const MAT_BRASS = 3;
+export const MAT_WOOD = 3;
 
 function fillBox(
   volume: Uint8Array,
@@ -47,8 +48,8 @@ function fillBox(
 }
 
 /**
- * Slim iron sconce at wall-texel size: 1-texel flush plate, arm, open cup.
- * No slab / backboard that reads as a ledge from the side.
+ * ~50 cm wall torch at wall-texel size: flush iron plate, wooden stave
+ * in a dark iron ring/cup. No slab backboard, no pale rim.
  */
 export function buildBracketOccupancy(capped: boolean): {
   volume: Uint8Array;
@@ -57,20 +58,20 @@ export function buildBracketOccupancy(capped: boolean): {
 } {
   const dims = BRACKET_DIMS;
   const volume = new Uint8Array(dims[0] * dims[1] * dims[2]);
-  // Flush plate — one texel thick, small, against the stone.
-  fillBox(volume, dims, 6, 10, 0, 9, 21, 0, MAT_IRON);
-  fillBox(volume, dims, 6, 12, 0, 6, 18, 0, MAT_RUST);
-  // Slim arm out to the cup (long enough to sit at the along-corridor FOV edge).
-  fillBox(volume, dims, 7, 15, 1, 8, 16, 25, MAT_IRON);
-  fillBox(volume, dims, 7, 13, 1, 8, 14, 6, MAT_IRON);
-  // Cup: open top, low front lip so the painted flame reads.
-  fillBox(volume, dims, 5, 14, 24, 10, 14, 29, MAT_IRON);
-  fillBox(volume, dims, 5, 14, 24, 5, 19, 29, MAT_IRON);
-  fillBox(volume, dims, 10, 14, 24, 10, 19, 29, MAT_IRON);
-  fillBox(volume, dims, 6, 14, 24, 9, 19, 24, MAT_IRON);
-  fillBox(volume, dims, 6, 14, 29, 9, 16, 29, MAT_IRON);
-  fillBox(volume, dims, 5, 19, 24, 10, 19, 29, MAT_BRASS);
-  if (capped) fillBox(volume, dims, 5, 20, 24, 10, 21, 29, MAT_IRON);
+  // Flush plate — one texel thick.
+  fillBox(volume, dims, 8, 16, 0, 11, 34, 0, MAT_IRON);
+  fillBox(volume, dims, 8, 20, 0, 8, 28, 0, MAT_RUST);
+  // Iron arm out to the ring.
+  fillBox(volume, dims, 9, 24, 1, 10, 28, 24, MAT_IRON);
+  // Dark iron cup / ring (hollow, open top, low front lip).
+  fillBox(volume, dims, 6, 32, 24, 13, 33, 31, MAT_IRON);
+  fillBox(volume, dims, 6, 32, 24, 6, 39, 31, MAT_IRON);
+  fillBox(volume, dims, 13, 32, 24, 13, 39, 31, MAT_IRON);
+  fillBox(volume, dims, 7, 32, 24, 12, 39, 24, MAT_IRON);
+  fillBox(volume, dims, 7, 32, 31, 12, 35, 31, MAT_IRON);
+  // Wooden handle standing in the cup, hanging below.
+  fillBox(volume, dims, 9, 10, 26, 11, 36, 28, MAT_WOOD);
+  if (capped) fillBox(volume, dims, 6, 40, 24, 13, 41, 31, MAT_IRON);
   let voxelCount = 0;
   for (let i = 0; i < volume.length; i++) if (volume[i]) voxelCount += 1;
   return { volume, dims, voxelCount };
@@ -98,21 +99,17 @@ function extract(volume: Uint8Array, id: number): Uint8Array {
   return out;
 }
 
-function ironMat(color: number, metalness: number, roughness: number): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({
+function matteMat(color: number): THREE.MeshLambertMaterial {
+  return new THREE.MeshLambertMaterial({
     color,
-    roughness,
-    metalness,
-    envMapIntensity: 0,
-    emissive: 0x000000,
-    flatShading: false
+    emissive: 0x000000
   });
 }
 
-const MATS: Record<number, THREE.MeshStandardMaterial> = {
-  [MAT_IRON]: ironMat(IRON_COLOR, 0.12, 0.9),
-  [MAT_RUST]: ironMat(RUST_COLOR, 0.04, 0.92),
-  [MAT_BRASS]: ironMat(BRASS_COLOR, 0.22, 0.62)
+const MATS: Record<number, THREE.MeshLambertMaterial> = {
+  [MAT_IRON]: matteMat(IRON_COLOR),
+  [MAT_RUST]: matteMat(RUST_COLOR),
+  [MAT_WOOD]: matteMat(WOOD_COLOR)
 };
 
 export function meshBracket(spec: SconceSpec): THREE.Group {
@@ -120,14 +117,16 @@ export function meshBracket(spec: SconceSpec): THREE.Group {
   group.name = `bracket:${spec.x},${spec.y},${spec.face}`;
   const { volume, dims } = buildBracketOccupancy(!!spec.capped);
   const toWorld = bracketToWorld(spec);
-  for (const id of [MAT_IRON, MAT_RUST, MAT_BRASS]) {
+  for (const id of [MAT_IRON, MAT_RUST, MAT_WOOD]) {
     const occ = extract(volume, id);
     const meshed = greedyMesh(occ, dims, toWorld);
     const geo = geometryFrom(meshed.mesh);
     if (!geo) continue;
     const mesh = new THREE.Mesh(geo, MATS[id]);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
+    mesh.layers.set(BRACKET_LAYER);
+    mesh.userData.noShadow = true;
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
     mesh.frustumCulled = false;
     mesh.name = `bracket-${id}`;
     group.add(mesh);
