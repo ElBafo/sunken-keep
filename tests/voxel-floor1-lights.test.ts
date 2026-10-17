@@ -27,7 +27,7 @@ import {
 import { floor1Map, enumerateFaces, isWalkableTile, tileAt } from '../src/voxel-floor1/layout';
 import { buildBracketOccupancy, MAT_IRON } from '../src/voxel-floor1/bracket';
 import { compositeCrackedCeiling, crackedCeilingHasGap, isBeamCeiling } from '../src/voxel-floor1/crack';
-import { bakeWeights, FAR_AMBIENT, litFarTorches, tileInTorchFlood } from '../src/voxel-floor1/bake';
+import { bakeWeights, FAR_AMBIENT, litFarTorches, smoothFalloff, tileInTorchFlood } from '../src/voxel-floor1/bake';
 
 describe('voxel-floor1 torches match the game sconce table', () => {
   it('uses floor1.sconces at the same squares and walls', () => {
@@ -137,6 +137,9 @@ describe('far torch bake lights the painted texture', () => {
     expect(south?.reach.has('3,5')).toBe(false);
     expect(tileInTorchFlood(6, 5, torches)).toBe(true);
     expect(tileInTorchFlood(3, 14, torches)).toBe(false);
+    expect(smoothFalloff(0, SCONCE_RADIUS_TILES)).toBe(1);
+    expect(smoothFalloff(SCONCE_RADIUS_TILES, SCONCE_RADIUS_TILES)).toBe(0);
+    expect(smoothFalloff(1.25, SCONCE_RADIUS_TILES)).toBeCloseTo(0.5, 5);
   });
 });
 

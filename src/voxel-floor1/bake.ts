@@ -50,10 +50,11 @@ export function tileInTorchFlood(tx: number, tz: number, torches: FarTorch[]): b
   return false;
 }
 
+/** Classic smoothstep. Same 2.5-tile cutoff; brighter mid-pool than t². */
 export function smoothFalloff(distTiles: number, radius: number): number {
-  if (distTiles >= radius) return 0;
+  if (radius <= 0 || distTiles >= radius) return 0;
   const t = 1 - distTiles / radius;
-  return t * t;
+  return t * t * (3 - 2 * t);
 }
 
 /** Per-torch falloff on a reachable tile. Channels map to the 3 lit floor-1 torches. */
@@ -161,13 +162,13 @@ export function flatGeometryWithBake(
       positions.push(p[0] + x, p[1] + y, p[2] + z);
       normals.push(n[0], n[1], n[2]);
     }
-    const w = bakeWeights(item.tx, item.tz, x, y, z, torches);
+    const farW = weightsFromPositions(positions, item.tx, item.tz, torches);
     return {
       positions,
       normals,
       uvs,
       indices: [0, 2, 1, 2, 3, 1],
-      farW: [w[0], w[1], w[2], w[0], w[1], w[2], w[0], w[1], w[2], w[0], w[1], w[2]]
+      farW
     };
   });
   const merged = mergeFar(packed);
