@@ -99,7 +99,7 @@ export function isBeamCeiling(tx: number, tz: number, beams: Array<{ x: number; 
 }
 
 export async function loadCrackedCeiling(): Promise<PngPixels> {
-  const variant = pickVariant(CEILING_VARIANTS, 11, 2, 'C');
+  const variant = pickVariant(CEILING_VARIANTS, 10, 1, 'C');
   const [ceil, crack] = await Promise.all([loadPng(variant), loadPng('../atmo/ceiling_crack.png')]);
   const image = compositeCrackedCeiling(ceil.data, crack.data);
   const canvas = document.createElement('canvas');

@@ -31,6 +31,12 @@ export type SunbeamSpec = {
   wz: number;
 };
 
+export type FallenBeamSpec = {
+  x: number;
+  y: number;
+  mirror: boolean;
+};
+
 /** Same as proto3d FACE_INTO_ROOM — duplicated so this page does not import proto3d. */
 export const FACE_INTO_ROOM: Record<WallFace, { nx: number; nz: number; rotY: number }> = {
   N: { nx: 0, nz: -1, rotY: Math.PI },
@@ -43,13 +49,42 @@ export const floor1Sconces: SconceSpec[] = (rawFloor1.sconces ?? []) as SconceSp
 
 const dressingFloor1 = dressingAct1.floor1 as { sunbeam?: Array<{ x: number; y: number }> };
 
-export const floor1Sunbeams: SunbeamSpec[] = (dressingFloor1.sunbeam ?? []).map((item) => ({
-  x: item.x,
-  y: item.y,
-  wx: item.x * CELL,
-  wy: CELL - 0.008,
-  wz: item.y * CELL
-}));
+/** Voxel page: drop the west-hall double crack; sit the guard-hall beam on the debris. */
+const VOXEL_SKIP_BEAMS = new Set(['2,6']);
+const VOXEL_MOVE_BEAMS: Record<string, { x: number; y: number }> = {
+  '11,2': { x: 10, y: 1 }
+};
+
+export const floor1Sunbeams: SunbeamSpec[] = (dressingFloor1.sunbeam ?? []).flatMap((item) => {
+  const key = `${item.x},${item.y}`;
+  if (VOXEL_SKIP_BEAMS.has(key)) return [];
+  const at = VOXEL_MOVE_BEAMS[key] ?? item;
+  return [
+    {
+      x: at.x,
+      y: at.y,
+      wx: at.x * CELL,
+      wy: CELL - 0.008,
+      wz: at.y * CELL
+    }
+  ];
+});
+
+/** Map piles plus the crack square so debris reads as having come through the hole. */
+export const floor1FallenBeams: FallenBeamSpec[] = (() => {
+  const out: FallenBeamSpec[] = [];
+  const seen = new Set<string>();
+  for (let y = 0; y < rawFloor1.height; y++) {
+    for (let x = 0; x < rawFloor1.width; x++) {
+      const tile = rawFloor1.tiles[y][x] as { prop?: string; mirror?: boolean };
+      if (tile.prop !== 'beams_fallen') continue;
+      seen.add(`${x},${y}`);
+      out.push({ x, y, mirror: !!tile.mirror });
+    }
+  }
+  if (!seen.has('10,1')) out.push({ x: 10, y: 1, mirror: false });
+  return out;
+})();
 
 export function sconceRoom(s: SconceSpec): { x: number; y: number } {
   const { nx, nz } = FACE_INTO_ROOM[s.face];
