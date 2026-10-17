@@ -25,7 +25,7 @@ import {
 import { facingCell, GridMover } from './camera';
 import { lookColors } from '../voxel-lab/look';
 import { applyShadowToggle, recompileShadowShaders } from '../voxel-lab/shadows';
-import { floor1Sconces, floor1Sunbeams } from './fixtures';
+import { facingSconce, floor1Sconces, floor1Sunbeams, TORCH_CAPPED_PROMPT } from './fixtures';
 import {
   Floor1Lights,
   parseLightMode,
@@ -37,6 +37,7 @@ import {
 } from './lights';
 import { floor1Map, tileAt } from './layout';
 import { buildFloor1 } from './level';
+import { buildFloor1Markers } from './markers';
 import { buildFloor1Openings } from './openings';
 import { buildFloor1Props } from './props';
 
@@ -243,6 +244,8 @@ async function boot(): Promise<void> {
   scene.add(props.group);
   const openings = await buildFloor1Openings(floor1Map, lightMode === 'all');
   scene.add(openings.group);
+  const markers = buildFloor1Markers(floor1Map);
+  scene.add(markers.group);
 
   const resize = (): void => {
     const cssW = window.innerWidth;
@@ -382,10 +385,23 @@ async function boot(): Promise<void> {
     const tile = tileAt(floor1Map, pos.x, pos.y);
     if (tile?.secret && !tile.secretOpen) {
       const ok = openings.system.openSecret(pos.x, pos.y, performance.now());
-      if (ok) showPrompt('The stone grinds aside.');
+      if (ok) {
+        showPrompt('The stone grinds aside.');
+        markers.update();
+      }
       return ok ? 'secret' : 'none';
     }
     if (tile?.door) return handleDoor(pos.x, pos.y);
+    const sconce = facingSconce(floor1Sconces, mover.x, mover.y, mover.dir);
+    if (sconce?.capped) {
+      showPrompt(TORCH_CAPPED_PROMPT);
+      return 'torch_capped';
+    }
+    const markerLine = markers.interact(mover.x, mover.y, mover.dir);
+    if (markerLine) {
+      showPrompt(markerLine);
+      return 'marker';
+    }
     return 'none';
   };
   const syncDoorButton = (): void => {
@@ -603,6 +619,7 @@ async function boot(): Promise<void> {
     if (arrived) onArrived();
     else if (!stepTracking && !mover.moving && level.pump()) level.warm(uploadPending);
     openings.system.update(now);
+    markers.update();
     syncDoorButton();
     api.hasKey = hasKey;
 

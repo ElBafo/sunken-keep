@@ -8,6 +8,7 @@ import {
   DOOR_SLIDE,
   DOOR_UNLOCK_LEAD_MS
 } from '../src/voxel-floor1/constants';
+import { greedyMesh } from '../src/voxel-lab/mesher';
 import {
   OpeningSystem,
   pickSecretTellTexels,
@@ -124,6 +125,23 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     expect(openings).not.toContain('secret_closed.png');
     expect(openings).toContain('greedyMesh');
     expect(openings).toContain('patchBakeMaterial');
+    expect(openings).toContain('keepBack');
+    expect(openings).toContain('cullNeg: [false, false, false]');
+    expect(main).toContain('buildFloor1Markers');
+    expect(main).toContain('TORCH_CAPPED_PROMPT');
+    expect(main).toContain('facingSconce');
+    expect(main).not.toContain('relightTorch');
+    expect(main).not.toContain('lightFacingTorch');
+  });
+
+  it('keeps greedy-mesh back faces when cullNeg depth is off', () => {
+    const dims: [number, number, number] = [2, 2, 2];
+    const volume = new Uint8Array(8).fill(1);
+    const toWorld = (x: number, y: number, z: number): [number, number, number] => [x, y, z];
+    const culled = greedyMesh(volume, dims, toWorld);
+    const kept = greedyMesh(volume, dims, toWorld, { cullNeg: [false, false, false] });
+    expect(kept.quads).toBeGreaterThan(culled.quads);
+    expect(kept.quads - culled.quads).toBe(1);
   });
 
   it('hashes secret faces like neighbouring stone walls', () => {

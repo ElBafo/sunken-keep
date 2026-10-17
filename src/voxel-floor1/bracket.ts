@@ -104,7 +104,12 @@ export function buildBracketOccupancy(capped: boolean): {
   }
   // Gold wrap: ~1/6 of the handle, a short band right under the flame.
   fillBox(volume, dims, 6, 38, 9, 10, 41, 13, MAT_GOLD);
-  if (capped) fillBox(volume, dims, 6, 42, 9, 10, 43, 13, MAT_IRON);
+  if (capped) {
+    // Dark iron lid over the cup — Classic capped sconces only. Slightly wider than the gold rim.
+    fillBox(volume, dims, 5, 41, 8, 11, 42, 14, MAT_IRON);
+    fillBox(volume, dims, 6, 42, 9, 10, 44, 13, MAT_IRON);
+    fillBox(volume, dims, 7, 44, 10, 9, 45, 12, MAT_IRON);
+  }
   let voxelCount = 0;
   for (let i = 0; i < volume.length; i++) if (volume[i]) voxelCount += 1;
   return { volume, dims, voxelCount };

@@ -18,7 +18,17 @@ import {
   WALL_MOUNT_NEAR_CULL,
   WALL_TEXELS
 } from '../src/voxel-floor1/constants';
-import { FACE_INTO_ROOM, floor1Sconces, hideWallProp, sconceRoom, torchWorldPos } from '../src/voxel-floor1/fixtures';
+import {
+  FACE_INTO_ROOM,
+  facingSconce,
+  floor1Sconces,
+  hideWallProp,
+  sconceIsCapped,
+  sconceIsLit,
+  sconceRoom,
+  TORCH_CAPPED_PROMPT,
+  torchWorldPos
+} from '../src/voxel-floor1/fixtures';
 import {
   buildBracketOccupancy,
   cupWorldPos,
@@ -244,5 +254,70 @@ describe('voxel-floor1 sconce near-cull', () => {
     expect(minOut).toBeLessThan(wallX + 0.03 + BRACKET_VOX);
     expect(maxOut).toBeGreaterThan(wallX + 0.04);
     expect(frontFacesRoom).toBe(true);
+  });
+});
+
+describe('voxel-floor1 capped sconces', () => {
+  const capped = floor1Sconces.filter((s) => s.capped);
+  const dead = floor1Sconces.filter((s) => !s.lit && !s.capped);
+  const litSconces = floor1Sconces.filter((s) => s.lit);
+
+  function ironAboveCup(cappedLid: boolean): number {
+    const { volume, dims } = buildBracketOccupancy(cappedLid);
+    const [W, H, D] = dims;
+    let n = 0;
+    for (let d = 0; d < D; d++) {
+      for (let v = 42; v < H; v++) {
+        for (let u = 0; u < W; u++) {
+          if (volume[u + v * W + d * W * H] === MAT_IRON) n += 1;
+        }
+      }
+    }
+    return n;
+  }
+
+  it('caps only Classic floor-1 sealed sconces, not dead unlit brackets', () => {
+    expect(capped.map((s) => `${s.x},${s.y},${s.face}`).sort()).toEqual(['0,3,E', '9,0,S']);
+    expect(dead.length).toBe(4);
+    expect(litSconces.length).toBe(3);
+    for (const s of capped) {
+      expect(s.lit).toBe(false);
+      expect(sconceIsCapped(s)).toBe(true);
+      expect(sconceIsLit(s)).toBe(false);
+    }
+    for (const s of dead) {
+      expect(sconceIsCapped(s)).toBe(false);
+      expect(sconceIsLit(s)).toBe(false);
+    }
+  });
+
+  it('puts a dark iron lid over the cup and leaves unlit brackets open', () => {
+    expect(ironAboveCup(true)).toBeGreaterThan(20);
+    expect(ironAboveCup(false)).toBe(0);
+    const { volume: capVol, dims } = buildBracketOccupancy(true);
+    const [W, H, D] = dims;
+    let lidUMin = W;
+    let lidUMax = 0;
+    for (let d = 0; d < D; d++) {
+      for (let v = 41; v < H; v++) {
+        for (let u = 0; u < W; u++) {
+          if (capVol[u + v * W + d * W * H] !== MAT_IRON) continue;
+          if (u < lidUMin) lidUMin = u;
+          if (u > lidUMax) lidUMax = u;
+        }
+      }
+    }
+    expect(lidUMax - lidUMin + 1).toBeGreaterThanOrEqual(6);
+  });
+
+  it('faces the same capped sconces as Classic and keeps the sealed line', () => {
+    const south = facingSconce(floor1Sconces, 9, 1, 0);
+    expect(south).toMatchObject({ x: 9, y: 0, face: 'S', capped: true });
+    const east = facingSconce(floor1Sconces, 1, 3, 3);
+    expect(east).toMatchObject({ x: 0, y: 3, face: 'E', capped: true });
+    const deadWest = facingSconce(floor1Sconces, 3, 6, 1);
+    expect(deadWest).toMatchObject({ x: 4, y: 6, face: 'W', capped: false, lit: false });
+    expect(facingSconce(floor1Sconces, 9, 1, 2)).toBeUndefined();
+    expect(TORCH_CAPPED_PROMPT).toBe("Sealed. It'll take forge-fire to open.");
   });
 });

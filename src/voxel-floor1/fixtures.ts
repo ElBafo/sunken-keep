@@ -60,8 +60,38 @@ export function sconceIsLit(s: SconceSpec): boolean {
   return !!s.lit && !s.capped && !s.empty;
 }
 
+/** Classic sealed sconces — iron cap, no flame, no light. Dead unlit brackets are not capped. */
+export function sconceIsCapped(s: SconceSpec): boolean {
+  return !!s.capped;
+}
+
+/** Same line as public/log.json `torch_capped`. */
+export const TORCH_CAPPED_PROMPT = "Sealed. It'll take forge-fire to open.";
+
 export function sconceKey(s: Pick<SconceSpec, 'x' | 'y' | 'face'>): string {
   return `${s.x},${s.y},${s.face}`;
+}
+
+/** Party stands in the sconce's room square, facing the wall cell. Same as proto3d. */
+export function facingSconce(
+  sconces: SconceSpec[],
+  playerX: number,
+  playerY: number,
+  dir: number
+): SconceSpec | undefined {
+  const deltas = [
+    [0, -1],
+    [1, 0],
+    [0, 1],
+    [-1, 0]
+  ] as const;
+  const [dx, dy] = deltas[dir & 3];
+  const fx = playerX + dx;
+  const fy = playerY + dy;
+  return sconces.find((s) => {
+    const room = sconceRoom(s);
+    return room.x === playerX && room.y === playerY && s.x === fx && s.y === fy;
+  });
 }
 
 export function beamKey(b: Pick<SunbeamSpec, 'x' | 'y'>): string {
