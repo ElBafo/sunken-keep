@@ -13,8 +13,7 @@ import {
   LAYER_SIZE,
   SHADOW_MAP_DESKTOP,
   SHADOW_MAP_MOBILE,
-  TORCH_COLOR,
-  TORCH_INTENSITY
+  TORCH_COLOR
 } from '../voxel-lab/constants';
 
 /** Same grid / eye / FOV as proto3d. Lab materials still use LAYER_SIZE = 1 cm. */
@@ -49,6 +48,7 @@ export const FLOOR_VARIANTS = [
   'floor_stone_4.png'
 ] as const;
 export const CEILING_VARIANTS = ['ceiling.png', 'ceiling_2.png', 'ceiling_3.png', 'ceiling_4.png'] as const;
+export const CRACKED_CEILING_FILE = 'ceiling_cracked.png';
 
 /** Same wall-mount sizes / flicker window as proto3d; duplicated so this page does not import it. */
 export const SCONCE_WIDTH_TILES = 0.25;
@@ -60,16 +60,35 @@ export const SCONCE_ANIM_FPS = 5;
 /** Game torch flood radius (tiles). Lab point/spot still do the per-pixel work. */
 export const SCONCE_RADIUS_TILES = 2.5;
 export const TORCH_DISTANCE = SCONCE_RADIUS_TILES * CELL;
-export const TORCH_SPOT_INTENSITY = 10;
+/**
+ * Lab uses 8 on a 2.5 m cell with the fill inside the mount — that blows out
+ * floor-1 walls. Flame sits ~0.37 m off the wall; keep inverse-square modest.
+ */
+export const TORCH_INTENSITY = 3.2;
+export const TORCH_SPOT_INTENSITY = 4;
 export const TORCH_SPOT_DISTANCE = 7.5;
 export const TORCH_SPOT_ANGLE = Math.PI / 4.8;
 export const MAX_ACTIVE_TORCHES = 2;
 export const MAX_ACTIVE_SUNBEAMS = 1;
+export const TORCH_FADE_MS = 280;
 export const SUNBEAM_COLOR = 0xb3d6ff;
-export const SUNBEAM_INTENSITY = 0.38 * 6;
+export const SUNBEAM_INTENSITY = 0.38 * 8;
 export const SUNBEAM_DISTANCE = CELL * 2.4;
 export const SUNBEAM_RADIUS_TILES = 2.0;
 export const SUNBEAM_ANGLE = Math.PI / 7;
+export const SHAFT_WIDTH_TILES = 0.55;
+export const SHAFT_OPACITY = 1;
+
+/** Voxel iron bracket — painted-sconce dark iron, not pale silver. */
+export const BRACKET_VOX = 0.05;
+export const BRACKET_DIMS: [number, number, number] = [10, 20, 10];
+export const BRACKET_WALL_GAP = 0.02;
+export const BRACKET_FLAME_OUT = 0.37;
+export const BRACKET_FLAME_LIFT = 0.29;
+export const IRON_COLOR = 0x1a120e;
+export const RUST_COLOR = 0x3a2214;
+export const BRASS_COLOR = 0x4a3218;
+export const BAKE_GAIN = 0.5;
 
 export {
   LANTERN_COLOR,
@@ -85,6 +104,5 @@ export {
   LAYER_SIZE,
   SHADOW_MAP_DESKTOP,
   SHADOW_MAP_MOBILE,
-  TORCH_COLOR,
-  TORCH_INTENSITY
+  TORCH_COLOR
 };

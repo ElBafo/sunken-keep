@@ -3,6 +3,7 @@ import {
   CAMERA_FAR,
   CAMERA_FOV,
   CAMERA_NEAR,
+  CAMERA_PITCH,
   CELL,
   LANTERN_COLOR,
   LANTERN_DISTANCE,
@@ -22,6 +23,7 @@ import { floor1Sconces, floor1Sunbeams } from './fixtures';
 import { Floor1Lights } from './lights';
 import { floor1Map } from './layout';
 import { buildFloor1 } from './level';
+import { TorchLightPools } from './pools';
 import { buildFloor1Props } from './props';
 
 THREE.ColorManagement.enabled = true;
@@ -47,6 +49,7 @@ type Floor1Api = {
   eyeHeight: number;
   fov: number;
   setPosition: (x: number, y: number, dir: number) => void;
+  setLookPitch: (rad: number) => void;
   stepForward: () => boolean;
   stepBack: () => boolean;
   turnLeft: () => boolean;
@@ -166,6 +169,8 @@ async function boot(): Promise<void> {
   loading.textContent = 'Placing torches…';
   const props = await buildFloor1Props(floor1Sconces, floor1Sunbeams);
   scene.add(props.group);
+  const pools = new TorchLightPools(floor1Map, floor1Sconces);
+  scene.add(pools.group);
 
   const resize = (): void => {
     const w = window.innerWidth;
@@ -190,6 +195,8 @@ async function boot(): Promise<void> {
 
   const placeLights = (now: number): void => {
     lights.setParty(mover.x, mover.y, now, preserveBuffer);
+    const flick = preserveBuffer ? 1 : 1 + 0.05 * Math.sin(now * 0.001 * 6.1);
+    pools.setBlends(lights.blends, flick);
     props.update(mover.x, mover.y, mover.dir, now, preserveBuffer);
     const key = `${lights.stats.torchesActive}:${lights.stats.sunbeamsActive}`;
     if (key !== lastLightKey) {
@@ -198,11 +205,11 @@ async function boot(): Promise<void> {
     }
   };
 
-  const renderFrame = (): number => {
+  const renderFrame = (): { draws: number; tris: number } => {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.setRenderTarget(null);
     renderer.render(scene, camera);
-    return renderer.info.render.calls;
+    return { draws: renderer.info.render.calls, tris: renderer.info.render.triangles };
   };
 
   const samplePixels = (
@@ -327,7 +334,12 @@ async function boot(): Promise<void> {
     fov: CAMERA_FOV,
     setPosition: (x, y, dir) => {
       mover.setPosition(x, y, dir);
+      camera.rotation.x = CAMERA_PITCH;
       onArrived();
+    },
+    setLookPitch: (rad) => {
+      camera.rotation.x = rad;
+      camera.updateMatrixWorld();
     },
     stepForward: () => mover.step(1),
     stepBack: () => mover.step(-1),
@@ -374,10 +386,10 @@ async function boot(): Promise<void> {
     }
     placeLights(now);
 
-    const draws = renderFrame();
-    api.draws = draws;
+    const frame = renderFrame();
+    api.draws = frame.draws;
     api.lights = lights.stats;
-    api.triangles = level.stats.triangles;
+    api.triangles = frame.tris;
     api.voxelFaces = level.stats.voxelFaces;
     api.flatFaces = level.stats.flatFaces;
     api.gridX = mover.x;
@@ -397,7 +409,7 @@ async function boot(): Promise<void> {
       statsEl.innerHTML =
         `<div><b>${api.fps}</b> fps</div>` +
         `<div>${api.avgMs.toFixed(1)} ms avg · <b>${api.worstMs.toFixed(1)}</b> ms worst</div>` +
-        `<div>${draws} draws · ${api.triangles.toLocaleString()} tri</div>` +
+        `<div>${frame.draws} draws · ${api.triangles.toLocaleString()} tri</div>` +
         `<div>${api.voxelFaces} vx faces · ${api.flatFaces} flat</div>` +
         `<div>${api.lights.total} lights · ${api.lights.torchesActive}/${api.lights.torchesLit} torch · ${api.lights.sunbeamsActive}/${api.lights.sunbeams} beam</div>`;
     }

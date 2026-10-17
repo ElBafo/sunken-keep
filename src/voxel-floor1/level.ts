@@ -3,8 +3,10 @@ import { volumeFromImageData, type VolumeFromPixels } from '../voxel-lab/classif
 import { makeToWorld, tileFlatPose, type FaceId } from '../voxel-lab/faces';
 import { geometryFrom, loadPng, pbrMap, voxelMaterial, type PngPixels } from '../voxel-lab/materials';
 import { greedyMesh, mergeMeshes, type MeshArrays } from '../voxel-lab/mesher';
-import { CELL, CULL_CHEB, LAYER_SIZE, VOXEL_CHEB } from './constants';
+import { CELL, CRACKED_CEILING_FILE, CULL_CHEB, LAYER_SIZE, VOXEL_CHEB } from './constants';
+import { floor1Sunbeams } from './fixtures';
 import { chebyshev, enumerateFaces, type FaceJob, type FloorMap } from './layout';
+import { isBeamCeiling, loadCrackedCeiling } from './crack';
 
 export interface LevelStats {
   voxels: number;
@@ -37,11 +39,16 @@ function applyPose(mesh: THREE.Object3D, face: FaceId, tx: number, tz: number): 
 
 export async function buildFloor1(map: FloorMap, partyX: number, partyY: number): Promise<BuiltLevel> {
   const jobs = enumerateFaces(map);
+  for (const job of jobs) {
+    if (job.kind === 'ceiling' && isBeamCeiling(job.tx, job.tz, floor1Sunbeams)) {
+      job.file = CRACKED_CEILING_FILE;
+    }
+  }
   const needed = [...new Set(jobs.map((j) => j.file))];
   const pngs = new Map<string, PngPixels>();
   await Promise.all(
     needed.map(async (file) => {
-      pngs.set(file, await loadPng(file));
+      pngs.set(file, file === CRACKED_CEILING_FILE ? await loadCrackedCeiling() : await loadPng(file));
     })
   );
 

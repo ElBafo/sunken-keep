@@ -13,6 +13,7 @@ import {
   SCONCE_RADIUS_TILES,
   TORCH_COLOR,
   TORCH_DISTANCE,
+  TORCH_FADE_MS,
   TORCH_INTENSITY,
   TORCH_SPOT_ANGLE,
   TORCH_SPOT_DISTANCE,
@@ -22,6 +23,7 @@ import {
   FACE_INTO_ROOM,
   floodReach,
   sconceIsLit,
+  sconceKey,
   sconceRoom,
   torchWorldPos,
   type SconceSpec,
@@ -43,6 +45,7 @@ export type LightStats = {
 type TorchSlot = {
   point: THREE.PointLight;
   spot: THREE.SpotLight;
+  key: string;
 };
 
 function isMobile(): boolean {
@@ -57,12 +60,14 @@ function torchFlicker(now: number, seed: number, freeze: boolean): number {
 
 export class Floor1Lights {
   group = new THREE.Group();
+  blends = new Map<string, number>();
   private torchSlots: TorchSlot[] = [];
   private sunbeamSlots: THREE.SpotLight[] = [];
   private sconces: SconceSpec[] = [];
   private sunbeams: SunbeamSpec[] = [];
   private map: FloorMap;
   private reach = new Map<string, Set<string>>();
+  private lastNow = 0;
   stats: LightStats = {
     lantern: 1,
     torches: 0,
@@ -104,7 +109,7 @@ export class Floor1Lights {
       spot.shadow.camera.far = 8;
       spot.shadow.camera.updateProjectionMatrix();
       this.group.add(point, spot, spot.target);
-      this.torchSlots.push({ point, spot });
+      this.torchSlots.push({ point, spot, key: '' });
     }
 
     for (let i = 0; i < MAX_ACTIVE_SUNBEAMS; i++) {
@@ -120,10 +125,13 @@ export class Floor1Lights {
     this.sconces = sconces;
     this.sunbeams = sunbeams;
     this.reach.clear();
+    this.blends.clear();
     for (const s of sconces) {
       if (!sconceIsLit(s)) continue;
       const room = sconceRoom(s);
-      this.reach.set(`${s.x},${s.y},${s.face}`, floodReach(this.map, room.x, room.y, SCONCE_RADIUS_TILES));
+      const key = sconceKey(s);
+      this.reach.set(key, floodReach(this.map, room.x, room.y, SCONCE_RADIUS_TILES));
+      this.blends.set(key, 0);
     }
     scene.add(this.group);
     this.stats.torches = sconces.length;
@@ -133,41 +141,58 @@ export class Floor1Lights {
 
   setParty(px: number, py: number, now: number, freezeFlicker: boolean): void {
     const partyKey = `${px},${py}`;
+    const dt = this.lastNow ? Math.min(0.08, Math.max(0, (now - this.lastNow) / 1000)) : 0;
+    this.lastNow = now;
+    const fade = freezeFlicker ? 1 : Math.min(1, (dt * 1000) / TORCH_FADE_MS);
+
     const lit = this.sconces.filter(sconceIsLit);
     const ranked = lit
       .map((s) => {
         const room = sconceRoom(s);
-        const canSee = this.reach.get(`${s.x},${s.y},${s.face}`)?.has(partyKey) ?? false;
-        return { s, room, canSee, dist: Math.hypot(room.x - px, room.y - py) };
+        const key = sconceKey(s);
+        const canSee = this.reach.get(key)?.has(partyKey) ?? false;
+        return { s, room, key, canSee, dist: Math.hypot(room.x - px, room.y - py) };
       })
       .filter((row) => row.canSee)
       .sort((a, b) => a.dist - b.dist);
 
+    const desired = new Set(ranked.slice(0, MAX_ACTIVE_TORCHES).map((row) => row.key));
+    for (const s of lit) {
+      const key = sconceKey(s);
+      const want = desired.has(key) ? 1 : 0;
+      const cur = this.blends.get(key) ?? 0;
+      this.blends.set(key, freezeFlicker ? want : cur + (want - cur) * Math.max(fade, 0.04));
+    }
+
+    const byBlend = lit
+      .map((s) => ({ s, key: sconceKey(s), blend: this.blends.get(sconceKey(s)) ?? 0 }))
+      .filter((row) => row.blend > 0.015)
+      .sort((a, b) => b.blend - a.blend);
+
     let torchActive = 0;
     for (let i = 0; i < this.torchSlots.length; i++) {
       const slot = this.torchSlots[i];
-      const row = ranked[i];
+      const row = byBlend[i];
       if (!row) {
         slot.point.intensity = 0;
         slot.spot.intensity = 0;
         slot.point.castShadow = false;
         slot.spot.castShadow = false;
+        slot.key = '';
         continue;
       }
       const pos = torchWorldPos(row.s);
       const { nx, nz } = FACE_INTO_ROOM[row.s.face];
       const flick = torchFlicker(now, i * 1.7, freezeFlicker);
-      // Pull the fill ~22 cm off the wall like the lab so the mount does not blow out.
-      const lx = pos.x + nx * 0.22;
-      const lz = pos.z + nz * 0.22;
-      slot.point.position.set(lx, pos.y, lz);
+      slot.point.position.set(pos.x, pos.y, pos.z);
       slot.spot.position.copy(slot.point.position);
-      slot.spot.target.position.set(lx + nx * 2.4, 0.12, lz + nz * 2.4);
-      slot.point.intensity = TORCH_INTENSITY * flick;
-      slot.spot.intensity = TORCH_SPOT_INTENSITY * flick;
+      slot.spot.target.position.set(pos.x + nx * 2.4, 0.12, pos.z + nz * 2.4);
+      slot.point.intensity = TORCH_INTENSITY * flick * row.blend;
+      slot.spot.intensity = TORCH_SPOT_INTENSITY * flick * row.blend;
       slot.point.castShadow = false;
-      slot.spot.castShadow = true;
-      torchActive += 1;
+      slot.spot.castShadow = row.blend > 0.35;
+      slot.key = row.key;
+      if (row.blend > 0.35) torchActive += 1;
     }
 
     const beams = this.sunbeams
