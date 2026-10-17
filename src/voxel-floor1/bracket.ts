@@ -9,7 +9,7 @@ import {
   BRACKET_VOX,
   BRACKET_WALL_GAP,
   CELL,
-  BRASS_COLOR,
+  EMBER_COLOR,
   GOLD_COLOR,
   IRON_COLOR,
   RUST_COLOR,
@@ -23,6 +23,7 @@ export const MAT_IRON = 1;
 export const MAT_RUST = 2;
 export const MAT_WOOD = 3;
 export const MAT_GOLD = 4;
+export const MAT_EMBER = 5;
 
 const HANDLE_LEN = 28;
 const HANDLE_V0 = 10;
@@ -54,6 +55,19 @@ function fillBox(
       }
     }
   }
+}
+
+/** Recess the front voxel and lay dull ember in the groove behind it. */
+function engrave(
+  volume: Uint8Array,
+  dims: [number, number, number],
+  x0: number,
+  y0: number,
+  x1: number,
+  y1: number
+): void {
+  fillBox(volume, dims, x0, y0, 21, x1, y1, 21, 0);
+  fillBox(volume, dims, x0, y0, 20, x1, y1, 20, MAT_EMBER);
 }
 
 function handleWidth(i: number): number {
@@ -117,18 +131,20 @@ export function buildBracketOccupancy(capped: boolean): {
     fillBox(volume, dims, 4, 44, 16, 12, 46, 16, MAT_RUST);
     fillBox(volume, dims, 5, 46, 9, 11, 47, 15, MAT_IRON);
     fillBox(volume, dims, 5, 46, 15, 11, 47, 15, MAT_RUST);
-    // Iron staple on the cap. A U-shackle hangs below the front lip, then a
-    // chunky brass padlock (~1.5× cup width) so the lock reads at phone size.
-    fillBox(volume, dims, 6, 38, 16, 10, 42, 19, MAT_IRON);
-    fillBox(volume, dims, 4, 32, 18, 5, 42, 21, MAT_IRON);
-    fillBox(volume, dims, 10, 32, 18, 11, 42, 21, MAT_IRON);
-    fillBox(volume, dims, 4, 41, 18, 11, 42, 21, MAT_IRON);
-    fillBox(volume, dims, 4, 32, 18, 11, 33, 21, MAT_IRON);
-    fillBox(volume, dims, 4, 24, 16, 11, 32, 21, MAT_GOLD);
-    fillBox(volume, dims, 4, 24, 16, 4, 32, 20, MAT_RUST);
-    fillBox(volume, dims, 11, 24, 16, 11, 32, 20, MAT_RUST);
-    fillBox(volume, dims, 4, 24, 16, 11, 24, 20, MAT_RUST);
-    fillBox(volume, dims, 7, 27, 21, 8, 30, 21, MAT_IRON);
+    // Iron slab (~1.5× cup, same face as the old padlock) flush on the cap
+    // front — no gap, no shackle. A recessed fire-seal rune (triangle on a
+    // stave) is engraved into the face; dull ember in the grooves, no light.
+    fillBox(volume, dims, 4, 36, 17, 11, 44, 21, MAT_IRON);
+    fillBox(volume, dims, 4, 36, 17, 4, 44, 21, MAT_RUST);
+    fillBox(volume, dims, 11, 36, 17, 11, 44, 21, MAT_RUST);
+    fillBox(volume, dims, 4, 36, 17, 11, 36, 21, MAT_RUST);
+    fillBox(volume, dims, 4, 44, 17, 11, 44, 21, MAT_RUST);
+    engrave(volume, dims, 7, 43, 8, 43);
+    engrave(volume, dims, 6, 42, 9, 42);
+    engrave(volume, dims, 5, 41, 6, 41);
+    engrave(volume, dims, 9, 41, 10, 41);
+    engrave(volume, dims, 5, 40, 10, 40);
+    engrave(volume, dims, 7, 37, 8, 39);
   }
   let voxelCount = 0;
   for (let i = 0; i < volume.length; i++) if (volume[i]) voxelCount += 1;
@@ -170,21 +186,21 @@ const MATS: Record<number, THREE.MeshBasicMaterial> = {
   [MAT_IRON]: matteMat(IRON_COLOR),
   [MAT_RUST]: matteMat(RUST_COLOR),
   [MAT_WOOD]: matteMat(WOOD_COLOR),
-  [MAT_GOLD]: matteMat(GOLD_COLOR)
+  [MAT_GOLD]: matteMat(GOLD_COLOR),
+  [MAT_EMBER]: matteMat(EMBER_COLOR)
 };
-const BRASS_MAT = matteMat(BRASS_COLOR);
 
 export function meshBracket(spec: SconceSpec): THREE.Group {
   const group = new THREE.Group();
   group.name = `bracket:${spec.x},${spec.y},${spec.face}`;
   const { volume, dims } = buildBracketOccupancy(!!spec.capped);
   const toWorld = bracketToWorld(spec);
-  for (const id of [MAT_IRON, MAT_RUST, MAT_WOOD, MAT_GOLD]) {
+  for (const id of [MAT_IRON, MAT_RUST, MAT_WOOD, MAT_GOLD, MAT_EMBER]) {
     const occ = extract(volume, id);
     const meshed = greedyMesh(occ, dims, toWorld, { cullNeg: [false, false, false] });
     const geo = geometryFrom(meshed.mesh);
     if (!geo) continue;
-    const mesh = new THREE.Mesh(geo, id === MAT_GOLD && spec.capped ? BRASS_MAT : MATS[id]);
+    const mesh = new THREE.Mesh(geo, MATS[id]);
     mesh.layers.set(BRACKET_LAYER);
     mesh.userData.noShadow = true;
     mesh.castShadow = false;

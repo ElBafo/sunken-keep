@@ -11,14 +11,15 @@ import {
   BRACKET_FLAME_W,
   BRACKET_VOX,
   BRACKET_WALL_GAP,
-  BRASS_COLOR,
   CAMERA_FAR,
   CAMERA_FOV,
   CAMERA_NEAR,
   CAMERA_VIEW_ASPECT,
   CELL,
   CUTOUT_ALPHA_TEST,
+  EMBER_COLOR,
   GOLD_COLOR,
+  IRON_COLOR,
   WALL_MOUNT_NEAR_CULL,
   WALL_TEXELS
 } from '../src/voxel-floor1/constants';
@@ -36,6 +37,7 @@ import {
 import {
   buildBracketOccupancy,
   cupWorldPos,
+  MAT_EMBER,
   MAT_GOLD,
   MAT_IRON,
   MAT_RUST,
@@ -322,7 +324,7 @@ describe('voxel-floor1 capped sconces', () => {
     }
   });
 
-  it('sheathes the gold cup completely and hangs a hasp and padlock on the front', () => {
+  it('sheathes the gold cup completely and seals the cap with a flush iron rune slab', () => {
     expect(ironCapVoxels(true)).toBeGreaterThan(80);
     expect(ironCapVoxels(false)).toBe(0);
     const { volume, dims } = buildBracketOccupancy(true);
@@ -340,47 +342,60 @@ describe('voxel-floor1 capped sconces', () => {
     }
     expect(cupGold).toBe(0);
     expect(cupCovered).toBe(5 * 4 * 5);
+    expect(volume.includes(MAT_GOLD)).toBe(false);
     const { volume: openVol } = buildBracketOccupancy(false);
     expect(openVol.includes(MAT_GOLD)).toBe(true);
-    let brass = 0;
-    let brassUMin = W;
-    let brassUMax = 0;
-    let brassVMax = 0;
-    let shackle = 0;
+    expect(openVol.includes(MAT_EMBER)).toBe(false);
+    let slabUMin = W;
+    let slabUMax = 0;
+    let slabVMin = H;
+    let slabVMax = 0;
+    let hanging = 0;
+    let ember = 0;
+    let recessed = 0;
     for (let d = 0; d < D; d++) {
       for (let v = 0; v < H; v++) {
         for (let u = 0; u < W; u++) {
           const id = volume[u + v * W + d * W * H];
-          if (id === MAT_GOLD && v < 37) {
-            brass += 1;
-            if (u < brassUMin) brassUMin = u;
-            if (u > brassUMax) brassUMax = u;
-            if (v > brassVMax) brassVMax = v;
+          if (d >= 17 && v >= 36 && (id === MAT_IRON || id === MAT_RUST || id === MAT_EMBER)) {
+            if (u < slabUMin) slabUMin = u;
+            if (u > slabUMax) slabUMax = u;
+            if (v < slabVMin) slabVMin = v;
+            if (v > slabVMax) slabVMax = v;
           }
-          if ((id === MAT_IRON || id === MAT_RUST) && d >= 18 && v >= 32 && v <= 42) shackle += 1;
+          if (d >= 17 && v < 36 && id) hanging += 1;
+          if (id === MAT_EMBER) {
+            ember += 1;
+            if (d === 20 && volume[u + v * W + 21 * W * H] === 0) recessed += 1;
+          }
         }
       }
     }
-    expect(brass).toBeGreaterThan(40);
-    expect(brassUMax - brassUMin + 1).toBeGreaterThanOrEqual(7);
-    expect(brassVMax).toBeLessThan(37);
-    expect(shackle).toBeGreaterThan(10);
+    expect(slabUMax - slabUMin + 1).toBeGreaterThanOrEqual(7);
+    expect(slabVMax - slabVMin + 1).toBeGreaterThanOrEqual(8);
+    expect(slabVMin).toBeGreaterThanOrEqual(36);
+    expect(hanging).toBe(0);
+    expect(ember).toBeGreaterThan(10);
+    expect(recessed).toBe(ember);
     const cap = matBounds(true, MAT_IRON, 37, 6);
     expect(cap.vMin).toBeLessThanOrEqual(37);
     expect(cap.uSpan).toBeGreaterThanOrEqual(9);
   });
 
-  it('paints the hanging padlock in brighter brass than the open cup', () => {
+  it('tints the rune grooves with dull ember, not brass or a light', () => {
     const luma = (hex: number) => {
       const r = (hex >> 16) & 255;
       const g = (hex >> 8) & 255;
       const b = hex & 255;
       return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
     };
-    expect(luma(BRASS_COLOR)).toBeGreaterThan(luma(GOLD_COLOR));
+    expect(luma(EMBER_COLOR)).toBeGreaterThan(luma(IRON_COLOR));
+    expect(luma(EMBER_COLOR)).toBeLessThan(luma(GOLD_COLOR));
     const bracket = readFileSync(resolve(__dirname, '../src/voxel-floor1/bracket.ts'), 'utf8');
-    expect(bracket).toContain('BRASS_COLOR');
-    expect(bracket).toContain('spec.capped');
+    expect(bracket).toContain('EMBER_COLOR');
+    expect(bracket).toContain('engrave');
+    expect(bracket).not.toContain('BRASS_COLOR');
+    expect(bracket).not.toContain('PointLight');
   });
 
   it('faces the same capped sconces as Classic and keeps the sealed line', () => {
