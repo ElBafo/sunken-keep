@@ -31,7 +31,14 @@ import {
   type FloorMap,
   type FloorTile
 } from './layout';
-import { faceHash, pickVariant } from './variants';
+import { faceHash } from './variants';
+import {
+  applyWallLook,
+  finishVolume,
+  lookForSecret,
+  textureFromPixels,
+  type WallLook
+} from './wall-look';
 
 const INSET: Record<'N' | 'E' | 'S' | 'W', [number, number]> = {
   N: [0, -1],
@@ -364,10 +371,8 @@ export async function buildFloor1Openings(
   wallFiles.forEach((file, i) => wallPngs.set(file, pngs[i + 2]));
   const panelVol = volumeFromImageData(panelPng.data);
   const frameVol = volumeFromImageData(framePng.data);
-  const wallVols = new Map<string, ReturnType<typeof volumeFromImageData>>();
-  for (const file of wallFiles) wallVols.set(file, volumeFromImageData(wallPngs.get(file)!.data));
 
-  const makeMat = (png: typeof panelPng, vol: { roughness: Uint8Array; dims: [number, number, number] }) => {
+  const makeMat = (png: { texture: THREE.Texture }, vol: { roughness: Uint8Array; dims: [number, number, number] }) => {
     const mat = voxelMaterial(png.texture, pbrMap(vol.roughness, vol.dims[0], vol.dims[1]));
     mat.fog = true;
     if (!realLights) patchBakeMaterial(mat);
@@ -375,11 +380,14 @@ export async function buildFloor1Openings(
   };
   const panelMat = makeMat(panelPng, panelVol);
   const frameMat = makeMat(framePng, frameVol);
-  const wallMats = new Map<string, THREE.MeshPhysicalMaterial>();
-  for (const file of wallFiles) {
-    wallMats.set(file, makeMat(wallPngs.get(file)!, wallVols.get(file)!));
-  }
-  system.bindLights(torches, beams, realLights, [panelMat, frameMat, ...wallMats.values()]);
+  const secretMats = new Map<string, THREE.MeshPhysicalMaterial>();
+  const secretMat = (look: WallLook, derived: { width: number; height: number; data: Uint8ClampedArray }, src: ReturnType<typeof volumeFromImageData>) => {
+    const hit = secretMats.get(look.key);
+    if (hit) return hit;
+    const mat = makeMat({ texture: textureFromPixels(derived) }, src);
+    secretMats.set(look.key, mat);
+    return mat;
+  };
 
   const addFace = (
     visual: OpeningVisual,
@@ -431,11 +439,14 @@ export async function buildFloor1Openings(
       }
       return;
     }
-    const file = pickVariant(WALL_VARIANTS, view.wallX, view.wallY, view.wallFace);
-    const src = wallVols.get(file)!;
+    const look = lookForSecret(view.wallX, view.wallY, view.wallFace, view.tx, view.tz);
+    const file = look.file;
     const png = wallPngs.get(file)!;
-    const mat = wallMats.get(file)!;
-    const tell = pickSecretTellTexels(png.data, faceHash(view.wallX, view.wallY, view.wallFace, 9));
+    const derived = applyWallLook(png.data, look);
+    const src = volumeFromImageData(derived);
+    finishVolume(src, look);
+    const mat = secretMat(look, derived, src);
+    const tell = pickSecretTellTexels(derived, faceHash(view.wallX, view.wallY, view.wallFace, 9));
     const volume = recessSecretTell(src.volume, src.dims, tell);
     const secretWorld = makeToWorld(view.face, view.tx, view.tz, src.dims, LAYER_SIZE, CELL, 'center');
     const secretGeo = meshVolume(volume, src.dims, secretWorld, view.tx, view.tz, torches, beams);
@@ -447,7 +458,8 @@ export async function buildFloor1Openings(
       wall.receiveShadow = true;
       wall.frustumCulled = false;
       wall.userData.secretTell = tell.length;
-      wall.userData.secretFile = file;
+      wall.userData.secretFile = look.key;
+      wall.userData.secretLook = look.key;
       slider.add(wall);
       slider.frustumCulled = false;
       group.add(slider);
@@ -492,6 +504,8 @@ export async function buildFloor1Openings(
     if (tile.secretOpen) system.snapOpen(visual, true);
     system.register(visual);
   }
+
+  system.bindLights(torches, beams, realLights, [panelMat, frameMat, ...secretMats.values()]);
 
   return { group, system };
 }

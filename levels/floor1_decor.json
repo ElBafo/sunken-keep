@@ -1,0 +1,2576 @@
+{
+ "floor": 1,
+ "version": 1,
+ "author": "Levie",
+ "basedOn": "levels/floor1.ts in /workspace/sunken-keep/levels as of 2026-10-18; regenerate with /workspace/sunken-keep/levels/tools/floor1_decor.py if the map changes",
+ "faceConvention": "face = the direction a wall face points. The viewer stands on the square next to the wall in that direction (N is y-1, S is y+1, E is x+1, W is x-1). Same as sconces in floor1.ts.",
+ "story": "Floor 1 is the top floor of a dwarf hold: its gate and guard level. The hold is sinking, so water stains rise from below.",
+ "rules": {
+  "noLight": "No decoration or material adds light or is emissive. Tile light is untouched: 0 flips across the 138 squares, tileLight(19,8) stays 0.05848.",
+  "darkZones": "pell, hook_corridor, lair and stair_room are matte only: nothing pale, glossy or specular. They must look as dark as they do now.",
+  "secrets": "No decoration on any wall tile within one square (incl. diagonals) of a secret wall (5,1), (5,13). knot_band never within two. The only mark on a secret is its own carving_secret.",
+  "knotBand": "At most 3 on the floor.",
+  "doors": "Door art stays painted. Only lintel decorations on door tiles; the lair door (19,5) stays plain.",
+  "mounts": "No decoration on the 11 wall-mount faces (9 sconces, Pell lamp (14,9)W, jar rack (8,10)E).",
+  "depth": "Nothing sticks out more than 0.05 of a square into a walkable square unless hideNearCamera is true; those join the wall-mount hide list.",
+  "purpose": "Chains, weapon racks and shield rows only in guard_hall. Clan banners only in muster_hall, antechamber, guard_hall. Set-piece carvings (ancestor faces, beard reliefs, pillars, heraldry, rune lintels, waymarkers) only at doorways, junctions and room ends.",
+  "variants": "Every wall face gets one of clean, damp, cracked, patched. No face matches its neighbour along the wall or another face seen from the same square (checked: 0 matches).",
+  "noFloodCues": "Canon: the keep sank into the Mirefen mud but stayed dry inside. No tide lines, water-level stains, salt crust, barnacles or kelp anywhere.",
+  "swamp": "The swamp presses in from outside. outerShell faces (solid rock or mud behind them) get seepage: wet_sheen outside dark zones, matte_dark (darkened, no specular) inside them. swampPressure (0 to 1) per zone scales how many mud-and-root cracks the renderer may add on outerShell faces. Every face gets a thin damp strip at the floor line.",
+  "bulge": "bulge faces push out at most 0.04 of a square, so they stay under the depth limit.",
+  "fire": "The fire was paid away: cold braziers, empty forge niches and soot ghost marks where lamps once hung. None of them glow."
+ },
+ "zones": [
+  {
+   "id": "entry_gate",
+   "name": "Gate passage",
+   "viewerSquares": [
+    [
+     1,
+     8,
+     3,
+     14
+    ]
+   ],
+   "material": "brick",
+   "swampPressure": 0.25,
+   "variantWeights": {
+    "clean": 2,
+    "damp": 3,
+    "cracked": 2,
+    "patched": 2
+   },
+   "story": "The fortress gate, sealed behind you by the cave-in at (3,14). Heavy carving says you came in through the front door of a dwarf hold."
+  },
+  {
+   "id": "water_hall",
+   "name": "Cistern hall",
+   "viewerSquares": [
+    [
+     1,
+     1,
+     3,
+     4
+    ]
+   ],
+   "material": "brick",
+   "swampPressure": 0.35,
+   "variantWeights": {
+    "clean": 1,
+    "damp": 4,
+    "cracked": 2,
+    "patched": 2
+   },
+   "story": "The hold's top cistern, still holding its own water. The swamp presses hardest on this outer corner."
+  },
+  {
+   "id": "muster_hall",
+   "name": "Muster hall",
+   "viewerSquares": [
+    [
+     1,
+     5,
+     3,
+     7
+    ],
+    [
+     4,
+     5,
+     4,
+     5
+    ]
+   ],
+   "material": "brick",
+   "swampPressure": 0.2,
+   "variantWeights": {
+    "clean": 3,
+    "damp": 2,
+    "cracked": 1,
+    "patched": 2
+   },
+   "story": "Where the gate guard assembled. Clan banners under the lit torch at (0,6)."
+  },
+  {
+   "id": "antechamber",
+   "name": "Guard antechamber",
+   "viewerSquares": [
+    [
+     5,
+     1,
+     7,
+     3
+    ],
+    [
+     4,
+     2,
+     4,
+     2
+    ]
+   ],
+   "material": "brick_banded",
+   "swampPressure": 0.15,
+   "variantWeights": {
+    "clean": 3,
+    "damp": 1,
+    "cracked": 2,
+    "patched": 2
+   },
+   "story": "Between the cistern door (4,2) and the guard hall."
+  },
+  {
+   "id": "guard_hall",
+   "name": "Guard hall",
+   "viewerSquares": [
+    [
+     8,
+     1,
+     13,
+     4
+    ],
+    [
+     14,
+     2,
+     14,
+     2
+    ]
+   ],
+   "material": "brick_banded",
+   "swampPressure": 0.1,
+   "variantWeights": {
+    "clean": 3,
+    "damp": 1,
+    "cracked": 3,
+    "patched": 2
+   },
+   "story": "The guard level's main room: racks, shields, chains. Sunbeam at (11,2), fallen beams."
+  },
+  {
+   "id": "pantry",
+   "name": "Pantry",
+   "viewerSquares": [
+    [
+     5,
+     5,
+     7,
+     7
+    ]
+   ],
+   "material": "plaster",
+   "swampPressure": 0.15,
+   "variantWeights": {
+    "clean": 2,
+    "damp": 2,
+    "cracked": 2,
+    "patched": 2
+   },
+   "story": "Store room, grey plaster flaking to brick."
+  },
+  {
+   "id": "hook_corridor",
+   "name": "Hook corridor",
+   "viewerSquares": [
+    [
+     8,
+     6,
+     11,
+     7
+    ]
+   ],
+   "material": "brick",
+   "swampPressure": 0.15,
+   "variantWeights": {
+    "clean": 2,
+    "damp": 1,
+    "cracked": 3,
+    "patched": 2
+   },
+   "story": "Dark passage toward the lamp-keeper. Soot starts here."
+  },
+  {
+   "id": "pell",
+   "name": "Lamp-keeper's rooms",
+   "viewerSquares": [
+    [
+     9,
+     8,
+     13,
+     10
+    ]
+   ],
+   "material": "soot",
+   "swampPressure": 0.15,
+   "variantWeights": {
+    "clean": 2,
+    "damp": 1,
+    "cracked": 2,
+    "patched": 3
+   },
+   "story": "Pell's rooms. floor1Dark: stays dark, matte only."
+  },
+  {
+   "id": "cellar",
+   "name": "Cellar landing",
+   "viewerSquares": [
+    [
+     4,
+     9,
+     7,
+     13
+    ],
+    [
+     6,
+     8,
+     6,
+     8
+    ]
+   ],
+   "material": "brick",
+   "swampPressure": 0.35,
+   "variantWeights": {
+    "clean": 1,
+    "damp": 4,
+    "cracked": 2,
+    "patched": 2
+   },
+   "story": "Below the cellar door (6,8), against the outer shell: mud and roots force through the cracks."
+  },
+  {
+   "id": "slime_trail",
+   "name": "Slime trail",
+   "viewerSquares": [
+    [
+     15,
+     2,
+     19,
+     2
+    ]
+   ],
+   "material": "etched",
+   "swampPressure": 0.2,
+   "variantWeights": {
+    "clean": 2,
+    "damp": 2,
+    "cracked": 3,
+    "patched": 1
+   },
+   "story": "Stone eaten smooth and pitted along the trail."
+  },
+  {
+   "id": "lair",
+   "name": "Slime lair",
+   "viewerSquares": [
+    [
+     19,
+     3,
+     19,
+     7
+    ]
+   ],
+   "material": "etched",
+   "swampPressure": 0.25,
+   "variantWeights": {
+    "clean": 1,
+    "damp": 2,
+    "cracked": 3,
+    "patched": 1
+   },
+   "story": "Unlit by design. Matte only, nothing pale or glossy."
+  },
+  {
+   "id": "stair_room",
+   "name": "Stair landing",
+   "viewerSquares": [
+    [
+     16,
+     8,
+     20,
+     10
+    ]
+   ],
+   "material": "brick",
+   "swampPressure": 0.3,
+   "variantWeights": {
+    "clean": 2,
+    "damp": 3,
+    "cracked": 2,
+    "patched": 1
+   },
+   "story": "The way down to floor 2, deep against the outer shell; cold air from below."
+  }
+ ],
+ "materials": {
+  "brick": "current wall brick",
+  "brick_banded": "brick with a darker band course at waist height (guard rooms)",
+  "plaster": "grey plaster flaking to brick",
+  "soot": "soot-blackened brick with oil streaks",
+  "etched": "stone eaten smooth and pitted, matte"
+ },
+ "faces": [
+  {
+   "x": 1,
+   "y": 0,
+   "face": "S",
+   "zone": "water_hall",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 2,
+   "y": 0,
+   "face": "S",
+   "zone": "water_hall",
+   "material": "brick",
+   "variant": "patched",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 3,
+   "y": 0,
+   "face": "S",
+   "zone": "water_hall",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 6,
+   "y": 0,
+   "face": "S",
+   "zone": "antechamber",
+   "material": "brick_banded",
+   "variant": "clean",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 7,
+   "y": 0,
+   "face": "S",
+   "zone": "antechamber",
+   "material": "brick_banded",
+   "variant": "patched",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 9,
+   "y": 0,
+   "face": "S",
+   "zone": "guard_hall",
+   "material": "brick_banded",
+   "variant": "clean",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 10,
+   "y": 0,
+   "face": "S",
+   "zone": "guard_hall",
+   "material": "brick_banded",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 11,
+   "y": 0,
+   "face": "S",
+   "zone": "guard_hall",
+   "material": "brick_banded",
+   "variant": "clean",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 12,
+   "y": 0,
+   "face": "S",
+   "zone": "guard_hall",
+   "material": "brick_banded",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 13,
+   "y": 0,
+   "face": "S",
+   "zone": "guard_hall",
+   "material": "brick_banded",
+   "variant": "clean",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 0,
+   "y": 1,
+   "face": "E",
+   "zone": "water_hall",
+   "material": "brick",
+   "variant": "patched",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 4,
+   "y": 1,
+   "face": "S",
+   "zone": "antechamber",
+   "material": "brick_banded",
+   "variant": "clean",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 4,
+   "y": 1,
+   "face": "W",
+   "zone": "water_hall",
+   "material": "brick",
+   "variant": "cracked",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 8,
+   "y": 1,
+   "face": "S",
+   "zone": "guard_hall",
+   "material": "brick_banded",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 8,
+   "y": 1,
+   "face": "E",
+   "zone": "guard_hall",
+   "material": "brick_banded",
+   "variant": "cracked",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 8,
+   "y": 1,
+   "face": "W",
+   "zone": "antechamber",
+   "material": "brick_banded",
+   "variant": "clean",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 14,
+   "y": 1,
+   "face": "S",
+   "zone": "guard_hall",
+   "material": "brick_banded",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 14,
+   "y": 1,
+   "face": "W",
+   "zone": "guard_hall",
+   "material": "brick_banded",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 15,
+   "y": 1,
+   "face": "S",
+   "zone": "slime_trail",
+   "material": "etched",
+   "variant": "clean",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 16,
+   "y": 1,
+   "face": "S",
+   "zone": "slime_trail",
+   "material": "etched",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 17,
+   "y": 1,
+   "face": "S",
+   "zone": "slime_trail",
+   "material": "etched",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 18,
+   "y": 1,
+   "face": "S",
+   "zone": "slime_trail",
+   "material": "etched",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 19,
+   "y": 1,
+   "face": "S",
+   "zone": "slime_trail",
+   "material": "etched",
+   "variant": "clean",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 0,
+   "y": 2,
+   "face": "E",
+   "zone": "water_hall",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 20,
+   "y": 2,
+   "face": "W",
+   "zone": "slime_trail",
+   "material": "etched",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 0,
+   "y": 3,
+   "face": "E",
+   "zone": "water_hall",
+   "material": "brick",
+   "variant": "patched",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 4,
+   "y": 3,
+   "face": "N",
+   "zone": "antechamber",
+   "material": "brick_banded",
+   "variant": "patched",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 4,
+   "y": 3,
+   "face": "E",
+   "zone": "antechamber",
+   "material": "brick_banded",
+   "variant": "clean",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 4,
+   "y": 3,
+   "face": "W",
+   "zone": "water_hall",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 8,
+   "y": 3,
+   "face": "N",
+   "zone": "guard_hall",
+   "material": "brick_banded",
+   "variant": "clean",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 8,
+   "y": 3,
+   "face": "E",
+   "zone": "guard_hall",
+   "material": "brick_banded",
+   "variant": "cracked",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 8,
+   "y": 3,
+   "face": "W",
+   "zone": "antechamber",
+   "material": "brick_banded",
+   "variant": "clean",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 14,
+   "y": 3,
+   "face": "N",
+   "zone": "guard_hall",
+   "material": "brick_banded",
+   "variant": "clean",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 14,
+   "y": 3,
+   "face": "W",
+   "zone": "guard_hall",
+   "material": "brick_banded",
+   "variant": "clean",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 15,
+   "y": 3,
+   "face": "N",
+   "zone": "slime_trail",
+   "material": "etched",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 16,
+   "y": 3,
+   "face": "N",
+   "zone": "slime_trail",
+   "material": "etched",
+   "variant": "clean",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 17,
+   "y": 3,
+   "face": "N",
+   "zone": "slime_trail",
+   "material": "etched",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 18,
+   "y": 3,
+   "face": "N",
+   "zone": "slime_trail",
+   "material": "etched",
+   "variant": "clean",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 18,
+   "y": 3,
+   "face": "E",
+   "zone": "lair",
+   "material": "etched",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 20,
+   "y": 3,
+   "face": "W",
+   "zone": "lair",
+   "material": "etched",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 0,
+   "y": 4,
+   "face": "E",
+   "zone": "water_hall",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 4,
+   "y": 4,
+   "face": "S",
+   "zone": "muster_hall",
+   "material": "brick",
+   "variant": "clean",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 4,
+   "y": 4,
+   "face": "W",
+   "zone": "water_hall",
+   "material": "brick",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 5,
+   "y": 4,
+   "face": "N",
+   "zone": "antechamber",
+   "material": "brick_banded",
+   "variant": "patched",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 5,
+   "y": 4,
+   "face": "S",
+   "zone": "pantry",
+   "material": "plaster",
+   "variant": "cracked",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 6,
+   "y": 4,
+   "face": "N",
+   "zone": "antechamber",
+   "material": "brick_banded",
+   "variant": "clean",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 6,
+   "y": 4,
+   "face": "S",
+   "zone": "pantry",
+   "material": "plaster",
+   "variant": "clean",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 7,
+   "y": 4,
+   "face": "N",
+   "zone": "antechamber",
+   "material": "brick_banded",
+   "variant": "patched",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 7,
+   "y": 4,
+   "face": "S",
+   "zone": "pantry",
+   "material": "plaster",
+   "variant": "cracked",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 8,
+   "y": 4,
+   "face": "E",
+   "zone": "guard_hall",
+   "material": "brick_banded",
+   "variant": "clean",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 14,
+   "y": 4,
+   "face": "W",
+   "zone": "guard_hall",
+   "material": "brick_banded",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 18,
+   "y": 4,
+   "face": "E",
+   "zone": "lair",
+   "material": "etched",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 20,
+   "y": 4,
+   "face": "W",
+   "zone": "lair",
+   "material": "etched",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 0,
+   "y": 5,
+   "face": "E",
+   "zone": "muster_hall",
+   "material": "brick",
+   "variant": "clean",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 8,
+   "y": 5,
+   "face": "S",
+   "zone": "hook_corridor",
+   "material": "brick",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 8,
+   "y": 5,
+   "face": "W",
+   "zone": "pantry",
+   "material": "plaster",
+   "variant": "patched",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 9,
+   "y": 5,
+   "face": "N",
+   "zone": "guard_hall",
+   "material": "brick_banded",
+   "variant": "cracked",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 9,
+   "y": 5,
+   "face": "S",
+   "zone": "hook_corridor",
+   "material": "brick",
+   "variant": "patched",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 10,
+   "y": 5,
+   "face": "N",
+   "zone": "guard_hall",
+   "material": "brick_banded",
+   "variant": "clean",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 10,
+   "y": 5,
+   "face": "S",
+   "zone": "hook_corridor",
+   "material": "brick",
+   "variant": "cracked",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 11,
+   "y": 5,
+   "face": "N",
+   "zone": "guard_hall",
+   "material": "brick_banded",
+   "variant": "cracked",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 11,
+   "y": 5,
+   "face": "S",
+   "zone": "hook_corridor",
+   "material": "brick",
+   "variant": "clean",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 12,
+   "y": 5,
+   "face": "N",
+   "zone": "guard_hall",
+   "material": "brick_banded",
+   "variant": "clean",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 13,
+   "y": 5,
+   "face": "N",
+   "zone": "guard_hall",
+   "material": "brick_banded",
+   "variant": "patched",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 18,
+   "y": 5,
+   "face": "E",
+   "zone": "lair",
+   "material": "etched",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 20,
+   "y": 5,
+   "face": "W",
+   "zone": "lair",
+   "material": "etched",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 0,
+   "y": 6,
+   "face": "E",
+   "zone": "muster_hall",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 4,
+   "y": 6,
+   "face": "N",
+   "zone": "muster_hall",
+   "material": "brick",
+   "variant": "patched",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 4,
+   "y": 6,
+   "face": "E",
+   "zone": "pantry",
+   "material": "plaster",
+   "variant": "cracked",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 4,
+   "y": 6,
+   "face": "W",
+   "zone": "muster_hall",
+   "material": "brick",
+   "variant": "clean",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 12,
+   "y": 6,
+   "face": "W",
+   "zone": "hook_corridor",
+   "material": "brick",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 18,
+   "y": 6,
+   "face": "E",
+   "zone": "lair",
+   "material": "etched",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 20,
+   "y": 6,
+   "face": "W",
+   "zone": "lair",
+   "material": "etched",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 0,
+   "y": 7,
+   "face": "E",
+   "zone": "muster_hall",
+   "material": "brick",
+   "variant": "clean",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 4,
+   "y": 7,
+   "face": "E",
+   "zone": "pantry",
+   "material": "plaster",
+   "variant": "damp",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 4,
+   "y": 7,
+   "face": "W",
+   "zone": "muster_hall",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 8,
+   "y": 7,
+   "face": "N",
+   "zone": "hook_corridor",
+   "material": "brick",
+   "variant": "patched",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 8,
+   "y": 7,
+   "face": "W",
+   "zone": "pantry",
+   "material": "plaster",
+   "variant": "patched",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 9,
+   "y": 7,
+   "face": "N",
+   "zone": "hook_corridor",
+   "material": "brick",
+   "variant": "cracked",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 9,
+   "y": 7,
+   "face": "S",
+   "zone": "pell",
+   "material": "soot",
+   "variant": "patched",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 10,
+   "y": 7,
+   "face": "N",
+   "zone": "hook_corridor",
+   "material": "brick",
+   "variant": "clean",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 10,
+   "y": 7,
+   "face": "S",
+   "zone": "pell",
+   "material": "soot",
+   "variant": "cracked",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 10,
+   "y": 7,
+   "face": "E",
+   "zone": "hook_corridor",
+   "material": "brick",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 12,
+   "y": 7,
+   "face": "S",
+   "zone": "pell",
+   "material": "soot",
+   "variant": "patched",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 12,
+   "y": 7,
+   "face": "W",
+   "zone": "hook_corridor",
+   "material": "brick",
+   "variant": "clean",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 13,
+   "y": 7,
+   "face": "S",
+   "zone": "pell",
+   "material": "soot",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 16,
+   "y": 7,
+   "face": "S",
+   "zone": "stair_room",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 17,
+   "y": 7,
+   "face": "S",
+   "zone": "stair_room",
+   "material": "brick",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 18,
+   "y": 7,
+   "face": "S",
+   "zone": "stair_room",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 18,
+   "y": 7,
+   "face": "E",
+   "zone": "lair",
+   "material": "etched",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 20,
+   "y": 7,
+   "face": "S",
+   "zone": "stair_room",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 20,
+   "y": 7,
+   "face": "W",
+   "zone": "lair",
+   "material": "etched",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 1,
+   "y": 8,
+   "face": "N",
+   "zone": "muster_hall",
+   "material": "brick",
+   "variant": "patched",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 1,
+   "y": 8,
+   "face": "E",
+   "zone": "entry_gate",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 3,
+   "y": 8,
+   "face": "N",
+   "zone": "muster_hall",
+   "material": "brick",
+   "variant": "clean",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 3,
+   "y": 8,
+   "face": "W",
+   "zone": "entry_gate",
+   "material": "brick",
+   "variant": "clean",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 4,
+   "y": 8,
+   "face": "S",
+   "zone": "cellar",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 5,
+   "y": 8,
+   "face": "N",
+   "zone": "pantry",
+   "material": "plaster",
+   "variant": "clean",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 5,
+   "y": 8,
+   "face": "S",
+   "zone": "cellar",
+   "material": "brick",
+   "variant": "patched",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 5,
+   "y": 8,
+   "face": "E",
+   "zone": "cellar",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 7,
+   "y": 8,
+   "face": "N",
+   "zone": "pantry",
+   "material": "plaster",
+   "variant": "cracked",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 7,
+   "y": 8,
+   "face": "S",
+   "zone": "cellar",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 7,
+   "y": 8,
+   "face": "W",
+   "zone": "cellar",
+   "material": "brick",
+   "variant": "patched",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 8,
+   "y": 8,
+   "face": "E",
+   "zone": "pell",
+   "material": "soot",
+   "variant": "cracked",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 14,
+   "y": 8,
+   "face": "W",
+   "zone": "pell",
+   "material": "soot",
+   "variant": "patched",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 15,
+   "y": 8,
+   "face": "E",
+   "zone": "stair_room",
+   "material": "brick",
+   "variant": "cracked",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 21,
+   "y": 8,
+   "face": "W",
+   "zone": "stair_room",
+   "material": "brick",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 1,
+   "y": 9,
+   "face": "E",
+   "zone": "entry_gate",
+   "material": "brick",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 3,
+   "y": 9,
+   "face": "E",
+   "zone": "cellar",
+   "material": "brick",
+   "variant": "patched",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 3,
+   "y": 9,
+   "face": "W",
+   "zone": "entry_gate",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 8,
+   "y": 9,
+   "face": "E",
+   "zone": "pell",
+   "material": "soot",
+   "variant": "patched",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 8,
+   "y": 9,
+   "face": "W",
+   "zone": "cellar",
+   "material": "brick",
+   "variant": "cracked",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 14,
+   "y": 9,
+   "face": "W",
+   "zone": "pell",
+   "material": "soot",
+   "variant": "clean",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 15,
+   "y": 9,
+   "face": "E",
+   "zone": "stair_room",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 21,
+   "y": 9,
+   "face": "W",
+   "zone": "stair_room",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": true
+  },
+  {
+   "x": 1,
+   "y": 10,
+   "face": "E",
+   "zone": "entry_gate",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 3,
+   "y": 10,
+   "face": "E",
+   "zone": "cellar",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 3,
+   "y": 10,
+   "face": "W",
+   "zone": "entry_gate",
+   "material": "brick",
+   "variant": "patched",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 8,
+   "y": 10,
+   "face": "E",
+   "zone": "pell",
+   "material": "soot",
+   "variant": "clean",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 8,
+   "y": 10,
+   "face": "W",
+   "zone": "cellar",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 14,
+   "y": 10,
+   "face": "W",
+   "zone": "pell",
+   "material": "soot",
+   "variant": "patched",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 15,
+   "y": 10,
+   "face": "E",
+   "zone": "stair_room",
+   "material": "brick",
+   "variant": "clean",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 21,
+   "y": 10,
+   "face": "W",
+   "zone": "stair_room",
+   "material": "brick",
+   "variant": "clean",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 1,
+   "y": 11,
+   "face": "E",
+   "zone": "entry_gate",
+   "material": "brick",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": true
+  },
+  {
+   "x": 3,
+   "y": 11,
+   "face": "E",
+   "zone": "cellar",
+   "material": "brick",
+   "variant": "cracked",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 3,
+   "y": 11,
+   "face": "W",
+   "zone": "entry_gate",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 8,
+   "y": 11,
+   "face": "W",
+   "zone": "cellar",
+   "material": "brick",
+   "variant": "patched",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 9,
+   "y": 11,
+   "face": "N",
+   "zone": "pell",
+   "material": "soot",
+   "variant": "patched",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 10,
+   "y": 11,
+   "face": "N",
+   "zone": "pell",
+   "material": "soot",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 11,
+   "y": 11,
+   "face": "N",
+   "zone": "pell",
+   "material": "soot",
+   "variant": "patched",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 12,
+   "y": 11,
+   "face": "N",
+   "zone": "pell",
+   "material": "soot",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 13,
+   "y": 11,
+   "face": "N",
+   "zone": "pell",
+   "material": "soot",
+   "variant": "clean",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 16,
+   "y": 11,
+   "face": "N",
+   "zone": "stair_room",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 17,
+   "y": 11,
+   "face": "N",
+   "zone": "stair_room",
+   "material": "brick",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 18,
+   "y": 11,
+   "face": "N",
+   "zone": "stair_room",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 19,
+   "y": 11,
+   "face": "N",
+   "zone": "stair_room",
+   "material": "brick",
+   "variant": "clean",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 20,
+   "y": 11,
+   "face": "N",
+   "zone": "stair_room",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "matte_dark",
+   "bulge": false
+  },
+  {
+   "x": 1,
+   "y": 12,
+   "face": "E",
+   "zone": "entry_gate",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 3,
+   "y": 12,
+   "face": "E",
+   "zone": "cellar",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 3,
+   "y": 12,
+   "face": "W",
+   "zone": "entry_gate",
+   "material": "brick",
+   "variant": "patched",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 8,
+   "y": 12,
+   "face": "W",
+   "zone": "cellar",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": true
+  },
+  {
+   "x": 1,
+   "y": 13,
+   "face": "S",
+   "zone": "entry_gate",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 1,
+   "y": 13,
+   "face": "E",
+   "zone": "entry_gate",
+   "material": "brick",
+   "variant": "clean",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 3,
+   "y": 13,
+   "face": "S",
+   "zone": "entry_gate",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 3,
+   "y": 13,
+   "face": "E",
+   "zone": "cellar",
+   "material": "brick",
+   "variant": "patched",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 3,
+   "y": 13,
+   "face": "W",
+   "zone": "entry_gate",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": false,
+   "seepage": null,
+   "bulge": false
+  },
+  {
+   "x": 8,
+   "y": 13,
+   "face": "W",
+   "zone": "cellar",
+   "material": "brick",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 0,
+   "y": 14,
+   "face": "E",
+   "zone": "entry_gate",
+   "material": "brick",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 4,
+   "y": 14,
+   "face": "N",
+   "zone": "cellar",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 4,
+   "y": 14,
+   "face": "W",
+   "zone": "entry_gate",
+   "material": "brick",
+   "variant": "cracked",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 6,
+   "y": 14,
+   "face": "N",
+   "zone": "cellar",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 7,
+   "y": 14,
+   "face": "N",
+   "zone": "cellar",
+   "material": "brick",
+   "variant": "patched",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 1,
+   "y": 15,
+   "face": "N",
+   "zone": "entry_gate",
+   "material": "brick",
+   "variant": "patched",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 2,
+   "y": 15,
+   "face": "N",
+   "zone": "entry_gate",
+   "material": "brick",
+   "variant": "damp",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  },
+  {
+   "x": 3,
+   "y": 15,
+   "face": "N",
+   "zone": "entry_gate",
+   "material": "brick",
+   "variant": "clean",
+   "outerShell": true,
+   "seepage": "wet_sheen",
+   "bulge": false
+  }
+ ],
+ "decorations": [
+  {
+   "type": "lintel_heraldry",
+   "x": 2,
+   "y": 13,
+   "axis": "NS",
+   "hideNearCamera": false,
+   "note": "Gate lintel with the anvil-and-hammer clan emblem, the first thing you see after the cave-in",
+   "zone": "entry_gate"
+  },
+  {
+   "type": "carved_pillar",
+   "x": 1,
+   "y": 13,
+   "face": "E",
+   "hideNearCamera": true,
+   "note": "Gate pilaster, west side",
+   "zone": "entry_gate"
+  },
+  {
+   "type": "carved_pillar",
+   "x": 3,
+   "y": 13,
+   "face": "W",
+   "hideNearCamera": true,
+   "note": "Gate pilaster, east side, cracked by the cave-in",
+   "zone": "entry_gate"
+  },
+  {
+   "type": "roots",
+   "x": 1,
+   "y": 10,
+   "face": "E",
+   "hideNearCamera": false,
+   "note": "Roots in a crack low on the wall",
+   "zone": "entry_gate"
+  },
+  {
+   "type": "fallen_ceiling_block",
+   "x": 1,
+   "y": 14,
+   "hideNearCamera": false,
+   "note": "Floor prop in the dead corner by the cave-in",
+   "zone": "entry_gate"
+  },
+  {
+   "type": "rune_lintel",
+   "x": 2,
+   "y": 8,
+   "axis": "NS",
+   "hideNearCamera": false,
+   "note": "Junction into the muster hall; carved runes, no glow; sagging, cracked",
+   "sag": true,
+   "zone": "entry_gate"
+  },
+  {
+   "type": "waymarker",
+   "x": 1,
+   "y": 8,
+   "face": "E",
+   "hideNearCamera": false,
+   "note": "Waymarker stone: gate behind, halls ahead",
+   "zone": "entry_gate"
+  },
+  {
+   "type": "ancestor_face_damaged",
+   "x": 3,
+   "y": 8,
+   "face": "W",
+   "hideNearCamera": false,
+   "note": "Ancestor face with a broken beard, watching the gate passage",
+   "zone": "entry_gate"
+  },
+  {
+   "type": "clan_banner",
+   "x": 4,
+   "y": 7,
+   "face": "W",
+   "hideNearCamera": true,
+   "note": "Dwarven drape in the (0,6) torch light, rotted hem",
+   "zone": "muster_hall"
+  },
+  {
+   "type": "clan_banner",
+   "x": 3,
+   "y": 8,
+   "face": "N",
+   "hideNearCamera": true,
+   "note": "Second drape, seen from (3,7)",
+   "zone": "muster_hall"
+  },
+  {
+   "type": "beard_relief",
+   "x": 0,
+   "y": 5,
+   "face": "E",
+   "hideNearCamera": false,
+   "note": "Room end, west wall",
+   "zone": "muster_hall"
+  },
+  {
+   "type": "knot_band",
+   "x": 0,
+   "y": 7,
+   "face": "E",
+   "hideNearCamera": false,
+   "note": "Knotwork band, 1 of 3",
+   "zone": "muster_hall"
+  },
+  {
+   "type": "rune_lintel",
+   "x": 4,
+   "y": 5,
+   "axis": "EW",
+   "hideNearCamera": false,
+   "note": "Pantry doorway",
+   "zone": "muster_hall"
+  },
+  {
+   "type": "roots_ceiling",
+   "x": 1,
+   "y": 2,
+   "hideNearCamera": false,
+   "note": "Roots through the ceiling over the shallow water",
+   "zone": "water_hall",
+   "ceiling": true
+  },
+  {
+   "type": "copper_pipe",
+   "x": 1,
+   "y": 1,
+   "to": [
+    3,
+    1
+   ],
+   "side": "N",
+   "hideNearCamera": false,
+   "note": "Cistern feed pipe along the ceiling edge, green patina, matte",
+   "zone": "water_hall",
+   "ceiling": true
+  },
+  {
+   "type": "lintel_heraldry",
+   "x": 4,
+   "y": 2,
+   "side": "W",
+   "hideNearCamera": false,
+   "note": "Stone clan shield over the locked door, cistern side only (east side is next to the secret wall)",
+   "zone": "antechamber"
+  },
+  {
+   "type": "clan_banner",
+   "x": 7,
+   "y": 0,
+   "face": "S",
+   "hideNearCamera": true,
+   "note": "Faded clan banner",
+   "zone": "antechamber"
+  },
+  {
+   "type": "weapon_rack",
+   "x": 10,
+   "y": 0,
+   "face": "S",
+   "hideNearCamera": true,
+   "note": "Empty weapon rack, flush",
+   "zone": "guard_hall"
+  },
+  {
+   "type": "vent_grate",
+   "x": 12,
+   "y": 0,
+   "face": "S",
+   "hideNearCamera": false,
+   "note": "Air vent under the pipe end",
+   "zone": "guard_hall"
+  },
+  {
+   "type": "shield_row",
+   "x": 13,
+   "y": 0,
+   "face": "S",
+   "hideNearCamera": true,
+   "note": "Row of guard shields",
+   "zone": "guard_hall"
+  },
+  {
+   "type": "stone_shield",
+   "x": 11,
+   "y": 5,
+   "face": "N",
+   "hideNearCamera": false,
+   "note": "Clan shield carved into the long south wall",
+   "zone": "guard_hall"
+  },
+  {
+   "type": "ancestor_face",
+   "x": 8,
+   "y": 4,
+   "face": "E",
+   "hideNearCamera": false,
+   "note": "West room end",
+   "zone": "guard_hall"
+  },
+  {
+   "type": "knot_band",
+   "x": 13,
+   "y": 5,
+   "face": "N",
+   "hideNearCamera": false,
+   "note": "Knotwork band, 2 of 3",
+   "zone": "guard_hall"
+  },
+  {
+   "type": "copper_pipe",
+   "x": 9,
+   "y": 1,
+   "to": [
+    13,
+    1
+   ],
+   "side": "N",
+   "hideNearCamera": false,
+   "note": "Vent line along the north ceiling edge",
+   "zone": "guard_hall",
+   "ceiling": true
+  },
+  {
+   "type": "lintel_heraldry",
+   "x": 14,
+   "y": 2,
+   "side": "W",
+   "hideNearCamera": false,
+   "note": "Anvil emblem over the east door, guard hall side",
+   "zone": "guard_hall"
+  },
+  {
+   "type": "jar_niche",
+   "x": 8,
+   "y": 7,
+   "face": "W",
+   "hideNearCamera": false,
+   "note": "Recessed niche with jars",
+   "zone": "pantry"
+  },
+  {
+   "type": "jar_niche",
+   "x": 5,
+   "y": 4,
+   "face": "S",
+   "hideNearCamera": false,
+   "note": "Recessed niche, seen from (5,5)",
+   "zone": "pantry"
+  },
+  {
+   "type": "shelf_fixed",
+   "x": 4,
+   "y": 7,
+   "face": "E",
+   "hideNearCamera": true,
+   "note": "Fixed stone shelf, flush, beside the chest at (5,7)",
+   "zone": "pantry"
+  },
+  {
+   "type": "rune_lintel",
+   "x": 6,
+   "y": 8,
+   "side": "N",
+   "hideNearCamera": false,
+   "note": "Over the cellar door: way to the cisterns below",
+   "zone": "cellar"
+  },
+  {
+   "type": "rune_lintel",
+   "x": 8,
+   "y": 6,
+   "axis": "EW",
+   "hideNearCamera": false,
+   "note": "Pantry to hook corridor; sagging, cracked",
+   "sag": true,
+   "zone": "hook_corridor"
+  },
+  {
+   "type": "copper_pipe",
+   "x": 8,
+   "y": 6,
+   "to": [
+    11,
+    6
+   ],
+   "side": "S",
+   "hideNearCamera": false,
+   "note": "Oil line toward the lamp-keeper, matte",
+   "zone": "hook_corridor",
+   "ceiling": true
+  },
+  {
+   "type": "waymarker",
+   "x": 12,
+   "y": 7,
+   "face": "W",
+   "hideNearCamera": false,
+   "note": "Junction down to Pell's rooms",
+   "zone": "hook_corridor"
+  },
+  {
+   "type": "tool_niche",
+   "x": 8,
+   "y": 9,
+   "face": "E",
+   "hideNearCamera": false,
+   "note": "Lamp-keeper tool niche, matte, nothing reflective",
+   "zone": "pell"
+  },
+  {
+   "type": "roots",
+   "x": 8,
+   "y": 11,
+   "face": "W",
+   "hideNearCamera": false,
+   "note": "Roots in the wet wall",
+   "zone": "cellar"
+  },
+  {
+   "type": "fallen_ceiling_block",
+   "x": 7,
+   "y": 12,
+   "hideNearCamera": false,
+   "note": "Floor prop",
+   "zone": "cellar"
+  },
+  {
+   "type": "rag_stub",
+   "x": 18,
+   "y": 1,
+   "face": "S",
+   "hideNearCamera": false,
+   "note": "Dissolved banner stub, matte",
+   "zone": "slime_trail"
+  },
+  {
+   "type": "ancestor_face_damaged",
+   "x": 16,
+   "y": 11,
+   "face": "N",
+   "hideNearCamera": false,
+   "note": "Crest over the down stairs (16,10)",
+   "zone": "stair_room"
+  },
+  {
+   "type": "knot_band",
+   "x": 21,
+   "y": 8,
+   "face": "W",
+   "hideNearCamera": false,
+   "note": "Knotwork band, 3 of 3",
+   "zone": "stair_room"
+  },
+  {
+   "type": "roots",
+   "x": 15,
+   "y": 9,
+   "face": "E",
+   "hideNearCamera": false,
+   "note": "Roots in a crack",
+   "zone": "stair_room"
+  },
+  {
+   "type": "fallen_ceiling_block",
+   "x": 20,
+   "y": 10,
+   "hideNearCamera": false,
+   "note": "Floor prop",
+   "zone": "stair_room"
+  },
+  {
+   "type": "mud_root_crack",
+   "x": 0,
+   "y": 2,
+   "face": "E",
+   "hideNearCamera": false,
+   "note": "Mud and roots through a crack in the outer shell",
+   "zone": "water_hall"
+  },
+  {
+   "type": "mud_root_crack",
+   "x": 1,
+   "y": 12,
+   "face": "E",
+   "hideNearCamera": false,
+   "note": "Outer shell of the gate passage",
+   "zone": "entry_gate"
+  },
+  {
+   "type": "mud_root_crack",
+   "x": 19,
+   "y": 1,
+   "face": "S",
+   "hideNearCamera": false,
+   "note": "Matte, on the slime trail",
+   "zone": "slime_trail"
+  },
+  {
+   "type": "mud_root_crack",
+   "x": 15,
+   "y": 8,
+   "face": "E",
+   "hideNearCamera": false,
+   "note": "Stair landing outer wall, matte",
+   "zone": "stair_room"
+  },
+  {
+   "type": "cold_brazier",
+   "x": 1,
+   "y": 5,
+   "hideNearCamera": false,
+   "note": "Cold brazier in the muster hall corner, ash only",
+   "zone": "muster_hall"
+  },
+  {
+   "type": "cold_brazier",
+   "x": 9,
+   "y": 1,
+   "hideNearCamera": false,
+   "note": "Cold brazier in the guard hall corner",
+   "zone": "guard_hall"
+  },
+  {
+   "type": "cold_brazier",
+   "x": 16,
+   "y": 8,
+   "hideNearCamera": false,
+   "note": "Cold brazier at the stair landing, matte",
+   "zone": "stair_room"
+  },
+  {
+   "type": "forge_niche_empty",
+   "x": 1,
+   "y": 8,
+   "face": "N",
+   "hideNearCamera": false,
+   "note": "Empty forge niche, seen from (1,7)",
+   "zone": "muster_hall"
+  },
+  {
+   "type": "forge_niche_empty",
+   "x": 9,
+   "y": 5,
+   "face": "N",
+   "hideNearCamera": false,
+   "note": "Empty forge niche, seen from (9,4)",
+   "zone": "guard_hall"
+  },
+  {
+   "type": "forge_niche_empty",
+   "x": 7,
+   "y": 4,
+   "face": "N",
+   "hideNearCamera": false,
+   "note": "Empty forge niche in the antechamber, seen from (7,3)",
+   "zone": "antechamber"
+  },
+  {
+   "type": "soot_ghost",
+   "x": 10,
+   "y": 5,
+   "face": "S",
+   "hideNearCamera": false,
+   "note": "Soot ghost where a lamp hung, hook corridor",
+   "zone": "hook_corridor"
+  },
+  {
+   "type": "soot_ghost",
+   "x": 9,
+   "y": 7,
+   "face": "N",
+   "hideNearCamera": false,
+   "note": "Soot ghost, hook corridor",
+   "zone": "hook_corridor"
+  },
+  {
+   "type": "soot_ghost",
+   "x": 12,
+   "y": 11,
+   "face": "N",
+   "hideNearCamera": false,
+   "note": "Soot ghost in Pell's rooms",
+   "zone": "pell"
+  },
+  {
+   "type": "soot_ghost",
+   "x": 3,
+   "y": 10,
+   "face": "W",
+   "hideNearCamera": false,
+   "note": "Soot ghost in the gate passage",
+   "zone": "entry_gate"
+  },
+  {
+   "type": "soot_ghost",
+   "x": 4,
+   "y": 8,
+   "face": "S",
+   "hideNearCamera": false,
+   "note": "Soot ghost over the cellar landing",
+   "zone": "cellar"
+  }
+ ],
+ "dressingOverrides": [
+  {
+   "file": "dressing_act1.json",
+   "key": "chains",
+   "from": {
+    "x": 8,
+    "y": 3,
+    "face": "W"
+   },
+   "to": {
+    "x": 8,
+    "y": 3,
+    "face": "E"
+   },
+   "why": "chains only in the guard hall; W faced the antechamber"
+  },
+  {
+   "file": "dressing_act1.json",
+   "key": "rust_stain",
+   "from": {
+    "x": 8,
+    "y": 3,
+    "face": "W"
+   },
+   "to": {
+    "x": 8,
+    "y": 3,
+    "face": "E"
+   },
+   "why": "stays under the chains"
+  },
+  {
+   "file": "dressing_act1.json",
+   "key": "water_line",
+   "action": "remove_all",
+   "why": "the 9 water_line stains read as a tide line; canon says the halls stayed dry. Pool-edge wet strips (wet_strip, auto) stay"
+  },
+  {
+   "file": "dressing_act1.json",
+   "key": "banner_torn",
+   "from": {
+    "x": 14,
+    "y": 2,
+    "face": "W"
+   },
+   "to": {
+    "x": 14,
+    "y": 4,
+    "face": "W"
+   },
+   "why": "(14,2) is a door tile; moved to the guard hall east wall"
+  }
+ ]
+}

@@ -3,6 +3,7 @@ import type { FaceId } from '../voxel-lab/faces';
 import { CEILING_VARIANTS, FLOOR_VARIANTS, WALL_VARIANTS } from './constants';
 import { KNOT_FACE_NEIGHBORS, knotWallFile } from './knot-walls';
 import { pickVariant } from './variants';
+import { lookForWall, type WallLook } from './wall-look';
 
 export type FloorTile = {
   wall?: boolean;
@@ -86,10 +87,14 @@ export type FaceJob = {
   tx: number;
   tz: number;
   file: string;
+  /** Material batch key — derived wall looks share one mesh. */
+  batch: string;
   kind: 'wall' | 'floor' | 'ceiling';
   wallX: number;
   wallY: number;
   wallFace: string;
+  bulge: number;
+  look?: WallLook;
 };
 
 export type DoorSpec = { x: number; y: number; locked: boolean };
@@ -178,39 +183,51 @@ export function enumerateFaces(map: FloorMap): FaceJob[] {
   for (let z = 0; z < map.height; z++) {
     for (let x = 0; x < map.width; x++) {
       if (!isShellTile(map.tiles[z][x])) continue;
+      const floorFile = pickVariant(FLOOR_VARIANTS, x, z, 'F');
       jobs.push({
         face: 'floor',
         tx: x,
         tz: z,
-        file: pickVariant(FLOOR_VARIANTS, x, z, 'F'),
+        file: floorFile,
+        batch: floorFile,
         kind: 'floor',
         wallX: x,
         wallY: z,
-        wallFace: 'F'
+        wallFace: 'F',
+        bulge: 0
       });
+      const ceilFile = pickVariant(CEILING_VARIANTS, x, z, 'C');
       jobs.push({
         face: 'ceiling',
         tx: x,
         tz: z,
-        file: pickVariant(CEILING_VARIANTS, x, z, 'C'),
+        file: ceilFile,
+        batch: ceilFile,
         kind: 'ceiling',
         wallX: x,
         wallY: z,
-        wallFace: 'C'
+        wallFace: 'C',
+        bulge: 0
       });
       for (const spec of OPEN_TO_WALL) {
         const wx = x + spec.dx;
         const wz = z + spec.dz;
         if (!isTrueWall(tileAt(map, wx, wz))) continue;
+        const knot = knotWallFile(wx, wz, spec.wallFace);
+        const look = knot ? undefined : lookForWall(wx, wz, spec.wallFace);
+        const file = knot ?? look?.file ?? pickVariant(WALL_VARIANTS, wx, wz, spec.wallFace);
         jobs.push({
           face: spec.face,
           tx: x,
           tz: z,
-          file: knotWallFile(wx, wz, spec.wallFace) ?? pickVariant(WALL_VARIANTS, wx, wz, spec.wallFace),
+          file,
+          batch: knot ?? look?.key ?? file,
           kind: 'wall',
           wallX: wx,
           wallY: wz,
-          wallFace: spec.wallFace
+          wallFace: spec.wallFace,
+          bulge: look?.bulge ?? 0,
+          look
         });
       }
     }
