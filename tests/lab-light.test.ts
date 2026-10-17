@@ -4,6 +4,7 @@ import { resolve } from 'path';
 import { TORCH_COLOR, LANTERN_COLOR } from '../src/voxel-lab/constants';
 import { floor1, floor1Sconces } from '../src/proto3d/floor-data';
 import {
+  LAB_AMBIENT_SCALE,
   LAB_LANTERN_HEX,
   LAB_LANTERN_RGB,
   LAB_TORCH_HEX,
@@ -13,7 +14,7 @@ import {
   syncLabLightQuery
 } from '../src/proto3d/lab-light';
 import { canLabPatch } from '../src/proto3d/lab-look';
-import { isSurfaceLitKind, VOXEL_SUNBEAM_INTENSITY } from '../src/proto3d/surface-light';
+import { createSurfaceLightShared, isSurfaceLitKind, VOXEL_SUNBEAM_INTENSITY } from '../src/proto3d/surface-light';
 import { neutralizeBakedVertexColors, VertexLightingManager } from '../src/proto3d/vertex-lighting';
 import * as THREE from 'three';
 
@@ -60,6 +61,16 @@ describe('lab look keeps gameplay lighting', () => {
     expect(lighting.isSquareLit(19, 7)).toBe(false);
     expect(lighting.calculateBrightness(19, 8, false)).toBeCloseTo(0.05848, 5);
     expect(lighting.ambientBrightness()).toBeCloseTo(0.05848, 5);
+    expect(LAB_AMBIENT_SCALE).toBe(0.55);
+    const classicShared = createSurfaceLightShared();
+    const labShared = createSurfaceLightShared();
+    lighting.fillSurfaceShared(classicShared);
+    lighting.fillSurfaceShared(labShared, { ambientScale: LAB_AMBIENT_SCALE });
+    expect(classicShared.uAmbientRgb.value.x).toBeGreaterThan(0.05);
+    expect(labShared.uAmbientRgb.value.x / classicShared.uAmbientRgb.value.x).toBeCloseTo(
+      LAB_AMBIENT_SCALE,
+      5
+    );
     lighting.setPartyPosition(19, 3);
     expect(lighting.isSquareLit(19, 7)).toBe(false);
     expect(lighting.isSquareLit(19, 6)).toBe(false);
@@ -110,6 +121,7 @@ describe('lab look keeps gameplay lighting', () => {
     expect(look).toContain('uSunbeam3D');
     expect(look).toContain('VOXEL_SUNBEAM_INTENSITY');
     expect(look).toContain('setPaletteEnabled(false)');
+    expect(look).toContain('LAB_AMBIENT_SCALE');
     expect(look).toContain('skipSurfaceBake');
     expect(look).toContain('neutralizeBakedVertexColors');
     expect(look).toContain('tintSprites');

@@ -12,6 +12,13 @@ export function hexToRgb01(hex: number): [number, number, number] {
 export const LAB_TORCH_RGB = hexToRgb01(LAB_TORCH_HEX);
 export const LAB_LANTERN_RGB = hexToRgb01(LAB_LANTERN_HEX);
 
+/**
+ * Lab has no palette crush, so the same Classic ambient factor reads brighter
+ * on unlit stone. Scale only the shader ambient floor — gameplay
+ * tileBrightness / sourceLight stay on the Classic table.
+ */
+export const LAB_AMBIENT_SCALE = 0.55;
+
 export function labLightFromSearch(params: URLSearchParams): boolean {
   return params.get('light') === 'lab';
 }
