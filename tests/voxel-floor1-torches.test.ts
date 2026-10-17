@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { poseGridCamera } from '../src/voxel-floor1/camera';
 import {
+  BRACKET_CUP_V,
   BRACKET_DIMS,
+  BRACKET_FLAME_H,
+  BRACKET_FLAME_W,
   BRACKET_VOX,
   BRACKET_WALL_GAP,
   CAMERA_FAR,
@@ -171,5 +174,27 @@ describe('voxel-floor1 sconce near-cull', () => {
     expect(pos.x).toBeGreaterThan(0 * CELL + FACE_INTO_ROOM.E.nx * (CELL / 2) + 0.2);
     expect(nearPlaneCulled(cameraSpaceDepth(pos.x, pos.y, pos.z, face))).toBe(false);
     expect(objectNearPlaneCulled(meshBracket(lit), face)).toBe(false);
+  });
+
+  it('anchors a short teardrop flame on the gold cup top', () => {
+    const { volume, dims } = buildBracketOccupancy(false);
+    const [W, H, D] = dims;
+    let goldMaxV = 0;
+    let goldMinV = H;
+    for (let d = 0; d < D; d++) {
+      for (let v = 0; v < H; v++) {
+        for (let u = 0; u < W; u++) {
+          if (volume[u + v * W + d * W * H] !== MAT_GOLD) continue;
+          if (v < goldMinV) goldMinV = v;
+          if (v > goldMaxV) goldMaxV = v;
+        }
+      }
+    }
+    const cupH = (goldMaxV - goldMinV + 1) * BRACKET_VOX;
+    expect(BRACKET_CUP_V).toBeGreaterThan(goldMaxV);
+    expect(BRACKET_FLAME_H).toBeGreaterThan(cupH * 1.15);
+    expect(BRACKET_FLAME_H).toBeLessThan(cupH * 1.65);
+    expect(BRACKET_FLAME_W).toBeGreaterThan(5 * BRACKET_VOX);
+    expect(BRACKET_FLAME_W).toBeLessThan(10 * BRACKET_VOX);
   });
 });

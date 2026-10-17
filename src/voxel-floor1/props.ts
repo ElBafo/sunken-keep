@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import {
-  BRACKET_VOX,
+  BRACKET_FLAME_H,
+  BRACKET_FLAME_W,
+  BRACKET_HANDLE_TILT,
   CELL,
   CUTOUT_ALPHA_TEST,
   SCONCE_ANIM_FPS,
@@ -8,7 +10,7 @@ import {
   SHAFT_WIDTH_TILES
 } from './constants';
 import { dirToRot, poseGridCamera } from './camera';
-import { sconceIsLit, type SconceSpec, type SunbeamSpec } from './fixtures';
+import { FACE_INTO_ROOM, sconceIsLit, type SconceSpec, type SunbeamSpec } from './fixtures';
 import { applyWallMountNearCull } from './near-cull';
 import { loadPng } from '../voxel-lab/materials';
 import { cupWorldPos, flameOnBracket, meshBracket } from './bracket';
@@ -55,20 +57,22 @@ export async function buildFloor1Props(
   group.name = 'floor1-props';
 
   const [flame1, flame2, flame3, flame4, shaft1, shaft2] = await Promise.all([
-    loadPng('torch/flame_calm_1.png'),
-    loadPng('torch/flame_calm_2.png'),
-    loadPng('torch/flame_calm_3.png'),
-    loadPng('torch/flame_calm_4.png'),
+    loadPng('torch/flame_teardrop_1.png'),
+    loadPng('torch/flame_teardrop_2.png'),
+    loadPng('torch/flame_teardrop_3.png'),
+    loadPng('torch/flame_teardrop_4.png'),
     loadPng('../atmo/shaft_1.png'),
     loadPng('../atmo/shaft_2.png')
   ]);
 
   const flames = [flame1.texture, flame2.texture, flame3.texture, flame4.texture];
   const flameMat = cutoutFlameMat(flames[0]);
-  // PNG is 32×40; opaque two-tongue flame is ~15×27 texels (~handle height).
-  const flameW = 32 * BRACKET_VOX;
-  const flameH = 40 * BRACKET_VOX;
-  const flameGeo = new THREE.PlaneGeometry(flameW, flameH);
+  const flameGeo = new THREE.PlaneGeometry(BRACKET_FLAME_W, BRACKET_FLAME_H);
+  // Pivot at the bottom-centre so the sprite base sits on the gold cup.
+  flameGeo.translate(0, BRACKET_FLAME_H * 0.5, 0);
+  const flameUp = new THREE.Vector3();
+  const sinTilt = Math.sin(BRACKET_HANDLE_TILT);
+  const cosTilt = Math.cos(BRACKET_HANDLE_TILT);
   const visuals: TorchVisual[] = [];
   const destCam = new THREE.PerspectiveCamera();
 
@@ -82,7 +86,7 @@ export async function buildFloor1Props(
     if (flameOnBracket(spec) && sconceIsLit(spec)) {
       flame = new THREE.Mesh(flameGeo, flameMat);
       const pos = cupWorldPos(spec);
-      flame.position.set(pos.x, pos.y + flameH * 0.42, pos.z);
+      flame.position.set(pos.x, pos.y, pos.z);
       flame.userData.noShadow = true;
       flame.userData.isSconce = true;
       flame.frustumCulled = false;
@@ -146,7 +150,12 @@ export async function buildFloor1Props(
     }
     for (const v of visuals) {
       v.group.visible = true;
-      if (v.flame) v.flame.quaternion.copy(camera.quaternion);
+      if (v.flame) {
+        const { nx, nz } = FACE_INTO_ROOM[v.spec.face];
+        flameUp.set(nx * sinTilt, cosTilt, nz * sinTilt).normalize();
+        v.flame.up.copy(flameUp);
+        v.flame.lookAt(camera.position);
+      }
       applyWallMountNearCull(v.group, camera, destCamera);
     }
   };

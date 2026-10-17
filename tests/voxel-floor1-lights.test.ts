@@ -104,8 +104,9 @@ describe('voxel iron brackets', () => {
     const g = (IRON_COLOR >> 8) & 255;
     const b = IRON_COLOR & 255;
     const luma = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-    expect(luma).toBeGreaterThan(0.28);
-    expect(luma).toBeLessThan(0.48);
+    expect(luma).toBeGreaterThan(0.12);
+    expect(luma).toBeLessThan(0.32);
+    expect(IRON_COLOR).toBeLessThan(0x4a4844);
   });
 });
 
@@ -336,6 +337,10 @@ describe('voxel-floor1 still does not import proto3d', () => {
     expect(props).toContain('alphaTest');
     expect(props).toContain('premultipliedAlpha');
     expect(props).toContain('applyWallMountNearCull');
+    expect(props).toContain('flameGeo.translate');
+    expect(props).toContain('lookAt');
+    expect(props).toContain('flame_teardrop');
+    expect(props).not.toContain('quaternion.copy(camera.quaternion)');
     expect(props).not.toContain('hideWallProp');
     expect(props).not.toContain('THREE.Sprite');
     expect(props).not.toContain('bracket_lit_front');

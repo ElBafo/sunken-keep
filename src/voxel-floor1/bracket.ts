@@ -4,6 +4,7 @@ import {
   BRACKET_CUP_U,
   BRACKET_CUP_V,
   BRACKET_DIMS,
+  BRACKET_HANDLE_TILT,
   BRACKET_LAYER,
   BRACKET_VOX,
   BRACKET_WALL_GAP,
@@ -25,7 +26,7 @@ export const MAT_GOLD = 4;
 const HANDLE_LEN = 28;
 const HANDLE_V0 = 10;
 const HANDLE_D0 = 4;
-const TILT = Math.tan((18 * Math.PI) / 180);
+const TILT = Math.tan(BRACKET_HANDLE_TILT);
 
 function fillBox(
   volume: Uint8Array,
@@ -79,8 +80,8 @@ export function buildBracketOccupancy(capped: boolean): {
 } {
   const dims = BRACKET_DIMS;
   const volume = new Uint8Array(dims[0] * dims[1] * dims[2]);
-  // Plate ~2× handle width, taller than the collar so it shows on all four sides.
-  // 10×36×3 texels (15.6 × 56 × 4.7 cm). Dark bevel, stone-mid inner.
+  // Plate ~2× handle width, taller than the collar. Darker-than-stone inner,
+  // slightly lighter bevel so the edge reads from the front.
   fillBox(volume, dims, 3, 5, 0, 12, 40, 2, MAT_RUST);
   fillBox(volume, dims, 4, 6, 0, 11, 39, 3, MAT_IRON);
   // Short arm from the plate's middle out to the collar.

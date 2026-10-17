@@ -116,18 +116,22 @@ export const BRACKET_VOX = CELL / WALL_TEXELS;
 export const BRACKET_DIMS: [number, number, number] = [16, 48, 22];
 /** Flush with the stone — plate is a few cm thick, not a standing slab. */
 export const BRACKET_WALL_GAP = 0;
-/** Gold cup centre in occupancy (u, v, d). Short band under the flame. */
-export const BRACKET_CUP_U = 8;
-export const BRACKET_CUP_V = 39;
-export const BRACKET_CUP_D = 14;
+/** Gold cup top-centre in occupancy (u, v, d). Flame base anchors here. */
+export const BRACKET_CUP_U = 8.5;
+export const BRACKET_CUP_V = 42;
+export const BRACKET_CUP_D = 14.5;
 export const BRACKET_FLAME_OUT = BRACKET_CUP_D * BRACKET_VOX;
 export const BRACKET_FLAME_LIFT = 0.04 + (BRACKET_CUP_V - BRACKET_DIMS[1] / 2) * BRACKET_VOX;
-/** Point light in the flame above the gold cup, not inside the collar. */
-export const BRACKET_LIGHT_FORWARD = 0.06;
-export const BRACKET_LIGHT_UP = 0.16;
-/** Stone-mid unlit steel — not pale/blue, not black. Darker bevel on the rim. */
-export const IRON_COLOR = 0x5e5c58;
-export const RUST_COLOR = 0x32302c;
+export const BRACKET_HANDLE_TILT = (18 * Math.PI) / 180;
+/** Cup is 5×4 texels; flame is slightly wider and 1.5× as tall. */
+export const BRACKET_FLAME_W = 8 * BRACKET_VOX;
+export const BRACKET_FLAME_H = 6 * BRACKET_VOX;
+/** Point light in the short flame above the gold cup. */
+export const BRACKET_LIGHT_FORWARD = 0.03;
+export const BRACKET_LIGHT_UP = 0.05;
+/** Plate darker than the stone mid; bevel a step lighter so the edge reads. */
+export const IRON_COLOR = 0x2a2826;
+export const RUST_COLOR = 0x4a4844;
 export const WOOD_COLOR = 0x5c3318;
 export const GOLD_COLOR = 0xb07a18;
 export const BRACKET_LAYER = 1;
