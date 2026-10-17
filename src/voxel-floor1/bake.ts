@@ -328,8 +328,8 @@ const FOG_LIT_SKIP = `{
 #else
 	float fogFactor = smoothstep( fogNear, fogFar, vFogDepth );
 #endif
-	float farLit = max( dot( vFarW, uFarBlend ), 0.0 ) + max( dot( vFarB, uFarBeamBlend ), 0.0 );
-	gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor * ( 1.0 - saturate( farLit * 12.0 ) ) );
+	float farCover = max( vFarW.x, max( vFarW.y, vFarW.z ) ) + max( vFarB.x, max( vFarB.y, vFarB.z ) );
+	gl_FragColor.rgb = mix( gl_FragColor.rgb, fogColor, fogFactor * ( 1.0 - saturate( farCover * 12.0 ) ) );
 #endif
 }`;
 

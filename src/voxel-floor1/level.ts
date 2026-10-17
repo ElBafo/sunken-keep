@@ -136,7 +136,6 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
     clearGroup(voxelGroup);
     clearGroup(flatGroup);
     const voxelByFile = new Map<string, PreparedFace[]>();
-    const farLitByFile = new Map<string, PreparedFace[]>();
     const flats: PreparedFace[] = [];
     let voxelFaces = 0;
     for (const face of prepared) {
@@ -144,16 +143,13 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
       const inFlood = tileInLightFlood(face.tx, face.tz, torches, beams);
       // Keep each torch/beam pool even when the party is far down the hall.
       if (dist > CULL_CHEB && !inFlood) continue;
-      if (dist <= VOXEL_CHEB) {
+      if (dist <= VOXEL_CHEB || inFlood) {
+        // Flood stays on the near MeshPhysical path at any distance so the
+        // torch-wall hotspot and beam patch do not dim at the far LOD.
         const list = voxelByFile.get(face.file) ?? [];
         list.push(face);
         voxelByFile.set(face.file, list);
         voxelFaces += 1;
-      } else if (inFlood) {
-        // Same dense voxel mesh as near — 4-vert flats miss the wall/beam hotspot.
-        const list = farLitByFile.get(face.file) ?? [];
-        list.push(face);
-        farLitByFile.set(face.file, list);
       } else {
         flats.push(face);
       }
@@ -175,26 +171,8 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
       mesh.castShadow = !isFloor;
       mesh.receiveShadow = true;
       mesh.name = `voxel:${file}`;
-      voxelGroup.add(mesh);
-    }
-
-    for (const [file, faces] of farLitByFile) {
-      const mat = farMats.get(file);
-      const geo = geometryWithBake(
-        faces.map((f) => ({ mesh: f.mesh, tx: f.tx, tz: f.tz })),
-        torches,
-        beams
-      );
-      if (!mat || !geo) continue;
-      liveTris += (geo.getIndex()?.count ?? 0) / 3;
-      const mesh = new THREE.Mesh(geo, mat);
-      mesh.userData.castWhenOn = false;
-      mesh.userData.receiveWhenOn = false;
-      mesh.castShadow = false;
-      mesh.receiveShadow = false;
       mesh.frustumCulled = false;
-      mesh.name = `far-lit:${file}`;
-      flatGroup.add(mesh);
+      voxelGroup.add(mesh);
     }
 
     const flatsByFile = new Map<string, PreparedFace[]>();
@@ -224,7 +202,7 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
     }
 
     stats.voxelFaces = voxelFaces;
-    stats.flatFaces = flats.length + [...farLitByFile.values()].reduce((n, list) => n + list.length, 0);
+    stats.flatFaces = flats.length;
     stats.triangles = liveTris;
     stats.draws = voxelGroup.children.length + flatGroup.children.length;
   };

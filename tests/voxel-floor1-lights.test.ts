@@ -279,7 +279,7 @@ describe('voxel-floor1 still does not import proto3d', () => {
     expect(bake).toContain('SUNBEAM_RGB');
     expect(bake).toContain('SUNBEAM_INTENSITY');
     expect(bake).toContain('#include <fog_fragment>');
-    expect(bake).toContain('farLit');
+    expect(bake).toContain('farCover');
     expect(bake).toContain('#include <opaque_fragment>');
     expect(bake).not.toContain('GAME_TORCH_RGB');
     expect(bake).not.toContain('FAR_AMBIENT');
@@ -295,7 +295,7 @@ describe('voxel-floor1 still does not import proto3d', () => {
     const level = readFileSync(resolve(__dirname, '../src/voxel-floor1/level.ts'), 'utf8');
     expect(level).toContain('flatGeometryWithBake');
     expect(level).toContain('tileInLightFlood');
-    expect(level).toContain('far-lit:');
+    expect(level).toContain('inFlood');
     expect(level).toContain('receiveWhenOn = false');
     expect(level).toContain('frustumCulled = false');
     expect(level).not.toContain('InstancedMesh');
