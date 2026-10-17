@@ -211,8 +211,7 @@ async function boot(): Promise<void> {
   };
 
   const onArrived = (): void => {
-    level.setParty(mover.x, mover.y);
-    syncShadows();
+    if (level.setParty(mover.x, mover.y)) syncShadows();
   };
 
   btnFwd.addEventListener('click', (e) => {

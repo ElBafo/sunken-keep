@@ -20,7 +20,8 @@ export interface LevelStats {
 export interface BuiltLevel {
   group: THREE.Group;
   stats: LevelStats;
-  setParty: (x: number, y: number) => void;
+  /** Rebuilds nearby voxel/flat meshes. False when the party cell did not change. */
+  setParty: (x: number, y: number) => boolean;
 }
 
 type PreparedFace = FaceJob & {
@@ -178,10 +179,18 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
   };
 
   remesh(partyX, partyY);
+  let lastX = partyX;
+  let lastY = partyY;
 
   return {
     group,
     stats,
-    setParty: (x, y) => remesh(x, y)
+    setParty: (x, y) => {
+      if (x === lastX && y === lastY) return false;
+      lastX = x;
+      lastY = y;
+      remesh(x, y);
+      return true;
+    }
   };
 }

@@ -56,6 +56,14 @@ describe('doors and secrets are plain blocking walls', () => {
     expect(faces.some((f) => f.tx === 5 && f.tz === 1)).toBe(false);
     expect(faces.some((f) => f.kind === 'floor' && f.tx === 2 && f.tz === 14)).toBe(true);
   });
+
+  it('keeps the north corridor open at (2,8) into the hall at (2,7)', () => {
+    const faces = enumerateFaces(floor1Map);
+    expect(isWalkableTile(tileAt(floor1Map, 2, 8))).toBe(true);
+    expect(isWalkableTile(tileAt(floor1Map, 2, 7))).toBe(true);
+    expect(faces.some((f) => f.tx === 2 && f.tz === 8 && f.face === 'N')).toBe(false);
+    expect(faces.some((f) => f.kind === 'floor' && f.tx === 2 && f.tz === 7)).toBe(true);
+  });
 });
 
 describe('wall variants match the game hash', () => {
