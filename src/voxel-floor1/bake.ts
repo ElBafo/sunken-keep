@@ -28,6 +28,8 @@ import type { FloorMap } from './layout';
 
 export const FAR_TORCH_SLOTS = 3;
 export const FAR_BEAM_SLOTS = 3;
+/** Subdivide flood flats so the torch-wall hotspot and beam cone survive the far LOD. */
+export const FAR_BAKE_SEGS = 8;
 
 const SUNBEAM_CONE_COS = Math.cos(SUNBEAM_ANGLE);
 const SUNBEAM_PENUMBRA_COS = Math.cos(SUNBEAM_ANGLE * (1 - SUNBEAM_PENUMBRA));
@@ -260,45 +262,69 @@ function geometryFromMerged(merged: ReturnType<typeof mergeFar>): THREE.BufferGe
   return g;
 }
 
+function packFlatQuad(
+  pose: { x: number; y: number; z: number; rotX: number; rotY: number },
+  tx: number,
+  tz: number,
+  cell: number,
+  segs: number,
+  torches: FarTorch[],
+  beams: FarBeam[]
+): {
+  positions: number[];
+  normals: number[];
+  uvs: number[];
+  indices: number[];
+  farW: number[];
+  farB: number[];
+} {
+  const hw = cell / 2;
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+  const n = rotateOffset(0, 0, 1, pose.rotX, pose.rotY);
+  const cols = segs + 1;
+  for (let j = 0; j <= segs; j++) {
+    const v = j / segs;
+    const py = -hw + v * cell;
+    for (let i = 0; i <= segs; i++) {
+      const u = i / segs;
+      const px = -hw + u * cell;
+      const p = rotateOffset(px, py, 0, pose.rotX, pose.rotY);
+      positions.push(p[0] + pose.x, p[1] + pose.y, p[2] + pose.z);
+      normals.push(n[0], n[1], n[2]);
+      uvs.push(u, v);
+    }
+  }
+  for (let j = 0; j < segs; j++) {
+    for (let i = 0; i < segs; i++) {
+      const a = j * cols + i;
+      const b = a + 1;
+      const c = a + cols;
+      const d = c + 1;
+      indices.push(c, a, d, a, b, d);
+    }
+  }
+  const { farW, farB } = weightsFromPositions(positions, tx, tz, torches, beams);
+  return { positions, normals, uvs, indices, farW, farB };
+}
+
 /** Far-ring quads with the same aFarW / aFarB path as near voxels — no instanced attrs. */
 export function flatGeometryWithBake(
   items: Array<{
     pose: { x: number; y: number; z: number; rotX: number; rotY: number };
     tx: number;
     tz: number;
+    segs?: number;
   }>,
   torches: FarTorch[],
   cell: number,
   beams: FarBeam[] = []
 ): THREE.BufferGeometry | null {
-  const hw = cell / 2;
-  const packed = items.map((item) => {
-    const { x, y, z, rotX, rotY } = item.pose;
-    const corners: Array<[number, number]> = [
-      [-hw, hw],
-      [hw, hw],
-      [-hw, -hw],
-      [hw, -hw]
-    ];
-    const positions: number[] = [];
-    const normals: number[] = [];
-    const uvs: number[] = [0, 1, 1, 1, 0, 0, 1, 0];
-    const n = rotateOffset(0, 0, 1, rotX, rotY);
-    for (const [px, py] of corners) {
-      const p = rotateOffset(px, py, 0, rotX, rotY);
-      positions.push(p[0] + x, p[1] + y, p[2] + z);
-      normals.push(n[0], n[1], n[2]);
-    }
-    const { farW, farB } = weightsFromPositions(positions, item.tx, item.tz, torches, beams);
-    return {
-      positions,
-      normals,
-      uvs,
-      indices: [0, 2, 1, 2, 3, 1],
-      farW,
-      farB
-    };
-  });
+  const packed = items.map((item) =>
+    packFlatQuad(item.pose, item.tx, item.tz, cell, item.segs ?? 1, torches, beams)
+  );
   return geometryFromMerged(mergeFar(packed));
 }
 
@@ -407,24 +433,36 @@ export function farBakeMaterial(map: THREE.Texture): THREE.MeshBasicMaterial {
   return mat;
 }
 
+export type BakeBlendKind = 'complement' | 'full';
+
 export function setBakeBlends(
   mats: Iterable<THREE.Material>,
   torches: FarTorch[],
   blends: Map<string, number>,
   flick = 1,
-  beams: FarBeam[] = []
+  beams: FarBeam[] = [],
+  kind: BakeBlendKind = 'complement'
 ): void {
   const torchV = new THREE.Vector3();
   for (let i = 0; i < FAR_TORCH_SLOTS; i++) {
     const t = torches[i];
-    const real = t ? (blends.get(t.key) ?? 0) : 1;
-    torchV.setComponent(i, t ? Math.max(0, 1 - real) * flick : 0);
+    if (!t) {
+      torchV.setComponent(i, 0);
+      continue;
+    }
+    const real = blends.get(t.key) ?? 0;
+    const w = kind === 'full' ? 1 : Math.max(0, 1 - real);
+    torchV.setComponent(i, w * flick);
   }
   const beamV = new THREE.Vector3();
   for (let i = 0; i < FAR_BEAM_SLOTS; i++) {
     const b = beams[i];
-    const real = b ? (blends.get(b.key) ?? 0) : 1;
-    beamV.setComponent(i, b ? Math.max(0, 1 - real) : 0);
+    if (!b) {
+      beamV.setComponent(i, 0);
+      continue;
+    }
+    const real = blends.get(b.key) ?? 0;
+    beamV.setComponent(i, kind === 'full' ? 1 : Math.max(0, 1 - real));
   }
   for (const mat of mats) {
     const u = mat.userData.uFarBlend as { value: THREE.Vector3 } | undefined;

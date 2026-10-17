@@ -25,7 +25,7 @@ import { GridMover } from './camera';
 import { lookColors } from '../voxel-lab/look';
 import { applyShadowToggle, recompileShadowShaders } from '../voxel-lab/shadows';
 import { floor1Sconces, floor1Sunbeams } from './fixtures';
-import { Floor1Lights } from './lights';
+import { Floor1Lights, parseLightMode, type LightMode } from './lights';
 import { floor1Map } from './layout';
 import { buildFloor1 } from './level';
 import { buildFloor1Props } from './props';
@@ -45,6 +45,8 @@ type Floor1Api = {
   faces: number;
   voxelFaces: number;
   flatFaces: number;
+  gpuTriangles: number;
+  programs: number;
   gridX: number;
   gridY: number;
   dir: number;
@@ -65,6 +67,7 @@ type Floor1Api = {
   meanLuma: (band?: { y0?: number; y1?: number }) => number;
   meanRgb: (band?: { y0?: number; y1?: number }) => { r: number; g: number; b: number; rb: number };
   lights: {
+    mode: LightMode;
     lantern: number;
     torches: number;
     torchesLit: number;
@@ -98,6 +101,7 @@ async function boot(): Promise<void> {
 
   const params = new URLSearchParams(location.search);
   const preserveBuffer = params.get('test') === '1';
+  const lightMode = parseLightMode(location.search);
   const devHud = showDevHud();
   hud.hidden = !devHud;
 
@@ -171,7 +175,7 @@ async function boot(): Promise<void> {
   const level = await buildFloor1(floor1Map, mover.x, mover.y);
   scene.add(level.group);
 
-  const lights = new Floor1Lights(floor1Map);
+  const lights = new Floor1Lights(floor1Map, lightMode);
   lights.attach(scene, floor1Sconces, floor1Sunbeams);
 
   loading.textContent = 'Placing torches…';
@@ -195,7 +199,6 @@ async function boot(): Promise<void> {
   window.addEventListener('resize', resize);
   window.visualViewport?.addEventListener('resize', resize);
 
-  let lastLightKey = '';
   const syncShadows = (): void => {
     applyShadowToggle({
       on: true,
@@ -210,11 +213,6 @@ async function boot(): Promise<void> {
     const flick = preserveBuffer ? 1 : 1 + 0.05 * Math.sin(now * 0.001 * 6.1);
     level.setBakeBlends(lights.blends, flick);
     props.update(mover.x, mover.y, mover.dir, now, preserveBuffer);
-    const key = `${lights.stats.torchesActive}:${lights.stats.sunbeamsActive}`;
-    if (key !== lastLightKey) {
-      lastLightKey = key;
-      syncShadows();
-    }
   };
 
   const renderFrame = (): { draws: number; tris: number } => {
@@ -260,9 +258,8 @@ async function boot(): Promise<void> {
   };
 
   const onArrived = (): void => {
-    const remeshed = level.setParty(mover.x, mover.y);
+    level.setParty(mover.x, mover.y);
     placeLights(performance.now());
-    if (remeshed) syncShadows();
   };
 
   btnFwd.addEventListener('click', (e) => {
@@ -337,6 +334,8 @@ async function boot(): Promise<void> {
     faces: level.stats.faces,
     voxelFaces: level.stats.voxelFaces,
     flatFaces: level.stats.flatFaces,
+    gpuTriangles: 0,
+    programs: 0,
     gridX: mover.x,
     gridY: mover.y,
     dir: mover.dir,
@@ -404,6 +403,8 @@ async function boot(): Promise<void> {
 
     const frame = renderFrame();
     api.draws = frame.draws;
+    api.gpuTriangles = renderer.info.render.triangles;
+    api.programs = renderer.info.programs?.length ?? 0;
     api.lights = lights.stats;
     api.triangles = level.stats.triangles;
     api.voxelFaces = level.stats.voxelFaces;
@@ -428,9 +429,9 @@ async function boot(): Promise<void> {
       statsEl.innerHTML =
         `<div><b>${api.fps}</b> fps</div>` +
         `<div>${api.avgMs.toFixed(1)} ms avg · <b>${api.worstMs.toFixed(1)}</b> ms worst</div>` +
-        `<div>${frame.draws} draws · ${level.stats.triangles.toLocaleString()} tri</div>` +
+        `<div>${frame.draws} draws · ${level.stats.triangles.toLocaleString()} tri · ${api.programs} prog</div>` +
         `<div>${api.voxelFaces} vx faces · ${api.flatFaces} flat</div>` +
-        `<div>${api.lights.total} lights · ${api.lights.torchesActive}/${api.lights.torchesLit} torch · ${api.lights.sunbeamsActive}/${api.lights.sunbeams} beam</div>`;
+        `<div>lights=${api.lights.mode} · ${api.lights.total} · ${api.lights.torchesActive}/${api.lights.torchesLit} torch · ${api.lights.sunbeamsActive}/${api.lights.sunbeams} beam</div>`;
     }
   };
   requestAnimationFrame(loop);
