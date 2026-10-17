@@ -5,6 +5,7 @@ import { floor1 } from '../public/levels/floor1';
 import dressing from '../public/levels/dressing_act1.json';
 import {
   FACE_INTO_ROOM,
+  beamKey,
   floodReach,
   floor1Sconces,
   floor1Sunbeams,
@@ -22,6 +23,13 @@ import {
   MAX_ACTIVE_SUNBEAMS,
   MAX_ACTIVE_TORCHES,
   SCONCE_RADIUS_TILES,
+  SUNBEAM_ANGLE,
+  SUNBEAM_DECAY,
+  SUNBEAM_DISTANCE,
+  SUNBEAM_INTENSITY,
+  SUNBEAM_PENUMBRA,
+  SUNBEAM_RADIUS_TILES,
+  SUNBEAM_RGB,
   TORCH_DECAY,
   TORCH_DISTANCE,
   TORCH_INTENSITY,
@@ -30,7 +38,17 @@ import {
 import { floor1Map, enumerateFaces, isWalkableTile, tileAt } from '../src/voxel-floor1/layout';
 import { buildBracketOccupancy, MAT_IRON } from '../src/voxel-floor1/bracket';
 import { compositeCrackedCeiling, crackedCeilingHasGap, isBeamCeiling } from '../src/voxel-floor1/crack';
-import { bakeWeights, litFarTorches, tileInTorchFlood, torchAttenuation } from '../src/voxel-floor1/bake';
+import {
+  bakeBeamWeights,
+  bakeWeights,
+  litFarBeams,
+  litFarTorches,
+  spotAttenuation,
+  tileInBeamFlood,
+  tileInLightFlood,
+  tileInTorchFlood,
+  torchAttenuation
+} from '../src/voxel-floor1/bake';
 
 describe('voxel-floor1 torches match the game sconce table', () => {
   it('uses floor1.sconces at the same squares and walls', () => {
@@ -142,6 +160,21 @@ describe('far torch bake lights the painted texture', () => {
     expect(tileInTorchFlood(3, 14, torches)).toBe(false);
   });
 
+  it('keeps the mounting wall in the flood, with a hotspot the 4-vert far quad would miss', () => {
+    const east = floor1Sconces.find((s) => s.x === 0 && s.y === 6 && s.face === 'E');
+    expect(east).toBeTruthy();
+    const room = sconceRoom(east!);
+    const torches = litFarTorches(floor1Map, floor1Sconces);
+    expect(tileInTorchFlood(room.x, room.y, torches)).toBe(true);
+    const flame = torchWorldPos(east!);
+    const wallX = east!.x * CELL + FACE_INTO_ROOM[east!.face].nx * (CELL / 2);
+    const wallZ = east!.y * CELL + FACE_INTO_ROOM[east!.face].nz * (CELL / 2);
+    const hot = bakeWeights(room.x, room.y, wallX, flame.y, wallZ, torches);
+    const corner = bakeWeights(room.x, room.y, wallX, 0.05, wallZ - CELL / 2, torches);
+    expect(hot[0] + hot[1] + hot[2]).toBeGreaterThan(2);
+    expect(hot[0] + hot[1] + hot[2]).toBeGreaterThan((corner[0] + corner[1] + corner[2]) * 4);
+  });
+
   it('shares PointLight colour, range and inverse-square decay with the near lights', () => {
     expect(TORCH_RGB[0]).toBeCloseTo(1, 5);
     expect(TORCH_RGB[1]).toBeLessThan(0.65);
@@ -155,6 +188,48 @@ describe('far torch bake lights the painted texture', () => {
     const farPool = bakeWeights(4, 5, 4 * CELL, 0.1, 5 * CELL, litFarTorches(floor1Map, floor1Sconces));
     const midPool = bakeWeights(5, 5, 5 * CELL, 0.1, 5 * CELL, litFarTorches(floor1Map, floor1Sconces));
     expect(midPool[0] + midPool[1] + midPool[2]).toBeGreaterThan(farPool[0] + farPool[1] + farPool[2]);
+  });
+});
+
+describe('far beam bake matches the near SpotLight', () => {
+  it('lights only the cone on reachable tiles, so unlit rooms stay dark', () => {
+    const beams = litFarBeams(floor1Map, floor1Sunbeams);
+    expect(beams.length).toBe(3);
+    const beam = floor1Sunbeams.find((b) => b.x === 2 && b.y === 6);
+    expect(beam).toBeTruthy();
+    const centre = bakeBeamWeights(2, 6, beam!.wx, 0.1, beam!.wz, beams);
+    expect(centre[0] + centre[1] + centre[2]).toBeGreaterThan(0.15);
+    const neighbour = bakeBeamWeights(2, 7, beam!.wx, 0.1, beam!.wz + CELL, beams);
+    expect(neighbour[0] + neighbour[1] + neighbour[2]).toBe(0);
+    const start = bakeBeamWeights(3, 14, 3 * CELL, 0.1, 14 * CELL, beams);
+    expect(start[0] + start[1] + start[2]).toBe(0);
+  });
+
+  it('does not widen the 2-tile flood or the spot cone', () => {
+    expect(SUNBEAM_RADIUS_TILES).toBe(2);
+    expect(SUNBEAM_ANGLE).toBeCloseTo(Math.PI / 7, 8);
+    expect(SUNBEAM_PENUMBRA).toBeCloseTo(0.45, 8);
+    expect(SUNBEAM_DECAY).toBeCloseTo(1.2, 8);
+    expect(SUNBEAM_DISTANCE).toBe(CELL * 2.4);
+    const beams = litFarBeams(floor1Map, floor1Sunbeams);
+    expect(tileInBeamFlood(2, 6, beams)).toBe(true);
+    expect(tileInBeamFlood(2, 7, beams)).toBe(true);
+    expect(tileInBeamFlood(3, 14, beams)).toBe(false);
+    expect(tileInLightFlood(2, 6, litFarTorches(floor1Map, floor1Sconces), beams)).toBe(true);
+    expect(spotAttenuation(1)).toBeCloseTo(1, 5);
+    expect(spotAttenuation(Math.cos(SUNBEAM_ANGLE))).toBe(0);
+  });
+
+  it('shares SpotLight colour, intensity and falloff with the near lights', () => {
+    expect(SUNBEAM_RGB[2]).toBeCloseTo(1, 5);
+    expect(SUNBEAM_RGB[0]).toBeGreaterThan(0.65);
+    expect(SUNBEAM_RGB[0]).toBeLessThan(SUNBEAM_RGB[2]);
+    expect(SUNBEAM_INTENSITY).toBeCloseTo(0.38 * 8, 8);
+    expect(torchAttenuation(SUNBEAM_DISTANCE, SUNBEAM_DISTANCE, SUNBEAM_DECAY)).toBe(0);
+    expect(torchAttenuation(1, SUNBEAM_DISTANCE, SUNBEAM_DECAY)).toBeGreaterThan(
+      torchAttenuation(2, SUNBEAM_DISTANCE, SUNBEAM_DECAY)
+    );
+    expect(beamKey({ x: 2, y: 6 })).toBe('beam:2,6');
   });
 });
 
@@ -199,6 +274,12 @@ describe('voxel-floor1 still does not import proto3d', () => {
     expect(bake).toContain('RECIPROCAL_PI');
     expect(bake).toContain('flatGeometryWithBake');
     expect(bake).toContain('tileInTorchFlood');
+    expect(bake).toContain('tileInBeamFlood');
+    expect(bake).toContain('aFarB');
+    expect(bake).toContain('SUNBEAM_RGB');
+    expect(bake).toContain('SUNBEAM_INTENSITY');
+    expect(bake).toContain('#include <fog_fragment>');
+    expect(bake).toContain('farCover');
     expect(bake).toContain('#include <opaque_fragment>');
     expect(bake).not.toContain('GAME_TORCH_RGB');
     expect(bake).not.toContain('FAR_AMBIENT');
@@ -207,9 +288,14 @@ describe('voxel-floor1 still does not import proto3d', () => {
     const lights = readFileSync(resolve(__dirname, '../src/voxel-floor1/lights.ts'), 'utf8');
     expect(lights).toContain('TORCH_RGB');
     expect(lights).toContain('TORCH_DECAY');
+    expect(lights).toContain('SUNBEAM_RGB');
+    expect(lights).toContain('SUNBEAM_DECAY');
+    expect(lights).toContain('SUNBEAM_PENUMBRA');
+    expect(lights).toContain('beamKey');
     const level = readFileSync(resolve(__dirname, '../src/voxel-floor1/level.ts'), 'utf8');
     expect(level).toContain('flatGeometryWithBake');
-    expect(level).toContain('tileInTorchFlood');
+    expect(level).toContain('tileInLightFlood');
+    expect(level).toContain('inFlood');
     expect(level).toContain('receiveWhenOn = false');
     expect(level).toContain('frustumCulled = false');
     expect(level).not.toContain('InstancedMesh');
