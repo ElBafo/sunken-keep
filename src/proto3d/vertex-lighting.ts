@@ -479,8 +479,8 @@ export class VertexLightingManager {
     );
   }
 
-  fillSurfaceShared(shared: SurfaceLightShared): void {
-    const ambient = this.floorAmbient();
+  fillSurfaceShared(shared: SurfaceLightShared, opts?: { ambientScale?: number }): void {
+    const ambient = this.floorAmbient() * (opts?.ambientScale ?? 1);
     shared.uAmbientRgb.value.set(
       ambient * AMBIENT_RGB[0],
       ambient * AMBIENT_RGB[1],

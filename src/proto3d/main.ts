@@ -87,7 +87,7 @@ import {
 import type { DevOoze } from './dev-ooze';
 import type { DevPanel } from './dev-panel';
 import { PixelRenderer } from './renderer';
-import { SceneBuilder } from './scene-builder';
+import { neighborFacesIntoCell, SceneBuilder } from './scene-builder';
 import { SpriteManager } from './sprites';
 import { TorchSystem, torchWorldPos } from './torches';
 import { listVisibleNearBand } from './wall-near-cull';
@@ -2410,8 +2410,7 @@ class Game {
     this.syncVoxelParty();
     this.torches.setParty(this.player.x, this.player.y, this.player.dir);
     this.syncCarriedLight();
-    this.vertexLighting.relight();
-    this.syncLabWorld();
+    this.resyncSecretGeometry();
     this.updateOilHud();
     this.updateDoorButton();
     this.inventory?.redraw();
@@ -2423,6 +2422,15 @@ class Game {
     this.rebuildAudioFromState();
     this.audioManager?.updateListener(this.player.x, this.player.y, this.player.dir);
     this.syncCaveInWorld();
+  }
+
+  private resyncSecretGeometry() {
+    if (!this.vertexLighting || !this.renderer) return;
+    this.vertexLighting.registerScene(this.renderer.scene);
+    this.vertexLighting.relight();
+    this.voxel?.refresh();
+    this.labLook?.refresh();
+    this.syncLabWorld();
   }
 
   private refreshOccupancy() {
@@ -2791,12 +2799,9 @@ class Game {
     tile.secretOpen = true;
     this.flags.add('secret_found');
     this.sceneBuilder.setSecretOpen(this.renderer.scene, x, y, true);
-    this.voxel?.invalidateCell(x, y);
-    this.labLook?.refresh();
-    this.syncLabWorld();
+    this.resyncSecretGeometry();
     this.spriteManager.resetItems(floor1);
     this.refreshOccupancy();
-    this.vertexLighting.relight();
     if (this.storyProgress.fire('secret_found')) this.showMessage(this.storyLog('secret_found'));
     this.speakBark('secret_wall');
     return true;
@@ -3252,15 +3257,31 @@ class Game {
         return { n: lumas.length, p10, p50, p90, ratio: p90 > 0 ? p10 / p90 : 0 };
       },
       faceKinds: () => {
-        const out: Array<{ kind: string; lightX: number; lightY: number; face?: string }> = [];
+        const out: Array<{
+          kind: string;
+          lightX: number;
+          lightY: number;
+          face?: string;
+          cellX?: number;
+          cellY?: number;
+          voxelMesh?: boolean;
+          secretReveal?: boolean;
+          matVisible?: boolean;
+        }> = [];
         this.renderer.scene.traverse((obj) => {
           if (!(obj instanceof THREE.Mesh)) return;
           if (typeof obj.userData.kind !== 'string') return;
+          const mat = obj.material as THREE.MeshBasicMaterial;
           out.push({
             kind: obj.userData.kind,
             lightX: obj.userData.lightX,
             lightY: obj.userData.lightY,
-            face: obj.userData.face
+            face: obj.userData.face,
+            cellX: obj.userData.cellX,
+            cellY: obj.userData.cellY,
+            voxelMesh: !!obj.userData.voxelMesh,
+            secretReveal: !!obj.userData.secretReveal,
+            matVisible: mat?.visible !== false
           });
         });
         return out;
@@ -3593,7 +3614,47 @@ class Game {
       listAutosaves: () => listAutosaves(),
       fireVisibilityAutosave: () => this.tryAutosave('quiet'),
       openSecret: (x: number, y: number) => this.openSecretAt(x, y),
+      closeSecret: (x: number, y: number) => {
+        const tile = this.player.tileAt(x, y);
+        if (!tile?.secret || !tile.secretOpen) return false;
+        tile.secretOpen = false;
+        this.sceneBuilder.setSecretOpen(this.renderer.scene, x, y, false);
+        this.resyncSecretGeometry();
+        this.spriteManager.resetItems(floor1);
+        this.refreshOccupancy();
+        return true;
+      },
       secretOpen: (x: number, y: number) => !!this.player.tileAt(x, y)?.secretOpen,
+      secretPassage: (x: number, y: number) => {
+        const want = neighborFacesIntoCell(floor1, x, y);
+        const have: Array<{
+          cellX: number;
+          cellY: number;
+          face: string;
+          visible: boolean;
+          voxel: boolean;
+          reveal: boolean;
+        }> = [];
+        this.renderer.scene.traverse((obj) => {
+          if (!(obj instanceof THREE.Mesh)) return;
+          const kind = obj.userData.kind;
+          if (kind !== 'wall' && kind !== 'secret') return;
+          const cellX = obj.userData.cellX;
+          const cellY = obj.userData.cellY;
+          const face = obj.userData.face;
+          if (!want.some((w) => w.cellX === cellX && w.cellY === cellY && w.face === face)) return;
+          const mat = obj.material as THREE.MeshBasicMaterial;
+          have.push({
+            cellX,
+            cellY,
+            face,
+            visible: obj.visible !== false && mat?.visible !== false,
+            voxel: !!obj.userData.voxelMesh,
+            reveal: !!obj.userData.secretReveal
+          });
+        });
+        return { want, have };
+      },
       speakBark: (trigger: string, speaker?: HeroId) => this.speakBark(trigger, speaker),
       lastBark: () => this.lastBarkFace,
       lastBarkTrigger: () => this.lastBarkTrigger,

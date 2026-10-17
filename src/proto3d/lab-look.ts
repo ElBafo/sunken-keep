@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { LAB_LANTERN_RGB, LAB_TORCH_RGB } from './lab-light';
+import { LAB_AMBIENT_SCALE, LAB_LANTERN_RGB, LAB_TORCH_RGB } from './lab-light';
 import type { PixelRenderer } from './renderer';
 import type { SpriteManager } from './sprites';
 import {
@@ -89,7 +89,7 @@ export class LabLook {
 
   sync(): void {
     if (!this.enabled) return;
-    this.lighting.fillSurfaceShared(this.shared);
+    this.lighting.fillSurfaceShared(this.shared, { ambientScale: LAB_AMBIENT_SCALE });
     this.shared.uTorchRgb.value.set(LAB_TORCH_RGB[0], LAB_TORCH_RGB[1], LAB_TORCH_RGB[2]);
     this.shared.uLanternRgb.value.set(LAB_LANTERN_RGB[0], LAB_LANTERN_RGB[1], LAB_LANTERN_RGB[2]);
     this.shared.uSunbeam3D.value = 1;
