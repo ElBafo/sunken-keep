@@ -8,6 +8,7 @@ import { floor1Sconces, floor1Sunbeams } from './fixtures';
 import { chebyshev, enumerateFaces, type FaceJob, type FloorMap } from './layout';
 import { isBeamCeiling, loadCrackedCeiling } from './crack';
 import {
+  farBakeMaterial,
   flatGeometryWithBake,
   geometryWithBake,
   litFarTorches,
@@ -85,6 +86,7 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
 
   const torches: FarTorch[] = litFarTorches(map, floor1Sconces);
   const mats = new Map<string, THREE.MeshPhysicalMaterial>();
+  const farMats = new Map<string, THREE.MeshBasicMaterial>();
   for (const file of needed) {
     const png = pngs.get(file);
     const rough = roughByFile.get(file);
@@ -93,6 +95,9 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
     mat.name = file;
     patchBakeMaterial(mat);
     mats.set(file, mat);
+    const farMat = farBakeMaterial(png.texture);
+    farMat.name = `far:${file}`;
+    farMats.set(file, farMat);
   }
 
   const group = new THREE.Group();
@@ -166,7 +171,7 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
       flatsByFile.set(face.file, list);
     }
     for (const [file, list] of flatsByFile) {
-      const mat = mats.get(file);
+      const mat = farMats.get(file);
       const geo = flatGeometryWithBake(
         list.map((f) => ({ pose: f.pose, tx: f.tx, tz: f.tz })),
         torches,
@@ -204,7 +209,7 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
       return true;
     },
     setBakeBlends: (blends, flick = 1) => {
-      applyBakeBlends(mats.values(), torches, blends, flick);
+      applyBakeBlends([...mats.values(), ...farMats.values()], torches, blends, flick);
     }
   };
 }

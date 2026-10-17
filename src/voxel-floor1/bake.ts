@@ -195,14 +195,15 @@ export function geometryWithBake(
   return g;
 }
 
-export function patchBakeMaterial(mat: THREE.MeshPhysicalMaterial): void {
-  // Classic vertex bake is sRGB torch × 1.45, then albedo multiply. Keep the
-  // same numbers so far bricks read warm-yellow, not a linear-orange wash.
+const FAR_FACTOR = `min( vec3( 1.0 ), uFarColor * max( dot( vFarW, uFarBlend ), 0.0 ) )`;
+
+export function patchBakeMaterial(mat: THREE.Material): void {
+  // Classic MeshBasic: texture × torch factor. Same numbers, no halo.
   mat.userData.uFarColor = {
     value: new THREE.Vector3(GAME_TORCH_RGB[0], GAME_TORCH_RGB[1], GAME_TORCH_RGB[2]).multiplyScalar(BAKE_GAIN)
   };
   mat.userData.uFarBlend = { value: new THREE.Vector3() };
-  mat.customProgramCacheKey = () => 'floor1-far-bake-v3';
+  mat.customProgramCacheKey = () => 'floor1-far-bake-v4';
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uFarColor = mat.userData.uFarColor;
     shader.uniforms.uFarBlend = mat.userData.uFarBlend;
@@ -220,27 +221,42 @@ varying vec3 vFarW;`
 vFarW = aFarW;`
         );
     }
-    if (!shader.fragmentShader.includes('uFarColor')) {
-      shader.fragmentShader = shader.fragmentShader
-        .replace(
-          '#include <common>',
-          `#include <common>
+    if (shader.fragmentShader.includes('uFarColor')) return;
+    shader.fragmentShader = shader.fragmentShader.replace(
+      '#include <common>',
+      `#include <common>
 varying vec3 vFarW;
 uniform vec3 uFarColor;
 uniform vec3 uFarBlend;`
-        )
-        .replace(
-          '#include <colorspace_fragment>',
-          `#include <colorspace_fragment>
-gl_FragColor.rgb += linearToOutputTexel( vec4( diffuseColor.rgb, 1.0 ) ).rgb * uFarColor * max( dot( vFarW, uFarBlend ), 0.0 );`
-        );
+    );
+    if (shader.fragmentShader.includes('vec3 outgoingLight = reflectedLight.indirectDiffuse;')) {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        'vec3 outgoingLight = reflectedLight.indirectDiffuse;',
+        `vec3 outgoingLight = reflectedLight.indirectDiffuse * ${FAR_FACTOR};`
+      );
+    } else {
+      shader.fragmentShader = shader.fragmentShader.replace(
+        'vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;',
+        `vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;
+outgoingLight = max( outgoingLight, diffuseColor.rgb * ${FAR_FACTOR} );`
+      );
     }
   };
   mat.needsUpdate = true;
 }
 
+export function farBakeMaterial(map: THREE.Texture): THREE.MeshBasicMaterial {
+  const mat = new THREE.MeshBasicMaterial({
+    map,
+    fog: true,
+    toneMapped: false
+  });
+  patchBakeMaterial(mat);
+  return mat;
+}
+
 export function setBakeBlends(
-  mats: Iterable<THREE.MeshPhysicalMaterial>,
+  mats: Iterable<THREE.Material>,
   torches: FarTorch[],
   blends: Map<string, number>,
   flick = 1

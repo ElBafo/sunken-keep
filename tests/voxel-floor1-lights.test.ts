@@ -158,8 +158,8 @@ describe('voxel-floor1 still does not import proto3d', () => {
     expect(main).toContain('renderer.setSize(CAMERA_VIEW_W, CAMERA_VIEW_H, false)');
     expect(main).not.toContain('TorchLightPools');
     const bake = readFileSync(resolve(__dirname, '../src/voxel-floor1/bake.ts'), 'utf8');
-    expect(bake).toContain('linearToOutputTexel');
-    expect(bake).toContain('diffuseColor.rgb');
+    expect(bake).toContain('farBakeMaterial');
+    expect(bake).toContain('MeshBasicMaterial');
     expect(bake).toContain('GAME_TORCH_RGB');
     expect(bake).toContain('flatGeometryWithBake');
     expect(bake).not.toContain('AdditiveBlending');
