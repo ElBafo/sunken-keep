@@ -41,6 +41,15 @@ export function litFarTorches(map: FloorMap, sconces: SconceSpec[]): FarTorch[] 
   return out;
 }
 
+/** Tile sits in a lit torch's 2.5-tile flood — keep it even past the far cull. */
+export function tileInTorchFlood(tx: number, tz: number, torches: FarTorch[]): boolean {
+  const key = `${tx},${tz}`;
+  for (const t of torches) {
+    if (t.reach.has(key)) return true;
+  }
+  return false;
+}
+
 export function smoothFalloff(distTiles: number, radius: number): number {
   if (distTiles >= radius) return 0;
   const t = 1 - distTiles / radius;
@@ -205,7 +214,7 @@ export function patchBakeMaterial(mat: THREE.Material): void {
     value: new THREE.Vector3(GAME_TORCH_RGB[0], GAME_TORCH_RGB[1], GAME_TORCH_RGB[2]).multiplyScalar(BAKE_GAIN)
   };
   mat.userData.uFarBlend = { value: new THREE.Vector3() };
-  mat.customProgramCacheKey = () => 'floor1-far-bake-v5';
+  mat.customProgramCacheKey = () => 'floor1-far-bake-v6';
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uFarColor = mat.userData.uFarColor;
     shader.uniforms.uFarBlend = mat.userData.uFarBlend;
@@ -232,15 +241,17 @@ uniform vec3 uFarColor;
 uniform vec3 uFarBlend;`
     );
     if (shader.fragmentShader.includes('vec3 outgoingLight = reflectedLight.indirectDiffuse;')) {
+      // MeshBasic far flats: Classic texture × torch factor at any view distance.
       shader.fragmentShader = shader.fragmentShader.replace(
         'vec3 outgoingLight = reflectedLight.indirectDiffuse;',
         `vec3 outgoingLight = reflectedLight.indirectDiffuse * ${FAR_FACTOR};`
       );
     } else {
+      // MeshPhysical: lift after clearcoat so the baked pool is not crushed.
       shader.fragmentShader = shader.fragmentShader.replace(
-        'vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;',
-        `vec3 outgoingLight = totalDiffuse + totalSpecular + totalEmissiveRadiance;
-outgoingLight = max( outgoingLight, diffuseColor.rgb * ${FAR_FACTOR} );`
+        '#include <opaque_fragment>',
+        `outgoingLight = max( outgoingLight, diffuseColor.rgb * ${FAR_FACTOR} );
+#include <opaque_fragment>`
       );
     }
   };

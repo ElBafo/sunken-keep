@@ -16,6 +16,8 @@ import {
   BRACKET_FLAME_OUT,
   CELL,
   CRACKED_CEILING_FILE,
+  CULL_CHEB,
+  FOG_FAR,
   IRON_COLOR,
   MAX_ACTIVE_SUNBEAMS,
   MAX_ACTIVE_TORCHES,
@@ -25,7 +27,7 @@ import {
 import { floor1Map, enumerateFaces, isWalkableTile, tileAt } from '../src/voxel-floor1/layout';
 import { buildBracketOccupancy, MAT_IRON } from '../src/voxel-floor1/bracket';
 import { compositeCrackedCeiling, crackedCeilingHasGap, isBeamCeiling } from '../src/voxel-floor1/crack';
-import { bakeWeights, FAR_AMBIENT, litFarTorches } from '../src/voxel-floor1/bake';
+import { bakeWeights, FAR_AMBIENT, litFarTorches, tileInTorchFlood } from '../src/voxel-floor1/bake';
 
 describe('voxel-floor1 torches match the game sconce table', () => {
   it('uses floor1.sconces at the same squares and walls', () => {
@@ -123,6 +125,19 @@ describe('far torch bake lights the painted texture', () => {
     const start = bakeWeights(3, 14, 3 * CELL, 0.1, 14 * CELL, torches);
     expect(start[0] + start[1] + start[2]).toBe(0);
   });
+
+  it('does not widen the 2.5-tile bubble, and keeps that pool past the view cull', () => {
+    expect(SCONCE_RADIUS_TILES).toBe(2.5);
+    expect(CULL_CHEB).toBe(Math.ceil(FOG_FAR / CELL));
+    expect(CULL_CHEB).toBeGreaterThanOrEqual(14);
+    const torches = litFarTorches(floor1Map, floor1Sconces);
+    const south = torches.find((t) => t.key.endsWith(',S'));
+    expect(south?.reach.has('6,5')).toBe(true);
+    expect(south?.reach.has('4,5')).toBe(true);
+    expect(south?.reach.has('3,5')).toBe(false);
+    expect(tileInTorchFlood(6, 5, torches)).toBe(true);
+    expect(tileInTorchFlood(3, 14, torches)).toBe(false);
+  });
 });
 
 describe('active light cap', () => {
@@ -163,9 +178,14 @@ describe('voxel-floor1 still does not import proto3d', () => {
     expect(bake).toContain('MeshBasicMaterial');
     expect(bake).toContain('GAME_TORCH_RGB');
     expect(bake).toContain('flatGeometryWithBake');
+    expect(bake).toContain('tileInTorchFlood');
+    expect(bake).toContain('#include <opaque_fragment>');
     expect(bake).not.toContain('AdditiveBlending');
     const level = readFileSync(resolve(__dirname, '../src/voxel-floor1/level.ts'), 'utf8');
     expect(level).toContain('flatGeometryWithBake');
+    expect(level).toContain('tileInTorchFlood');
+    expect(level).toContain('receiveWhenOn = false');
+    expect(level).toContain('frustumCulled = false');
     expect(level).not.toContain('InstancedMesh');
   });
 });
