@@ -22,6 +22,9 @@ export const EYE_HEIGHT = cameraSpec.eyeHeight;
 export const CAMERA_FOV = cameraSpec.fov;
 export const CAMERA_NEAR = cameraSpec.near;
 export const CAMERA_FAR = cameraSpec.far;
+/** Hide wall mounts that would clip the near plane (same band as proto3d). */
+export const WALL_MOUNT_NEAR_CULL = CAMERA_NEAR + 0.5;
+export const CUTOUT_ALPHA_TEST = 0.5;
 export const CAMERA_PITCH = (cameraSpec.pitchDeg * Math.PI) / 180;
 export const BACK_OFFSET = cameraSpec.backOffsetTiles * CELL;
 /** Same logical 3D view box as proto3d — keeps hall length matching Classic. */
@@ -107,12 +110,18 @@ export const SUNBEAM_RGB: [number, number, number] = [
 export const SHAFT_WIDTH_TILES = 0.55;
 export const SHAFT_OPACITY = 1;
 
-/** Voxel iron bracket — painted-sconce dark iron, not pale silver. */
-export const BRACKET_VOX = 0.05;
-export const BRACKET_DIMS: [number, number, number] = [10, 20, 10];
-export const BRACKET_WALL_GAP = 0.02;
-export const BRACKET_FLAME_OUT = 0.37;
-export const BRACKET_FLAME_LIFT = 0.29;
+/** Wall `tex3d` PNGs are 128² on a CELL-metre face. Bracket voxels match that. */
+export const WALL_TEXELS = 128;
+export const BRACKET_VOX = CELL / WALL_TEXELS;
+export const BRACKET_DIMS: [number, number, number] = [16, 28, 20];
+/** Flush with the stone — a 1-texel plate, not a standing slab. */
+export const BRACKET_WALL_GAP = 0;
+/** Cup centre in occupancy (u, v, d), used for flame / light origin. */
+export const BRACKET_CUP_U = 8;
+export const BRACKET_CUP_V = 18;
+export const BRACKET_CUP_D = 15;
+export const BRACKET_FLAME_OUT = BRACKET_CUP_D * BRACKET_VOX;
+export const BRACKET_FLAME_LIFT = 0.04 + (BRACKET_CUP_V - BRACKET_DIMS[1] / 2) * BRACKET_VOX;
 export const IRON_COLOR = 0x1a120e;
 export const RUST_COLOR = 0x3a2214;
 export const BRASS_COLOR = 0x4a3218;

@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import {
+  BRACKET_CUP_D,
+  BRACKET_CUP_U,
+  BRACKET_CUP_V,
   BRACKET_DIMS,
   BRACKET_VOX,
   BRACKET_WALL_GAP,
@@ -43,29 +46,31 @@ function fillBox(
   }
 }
 
-/** A few iron / rust / brass cubes: backplate, arm, cup. Capped gets a lid. */
+/**
+ * Slim iron sconce at wall-texel size: 1-texel flush plate, arm, open cup.
+ * No slab / backboard that reads as a ledge from the side.
+ */
 export function buildBracketOccupancy(capped: boolean): {
   volume: Uint8Array;
   dims: [number, number, number];
   voxelCount: number;
 } {
   const dims = BRACKET_DIMS;
-  const [W, H, D] = dims;
-  const volume = new Uint8Array(W * H * D);
-  // Backplate against the wall.
-  fillBox(volume, dims, 1, 2, 0, 8, 17, 1, MAT_IRON);
-  fillBox(volume, dims, 1, 4, 0, 2, 9, 1, MAT_RUST);
-  // Arm sticking out.
-  fillBox(volume, dims, 4, 9, 1, 5, 11, 6, MAT_IRON);
-  fillBox(volume, dims, 4, 7, 1, 5, 9, 3, MAT_IRON);
-  // Cup bowl.
-  fillBox(volume, dims, 3, 9, 5, 6, 10, 8, MAT_IRON);
-  fillBox(volume, dims, 3, 10, 5, 3, 13, 8, MAT_IRON);
-  fillBox(volume, dims, 6, 10, 5, 6, 13, 8, MAT_IRON);
-  fillBox(volume, dims, 3, 10, 5, 6, 13, 5, MAT_IRON);
-  fillBox(volume, dims, 3, 10, 8, 6, 13, 8, MAT_IRON);
-  fillBox(volume, dims, 3, 13, 5, 6, 13, 8, MAT_BRASS);
-  if (capped) fillBox(volume, dims, 3, 13, 5, 6, 15, 8, MAT_IRON);
+  const volume = new Uint8Array(dims[0] * dims[1] * dims[2]);
+  // Flush plate — one texel thick, small, against the stone.
+  fillBox(volume, dims, 6, 10, 0, 9, 21, 0, MAT_IRON);
+  fillBox(volume, dims, 6, 12, 0, 6, 18, 0, MAT_RUST);
+  // Arm.
+  fillBox(volume, dims, 7, 15, 1, 8, 16, 13, MAT_IRON);
+  fillBox(volume, dims, 7, 13, 1, 8, 14, 6, MAT_IRON);
+  // Cup: open top, low front lip so the painted flame reads.
+  fillBox(volume, dims, 5, 14, 12, 10, 14, 17, MAT_IRON);
+  fillBox(volume, dims, 5, 14, 12, 5, 19, 17, MAT_IRON);
+  fillBox(volume, dims, 10, 14, 12, 10, 19, 17, MAT_IRON);
+  fillBox(volume, dims, 6, 14, 12, 9, 19, 12, MAT_IRON);
+  fillBox(volume, dims, 6, 14, 17, 9, 16, 17, MAT_IRON);
+  fillBox(volume, dims, 5, 19, 12, 10, 19, 17, MAT_BRASS);
+  if (capped) fillBox(volume, dims, 5, 20, 12, 10, 21, 17, MAT_IRON);
   let voxelCount = 0;
   for (let i = 0; i < volume.length; i++) if (volume[i]) voxelCount += 1;
   return { volume, dims, voxelCount };
@@ -123,6 +128,7 @@ export function meshBracket(spec: SconceSpec): THREE.Group {
     const mesh = new THREE.Mesh(geo, MATS[id]);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
+    mesh.frustumCulled = false;
     mesh.name = `bracket-${id}`;
     group.add(mesh);
   }
@@ -131,4 +137,9 @@ export function meshBracket(spec: SconceSpec): THREE.Group {
 
 export function flameOnBracket(spec: SconceSpec): boolean {
   return sconceIsLit(spec);
+}
+
+export function cupWorldPos(spec: SconceSpec): { x: number; y: number; z: number } {
+  const [x, y, z] = bracketToWorld(spec)(BRACKET_CUP_U, BRACKET_CUP_V, BRACKET_CUP_D);
+  return { x, y, z };
 }

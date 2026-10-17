@@ -75,6 +75,7 @@ type Floor1Api = {
   turnRight: () => boolean;
   meanLuma: (band?: { y0?: number; y1?: number }) => number;
   meanRgb: (band?: { y0?: number; y1?: number }) => { r: number; g: number; b: number; rb: number };
+  sconceVisible: (x: number, y: number, face: string) => boolean;
   lights: {
     mode: LightMode;
     lantern: number;
@@ -242,7 +243,12 @@ async function boot(): Promise<void> {
     lights.setParty(px, py, now, preserveBuffer);
     const flick = preserveBuffer ? 1 : 1 + 0.05 * Math.sin(now * 0.001 * 6.1);
     level.setBakeBlends(lights.blends, flick);
-    props.update(px, py, mover.dir, now, preserveBuffer);
+    props.update(
+      camera,
+      now,
+      preserveBuffer,
+      mover.kind === 'step' ? { x: mover.toX, y: mover.toY, dir: mover.toDir } : null
+    );
   };
 
   const renderFrame = (): { draws: number; tris: number } => {
@@ -444,6 +450,7 @@ async function boot(): Promise<void> {
       const s = samplePixels(band);
       return { r: s.r, g: s.g, b: s.b, rb: s.rb };
     },
+    sconceVisible: (x, y, face) => props.sconceVisible(x, y, face),
     lights: lights.stats
   };
   (window as unknown as { __voxelFloor1: Floor1Api }).__voxelFloor1 = api;

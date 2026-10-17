@@ -325,7 +325,11 @@ describe('voxel-floor1 still does not import proto3d', () => {
   it('builds voxel brackets and camera-facing flame sprites', () => {
     const props = readFileSync(resolve(__dirname, '../src/voxel-floor1/props.ts'), 'utf8');
     expect(props).toContain('meshBracket');
-    expect(props).toContain('THREE.Sprite');
+    expect(props).toContain('alphaTest');
+    expect(props).toContain('premultipliedAlpha');
+    expect(props).toContain('applyWallMountNearCull');
+    expect(props).not.toContain('hideWallProp');
+    expect(props).not.toContain('THREE.Sprite');
     expect(props).not.toContain('bracket_lit_front');
     const main = readFileSync(resolve(__dirname, '../src/voxel-floor1/main.ts'), 'utf8');
     expect(main).toContain('setBakeBlends');
