@@ -39,8 +39,11 @@ export const SWIPE_THRESHOLD = 50;
 
 /** Real cubes within this Chebyshev distance; flat-but-lit beyond. */
 export const VOXEL_CHEB = 3;
-/** Skip faces past fog / lantern reach. */
-export const CULL_CHEB = 12;
+/**
+ * Draw as far as Classic fog (FOG_FAR / CELL). Torch-flood faces are kept
+ * even past this — the 2.5-tile bubble must stay visible down a long hall.
+ */
+export const CULL_CHEB = Math.ceil(FOG_FAR / CELL);
 
 export const WALL_VARIANTS = [
   'wall_plain.png',

@@ -14,6 +14,7 @@ import {
   litFarTorches,
   patchBakeMaterial,
   setBakeBlends as applyBakeBlends,
+  tileInTorchFlood,
   type FarTorch
 } from './bake';
 
@@ -136,7 +137,8 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
     let voxelFaces = 0;
     for (const face of prepared) {
       const dist = chebyshev(px, py, face.tx, face.tz);
-      if (dist > CULL_CHEB) continue;
+      // Keep each torch's 2.5-tile pool even when the party is far down the hall.
+      if (dist > CULL_CHEB && !tileInTorchFlood(face.tx, face.tz, torches)) continue;
       if (dist <= VOXEL_CHEB) {
         const list = voxelByFile.get(face.file) ?? [];
         list.push(face);
@@ -181,10 +183,11 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
       if (!mat || !geo) continue;
       liveTris += (geo.getIndex()?.count ?? 0) / 3;
       const mesh = new THREE.Mesh(geo, mat);
-      const isFloor = file.startsWith('floor_');
-      mesh.userData.castWhenOn = !isFloor;
-      mesh.castShadow = !isFloor;
-      mesh.receiveShadow = true;
+      mesh.userData.castWhenOn = false;
+      mesh.userData.receiveWhenOn = false;
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      mesh.frustumCulled = false;
       mesh.name = `flat:${file}`;
       flatGroup.add(mesh);
     }
