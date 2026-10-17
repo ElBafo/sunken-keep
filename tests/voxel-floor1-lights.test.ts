@@ -37,7 +37,7 @@ import {
   TORCH_RGB
 } from '../src/voxel-floor1/constants';
 import { floor1Map, enumerateFaces, isWalkableTile, tileAt } from '../src/voxel-floor1/layout';
-import { buildBracketOccupancy, MAT_IRON } from '../src/voxel-floor1/bracket';
+import { buildBracketOccupancy, MAT_GOLD, MAT_IRON } from '../src/voxel-floor1/bracket';
 import { compositeCrackedCeiling, crackedCeilingHasGap, isBeamCeiling } from '../src/voxel-floor1/crack';
 import {
   FAR_BAKE_SEGS,
@@ -90,20 +90,25 @@ describe('voxel-floor1 torches match the game sconce table', () => {
 });
 
 describe('voxel iron brackets', () => {
-  it('greedy-merges a few dark iron cubes, not pale silver', () => {
+  it('greedy-merges mid-grey iron, wood, and a gold cup — not pale silver', () => {
     const { volume, voxelCount } = buildBracketOccupancy(false);
     expect(voxelCount).toBeGreaterThan(30);
     expect(volume.includes(MAT_IRON)).toBe(true);
+    expect(volume.includes(MAT_GOLD)).toBe(true);
     const bracket = readFileSync(resolve(__dirname, '../src/voxel-floor1/bracket.ts'), 'utf8');
     expect(bracket).toContain('MeshLambertMaterial');
     expect(bracket).toContain('MAT_WOOD');
+    expect(bracket).toContain('MAT_GOLD');
     expect(bracket).not.toContain('MAT_BRASS');
     const r = (IRON_COLOR >> 16) & 255;
     const g = (IRON_COLOR >> 8) & 255;
     const b = IRON_COLOR & 255;
     const luma = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-    expect(luma).toBeLessThan(0.12);
-    expect(r).toBeLessThan(40);
+    expect(luma).toBeGreaterThan(0.28);
+    expect(luma).toBeLessThan(0.55);
+    const lights = readFileSync(resolve(__dirname, '../src/voxel-floor1/lights.ts'), 'utf8');
+    expect(lights).toContain('BRACKET_LAYER');
+    expect(lights).toContain('point.layers.enable(BRACKET_LAYER)');
   });
 });
 

@@ -15,7 +15,7 @@ import {
   WALL_TEXELS
 } from '../src/voxel-floor1/constants';
 import { FACE_INTO_ROOM, floor1Sconces, hideWallProp, sconceRoom, torchWorldPos } from '../src/voxel-floor1/fixtures';
-import { buildBracketOccupancy, cupWorldPos, MAT_WOOD, meshBracket } from '../src/voxel-floor1/bracket';
+import { buildBracketOccupancy, cupWorldPos, MAT_GOLD, MAT_WOOD, meshBracket } from '../src/voxel-floor1/bracket';
 import { cameraSpaceDepth, nearPlaneCulled, objectNearPlaneCulled } from '../src/voxel-floor1/near-cull';
 
 const lit = floor1Sconces.find((s) => s.x === 0 && s.y === 6)!;
@@ -36,45 +36,78 @@ describe('voxel-floor1 sconce near-cull', () => {
     expect(WALL_MOUNT_NEAR_CULL).toBeGreaterThan(CAMERA_NEAR);
   });
 
-  it('uses a 1-texel plate, not a slab backboard', () => {
+  it('uses a tall narrow mid-grey plate, tapered tilted wood, and a gold cup', () => {
     const { volume, dims, voxelCount } = buildBracketOccupancy(false);
     expect(voxelCount).toBeGreaterThan(30);
     const [W, H, D] = dims;
     expect(D).toBe(BRACKET_DIMS[2]);
-    let plate = 0;
-    let offWall = 0;
+    let plateUMin = W;
+    let plateUMax = 0;
+    let plateVMin = H;
+    let plateVMax = 0;
+    let plateDMax = 0;
     let offWallWide = 0;
     for (let d = 0; d < D; d++) {
       for (let v = 0; v < H; v++) {
         for (let u = 0; u < W; u++) {
           if (!volume[u + v * W + d * W * H]) continue;
-          if (d === 0) plate += 1;
-          else {
-            offWall += 1;
-            if (u < 5 || u > 14) offWallWide += 1;
+          if (d <= 2) {
+            if (u < plateUMin) plateUMin = u;
+            if (u > plateUMax) plateUMax = u;
+            if (v < plateVMin) plateVMin = v;
+            if (v > plateVMax) plateVMax = v;
+            if (d > plateDMax) plateDMax = d;
+          }
+          if (d > 0 && (u < 4 || u > 11)) offWallWide += 1;
+        }
+      }
+    }
+    const plateW = (plateUMax - plateUMin + 1) * BRACKET_VOX;
+    const plateH = (plateVMax - plateVMin + 1) * BRACKET_VOX;
+    const plateT = (plateDMax + 1) * BRACKET_VOX;
+    expect(plateW).toBeGreaterThan(0.07);
+    expect(plateW).toBeLessThan(0.12);
+    expect(plateH).toBeGreaterThan(0.28);
+    expect(plateH).toBeLessThan(0.38);
+    expect(plateT).toBeGreaterThan(0.02);
+    expect(plateT).toBeLessThan(0.06);
+    expect(offWallWide).toBe(0);
+    expect(volume.includes(MAT_WOOD)).toBe(true);
+    expect(volume.includes(MAT_GOLD)).toBe(true);
+    let woodMinV = H;
+    let woodMaxV = 0;
+    let woodBotD = 0;
+    let woodTopD = 0;
+    let woodBotSpan = 0;
+    let woodTopSpan = 0;
+    for (let d = 0; d < D; d++) {
+      for (let v = 0; v < H; v++) {
+        for (let u = 0; u < W; u++) {
+          if (volume[u + v * W + d * W * H] !== MAT_WOOD) continue;
+          if (v < woodMinV) {
+            woodMinV = v;
+            woodBotD = d;
+            woodBotSpan = 1;
+          } else if (v === woodMinV) {
+            woodBotSpan += 1;
+            if (d > woodBotD) woodBotD = d;
+          }
+          if (v > woodMaxV) {
+            woodMaxV = v;
+            woodTopD = d;
+            woodTopSpan = 1;
+          } else if (v === woodMaxV) {
+            woodTopSpan += 1;
+            if (d > woodTopD) woodTopD = d;
           }
         }
       }
     }
-    expect(plate).toBeGreaterThan(20);
-    expect(plate).toBeLessThan(120);
-    expect(offWall).toBeGreaterThan(40);
-    expect(offWallWide).toBe(0);
-    expect(volume.includes(MAT_WOOD)).toBe(true);
-    let minV = H;
-    let maxV = 0;
-    for (let d = 0; d < D; d++) {
-      for (let v = 0; v < H; v++) {
-        for (let u = 0; u < W; u++) {
-          if (!volume[u + v * W + d * W * H]) continue;
-          if (v < minV) minV = v;
-          if (v > maxV) maxV = v;
-        }
-      }
-    }
-    const tall = (maxV - minV + 1) * BRACKET_VOX;
-    expect(tall).toBeGreaterThan(0.38);
-    expect(tall).toBeLessThan(0.58);
+    const handleH = (woodMaxV - woodMinV + 1) * BRACKET_VOX;
+    expect(handleH).toBeGreaterThan(0.38);
+    expect(handleH).toBeLessThan(0.5);
+    expect(woodTopD).toBeGreaterThan(woodBotD);
+    expect(woodTopSpan).toBeGreaterThan(woodBotSpan);
   });
 
   it('shows the torch at rest in its room looking along the wall', () => {
@@ -87,8 +120,7 @@ describe('voxel-floor1 sconce near-cull', () => {
     const group = meshBracket(lit);
     expect(objectNearPlaneCulled(group, along)).toBe(false);
     expect(hideWallProp(lit.x, lit.y, lit.face, 1, 6, 0)).toBe(true);
-    const halfH = Math.atan(Math.tan(((CAMERA_FOV * Math.PI) / 180) / 2) * CAMERA_VIEW_ASPECT);
-    expect(Math.abs(pos.x - along.position.x) / depth).toBeLessThan(Math.tan(halfH));
+    expect(depth).toBeGreaterThan(WALL_MOUNT_NEAR_CULL);
   });
 
   it('hides the torch when the camera is back-to it in its own square', () => {

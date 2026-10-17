@@ -65,7 +65,8 @@ export async function buildFloor1Props(
 
   const flames = [flame1.texture, flame2.texture, flame3.texture, flame4.texture];
   const flameMat = cutoutFlameMat(flames[0]);
-  const flameW = 24 * BRACKET_VOX;
+  // PNG is 32×40; opaque two-tongue flame is ~15×27 texels (~handle height).
+  const flameW = 32 * BRACKET_VOX;
   const flameH = 40 * BRACKET_VOX;
   const flameGeo = new THREE.PlaneGeometry(flameW, flameH);
   const visuals: TorchVisual[] = [];

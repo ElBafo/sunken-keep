@@ -22,7 +22,8 @@ import {
   TORCH_RGB,
   TORCH_SPOT_ANGLE,
   TORCH_SPOT_DISTANCE,
-  TORCH_SPOT_INTENSITY
+  TORCH_SPOT_INTENSITY,
+  BRACKET_LAYER
 } from './constants';
 import {
   FACE_INTO_ROOM,
@@ -288,6 +289,7 @@ export class Floor1Lights {
       point.shadow.bias = -0.0004;
       point.shadow.normalBias = 0.008;
       point.shadow.radius = 1;
+      point.layers.enable(BRACKET_LAYER);
       const spot = new THREE.SpotLight(TORCH_COLOR, SLOT_HOLD, TORCH_SPOT_DISTANCE, TORCH_SPOT_ANGLE, 0.32, 1.4);
       spot.name = `torch-spot-${i}`;
       spot.color.setRGB(TORCH_RGB[0], TORCH_RGB[1], TORCH_RGB[2]);
