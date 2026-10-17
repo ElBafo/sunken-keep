@@ -342,6 +342,9 @@ describe('voxel-floor1 still does not import proto3d', () => {
     expect(main).toContain('beginStep');
     expect(main).toContain('prepareCell');
     expect(main).toContain('warmupRT');
+    expect(main).toContain("mover.kind === 'step' ? mover.toX");
+    expect(main).toContain('stepWorstWorkMs');
+    expect(main).not.toContain('shadowMap.enabled = false');
     expect(main).not.toContain('lastLightKey');
     expect(main).not.toContain('if (remeshed) syncShadows()');
     const bake = readFileSync(resolve(__dirname, '../src/voxel-floor1/bake.ts'), 'utf8');

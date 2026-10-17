@@ -86,6 +86,7 @@ type Floor1Api = {
     total: number;
   };
   stepWorstMs: number;
+  stepWorstWorkMs: number;
   stepArrivalMs: number;
   stepBuildMs: number;
   cacheSize: number;
@@ -236,10 +237,12 @@ async function boot(): Promise<void> {
   };
 
   const placeLights = (now: number): void => {
-    lights.setParty(mover.x, mover.y, now, preserveBuffer);
+    const px = mover.kind === 'step' ? mover.toX : mover.x;
+    const py = mover.kind === 'step' ? mover.toY : mover.y;
+    lights.setParty(px, py, now, preserveBuffer);
     const flick = preserveBuffer ? 1 : 1 + 0.05 * Math.sin(now * 0.001 * 6.1);
     level.setBakeBlends(lights.blends, flick);
-    props.update(mover.x, mover.y, mover.dir, now, preserveBuffer);
+    props.update(px, py, mover.dir, now, preserveBuffer);
   };
 
   const renderFrame = (): { draws: number; tris: number } => {
@@ -284,15 +287,13 @@ async function boot(): Promise<void> {
     };
   };
 
-  const warmupRT = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: false, stencilBuffer: false });
+  // Keep shadowMap on so warmup does not compile a second MeshPhysical variant.
+  const warmupRT = new THREE.WebGLRenderTarget(1, 1);
   const uploadPending = (): void => {
-    const sh = renderer.shadowMap.enabled;
-    renderer.shadowMap.enabled = false;
     const prev = renderer.getRenderTarget();
     renderer.setRenderTarget(warmupRT);
     renderer.render(scene, camera);
     renderer.setRenderTarget(prev);
-    renderer.shadowMap.enabled = sh;
   };
 
   const prepareCell = (x: number, y: number): number => {
@@ -304,9 +305,11 @@ async function boot(): Promise<void> {
 
   let stepTracking = false;
   let stepWorstMs = 0;
+  let stepWorstWorkMs = 0;
   let stepArrivalMs = 0;
   let stepBuildMs = 0;
   let lastStepWorstMs = 0;
+  let lastStepWorstWorkMs = 0;
   let lastStepArrivalMs = 0;
   let lastStepBuildMs = 0;
 
@@ -314,9 +317,11 @@ async function boot(): Promise<void> {
     if (!mover.step(dirSign)) return false;
     stepTracking = true;
     stepWorstMs = 0;
+    stepWorstWorkMs = 0;
     stepArrivalMs = 0;
     stepBuildMs = prepareCell(mover.toX, mover.toY);
     if (stepBuildMs > stepWorstMs) stepWorstMs = stepBuildMs;
+    if (stepBuildMs > stepWorstWorkMs) stepWorstWorkMs = stepBuildMs;
     return true;
   };
 
@@ -418,6 +423,7 @@ async function boot(): Promise<void> {
       onArrived();
     },
     stepWorstMs: 0,
+    stepWorstWorkMs: 0,
     stepArrivalMs: 0,
     stepBuildMs: 0,
     cacheSize: 1,
@@ -474,12 +480,14 @@ async function boot(): Promise<void> {
     const frame = renderFrame();
     const workMs = performance.now() - now;
     if (stepTracking || arrived) {
+      if (workMs > stepWorstWorkMs) stepWorstWorkMs = workMs;
       const spike = Math.max(dt, workMs);
       if (spike > stepWorstMs) stepWorstMs = spike;
     }
     if (arrived) {
       stepArrivalMs = workMs;
       lastStepWorstMs = stepWorstMs;
+      lastStepWorstWorkMs = stepWorstWorkMs;
       lastStepArrivalMs = stepArrivalMs;
       lastStepBuildMs = stepBuildMs;
       stepTracking = false;
@@ -498,6 +506,7 @@ async function boot(): Promise<void> {
     api.aspect = camera.aspect;
     api.position = [camera.position.x, camera.position.y, camera.position.z];
     api.stepWorstMs = lastStepWorstMs;
+    api.stepWorstWorkMs = lastStepWorstWorkMs;
     api.stepArrivalMs = lastStepArrivalMs;
     api.stepBuildMs = lastStepBuildMs;
     api.cacheSize = level.cacheSize;
