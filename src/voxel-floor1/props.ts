@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import {
   BRACKET_FLAME_H,
+  BRACKET_FLAME_SINK,
   BRACKET_FLAME_W,
   BRACKET_HANDLE_TILT,
   CELL,
@@ -68,8 +69,8 @@ export async function buildFloor1Props(
   const flames = [flame1.texture, flame2.texture, flame3.texture, flame4.texture];
   const flameMat = cutoutFlameMat(flames[0]);
   const flameGeo = new THREE.PlaneGeometry(BRACKET_FLAME_W, BRACKET_FLAME_H);
-  // Pivot at the bottom-centre so the sprite base sits on the gold cup.
-  flameGeo.translate(0, BRACKET_FLAME_H * 0.5, 0);
+  // Pivot at the cup: a little of the wide base hangs into the gold so there is no gap.
+  flameGeo.translate(0, BRACKET_FLAME_H * 0.5 - BRACKET_FLAME_SINK, 0);
   const flameUp = new THREE.Vector3();
   const sinTilt = Math.sin(BRACKET_HANDLE_TILT);
   const cosTilt = Math.cos(BRACKET_HANDLE_TILT);

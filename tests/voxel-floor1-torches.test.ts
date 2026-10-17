@@ -5,6 +5,7 @@ import {
   BRACKET_CUP_V,
   BRACKET_DIMS,
   BRACKET_FLAME_H,
+  BRACKET_FLAME_SINK,
   BRACKET_FLAME_W,
   BRACKET_VOX,
   BRACKET_WALL_GAP,
@@ -18,7 +19,14 @@ import {
   WALL_TEXELS
 } from '../src/voxel-floor1/constants';
 import { FACE_INTO_ROOM, floor1Sconces, hideWallProp, sconceRoom, torchWorldPos } from '../src/voxel-floor1/fixtures';
-import { buildBracketOccupancy, cupWorldPos, MAT_GOLD, MAT_WOOD, meshBracket } from '../src/voxel-floor1/bracket';
+import {
+  buildBracketOccupancy,
+  cupWorldPos,
+  MAT_GOLD,
+  MAT_IRON,
+  MAT_WOOD,
+  meshBracket
+} from '../src/voxel-floor1/bracket';
 import { cameraSpaceDepth, nearPlaneCulled, objectNearPlaneCulled } from '../src/voxel-floor1/near-cull';
 
 const lit = floor1Sconces.find((s) => s.x === 0 && s.y === 6)!;
@@ -31,10 +39,10 @@ function makeCam(x: number, y: number, dir: number): THREE.PerspectiveCamera {
 }
 
 describe('voxel-floor1 sconce near-cull', () => {
-  it('matches wall texel size and sits flush', () => {
+  it('matches wall texel size and sits proud of the stone', () => {
     expect(BRACKET_VOX).toBeCloseTo(CELL / WALL_TEXELS, 8);
     expect(BRACKET_VOX).toBeCloseTo(CELL / 128, 8);
-    expect(BRACKET_WALL_GAP).toBe(0);
+    expect(BRACKET_WALL_GAP).toBeCloseTo(2 * BRACKET_VOX, 8);
     expect(CUTOUT_ALPHA_TEST).toBe(0.5);
     expect(WALL_MOUNT_NEAR_CULL).toBeGreaterThan(CAMERA_NEAR);
   });
@@ -176,25 +184,64 @@ describe('voxel-floor1 sconce near-cull', () => {
     expect(objectNearPlaneCulled(meshBracket(lit), face)).toBe(false);
   });
 
-  it('anchors a short teardrop flame on the gold cup top', () => {
+  it('anchors a teardrop flame on the gold cup, about plate-wide and 1/3 handle tall', () => {
     const { volume, dims } = buildBracketOccupancy(false);
     const [W, H, D] = dims;
     let goldMaxV = 0;
     let goldMinV = H;
+    let woodMinV = H;
+    let woodMaxV = 0;
+    let plateUMin = W;
+    let plateUMax = 0;
     for (let d = 0; d < D; d++) {
       for (let v = 0; v < H; v++) {
         for (let u = 0; u < W; u++) {
-          if (volume[u + v * W + d * W * H] !== MAT_GOLD) continue;
-          if (v < goldMinV) goldMinV = v;
-          if (v > goldMaxV) goldMaxV = v;
+          const id = volume[u + v * W + d * W * H];
+          if (id === MAT_GOLD) {
+            if (v < goldMinV) goldMinV = v;
+            if (v > goldMaxV) goldMaxV = v;
+          }
+          if (id === MAT_WOOD) {
+            if (v < woodMinV) woodMinV = v;
+            if (v > woodMaxV) woodMaxV = v;
+          }
+          if (d <= 3 && id) {
+            if (u < plateUMin) plateUMin = u;
+            if (u > plateUMax) plateUMax = u;
+          }
         }
       }
     }
-    const cupH = (goldMaxV - goldMinV + 1) * BRACKET_VOX;
+    const plateW = (plateUMax - plateUMin + 1) * BRACKET_VOX;
+    const handleH = (woodMaxV - woodMinV + 1) * BRACKET_VOX;
     expect(BRACKET_CUP_V).toBeGreaterThan(goldMaxV);
-    expect(BRACKET_FLAME_H).toBeGreaterThan(cupH * 1.15);
-    expect(BRACKET_FLAME_H).toBeLessThan(cupH * 1.65);
-    expect(BRACKET_FLAME_W).toBeGreaterThan(5 * BRACKET_VOX);
-    expect(BRACKET_FLAME_W).toBeLessThan(10 * BRACKET_VOX);
+    expect(BRACKET_FLAME_SINK).toBeGreaterThan(0);
+    expect(BRACKET_FLAME_W).toBeGreaterThan(plateW * 0.9);
+    expect(BRACKET_FLAME_W).toBeLessThan(plateW * 1.6);
+    expect(BRACKET_FLAME_H).toBeGreaterThan(handleH * 0.4);
+    expect(BRACKET_FLAME_H).toBeLessThan(handleH * 0.6);
+  });
+
+  it('renders the plate in front of the wall with faces into the room', () => {
+    const group = meshBracket(lit);
+    const iron = group.children.find((child) => child.name === `bracket-${MAT_IRON}`) as THREE.Mesh;
+    expect(iron).toBeTruthy();
+    const pos = iron.geometry.getAttribute('position');
+    const nrm = iron.geometry.getAttribute('normal');
+    const wallX = lit.x * CELL + FACE_INTO_ROOM[lit.face].nx * (CELL / 2);
+    let maxOut = -Infinity;
+    let minOut = Infinity;
+    let frontFacesRoom = false;
+    for (let i = 0; i < pos.count; i++) {
+      const out = pos.getX(i);
+      if (out > maxOut) maxOut = out;
+      if (out < minOut) minOut = out;
+      if (out > wallX + BRACKET_WALL_GAP + BRACKET_VOX && nrm.getX(i) > 0.7) {
+        frontFacesRoom = true;
+      }
+    }
+    expect(minOut).toBeGreaterThan(wallX + BRACKET_VOX);
+    expect(maxOut).toBeGreaterThan(wallX + 0.04);
+    expect(frontFacesRoom).toBe(true);
   });
 });

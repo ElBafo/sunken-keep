@@ -114,18 +114,23 @@ export const SHAFT_OPACITY = 1;
 export const WALL_TEXELS = 128;
 export const BRACKET_VOX = CELL / WALL_TEXELS;
 export const BRACKET_DIMS: [number, number, number] = [16, 48, 22];
-/** Flush with the stone — plate is a few cm thick, not a standing slab. */
-export const BRACKET_WALL_GAP = 0;
+/** Sit the plate 2 texels in front of the wall plane (past the 3 cm stone relief). */
+export const BRACKET_WALL_GAP = 2 * BRACKET_VOX;
 /** Gold cup top-centre in occupancy (u, v, d). Flame base anchors here. */
 export const BRACKET_CUP_U = 8.5;
 export const BRACKET_CUP_V = 42;
 export const BRACKET_CUP_D = 14.5;
-export const BRACKET_FLAME_OUT = BRACKET_CUP_D * BRACKET_VOX;
+export const BRACKET_FLAME_OUT = BRACKET_CUP_D * BRACKET_VOX + BRACKET_WALL_GAP;
 export const BRACKET_FLAME_LIFT = 0.04 + (BRACKET_CUP_V - BRACKET_DIMS[1] / 2) * BRACKET_VOX;
 export const BRACKET_HANDLE_TILT = (18 * Math.PI) / 180;
-/** Cup is 5×4 texels; flame is slightly wider and 1.5× as tall. */
-export const BRACKET_FLAME_W = 8 * BRACKET_VOX;
-export const BRACKET_FLAME_H = 6 * BRACKET_VOX;
+/**
+ * Teardrop ~plate-wide and ~1/3 handle tall. PNG is 16×14 with 4 px of empty
+ * tip, so the plane is a little larger than the visible flame.
+ */
+export const BRACKET_FLAME_W = 14 * BRACKET_VOX;
+export const BRACKET_FLAME_H = 15 * BRACKET_VOX;
+/** Drop the sprite into the cup so the wide base overlaps the gold rim. */
+export const BRACKET_FLAME_SINK = 1.5 * BRACKET_VOX;
 /** Point light in the short flame above the gold cup. */
 export const BRACKET_LIGHT_FORWARD = 0.03;
 export const BRACKET_LIGHT_UP = 0.05;

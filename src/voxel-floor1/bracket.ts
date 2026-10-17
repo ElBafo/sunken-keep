@@ -80,10 +80,13 @@ export function buildBracketOccupancy(capped: boolean): {
 } {
   const dims = BRACKET_DIMS;
   const volume = new Uint8Array(dims[0] * dims[1] * dims[2]);
-  // Plate ~2× handle width, taller than the collar. Darker-than-stone inner,
-  // slightly lighter bevel so the edge reads from the front.
-  fillBox(volume, dims, 3, 5, 0, 12, 40, 2, MAT_RUST);
-  fillBox(volume, dims, 4, 6, 0, 11, 39, 3, MAT_IRON);
+  // Plate ~2× handle width, taller than the collar. Full-width dark-iron front
+  // so both sides read from the room; 1-texel lighter bevel on the rim.
+  fillBox(volume, dims, 3, 5, 0, 12, 40, 3, MAT_IRON);
+  fillBox(volume, dims, 3, 5, 0, 3, 40, 3, MAT_RUST);
+  fillBox(volume, dims, 12, 5, 0, 12, 40, 3, MAT_RUST);
+  fillBox(volume, dims, 4, 5, 0, 11, 5, 3, MAT_RUST);
+  fillBox(volume, dims, 4, 40, 0, 11, 40, 3, MAT_RUST);
   // Short arm from the plate's middle out to the collar.
   fillBox(volume, dims, 7, 21, 3, 9, 25, 7, MAT_IRON);
   // Collar: same mid-grey iron, darker edge (not a pale band).
@@ -109,8 +112,9 @@ export function buildBracketOccupancy(capped: boolean): {
 
 export function bracketToWorld(spec: SconceSpec): (u: number, v: number, d: number) => [number, number, number] {
   const { nx, nz } = FACE_INTO_ROOM[spec.face];
-  const px = -nz;
-  const pz = nx;
+  // Even permutation so greedy-mesh +d faces point into the room (FrontSide).
+  const px = nz;
+  const pz = -nx;
   const wallX = spec.x * CELL + nx * (CELL / 2);
   const wallZ = spec.y * CELL + nz * (CELL / 2);
   const midY = CELL / 2 + 0.04;
@@ -151,7 +155,7 @@ export function meshBracket(spec: SconceSpec): THREE.Group {
   const toWorld = bracketToWorld(spec);
   for (const id of [MAT_IRON, MAT_RUST, MAT_WOOD, MAT_GOLD]) {
     const occ = extract(volume, id);
-    const meshed = greedyMesh(occ, dims, toWorld);
+    const meshed = greedyMesh(occ, dims, toWorld, { cullNeg: [false, false, false] });
     const geo = geometryFrom(meshed.mesh);
     if (!geo) continue;
     const mesh = new THREE.Mesh(geo, MATS[id]);

@@ -338,6 +338,7 @@ describe('voxel-floor1 still does not import proto3d', () => {
     expect(props).toContain('premultipliedAlpha');
     expect(props).toContain('applyWallMountNearCull');
     expect(props).toContain('flameGeo.translate');
+    expect(props).toContain('BRACKET_FLAME_SINK');
     expect(props).toContain('lookAt');
     expect(props).toContain('flame_teardrop');
     expect(props).not.toContain('quaternion.copy(camera.quaternion)');
