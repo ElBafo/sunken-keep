@@ -146,6 +146,8 @@ export const IRON_COLOR = 0x2a2826;
 export const RUST_COLOR = 0x4a4844;
 export const WOOD_COLOR = 0x5c3318;
 export const GOLD_COLOR = 0xb07a18;
+/** Recessed rune grooves — dull banked-coal, not a light and not brass. */
+export const EMBER_COLOR = 0x8a3f16;
 export const BRACKET_LAYER = 1;
 
 export {

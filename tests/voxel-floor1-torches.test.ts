@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { poseGridCamera } from '../src/voxel-floor1/camera';
@@ -15,18 +17,34 @@ import {
   CAMERA_VIEW_ASPECT,
   CELL,
   CUTOUT_ALPHA_TEST,
+  EMBER_COLOR,
+  GOLD_COLOR,
+  IRON_COLOR,
   WALL_MOUNT_NEAR_CULL,
   WALL_TEXELS
 } from '../src/voxel-floor1/constants';
-import { FACE_INTO_ROOM, floor1Sconces, hideWallProp, sconceRoom, torchWorldPos } from '../src/voxel-floor1/fixtures';
+import {
+  FACE_INTO_ROOM,
+  facingSconce,
+  floor1Sconces,
+  hideWallProp,
+  sconceIsCapped,
+  sconceIsLit,
+  sconceRoom,
+  TORCH_CAPPED_PROMPT,
+  torchWorldPos
+} from '../src/voxel-floor1/fixtures';
 import {
   buildBracketOccupancy,
   cupWorldPos,
+  MAT_EMBER,
   MAT_GOLD,
   MAT_IRON,
+  MAT_RUST,
   MAT_WOOD,
   meshBracket
 } from '../src/voxel-floor1/bracket';
+import { floor1Map, isWalkableTile, tileAt } from '../src/voxel-floor1/layout';
 import { cameraSpaceDepth, nearPlaneCulled, objectNearPlaneCulled } from '../src/voxel-floor1/near-cull';
 
 const lit = floor1Sconces.find((s) => s.x === 0 && s.y === 6)!;
@@ -244,5 +262,154 @@ describe('voxel-floor1 sconce near-cull', () => {
     expect(minOut).toBeLessThan(wallX + 0.03 + BRACKET_VOX);
     expect(maxOut).toBeGreaterThan(wallX + 0.04);
     expect(frontFacesRoom).toBe(true);
+  });
+});
+
+describe('voxel-floor1 capped sconces', () => {
+  const capped = floor1Sconces.filter((s) => s.capped);
+  const dead = floor1Sconces.filter((s) => !s.lit && !s.capped);
+  const litSconces = floor1Sconces.filter((s) => s.lit);
+
+  function ironCapVoxels(cappedLid: boolean): number {
+    const { volume, dims } = buildBracketOccupancy(cappedLid);
+    const [W, H, D] = dims;
+    let n = 0;
+    for (let d = 6; d < D; d++) {
+      for (let v = 40; v < H; v++) {
+        for (let u = 0; u < W; u++) {
+          if (volume[u + v * W + d * W * H] === MAT_IRON) n += 1;
+        }
+      }
+    }
+    return n;
+  }
+
+  function matBounds(cappedLid: boolean, id: number, minV = 0, minD = 0) {
+    const { volume, dims } = buildBracketOccupancy(cappedLid);
+    const [W, H, D] = dims;
+    let uMin = W;
+    let uMax = 0;
+    let vMin = H;
+    let vMax = 0;
+    let dMin = D;
+    let dMax = 0;
+    for (let d = minD; d < D; d++) {
+      for (let v = minV; v < H; v++) {
+        for (let u = 0; u < W; u++) {
+          if (volume[u + v * W + d * W * H] !== id) continue;
+          if (u < uMin) uMin = u;
+          if (u > uMax) uMax = u;
+          if (v < vMin) vMin = v;
+          if (v > vMax) vMax = v;
+          if (d < dMin) dMin = d;
+          if (d > dMax) dMax = d;
+        }
+      }
+    }
+    return { uMin, uMax, vMin, vMax, dMin, dMax, uSpan: uMax - uMin + 1, dSpan: dMax - dMin + 1 };
+  }
+
+  it('caps only Classic floor-1 sealed sconces, not dead unlit brackets', () => {
+    expect(capped.map((s) => `${s.x},${s.y},${s.face}`).sort()).toEqual(['0,3,E', '9,0,S']);
+    expect(dead.length).toBe(4);
+    expect(litSconces.length).toBe(3);
+    for (const s of capped) {
+      expect(s.lit).toBe(false);
+      expect(sconceIsCapped(s)).toBe(true);
+      expect(sconceIsLit(s)).toBe(false);
+    }
+    for (const s of dead) {
+      expect(sconceIsCapped(s)).toBe(false);
+      expect(sconceIsLit(s)).toBe(false);
+    }
+  });
+
+  it('sheathes the gold cup completely and seals the cap with a flush iron rune slab', () => {
+    expect(ironCapVoxels(true)).toBeGreaterThan(80);
+    expect(ironCapVoxels(false)).toBe(0);
+    const { volume, dims } = buildBracketOccupancy(true);
+    const [W, H, D] = dims;
+    let cupGold = 0;
+    let cupCovered = 0;
+    for (let d = 9; d <= 13; d++) {
+      for (let v = 38; v <= 41; v++) {
+        for (let u = 6; u <= 10; u++) {
+          const id = volume[u + v * W + d * W * H];
+          if (id === MAT_GOLD) cupGold += 1;
+          if (id === MAT_IRON || id === MAT_RUST) cupCovered += 1;
+        }
+      }
+    }
+    expect(cupGold).toBe(0);
+    expect(cupCovered).toBe(5 * 4 * 5);
+    expect(volume.includes(MAT_GOLD)).toBe(false);
+    const { volume: openVol } = buildBracketOccupancy(false);
+    expect(openVol.includes(MAT_GOLD)).toBe(true);
+    expect(openVol.includes(MAT_EMBER)).toBe(false);
+    let slabUMin = W;
+    let slabUMax = 0;
+    let slabVMin = H;
+    let slabVMax = 0;
+    let hanging = 0;
+    let ember = 0;
+    let recessed = 0;
+    for (let d = 0; d < D; d++) {
+      for (let v = 0; v < H; v++) {
+        for (let u = 0; u < W; u++) {
+          const id = volume[u + v * W + d * W * H];
+          if (d >= 17 && v >= 36 && (id === MAT_IRON || id === MAT_RUST || id === MAT_EMBER)) {
+            if (u < slabUMin) slabUMin = u;
+            if (u > slabUMax) slabUMax = u;
+            if (v < slabVMin) slabVMin = v;
+            if (v > slabVMax) slabVMax = v;
+          }
+          if (d >= 17 && v < 36 && id) hanging += 1;
+          if (id === MAT_EMBER) {
+            ember += 1;
+            if (d === 20 && volume[u + v * W + 21 * W * H] === 0) recessed += 1;
+          }
+        }
+      }
+    }
+    expect(slabUMax - slabUMin + 1).toBeGreaterThanOrEqual(7);
+    expect(slabVMax - slabVMin + 1).toBeGreaterThanOrEqual(8);
+    expect(slabVMin).toBeGreaterThanOrEqual(36);
+    expect(hanging).toBe(0);
+    expect(ember).toBeGreaterThan(10);
+    expect(recessed).toBe(ember);
+    const cap = matBounds(true, MAT_IRON, 37, 6);
+    expect(cap.vMin).toBeLessThanOrEqual(37);
+    expect(cap.uSpan).toBeGreaterThanOrEqual(9);
+  });
+
+  it('tints the rune grooves with dull ember, not brass or a light', () => {
+    const luma = (hex: number) => {
+      const r = (hex >> 16) & 255;
+      const g = (hex >> 8) & 255;
+      const b = hex & 255;
+      return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    };
+    expect(luma(EMBER_COLOR)).toBeGreaterThan(luma(IRON_COLOR));
+    expect(luma(EMBER_COLOR)).toBeLessThan(luma(GOLD_COLOR));
+    const bracket = readFileSync(resolve(__dirname, '../src/voxel-floor1/bracket.ts'), 'utf8');
+    expect(bracket).toContain('EMBER_COLOR');
+    expect(bracket).toContain('engrave');
+    expect(bracket).not.toContain('BRASS_COLOR');
+    expect(bracket).not.toContain('PointLight');
+  });
+
+  it('faces the same capped sconces as Classic and keeps the sealed line', () => {
+    const south = facingSconce(floor1Sconces, 9, 1, 0);
+    expect(south).toMatchObject({ x: 9, y: 0, face: 'S', capped: true });
+    const east = facingSconce(floor1Sconces, 1, 3, 3);
+    expect(east).toMatchObject({ x: 0, y: 3, face: 'E', capped: true });
+    const deadWest = facingSconce(floor1Sconces, 3, 6, 1);
+    expect(deadWest).toMatchObject({ x: 4, y: 6, face: 'W', capped: false, lit: false });
+    expect(facingSconce(floor1Sconces, 9, 1, 2)).toBeUndefined();
+    expect(TORCH_CAPPED_PROMPT).toBe("Sealed. It'll take forge-fire to open.");
+    // (8,1) is the west wall of this alcove — along-wall shots stand in (10,1).
+    expect(isWalkableTile(tileAt(floor1Map, 9, 1))).toBe(true);
+    expect(isWalkableTile(tileAt(floor1Map, 8, 1))).toBe(false);
+    expect(isWalkableTile(tileAt(floor1Map, 10, 1))).toBe(true);
   });
 });

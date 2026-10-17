@@ -176,9 +176,15 @@ function meshVolume(
   tx: number,
   tz: number,
   torches: FarTorch[],
-  beams: FarBeam[]
+  beams: FarBeam[],
+  keepBack = false
 ): THREE.BufferGeometry | null {
-  const meshed = greedyMesh(volume, dims, toWorld);
+  const meshed = greedyMesh(
+    volume,
+    dims,
+    toWorld,
+    keepBack ? { cullNeg: [false, false, false] } : undefined
+  );
   return geometryWithBake([{ mesh: meshed.mesh, tx, tz }], torches, beams);
 }
 
@@ -391,7 +397,16 @@ export async function buildFloor1Openings(
     const [inx, inz] = INSET[face];
     const toWorld = makeToWorld(view.face, view.tx, view.tz, panelVol.dims, LAYER_SIZE, CELL, 'center');
     if (kind === 'door') {
-      const frameGeo = meshVolume(frameVol.volume, frameVol.dims, toWorld, view.tx, view.tz, torches, beams);
+      const frameGeo = meshVolume(
+        frameVol.volume,
+        frameVol.dims,
+        toWorld,
+        view.tx,
+        view.tz,
+        torches,
+        beams,
+        true
+      );
       if (frameGeo) {
         const frame = new THREE.Mesh(frameGeo, frameMat);
         frame.name = `door-frame:${visual.x},${visual.y}:${face}`;
