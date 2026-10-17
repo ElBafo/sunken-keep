@@ -24,6 +24,13 @@ export const CAMERA_NEAR = cameraSpec.near;
 export const CAMERA_FAR = cameraSpec.far;
 export const CAMERA_PITCH = (cameraSpec.pitchDeg * Math.PI) / 180;
 export const BACK_OFFSET = cameraSpec.backOffsetTiles * CELL;
+/** Same logical 3D view box as proto3d — keeps hall length matching Classic. */
+export const CAMERA_VIEW_W = cameraSpec.view[0];
+export const CAMERA_VIEW_H = cameraSpec.view[1];
+export const CAMERA_VIEW_ASPECT = CAMERA_VIEW_W / CAMERA_VIEW_H;
+/** Same fog window as proto3d so a far square does not vanish early. */
+export const FOG_NEAR = 10;
+export const FOG_FAR = 28;
 
 /** Same step/turn window as proto3d. */
 export const MOVE_MS = 180;
@@ -88,7 +95,6 @@ export const BRACKET_FLAME_LIFT = 0.29;
 export const IRON_COLOR = 0x1a120e;
 export const RUST_COLOR = 0x3a2214;
 export const BRASS_COLOR = 0x4a3218;
-export const BAKE_GAIN = 0.5;
 
 export {
   LANTERN_COLOR,

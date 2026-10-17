@@ -4,7 +4,10 @@ import {
   CAMERA_FOV,
   CAMERA_NEAR,
   CAMERA_PITCH,
+  CAMERA_VIEW_ASPECT,
   CELL,
+  FOG_FAR,
+  FOG_NEAR,
   LANTERN_COLOR,
   LANTERN_DISTANCE,
   LANTERN_FLICKER,
@@ -23,7 +26,6 @@ import { floor1Sconces, floor1Sunbeams } from './fixtures';
 import { Floor1Lights } from './lights';
 import { floor1Map } from './layout';
 import { buildFloor1 } from './level';
-import { TorchLightPools } from './pools';
 import { buildFloor1Props } from './props';
 
 THREE.ColorManagement.enabled = true;
@@ -112,9 +114,9 @@ async function boot(): Promise<void> {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(fog);
-  scene.fog = new THREE.Fog(fog, 10, 22);
+  scene.fog = new THREE.Fog(fog, FOG_NEAR, FOG_FAR);
 
-  const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, CAMERA_NEAR, CAMERA_FAR);
+  const camera = new THREE.PerspectiveCamera(CAMERA_FOV, CAMERA_VIEW_ASPECT, CAMERA_NEAR, CAMERA_FAR);
   camera.rotation.order = 'YXZ';
 
   const hemi = new THREE.HemisphereLight(0x2a241c, 0x080605, 0.04);
@@ -169,14 +171,20 @@ async function boot(): Promise<void> {
   loading.textContent = 'Placing torches…';
   const props = await buildFloor1Props(floor1Sconces, floor1Sunbeams);
   scene.add(props.group);
-  const pools = new TorchLightPools(floor1Map, floor1Sconces);
-  scene.add(pools.group);
 
   const resize = (): void => {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    renderer.setSize(w, h, false);
-    camera.aspect = w / Math.max(1, h);
+    const cssW = window.innerWidth;
+    const cssH = window.innerHeight;
+    let w = cssW;
+    let h = w / CAMERA_VIEW_ASPECT;
+    if (h > cssH) {
+      h = cssH;
+      w = h * CAMERA_VIEW_ASPECT;
+    }
+    canvas.style.width = `${Math.round(w)}px`;
+    canvas.style.height = `${Math.round(h)}px`;
+    renderer.setSize(Math.round(w), Math.round(h), false);
+    camera.aspect = CAMERA_VIEW_ASPECT;
     camera.updateProjectionMatrix();
   };
   resize();
@@ -196,7 +204,7 @@ async function boot(): Promise<void> {
   const placeLights = (now: number): void => {
     lights.setParty(mover.x, mover.y, now, preserveBuffer);
     const flick = preserveBuffer ? 1 : 1 + 0.05 * Math.sin(now * 0.001 * 6.1);
-    pools.setBlends(lights.blends, flick);
+    level.setBakeBlends(lights.blends, flick);
     props.update(mover.x, mover.y, mover.dir, now, preserveBuffer);
     const key = `${lights.stats.torchesActive}:${lights.stats.sunbeamsActive}`;
     if (key !== lastLightKey) {
@@ -389,7 +397,7 @@ async function boot(): Promise<void> {
     const frame = renderFrame();
     api.draws = frame.draws;
     api.lights = lights.stats;
-    api.triangles = frame.tris;
+    api.triangles = level.stats.triangles;
     api.voxelFaces = level.stats.voxelFaces;
     api.flatFaces = level.stats.flatFaces;
     api.gridX = mover.x;
@@ -409,7 +417,7 @@ async function boot(): Promise<void> {
       statsEl.innerHTML =
         `<div><b>${api.fps}</b> fps</div>` +
         `<div>${api.avgMs.toFixed(1)} ms avg · <b>${api.worstMs.toFixed(1)}</b> ms worst</div>` +
-        `<div>${frame.draws} draws · ${api.triangles.toLocaleString()} tri</div>` +
+        `<div>${frame.draws} draws · ${level.stats.triangles.toLocaleString()} tri</div>` +
         `<div>${api.voxelFaces} vx faces · ${api.flatFaces} flat</div>` +
         `<div>${api.lights.total} lights · ${api.lights.torchesActive}/${api.lights.torchesLit} torch · ${api.lights.sunbeamsActive}/${api.lights.sunbeams} beam</div>`;
     }

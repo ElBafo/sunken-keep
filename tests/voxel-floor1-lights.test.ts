@@ -25,6 +25,7 @@ import {
 import { floor1Map, enumerateFaces, isWalkableTile, tileAt } from '../src/voxel-floor1/layout';
 import { buildBracketOccupancy, MAT_IRON } from '../src/voxel-floor1/bracket';
 import { compositeCrackedCeiling, crackedCeilingHasGap, isBeamCeiling } from '../src/voxel-floor1/crack';
+import { bakeWeights, litFarTorches } from '../src/voxel-floor1/bake';
 
 describe('voxel-floor1 torches match the game sconce table', () => {
   it('uses floor1.sconces at the same squares and walls', () => {
@@ -107,6 +108,19 @@ describe('voxel-floor1 crack beams match dressing_act1', () => {
   });
 });
 
+describe('far torch bake lights the painted texture', () => {
+  it('weights only tiles in the torch flood, so unlit rooms stay dark', () => {
+    const torches = litFarTorches(floor1Map, floor1Sconces);
+    expect(torches.length).toBe(3);
+    const south = torches.find((t) => t.key.endsWith(',S'));
+    expect(south).toBeTruthy();
+    const near = bakeWeights(6, 5, 6 * CELL, 0.1, 5 * CELL, torches);
+    expect(near[0] + near[1] + near[2]).toBeGreaterThan(0.2);
+    const start = bakeWeights(3, 14, 3 * CELL, 0.1, 14 * CELL, torches);
+    expect(start[0] + start[1] + start[2]).toBe(0);
+  });
+});
+
 describe('active light cap', () => {
   it('keeps a small torch/sunbeam pool so the shader cannot blow up', () => {
     expect(MAX_ACTIVE_TORCHES).toBe(2);
@@ -133,7 +147,12 @@ describe('voxel-floor1 still does not import proto3d', () => {
     expect(props).toContain('THREE.Sprite');
     expect(props).not.toContain('bracket_lit_front');
     const main = readFileSync(resolve(__dirname, '../src/voxel-floor1/main.ts'), 'utf8');
-    expect(main).toContain('TorchLightPools');
+    expect(main).toContain('setBakeBlends');
+    expect(main).toContain('CAMERA_VIEW_ASPECT');
     expect(main).toContain('setLookPitch');
+    expect(main).not.toContain('TorchLightPools');
+    const bake = readFileSync(resolve(__dirname, '../src/voxel-floor1/bake.ts'), 'utf8');
+    expect(bake).toContain('diffuseColor.rgb * uFarColor');
+    expect(bake).not.toContain('AdditiveBlending');
   });
 });
