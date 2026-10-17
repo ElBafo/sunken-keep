@@ -116,17 +116,18 @@ export function buildBracketOccupancy(capped: boolean): {
     fillBox(volume, dims, 4, 44, 16, 12, 46, 16, MAT_RUST);
     fillBox(volume, dims, 5, 46, 9, 11, 47, 15, MAT_IRON);
     fillBox(volume, dims, 5, 46, 15, 11, 47, 15, MAT_RUST);
-    // Hasp: strap on the cap front, padlock hanging through it.
-    fillBox(volume, dims, 6, 42, 17, 10, 44, 19, MAT_IRON);
-    fillBox(volume, dims, 7, 38, 17, 9, 42, 19, MAT_IRON);
-    fillBox(volume, dims, 6, 36, 18, 10, 40, 21, MAT_IRON);
-    fillBox(volume, dims, 6, 36, 18, 6, 40, 21, MAT_RUST);
-    fillBox(volume, dims, 10, 36, 18, 10, 40, 21, MAT_RUST);
-    fillBox(volume, dims, 6, 36, 21, 10, 36, 21, MAT_RUST);
-    fillBox(volume, dims, 6, 40, 19, 6, 44, 21, MAT_IRON);
-    fillBox(volume, dims, 10, 40, 19, 10, 44, 21, MAT_IRON);
-    fillBox(volume, dims, 6, 44, 19, 10, 44, 21, MAT_IRON);
-    fillBox(volume, dims, 8, 37, 21, 8, 39, 21, MAT_GOLD);
+    // Hasp strap on the cap front, padlock hanging in front of the handle.
+    fillBox(volume, dims, 6, 40, 16, 10, 43, 19, MAT_IRON);
+    fillBox(volume, dims, 7, 37, 16, 9, 40, 19, MAT_IRON);
+    fillBox(volume, dims, 5, 31, 15, 11, 37, 21, MAT_IRON);
+    fillBox(volume, dims, 5, 31, 21, 11, 37, 21, MAT_RUST);
+    fillBox(volume, dims, 5, 31, 15, 5, 37, 21, MAT_RUST);
+    fillBox(volume, dims, 11, 31, 15, 11, 37, 21, MAT_RUST);
+    fillBox(volume, dims, 5, 31, 15, 11, 31, 21, MAT_RUST);
+    fillBox(volume, dims, 5, 37, 17, 5, 43, 21, MAT_IRON);
+    fillBox(volume, dims, 11, 37, 17, 11, 43, 21, MAT_IRON);
+    fillBox(volume, dims, 5, 43, 17, 11, 43, 21, MAT_IRON);
+    fillBox(volume, dims, 7, 33, 21, 9, 35, 21, MAT_GOLD);
   }
   let voxelCount = 0;
   for (let i = 0; i < volume.length; i++) if (volume[i]) voxelCount += 1;

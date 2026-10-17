@@ -350,7 +350,7 @@ describe('voxel-floor1 capped sconces', () => {
     }
     expect(lockMetal).toBeGreaterThan(20);
     expect(keyhole).toBeGreaterThan(0);
-    expect(keyhole).toBeLessThan(8);
+    expect(keyhole).toBeLessThan(16);
     const cap = matBounds(true, MAT_IRON, 37, 6);
     expect(cap.vMin).toBeLessThanOrEqual(37);
     expect(cap.uSpan).toBeGreaterThanOrEqual(9);
