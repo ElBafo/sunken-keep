@@ -15,6 +15,7 @@ import {
 describe('voxel-lab wall texels match the game files', () => {
   const texDir = resolve(__dirname, '../public/proto3d/tex3d');
   const room = readFileSync(resolve(__dirname, '../src/voxel-lab/room.ts'), 'utf8');
+  const materials = readFileSync(resolve(__dirname, '../src/voxel-lab/materials.ts'), 'utf8');
   const look = readFileSync(resolve(__dirname, '../src/voxel-lab/look.ts'), 'utf8');
   const vertex = readFileSync(resolve(__dirname, '../src/proto3d/vertex-lighting.ts'), 'utf8');
   const renderer = readFileSync(resolve(__dirname, '../src/proto3d/renderer.ts'), 'utf8');
@@ -23,9 +24,11 @@ describe('voxel-lab wall texels match the game files', () => {
     for (const file of WALL_FILES) {
       expect(existsSync(resolve(texDir, file)), file).toBe(true);
     }
-    expect(room).toContain("return `${base}proto3d/tex3d/${file}`");
-    expect(room).toContain('new THREE.Texture(img)');
-    expect(room).toContain('texture.colorSpace = THREE.SRGBColorSpace');
+    expect(materials).toContain("return `${base}proto3d/tex3d/${file}`");
+    expect(materials).toContain('new THREE.Texture(img)');
+    expect(materials).toContain('texture.colorSpace = THREE.SRGBColorSpace');
+    expect(materials).not.toMatch(/fillStyle|globalCompositeOperation|multiplyScalar/);
+    expect(room).toContain("from './materials'");
     expect(room).not.toMatch(/fillStyle|globalCompositeOperation|multiplyScalar/);
   });
 

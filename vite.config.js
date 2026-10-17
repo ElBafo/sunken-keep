@@ -12,7 +12,8 @@ export default defineConfig({
       input: {
         main: resolve(__dirname, 'index.html'),
         proto3d: resolve(__dirname, 'proto3d.html'),
-        voxelLab: resolve(__dirname, 'voxel-lab.html')
+        voxelLab: resolve(__dirname, 'voxel-lab.html'),
+        voxelFloor1: resolve(__dirname, 'voxel-floor1.html')
       }
     }
   }
