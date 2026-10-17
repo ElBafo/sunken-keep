@@ -106,6 +106,71 @@ function mergeFar(
   return { positions, normals, uvs, indices, farW };
 }
 
+function rotateOffset(
+  x: number,
+  y: number,
+  z: number,
+  rotX: number,
+  rotY: number
+): [number, number, number] {
+  const cx = Math.cos(rotX);
+  const sx = Math.sin(rotX);
+  const cy = Math.cos(rotY);
+  const sy = Math.sin(rotY);
+  const y1 = y * cx - z * sx;
+  const z1 = y * sx + z * cx;
+  return [x * cy + z1 * sy, y1, -x * sy + z1 * cy];
+}
+
+/** Far-ring quads with the same aFarW path as near voxels — no instanced attrs. */
+export function flatGeometryWithBake(
+  items: Array<{
+    pose: { x: number; y: number; z: number; rotX: number; rotY: number };
+    tx: number;
+    tz: number;
+  }>,
+  torches: FarTorch[],
+  cell: number
+): THREE.BufferGeometry | null {
+  const hw = cell / 2;
+  const packed = items.map((item) => {
+    const { x, y, z, rotX, rotY } = item.pose;
+    const corners: Array<[number, number]> = [
+      [-hw, hw],
+      [hw, hw],
+      [-hw, -hw],
+      [hw, -hw]
+    ];
+    const positions: number[] = [];
+    const normals: number[] = [];
+    const uvs: number[] = [0, 1, 1, 1, 0, 0, 1, 0];
+    const n = rotateOffset(0, 0, 1, rotX, rotY);
+    for (const [px, py] of corners) {
+      const p = rotateOffset(px, py, 0, rotX, rotY);
+      positions.push(p[0] + x, p[1] + y, p[2] + z);
+      normals.push(n[0], n[1], n[2]);
+    }
+    const w = bakeWeights(item.tx, item.tz, x, y, z, torches);
+    return {
+      positions,
+      normals,
+      uvs,
+      indices: [0, 2, 1, 2, 3, 1],
+      farW: [w[0], w[1], w[2], w[0], w[1], w[2], w[0], w[1], w[2], w[0], w[1], w[2]]
+    };
+  });
+  const merged = mergeFar(packed);
+  if (merged.indices.length === 0) return null;
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(merged.positions, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(merged.normals, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(merged.uvs, 2));
+  g.setAttribute('aFarW', new THREE.Float32BufferAttribute(merged.farW, 3));
+  g.setIndex(merged.indices);
+  g.computeBoundingSphere();
+  return g;
+}
+
 export function geometryWithBake(
   items: Array<{
     mesh: { positions: number[]; normals: number[]; uvs: number[]; indices: number[] };
@@ -137,7 +202,7 @@ export function patchBakeMaterial(mat: THREE.MeshPhysicalMaterial): void {
     value: new THREE.Vector3(GAME_TORCH_RGB[0], GAME_TORCH_RGB[1], GAME_TORCH_RGB[2]).multiplyScalar(BAKE_GAIN)
   };
   mat.userData.uFarBlend = { value: new THREE.Vector3() };
-  mat.customProgramCacheKey = () => 'floor1-far-bake-v2';
+  mat.customProgramCacheKey = () => 'floor1-far-bake-v3';
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uFarColor = mat.userData.uFarColor;
     shader.uniforms.uFarBlend = mat.userData.uFarBlend;
@@ -165,9 +230,9 @@ uniform vec3 uFarColor;
 uniform vec3 uFarBlend;`
         )
         .replace(
-          '#include <opaque_fragment>',
-          `outgoingLight += diffuseColor.rgb * uFarColor * max(dot(vFarW, uFarBlend), 0.0);
-#include <opaque_fragment>`
+          '#include <colorspace_fragment>',
+          `#include <colorspace_fragment>
+gl_FragColor.rgb += linearToOutputTexel( vec4( diffuseColor.rgb, 1.0 ) ).rgb * uFarColor * max( dot( vFarW, uFarBlend ), 0.0 );`
         );
     }
   };
