@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { volumeFromImageData, type VolumeFromPixels } from '../voxel-lab/classify';
 import { makeToWorld, tileFlatPose } from '../voxel-lab/faces';
-import { loadPng, pbrMap, voxelMaterial, type PngPixels } from '../voxel-lab/materials';
+import { loadPng, pbrMap, textureFromPixels, voxelMaterial, type PngPixels } from '../voxel-lab/materials';
 import { greedyMesh, type MeshArrays } from '../voxel-lab/mesher';
 import { CELL, CRACKED_CEILING_FILE, CULL_CHEB, LAYER_SIZE, VOXEL_CHEB } from './constants';
 import { floor1Sconces, floor1Sunbeams } from './fixtures';
 import { canStep, chebyshev, enumerateFaces, type FaceJob, type FloorMap } from './layout';
 import { isBeamCeiling, loadCrackedCeiling } from './crack';
+import { lookPixels } from './wall-once';
 import { bulgePose, bulgeWorld, finishVolume, type WallLook } from './wall-look';
 import {
   FAR_BAKE_SEGS,
@@ -68,10 +69,14 @@ export async function buildFloor1(
       job.file = CRACKED_CEILING_FILE;
     }
   }
-  const neededFiles = [...new Set(jobs.map((j) => j.file))];
+  const neededFiles = new Set<string>();
+  for (const job of jobs) {
+    neededFiles.add(job.file);
+    if (job.look?.baseFile) neededFiles.add(job.look.baseFile);
+  }
   const pngs = new Map<string, PngPixels>();
   await Promise.all(
-    neededFiles.map(async (file) => {
+    [...neededFiles].map(async (file) => {
       pngs.set(file, file === CRACKED_CEILING_FILE ? await loadCrackedCeiling() : await loadPng(file));
     })
   );
@@ -99,12 +104,13 @@ export async function buildFloor1(
 
   for (const look of usedLooks.values()) {
     if (look.key === look.file) continue;
-    const base = pngs.get(look.file);
-    if (!base) continue;
-    const vol = volumeFromImageData(base.data);
+    const feat = pngs.get(look.file);
+    if (!feat) continue;
+    const pixels = lookPixels(look.file, pngs, look.once, look.baseFile);
+    const vol = volumeFromImageData(pixels);
     finishVolume(vol, look);
     volumes.set(look.key, vol);
-    texByBatch.set(look.key, base.texture);
+    texByBatch.set(look.key, look.once ? textureFromPixels(pixels) : feat.texture);
     voxels += vol.voxelCount;
     roughByBatch.set(look.key, pbrMap(vol.roughness, vol.dims[0], vol.dims[1]));
   }

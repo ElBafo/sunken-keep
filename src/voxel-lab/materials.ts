@@ -38,6 +38,29 @@ export async function loadPng(file: string): Promise<PngPixels> {
   return { img, data, texture };
 }
 
+/** Same sampling as `loadPng`, from a composited pixel buffer. */
+export function textureFromPixels(pixels: {
+  width: number;
+  height: number;
+  data: ArrayLike<number>;
+}): THREE.Texture {
+  const canvas = document.createElement('canvas');
+  canvas.width = pixels.width;
+  canvas.height = pixels.height;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
+  if (!ctx) throw new Error('2d context');
+  const img = ctx.createImageData(pixels.width, pixels.height);
+  img.data.set(pixels.data);
+  ctx.putImageData(img, 0, 0);
+  const texture = new THREE.Texture(canvas);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.magFilter = THREE.NearestFilter;
+  texture.minFilter = THREE.NearestFilter;
+  texture.generateMipmaps = false;
+  texture.needsUpdate = true;
+  return texture;
+}
+
 /**
  * Packed PBR map from per-texel roughness:
  * R = clearcoat (wet only), G = roughness, A = specular intensity.

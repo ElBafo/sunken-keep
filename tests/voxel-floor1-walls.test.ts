@@ -22,6 +22,7 @@ import {
   wallKind,
   ZONE_FAMILY
 } from '../src/voxel-floor1/wall-look';
+import { STRONG_ONCE_BASE } from '../src/voxel-floor1/wall-once';
 
 function facesOf(kind: string) {
   return floor1DecorFaces.filter((f) => wallKind(f) === kind);
@@ -156,6 +157,29 @@ describe('floor-1 walls use Artie painted tiles', () => {
     expect(level).not.toContain('applyWallLook');
     expect(level).toContain('bulgeWorld');
     expect(level).toContain('finishVolume');
+  });
+
+  it('shows each strong-feature tile only once per face', () => {
+    for (const f of floor1DecorFaces) {
+      const look = lookForWall(f.x, f.y, f.face)!;
+      const base = STRONG_ONCE_BASE[look.file];
+      if (base) {
+        expect(look.baseFile).toBe(base);
+        expect(look.once).toBeDefined();
+        expect(look.key).toMatch(/:once:\d+,\d+/);
+        expect(look.file).toBe(`walls_floor1/${f.texture}.png`);
+      } else {
+        expect(look.once).toBeUndefined();
+        expect(look.baseFile).toBeUndefined();
+      }
+    }
+    expect(lookForWall(4, 7, 'E')?.file).toBe(STRONG.brick_missing);
+    expect(lookForWall(4, 6, 'N')?.file).toBe(STRONG.ashlar_patched);
+    const src = readFileSync(resolve(__dirname, '../src/voxel-floor1/wall-once.ts'), 'utf8');
+    expect(src).toContain('compositeStrongOnce');
+    const once = readFileSync(resolve(__dirname, '../src/voxel-floor1/level.ts'), 'utf8');
+    expect(once).toContain('lookPixels');
+    expect(once).toContain('textureFromPixels');
   });
 
   it('copies a neighbour look onto secret walls', () => {

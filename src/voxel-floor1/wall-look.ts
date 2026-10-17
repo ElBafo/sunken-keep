@@ -3,6 +3,7 @@ import type { VolumeFromPixels } from '../voxel-lab/classify';
 import type { FaceId } from '../voxel-lab/faces';
 import { WALL_BULGE_FRAC } from './constants';
 import floor1DecorJson from '../../levels/floor1_decor.json';
+import { onceSlotFor, strongBaseFile, type OnceSlot } from './wall-once';
 
 export type WallKind = 'ashlar' | 'brick' | 'banded' | 'soot' | 'etched';
 export type WallVariant = 'clean' | 'damp' | 'cracked' | 'patched';
@@ -52,6 +53,9 @@ export type WallLook = {
   seepage: Seepage;
   zone: string;
   bulge: number;
+  /** Strong-feature repeat slot; omitted on family-base faces. */
+  once?: OnceSlot;
+  baseFile?: string;
 };
 
 const DARK_ZONES = new Set(['pell', 'hook_corridor', 'lair', 'stair_room']);
@@ -76,7 +80,11 @@ export const FLOOR1_WALL_FILES = [
 
 const STRONG = {
   ashlar_patched: 'walls_floor1/ashlar_patched.png',
-  brick_missing: 'walls_floor1/brick_missing.png'
+  ashlar_damp: 'walls_floor1/ashlar_damp.png',
+  brick_missing: 'walls_floor1/brick_missing.png',
+  brick_patched: 'walls_floor1/brick_patched.png',
+  banded_2: 'walls_floor1/banded_2.png',
+  etched_2: 'walls_floor1/etched_2.png'
 } as const;
 
 export const SOOT_2 = 'walls_floor1/soot_brick_2.png';
@@ -134,14 +142,21 @@ export function lookFromDecor(f: DecorFace): WallLook {
   const kind = wallKind(f);
   const file = ARTIE_FILE.get(faceKey(f)) ?? textureFile(f);
   const matte = isMatteLook(kind, f.seepage, f.zone);
+  const baseFile = strongBaseFile(file);
+  const once = baseFile ? onceSlotFor(f.x, f.y, f.face) : undefined;
+  const parts = [file];
+  if (once) parts.push(`once:${once.v},${once.h}`);
+  if (matte) parts.push('matte');
   return {
-    key: matte ? `${file}:matte` : file,
+    key: parts.join(':'),
     file,
     kind,
     variant: f.variant,
     seepage: f.seepage,
     zone: f.zone,
-    bulge: f.bulge ? WALL_BULGE_FRAC : 0
+    bulge: f.bulge ? WALL_BULGE_FRAC : 0,
+    once,
+    baseFile
   };
 }
 

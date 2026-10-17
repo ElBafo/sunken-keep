@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { volumeFromImageData } from '../voxel-lab/classify';
 import { makeToWorld, type FaceId } from '../voxel-lab/faces';
-import { loadPng, pbrMap, voxelMaterial } from '../voxel-lab/materials';
+import { loadPng, pbrMap, textureFromPixels, voxelMaterial } from '../voxel-lab/materials';
 import { greedyMesh } from '../voxel-lab/mesher';
 import {
   geometryWithBake,
@@ -31,6 +31,7 @@ import {
   type FloorTile
 } from './layout';
 import { faceHash } from './variants';
+import { lookPixels } from './wall-once';
 import { FLOOR1_WALL_FILES, finishVolume, lookForSecret, type WallLook } from './wall-look';
 
 const INSET: Record<'N' | 'E' | 'S' | 'W', [number, number]> = {
@@ -438,10 +439,11 @@ export async function buildFloor1Openings(
     }
     const look = lookForSecret(view.wallX, view.wallY, view.wallFace, view.tx, view.tz);
     const png = wallPngs.get(look.file)!;
-    const src = volumeFromImageData(png.data);
+    const pixels = lookPixels(look.file, wallPngs, look.once, look.baseFile);
+    const src = volumeFromImageData(pixels);
     finishVolume(src, look);
-    const mat = secretMat(look, png, src);
-    const tell = pickSecretTellTexels(png.data, faceHash(view.wallX, view.wallY, view.wallFace, 9));
+    const mat = secretMat(look, look.once ? { texture: textureFromPixels(pixels) } : png, src);
+    const tell = pickSecretTellTexels(pixels, faceHash(view.wallX, view.wallY, view.wallFace, 9));
     const volume = recessSecretTell(src.volume, src.dims, tell);
     const secretWorld = makeToWorld(view.face, view.tx, view.tz, src.dims, LAYER_SIZE, CELL, 'center');
     const secretGeo = meshVolume(volume, src.dims, secretWorld, view.tx, view.tz, torches, beams);
