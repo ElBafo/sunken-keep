@@ -20,6 +20,8 @@ describe('voxel-floor1 is a standalone Vite page', () => {
     expect(html).toContain('id="btn-left"');
     expect(html).toContain('id="btn-right"');
     expect(html).toContain('id="btn-quality"');
+    expect(html).toContain('id="btn-door"');
+    expect(html).toContain('id="prompt"');
     expect(html).toContain('id="gfx"');
     expect(html).toContain('Turn Left');
     expect(html).toContain('Turn Right');

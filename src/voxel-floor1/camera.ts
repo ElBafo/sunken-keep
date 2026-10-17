@@ -13,6 +13,11 @@ export function dirToRot(dir: number): number {
   return (-(dir & 3) * Math.PI) / 2;
 }
 
+export function facingCell(x: number, y: number, dir: number, sign: 1 | -1 = 1): { x: number; y: number } {
+  const [dx, dy] = DIRS[dir & 3];
+  return { x: x + dx * sign, y: y + dy * sign };
+}
+
 export function poseGridCamera(
   camera: Camera,
   gridX: number,

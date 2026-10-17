@@ -119,6 +119,26 @@
       color: #e8d8a0;
     }
     #loading.hidden { display: none; }
+    #prompt {
+      position: fixed;
+      left: 50%;
+      bottom: max(88px, calc(env(safe-area-inset-bottom) + 72px));
+      transform: translateX(-50%);
+      z-index: 6;
+      max-width: min(92vw, 420px);
+      padding: 10px 14px;
+      background: rgba(8, 6, 4, 0.88);
+      border: 1px solid #6a5a40;
+      border-radius: 8px;
+      color: #e8d8a0;
+      font-size: 14px;
+      line-height: 1.35;
+      text-align: center;
+      pointer-events: none;
+    }
+    #prompt[hidden] { display: none; }
+    #btn-door { display: none; }
+    #btn-door.visible { display: inline-flex; align-items: center; }
   </style>
 </head>
 <body>
@@ -130,11 +150,13 @@
   <div id="gfx">
     <button id="btn-quality" class="lab" type="button" aria-label="Graphics quality">Gfx Max</button>
   </div>
+  <div id="prompt" hidden></div>
   <div id="move">
     <button id="btn-left" class="lab turn" type="button" aria-label="Turn left">Turn Left</button>
     <button id="btn-back" class="lab" type="button" aria-label="Step back">▼</button>
     <button id="btn-fwd" class="lab" type="button" aria-label="Step forward">▲</button>
     <button id="btn-right" class="lab turn" type="button" aria-label="Turn right">Turn Right</button>
+    <button id="btn-door" class="lab" type="button" aria-label="Open door">Open</button>
   </div>
   <script type="module" src="/src/voxel-floor1/main.ts"></script>
 </body>

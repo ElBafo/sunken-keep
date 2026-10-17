@@ -23,8 +23,19 @@ import {
   floor1Map,
   isSolidTile,
   isWalkableTile,
+  isTrueWall,
+  knotBesideSecret,
+  listDoors,
+  listSecrets,
+  resetFloor1Doors,
   tileAt
 } from '../src/voxel-floor1/layout';
+import {
+  floor1KnotWalls,
+  KNOT_WALL_FILE,
+  knotWallFile,
+  knotWallViewer
+} from '../src/voxel-floor1/knot-walls';
 import { pickVariantIndex } from '../src/voxel-floor1/variants';
 import { tileCorner, tileFlatPose } from '../src/voxel-lab/faces';
 
@@ -69,10 +80,41 @@ describe('doors and secrets are plain blocking walls', () => {
     expect(canStep(floor1Map, 5, 1)).toBe(false);
   });
 
-  it('does not emit floor/ceiling on door or secret cells', () => {
+  it('unblocks stepping once a door or secret is open, without changing baked faces', () => {
+    resetFloor1Doors();
+    const before = enumerateFaces(floor1Map).length;
+    const door = tileAt(floor1Map, 4, 2)!;
+    door.doorOpen = true;
+    expect(canStep(floor1Map, 4, 2)).toBe(true);
+    expect(enumerateFaces(floor1Map).length).toBe(before);
+    door.doorOpen = false;
+    const secret = tileAt(floor1Map, 5, 1)!;
+    secret.secretOpen = true;
+    expect(canStep(floor1Map, 5, 1)).toBe(true);
+    expect(enumerateFaces(floor1Map).length).toBe(before);
+    resetFloor1Doors();
+  });
+
+  it('keeps Classic floor-1 door and secret cells', () => {
+    expect(listDoors()).toEqual([
+      { x: 4, y: 2, locked: true },
+      { x: 14, y: 2, locked: false },
+      { x: 19, y: 5, locked: false },
+      { x: 6, y: 8, locked: false }
+    ]);
+    expect(listSecrets()).toEqual([
+      { x: 5, y: 1 },
+      { x: 5, y: 13 }
+    ]);
+  });
+
+  it('emits floor on door and secret cells, not stone faces into those openings', () => {
     const faces = enumerateFaces(floor1Map);
-    expect(faces.some((f) => f.tx === 4 && f.tz === 2)).toBe(false);
-    expect(faces.some((f) => f.tx === 5 && f.tz === 1)).toBe(false);
+    expect(faces.some((f) => f.kind === 'floor' && f.tx === 4 && f.tz === 2)).toBe(true);
+    expect(faces.some((f) => f.kind === 'floor' && f.tx === 5 && f.tz === 1)).toBe(true);
+    expect(faces.some((f) => f.tx === 3 && f.tz === 2 && f.face === 'E')).toBe(false);
+    expect(faces.some((f) => f.tx === 5 && f.tz === 2 && f.face === 'W')).toBe(false);
+    expect(faces.some((f) => f.tx === 4 && f.tz === 2 && f.face === 'N')).toBe(true);
     expect(faces.some((f) => f.kind === 'floor' && f.tx === 2 && f.tz === 14)).toBe(true);
   });
 
@@ -82,6 +124,35 @@ describe('doors and secrets are plain blocking walls', () => {
     expect(isWalkableTile(tileAt(floor1Map, 2, 7))).toBe(true);
     expect(faces.some((f) => f.tx === 2 && f.tz === 8 && f.face === 'N')).toBe(false);
     expect(faces.some((f) => f.kind === 'floor' && f.tx === 2 && f.tz === 7)).toBe(true);
+  });
+});
+
+describe('knot carving is a placed wall variant, not a secret', () => {
+  it('puts 1–2 knot faces on solid walls away from secrets', () => {
+    expect(floor1KnotWalls.length).toBeGreaterThanOrEqual(1);
+    expect(floor1KnotWalls.length).toBeLessThanOrEqual(2);
+    for (const spec of floor1KnotWalls) {
+      expect(isTrueWall(tileAt(floor1Map, spec.x, spec.y))).toBe(true);
+      expect(tileAt(floor1Map, spec.x, spec.y)?.secret).toBeFalsy();
+      expect(knotBesideSecret(floor1Map, spec.x, spec.y)).toBe(false);
+      const view = knotWallViewer(spec);
+      expect(isWalkableTile(tileAt(floor1Map, view.x, view.y))).toBe(true);
+      expect(knotWallFile(spec.x, spec.y, spec.face)).toBe(KNOT_WALL_FILE);
+    }
+  });
+
+  it('emits secret_closed.png only on those placed faces', () => {
+    const faces = enumerateFaces(floor1Map);
+    const knots = faces.filter((f) => f.file === KNOT_WALL_FILE);
+    expect(knots.length).toBe(floor1KnotWalls.length);
+    for (const spec of floor1KnotWalls) {
+      expect(
+        knots.some((f) => f.kind === 'wall' && f.wallX === spec.x && f.wallY === spec.y && f.wallFace === spec.face)
+      ).toBe(true);
+    }
+    for (const secret of listSecrets()) {
+      expect(knots.some((f) => f.wallX === secret.x && f.wallY === secret.y)).toBe(false);
+    }
   });
 });
 
