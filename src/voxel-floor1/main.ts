@@ -172,7 +172,7 @@ async function boot(): Promise<void> {
   const mover = new GridMover(camera, floor1Map);
 
   loading.textContent = 'Meshing floor 1…';
-  const level = await buildFloor1(floor1Map, mover.x, mover.y);
+  const level = await buildFloor1(floor1Map, mover.x, mover.y, lightMode === 'all');
   scene.add(level.group);
 
   const lights = new Floor1Lights(floor1Map, lightMode);

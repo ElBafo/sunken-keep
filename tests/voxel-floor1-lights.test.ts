@@ -51,7 +51,7 @@ import {
   tileInTorchFlood,
   torchAttenuation
 } from '../src/voxel-floor1/bake';
-import { parseLightMode } from '../src/voxel-floor1/lights';
+import { allModeSlotCounts, parseLightMode } from '../src/voxel-floor1/lights';
 import { tileFlatPose } from '../src/voxel-lab/faces';
 
 describe('voxel-floor1 torches match the game sconce table', () => {
@@ -273,6 +273,22 @@ describe('light modes', () => {
     expect(parseLightMode('lights=all&test=1')).toBe('all');
     expect(parseLightMode('lights=nope')).toBe('bake');
   });
+
+  it('gives all-mode a real light for every lit torch and beam, not a cap of 3', () => {
+    const n = allModeSlotCounts(floor1Sconces, floor1Sunbeams);
+    expect(n.torches).toBe(floor1Sconces.filter(sconceIsLit).length);
+    expect(n.beams).toBe(floor1Sunbeams.length);
+    expect(n.torches).toBeGreaterThan(MAX_ACTIVE_TORCHES);
+    expect(n.beams).toBeGreaterThan(MAX_ACTIVE_SUNBEAMS);
+    expect(n.torches).toBe(3);
+    expect(n.beams).toBe(3);
+    const extra = allModeSlotCounts(
+      [...floor1Sconces, { x: 9, y: 9, face: 'N', lit: true, capped: false }],
+      [...floor1Sunbeams, { x: 0, y: 0, wx: 0, wy: 0, wz: 0 }]
+    );
+    expect(extra.torches).toBe(4);
+    expect(extra.beams).toBe(4);
+  });
 });
 
 describe('voxel-floor1 still does not import proto3d', () => {
@@ -299,6 +315,7 @@ describe('voxel-floor1 still does not import proto3d', () => {
     expect(main).toContain('renderer.setSize(CAMERA_VIEW_W, CAMERA_VIEW_H, false)');
     expect(main).not.toContain('TorchLightPools');
     expect(main).toContain('parseLightMode');
+    expect(main).toContain("lightMode === 'all'");
     expect(main).not.toContain('lastLightKey');
     expect(main).not.toContain('if (remeshed) syncShadows()');
     const bake = readFileSync(resolve(__dirname, '../src/voxel-floor1/bake.ts'), 'utf8');
@@ -319,6 +336,7 @@ describe('voxel-floor1 still does not import proto3d', () => {
     expect(bake).toContain('#include <opaque_fragment>');
     expect(bake).toContain('FAR_BAKE_SEGS');
     expect(bake).toContain("kind === 'full'");
+    expect(bake).toContain("kind !== 'off'");
     expect(bake).not.toContain('GAME_TORCH_RGB');
     expect(bake).not.toContain('FAR_AMBIENT');
     expect(bake).not.toContain('0.068');
@@ -332,7 +350,9 @@ describe('voxel-floor1 still does not import proto3d', () => {
     expect(lights).toContain('beamKey');
     expect(lights).toContain("mode === 'all'");
     expect(lights).toContain("mode === 'pool'");
+    expect(lights).toContain('allModeSlotCounts');
     expect(lights).toContain('SLOT_HOLD');
+    expect(lights).not.toContain('FAR_TORCH_SLOTS');
     expect(lights).not.toContain('castShadow = row.blend');
     expect(lights).not.toContain('slot.spot.castShadow = false');
     const level = readFileSync(resolve(__dirname, '../src/voxel-floor1/level.ts'), 'utf8');
@@ -340,6 +360,8 @@ describe('voxel-floor1 still does not import proto3d', () => {
     expect(level).toContain('tileInLightFlood');
     expect(level).toContain('inFlood');
     expect(level).toContain('FAR_BAKE_SEGS');
+    expect(level).toContain('realLights');
+    expect(level).toContain(", 'off'");
     expect(level).toContain('dist <= VOXEL_CHEB');
     expect(level).toContain('receiveWhenOn = false');
     expect(level).toContain('frustumCulled = false');

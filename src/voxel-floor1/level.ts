@@ -45,7 +45,12 @@ type PreparedFace = FaceJob & {
   pose: ReturnType<typeof tileFlatPose>;
 };
 
-export async function buildFloor1(map: FloorMap, partyX: number, partyY: number): Promise<BuiltLevel> {
+export async function buildFloor1(
+  map: FloorMap,
+  partyX: number,
+  partyY: number,
+  realLights = false
+): Promise<BuiltLevel> {
   const jobs = enumerateFaces(map);
   for (const job of jobs) {
     if (job.kind === 'ceiling' && isBeamCeiling(job.tx, job.tz, floor1Sunbeams)) {
@@ -92,18 +97,24 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
   const torches: FarTorch[] = litFarTorches(map, floor1Sconces);
   const beams: FarBeam[] = litFarBeams(map, floor1Sunbeams);
   const mats = new Map<string, THREE.MeshPhysicalMaterial>();
-  const farMats = new Map<string, THREE.MeshBasicMaterial>();
+  const farMats = new Map<string, THREE.Material>();
   for (const file of needed) {
     const png = pngs.get(file);
     const rough = roughByFile.get(file);
     if (!png || !rough) continue;
     const mat = voxelMaterial(png.texture, rough);
     mat.name = file;
-    patchBakeMaterial(mat);
+    if (!realLights) patchBakeMaterial(mat);
     mats.set(file, mat);
-    const farMat = farBakeMaterial(png.texture);
-    farMat.name = `far:${file}`;
-    farMats.set(file, farMat);
+    if (realLights) {
+      const farMat = voxelMaterial(png.texture, rough);
+      farMat.name = `far:${file}`;
+      farMats.set(file, farMat);
+    } else {
+      const farMat = farBakeMaterial(png.texture);
+      farMat.name = `far:${file}`;
+      farMats.set(file, farMat);
+    }
   }
 
   const group = new THREE.Group();
@@ -150,8 +161,10 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
         voxelByFile.set(face.file, list);
         voxelFaces += 1;
       } else {
-        // Flood stays in view as subdivided MeshBasic, not dense MeshPhysical.
-        flats.push({ ...face, segs: inFlood ? FAR_BAKE_SEGS : 1 });
+        // Bake/pool: flood stays as subdivided MeshBasic. All-mode: unbaked
+        // MeshPhysical flats so the real lights reach every distance.
+        const segs = !realLights && inFlood ? FAR_BAKE_SEGS : 1;
+        flats.push({ ...face, segs });
       }
     }
 
@@ -192,9 +205,13 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
       liveTris += (geo.getIndex()?.count ?? 0) / 3;
       const mesh = new THREE.Mesh(geo, mat);
       mesh.userData.castWhenOn = false;
-      mesh.userData.receiveWhenOn = false;
       mesh.castShadow = false;
-      mesh.receiveShadow = false;
+      if (realLights) {
+        mesh.receiveShadow = true;
+      } else {
+        mesh.userData.receiveWhenOn = false;
+        mesh.receiveShadow = false;
+      }
       mesh.frustumCulled = false;
       mesh.name = `flat:${file}`;
       flatGroup.add(mesh);
@@ -221,6 +238,10 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
       return true;
     },
     setBakeBlends: (blends, flick = 1) => {
+      if (realLights) {
+        applyBakeBlends([...mats.values(), ...farMats.values()], torches, blends, flick, beams, 'off');
+        return;
+      }
       applyBakeBlends([...mats.values()], torches, blends, flick, beams, 'complement');
       applyBakeBlends([...farMats.values()], torches, blends, flick, beams, 'full');
     }
