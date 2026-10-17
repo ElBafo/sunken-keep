@@ -51,7 +51,13 @@ import {
   tileInTorchFlood,
   torchAttenuation
 } from '../src/voxel-floor1/bake';
-import { allModeSlotCounts, parseLightMode } from '../src/voxel-floor1/lights';
+import {
+  allModeSlotCounts,
+  parseLightMode,
+  parseLightsQuery,
+  qualityFromLightMode,
+  QUALITY_STORAGE_KEY
+} from '../src/voxel-floor1/lights';
 import { tileFlatPose } from '../src/voxel-lab/faces';
 
 describe('voxel-floor1 torches match the game sconce table', () => {
@@ -266,12 +272,26 @@ describe('far flood stays on subdivided MeshBasic, not dense voxels', () => {
 });
 
 describe('light modes', () => {
-  it('parses ?lights=bake|pool|all', () => {
-    expect(parseLightMode('')).toBe('bake');
-    expect(parseLightMode('test=1&dev=1')).toBe('bake');
-    expect(parseLightMode('?lights=pool')).toBe('pool');
+  it('defaults to Max (all real lights); ?lights=all|bake still override', () => {
+    expect(parseLightMode('')).toBe('all');
+    expect(parseLightMode('test=1&dev=1')).toBe('all');
+    expect(parseLightMode('?lights=pool')).toBe('all');
     expect(parseLightMode('lights=all&test=1')).toBe('all');
-    expect(parseLightMode('lights=nope')).toBe('bake');
+    expect(parseLightMode('lights=bake')).toBe('bake');
+    expect(parseLightMode('?lights=bake&dev=1')).toBe('bake');
+    expect(parseLightMode('lights=nope')).toBe('all');
+    expect(parseLightsQuery('')).toBeNull();
+    expect(parseLightsQuery('lights=pool')).toBeNull();
+  });
+
+  it('keeps stored Medium unless the URL overrides', () => {
+    expect(parseLightMode('', 'medium')).toBe('bake');
+    expect(parseLightMode('test=1', 'max')).toBe('all');
+    expect(parseLightMode('lights=bake', 'max')).toBe('bake');
+    expect(parseLightMode('lights=all', 'medium')).toBe('all');
+    expect(qualityFromLightMode('all')).toBe('max');
+    expect(qualityFromLightMode('bake')).toBe('medium');
+    expect(QUALITY_STORAGE_KEY).toBe('voxel-floor1-quality');
   });
 
   it('gives all-mode a real light for every lit torch and beam, not a cap of 3', () => {
@@ -315,6 +335,9 @@ describe('voxel-floor1 still does not import proto3d', () => {
     expect(main).toContain('renderer.setSize(CAMERA_VIEW_W, CAMERA_VIEW_H, false)');
     expect(main).not.toContain('TorchLightPools');
     expect(main).toContain('parseLightMode');
+    expect(main).toContain('readStoredQuality');
+    expect(main).toContain('writeStoredQuality');
+    expect(main).toContain('btn-quality');
     expect(main).toContain("lightMode === 'all'");
     expect(main).not.toContain('lastLightKey');
     expect(main).not.toContain('if (remeshed) syncShadows()');
@@ -349,8 +372,10 @@ describe('voxel-floor1 still does not import proto3d', () => {
     expect(lights).toContain('SUNBEAM_PENUMBRA');
     expect(lights).toContain('beamKey');
     expect(lights).toContain("mode === 'all'");
-    expect(lights).toContain("mode === 'pool'");
+    expect(lights).not.toContain("mode === 'pool'");
+    expect(lights).not.toContain('placePool');
     expect(lights).toContain('allModeSlotCounts');
+    expect(lights).toContain('QUALITY_STORAGE_KEY');
     expect(lights).toContain('SLOT_HOLD');
     expect(lights).not.toContain('FAR_TORCH_SLOTS');
     expect(lights).not.toContain('castShadow = row.blend');

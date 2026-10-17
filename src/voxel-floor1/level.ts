@@ -161,7 +161,7 @@ export async function buildFloor1(
         voxelByFile.set(face.file, list);
         voxelFaces += 1;
       } else {
-        // Bake/pool: flood stays as subdivided MeshBasic. All-mode: unbaked
+        // Bake: flood stays as subdivided MeshBasic. Max: unbaked
         // MeshPhysical flats so the real lights reach every distance.
         const segs = !realLights && inFlood ? FAR_BAKE_SEGS : 1;
         flats.push({ ...face, segs });

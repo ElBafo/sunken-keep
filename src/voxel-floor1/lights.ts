@@ -37,7 +37,10 @@ import {
 } from './fixtures';
 import type { FloorMap } from './layout';
 
-export type LightMode = 'bake' | 'pool' | 'all';
+export type LightMode = 'bake' | 'all';
+export type QualityLevel = 'max' | 'medium';
+
+export const QUALITY_STORAGE_KEY = 'voxel-floor1-quality';
 
 export type LightStats = {
   mode: LightMode;
@@ -69,14 +72,44 @@ function torchFlicker(now: number, seed: number, freeze: boolean): number {
   return 1 + 0.07 * Math.sin(t * 6.1) + 0.04 * Math.sin(t * 13.7);
 }
 
-export function parseLightMode(search: string): LightMode {
-  const raw = search.startsWith('?') ? search.slice(1) : search;
-  const v = new URLSearchParams(raw).get('lights');
-  if (v === 'pool' || v === 'all') return v;
-  return 'bake';
+export function qualityFromLightMode(mode: LightMode): QualityLevel {
+  return mode === 'bake' ? 'medium' : 'max';
 }
 
-/** One real light per lit torch and per beam — not the bake/pool cap of 3. */
+export function parseLightsQuery(search: string): LightMode | null {
+  const raw = search.startsWith('?') ? search.slice(1) : search;
+  const v = new URLSearchParams(raw).get('lights');
+  if (v === 'all' || v === 'bake') return v;
+  return null;
+}
+
+/** URL `?lights=` wins; else stored quality; else Max (all real lights). */
+export function parseLightMode(search: string, stored: string | null = null): LightMode {
+  const fromUrl = parseLightsQuery(search);
+  if (fromUrl) return fromUrl;
+  if (stored === 'medium' || stored === 'bake') return 'bake';
+  return 'all';
+}
+
+export function readStoredQuality(): QualityLevel | null {
+  try {
+    const v = globalThis.localStorage?.getItem(QUALITY_STORAGE_KEY);
+    if (v === 'max' || v === 'medium') return v;
+  } catch {
+    /* private mode */
+  }
+  return null;
+}
+
+export function writeStoredQuality(q: QualityLevel): void {
+  try {
+    globalThis.localStorage?.setItem(QUALITY_STORAGE_KEY, q);
+  } catch {
+    /* private mode */
+  }
+}
+
+/** One real light per lit torch and per beam — not the bake cap. */
 export function allModeSlotCounts(
   sconces: SconceSpec[],
   sunbeams: SunbeamSpec[]
@@ -98,7 +131,7 @@ export class Floor1Lights {
   private shadowSize: number;
   stats: LightStats;
 
-  constructor(map: FloorMap, mode: LightMode = 'bake') {
+  constructor(map: FloorMap, mode: LightMode = 'all') {
     this.map = map;
     this.mode = mode;
     this.group.name = 'floor1-lights';
@@ -113,7 +146,7 @@ export class Floor1Lights {
       sunbeamsActive: 0,
       total: 1
     };
-    // Bake/pool keep the small cap. All waits for attach() so every fixture gets a slot.
+    // Bake keeps the small cap. All waits for attach() so every fixture gets a slot.
     if (mode !== 'all') this.allocSlots(MAX_ACTIVE_TORCHES, MAX_ACTIVE_SUNBEAMS);
   }
 
@@ -151,11 +184,6 @@ export class Floor1Lights {
 
     if (this.mode === 'all') {
       this.placeAll(lit, now, freezeFlicker);
-      return;
-    }
-
-    if (this.mode === 'pool') {
-      this.placePool(px, py, lit, now, freezeFlicker);
       return;
     }
 
@@ -308,43 +336,6 @@ export class Floor1Lights {
     }
     this.stats.torchesActive = Math.min(this.torchSlots.length, lit.length);
     this.stats.sunbeamsActive = Math.min(this.sunbeamSlots.length, this.sunbeams.length);
-    this.stats.total = 1 + this.stats.torchesActive + this.stats.sunbeamsActive;
-  }
-
-  private placePool(
-    px: number,
-    py: number,
-    lit: SconceSpec[],
-    now: number,
-    freezeFlicker: boolean
-  ): void {
-    const ranked = lit
-      .map((s) => {
-        const room = sconceRoom(s);
-        return { s, key: sconceKey(s), dist: Math.hypot(room.x - px, room.y - py) };
-      })
-      .sort((a, b) => a.dist - b.dist);
-    const assigned = new Set(ranked.slice(0, this.torchSlots.length).map((row) => row.key));
-    for (const s of lit) this.blends.set(sconceKey(s), assigned.has(sconceKey(s)) ? 1 : 0);
-    for (let i = 0; i < this.torchSlots.length; i++) {
-      const row = ranked[i];
-      if (!row) continue;
-      this.bindTorch(this.torchSlots[i], row.s, now, i, 1, freezeFlicker);
-    }
-
-    const rankedBeams = this.sunbeams
-      .map((b) => ({ b, key: beamKey(b), dist: Math.hypot(b.x - px, b.y - py) }))
-      .sort((a, b) => a.dist - b.dist);
-    const assignedBeams = new Set(rankedBeams.slice(0, this.sunbeamSlots.length).map((row) => row.key));
-    for (const row of rankedBeams) this.blends.set(row.key, assignedBeams.has(row.key) ? 1 : 0);
-    for (let i = 0; i < this.sunbeamSlots.length; i++) {
-      const row = rankedBeams[i];
-      if (!row) continue;
-      this.bindBeam(this.sunbeamSlots[i], row.b, 1);
-    }
-
-    this.stats.torchesActive = Math.min(this.torchSlots.length, ranked.length);
-    this.stats.sunbeamsActive = Math.min(this.sunbeamSlots.length, rankedBeams.length);
     this.stats.total = 1 + this.stats.torchesActive + this.stats.sunbeamsActive;
   }
 

@@ -25,7 +25,15 @@ import { GridMover } from './camera';
 import { lookColors } from '../voxel-lab/look';
 import { applyShadowToggle, recompileShadowShaders } from '../voxel-lab/shadows';
 import { floor1Sconces, floor1Sunbeams } from './fixtures';
-import { Floor1Lights, parseLightMode, type LightMode } from './lights';
+import {
+  Floor1Lights,
+  parseLightMode,
+  qualityFromLightMode,
+  readStoredQuality,
+  writeStoredQuality,
+  type LightMode,
+  type QualityLevel
+} from './lights';
 import { floor1Map } from './layout';
 import { buildFloor1 } from './level';
 import { buildFloor1Props } from './props';
@@ -50,6 +58,7 @@ type Floor1Api = {
   gridX: number;
   gridY: number;
   dir: number;
+  quality: QualityLevel;
   lantern: boolean;
   cell: number;
   eyeHeight: number;
@@ -101,9 +110,23 @@ async function boot(): Promise<void> {
 
   const params = new URLSearchParams(location.search);
   const preserveBuffer = params.get('test') === '1';
-  const lightMode = parseLightMode(location.search);
+  const lightMode = parseLightMode(location.search, readStoredQuality());
+  const quality = qualityFromLightMode(lightMode);
   const devHud = showDevHud();
   hud.hidden = !devHud;
+
+  const btnQuality = document.getElementById('btn-quality') as HTMLButtonElement | null;
+  const labelQuality = (q: QualityLevel): string => (q === 'max' ? 'Gfx Max' : 'Gfx Med');
+  if (btnQuality) {
+    btnQuality.textContent = labelQuality(quality);
+    btnQuality.addEventListener('click', (e) => {
+      e.stopPropagation();
+      writeStoredQuality(quality === 'max' ? 'medium' : 'max');
+      const url = new URL(location.href);
+      url.searchParams.delete('lights');
+      location.replace(url.toString());
+    });
+  }
 
   const renderer = new THREE.WebGLRenderer({
     canvas,
@@ -339,6 +362,7 @@ async function boot(): Promise<void> {
     gridX: mover.x,
     gridY: mover.y,
     dir: mover.dir,
+    quality,
     lantern: true,
     cell: CELL,
     eyeHeight: camera.position.y,
@@ -431,7 +455,7 @@ async function boot(): Promise<void> {
         `<div>${api.avgMs.toFixed(1)} ms avg · <b>${api.worstMs.toFixed(1)}</b> ms worst</div>` +
         `<div>${frame.draws} draws · ${level.stats.triangles.toLocaleString()} tri · ${api.programs} prog</div>` +
         `<div>${api.voxelFaces} vx faces · ${api.flatFaces} flat</div>` +
-        `<div>lights=${api.lights.mode} · ${api.lights.total} · ${api.lights.torchesActive}/${api.lights.torchesLit} torch · ${api.lights.sunbeamsActive}/${api.lights.sunbeams} beam</div>`;
+        `<div>gfx=${api.quality} · lights=${api.lights.mode} · ${api.lights.total} · ${api.lights.torchesActive}/${api.lights.torchesLit} torch · ${api.lights.sunbeamsActive}/${api.lights.sunbeams} beam</div>`;
     }
   };
   requestAnimationFrame(loop);
