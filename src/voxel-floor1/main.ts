@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import {
+  BRACKET_LAYER,
   CAMERA_FAR,
   CAMERA_FOV,
   CAMERA_NEAR,
@@ -69,12 +70,14 @@ type Floor1Api = {
   position: [number, number, number];
   setPosition: (x: number, y: number, dir: number) => void;
   setLookPitch: (rad: number) => void;
+  setLookYaw: (rad: number) => void;
   stepForward: () => boolean;
   stepBack: () => boolean;
   turnLeft: () => boolean;
   turnRight: () => boolean;
   meanLuma: (band?: { y0?: number; y1?: number }) => number;
   meanRgb: (band?: { y0?: number; y1?: number }) => { r: number; g: number; b: number; rb: number };
+  sconceVisible: (x: number, y: number, face: string) => boolean;
   lights: {
     mode: LightMode;
     lantern: number;
@@ -160,9 +163,11 @@ async function boot(): Promise<void> {
   const hemi = new THREE.HemisphereLight(0x2a241c, 0x080605, 0.04);
   hemi.color.setRGB(look.ambientSky[0], look.ambientSky[1], look.ambientSky[2]);
   hemi.groundColor.setRGB(look.ambientGround[0], look.ambientGround[1], look.ambientGround[2]);
+  hemi.layers.enable(BRACKET_LAYER);
   scene.add(hemi);
   const fillLight = new THREE.AmbientLight(0x1c1814, 0.015);
   fillLight.color.setRGB(look.ambientFill[0], look.ambientFill[1], look.ambientFill[2]);
+  fillLight.layers.enable(BRACKET_LAYER);
   scene.add(fillLight);
 
   const lanternLight = new THREE.PointLight(LANTERN_COLOR, LANTERN_INTENSITY, LANTERN_DISTANCE, 2);
@@ -195,6 +200,9 @@ async function boot(): Promise<void> {
   lanternSpot.shadow.camera.updateProjectionMatrix();
   camera.add(lanternSpot);
   camera.add(lanternSpot.target);
+  camera.layers.enable(BRACKET_LAYER);
+  lanternLight.layers.enable(BRACKET_LAYER);
+  lanternSpot.layers.enable(BRACKET_LAYER);
   scene.add(camera);
 
   const mover = new GridMover(camera, floor1Map);
@@ -242,7 +250,12 @@ async function boot(): Promise<void> {
     lights.setParty(px, py, now, preserveBuffer);
     const flick = preserveBuffer ? 1 : 1 + 0.05 * Math.sin(now * 0.001 * 6.1);
     level.setBakeBlends(lights.blends, flick);
-    props.update(px, py, mover.dir, now, preserveBuffer);
+    props.update(
+      camera,
+      now,
+      preserveBuffer,
+      mover.kind === 'step' ? { x: mover.toX, y: mover.toY, dir: mover.toDir } : null
+    );
   };
 
   const renderFrame = (): { draws: number; tris: number } => {
@@ -435,6 +448,10 @@ async function boot(): Promise<void> {
       camera.rotation.x = rad;
       camera.updateMatrixWorld();
     },
+    setLookYaw: (rad) => {
+      camera.rotation.y = rad;
+      camera.updateMatrixWorld();
+    },
     stepForward: () => beginStep(1),
     stepBack: () => beginStep(-1),
     turnLeft: () => mover.turn(1),
@@ -444,6 +461,7 @@ async function boot(): Promise<void> {
       const s = samplePixels(band);
       return { r: s.r, g: s.g, b: s.b, rb: s.rb };
     },
+    sconceVisible: (x, y, face) => props.sconceVisible(x, y, face),
     lights: lights.stats
   };
   (window as unknown as { __voxelFloor1: Floor1Api }).__voxelFloor1 = api;

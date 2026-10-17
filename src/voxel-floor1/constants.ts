@@ -22,6 +22,9 @@ export const EYE_HEIGHT = cameraSpec.eyeHeight;
 export const CAMERA_FOV = cameraSpec.fov;
 export const CAMERA_NEAR = cameraSpec.near;
 export const CAMERA_FAR = cameraSpec.far;
+/** Hide wall mounts that would clip the near plane (same band as proto3d). */
+export const WALL_MOUNT_NEAR_CULL = CAMERA_NEAR + 0.5;
+export const CUTOUT_ALPHA_TEST = 0.5;
 export const CAMERA_PITCH = (cameraSpec.pitchDeg * Math.PI) / 180;
 export const BACK_OFFSET = cameraSpec.backOffsetTiles * CELL;
 /** Same logical 3D view box as proto3d — keeps hall length matching Classic. */
@@ -107,15 +110,36 @@ export const SUNBEAM_RGB: [number, number, number] = [
 export const SHAFT_WIDTH_TILES = 0.55;
 export const SHAFT_OPACITY = 1;
 
-/** Voxel iron bracket — painted-sconce dark iron, not pale silver. */
-export const BRACKET_VOX = 0.05;
-export const BRACKET_DIMS: [number, number, number] = [10, 20, 10];
-export const BRACKET_WALL_GAP = 0.02;
-export const BRACKET_FLAME_OUT = 0.37;
-export const BRACKET_FLAME_LIFT = 0.29;
-export const IRON_COLOR = 0x1a120e;
-export const RUST_COLOR = 0x3a2214;
-export const BRASS_COLOR = 0x4a3218;
+/** Wall `tex3d` PNGs are 128² on a CELL-metre face. Bracket voxels match that. */
+export const WALL_TEXELS = 128;
+export const BRACKET_VOX = CELL / WALL_TEXELS;
+export const BRACKET_DIMS: [number, number, number] = [16, 48, 22];
+/** Back of the 1-texel plate just past the 3 cm stone relief. */
+export const BRACKET_WALL_GAP = 2 * BRACKET_VOX;
+/** Gold cup top-centre in occupancy (u, v, d). Flame base anchors here. */
+export const BRACKET_CUP_U = 8.5;
+export const BRACKET_CUP_V = 42;
+export const BRACKET_CUP_D = 11.5;
+export const BRACKET_FLAME_OUT = BRACKET_CUP_D * BRACKET_VOX + BRACKET_WALL_GAP;
+export const BRACKET_FLAME_LIFT = 0.04 + (BRACKET_CUP_V - BRACKET_DIMS[1] / 2) * BRACKET_VOX;
+export const BRACKET_HANDLE_TILT = (18 * Math.PI) / 180;
+/**
+ * Teardrop ~plate-wide and ~1/3 handle tall. PNG is 16×14 with 4 px of empty
+ * tip, so the plane is a little larger than the visible flame.
+ */
+export const BRACKET_FLAME_W = 14 * BRACKET_VOX;
+export const BRACKET_FLAME_H = 15 * BRACKET_VOX;
+/** Drop the sprite into the cup so the wide base overlaps the gold rim. */
+export const BRACKET_FLAME_SINK = 1.5 * BRACKET_VOX;
+/** Point light in the short flame above the gold cup. */
+export const BRACKET_LIGHT_FORWARD = 0.03;
+export const BRACKET_LIGHT_UP = 0.05;
+/** Plate darker than the stone mid; bevel a step lighter so the edge reads. */
+export const IRON_COLOR = 0x2a2826;
+export const RUST_COLOR = 0x4a4844;
+export const WOOD_COLOR = 0x5c3318;
+export const GOLD_COLOR = 0xb07a18;
+export const BRACKET_LAYER = 1;
 
 export {
   LANTERN_COLOR,

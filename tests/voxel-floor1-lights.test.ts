@@ -15,6 +15,7 @@ import {
 } from '../src/voxel-floor1/fixtures';
 import {
   BRACKET_FLAME_OUT,
+  BRACKET_LIGHT_FORWARD,
   CELL,
   CRACKED_CEILING_FILE,
   CULL_CHEB,
@@ -36,7 +37,7 @@ import {
   TORCH_RGB
 } from '../src/voxel-floor1/constants';
 import { floor1Map, enumerateFaces, isWalkableTile, tileAt } from '../src/voxel-floor1/layout';
-import { buildBracketOccupancy, MAT_IRON } from '../src/voxel-floor1/bracket';
+import { buildBracketOccupancy, MAT_GOLD, MAT_IRON } from '../src/voxel-floor1/bracket';
 import { compositeCrackedCeiling, crackedCeilingHasGap, isBeamCeiling } from '../src/voxel-floor1/crack';
 import {
   FAR_BAKE_SEGS,
@@ -75,7 +76,7 @@ describe('voxel-floor1 torches match the game sconce table', () => {
     expect(isWalkableTile(tileAt(floor1Map, 1, 6))).toBe(true);
     const pos = torchWorldPos(floor1Sconces[0]);
     const wallX = 0 * CELL + FACE_INTO_ROOM.E.nx * (CELL / 2);
-    expect(pos.x).toBeCloseTo(wallX + BRACKET_FLAME_OUT, 5);
+    expect(pos.x).toBeCloseTo(wallX + BRACKET_FLAME_OUT + BRACKET_LIGHT_FORWARD, 5);
     expect(pos.x).toBeGreaterThan(wallX + 0.2);
   });
 
@@ -89,16 +90,23 @@ describe('voxel-floor1 torches match the game sconce table', () => {
 });
 
 describe('voxel iron brackets', () => {
-  it('greedy-merges a few dark iron cubes, not pale silver', () => {
+  it('greedy-merges mid-grey iron, wood, and a gold cup — not pale silver', () => {
     const { volume, voxelCount } = buildBracketOccupancy(false);
     expect(voxelCount).toBeGreaterThan(30);
     expect(volume.includes(MAT_IRON)).toBe(true);
+    expect(volume.includes(MAT_GOLD)).toBe(true);
+    const bracket = readFileSync(resolve(__dirname, '../src/voxel-floor1/bracket.ts'), 'utf8');
+    expect(bracket).toContain('MeshBasicMaterial');
+    expect(bracket).toContain('MAT_WOOD');
+    expect(bracket).toContain('MAT_GOLD');
+    expect(bracket).not.toContain('MAT_BRASS');
     const r = (IRON_COLOR >> 16) & 255;
     const g = (IRON_COLOR >> 8) & 255;
     const b = IRON_COLOR & 255;
     const luma = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-    expect(luma).toBeLessThan(0.12);
-    expect(r).toBeLessThan(40);
+    expect(luma).toBeGreaterThan(0.12);
+    expect(luma).toBeLessThan(0.32);
+    expect(IRON_COLOR).toBeLessThan(0x4a4844);
   });
 });
 
@@ -325,13 +333,25 @@ describe('voxel-floor1 still does not import proto3d', () => {
   it('builds voxel brackets and camera-facing flame sprites', () => {
     const props = readFileSync(resolve(__dirname, '../src/voxel-floor1/props.ts'), 'utf8');
     expect(props).toContain('meshBracket');
-    expect(props).toContain('THREE.Sprite');
+    expect(props).toContain('cupWorldPos');
+    expect(props).toContain('alphaTest');
+    expect(props).toContain('premultipliedAlpha');
+    expect(props).toContain('applyWallMountNearCull');
+    expect(props).toContain('flameGeo.translate');
+    expect(props).toContain('BRACKET_FLAME_SINK');
+    expect(props).toContain('lookAt');
+    expect(props).toContain('flame_teardrop');
+    expect(props).not.toContain('quaternion.copy(camera.quaternion)');
+    expect(props).not.toContain('hideWallProp');
+    expect(props).not.toContain('THREE.Sprite');
     expect(props).not.toContain('bracket_lit_front');
     const main = readFileSync(resolve(__dirname, '../src/voxel-floor1/main.ts'), 'utf8');
+    expect(main).toContain('BRACKET_LAYER');
     expect(main).toContain('setBakeBlends');
     expect(main).toContain('CAMERA_VIEW_ASPECT');
     expect(main).toContain('CAMERA_VIEW_W');
     expect(main).toContain('setLookPitch');
+    expect(main).toContain('setLookYaw');
     expect(main).toContain('renderer.setSize(CAMERA_VIEW_W, CAMERA_VIEW_H, false)');
     expect(main).not.toContain('TorchLightPools');
     expect(main).toContain('parseLightMode');

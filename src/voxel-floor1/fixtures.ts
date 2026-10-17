@@ -3,6 +3,8 @@ import { floor1 as rawFloor1 } from '../../public/levels/floor1';
 import {
   BRACKET_FLAME_LIFT,
   BRACKET_FLAME_OUT,
+  BRACKET_LIGHT_FORWARD,
+  BRACKET_LIGHT_UP,
   CELL,
   SCONCE_HEIGHT_TILES,
   SCONCE_WIDTH_TILES,
@@ -66,13 +68,13 @@ export function beamKey(b: Pick<SunbeamSpec, 'x' | 'y'>): string {
   return `beam:${b.x},${b.y}`;
 }
 
-/** Flame / light origin on the voxel cup, standing off the wall. */
+/** Torch point/spot origin — in the flame, in front of the iron cup. */
 export function torchWorldPos(s: SconceSpec): { x: number; y: number; z: number } {
   const { nx, nz } = FACE_INTO_ROOM[s.face];
-  const dist = CELL / 2 + BRACKET_FLAME_OUT;
+  const dist = CELL / 2 + BRACKET_FLAME_OUT + BRACKET_LIGHT_FORWARD;
   return {
     x: s.x * CELL + nx * dist,
-    y: CELL / 2 + BRACKET_FLAME_LIFT,
+    y: CELL / 2 + BRACKET_FLAME_LIFT + BRACKET_LIGHT_UP,
     z: s.y * CELL + nz * dist
   };
 }
