@@ -38,6 +38,7 @@ import {
   type LabActors
 } from './actors';
 import { lookColors } from './look';
+import { createOozeLab, type OozeAnim, type OozeLab, type OozeView } from './ooze';
 import { buildRoom, loadFlameTextures } from './room';
 import { applyShadowToggle, recompileShadowShaders } from './shadows';
 
@@ -100,6 +101,23 @@ type LabApi = {
     slimeZ: number;
     slimeH: number;
   };
+  oozeRes: number;
+  oozeMat: 'opaque' | 'shell';
+  oozeAnim: string;
+  oozeDist: 1 | 2;
+  oozeView: 'game' | 'orbit' | 'free';
+  oozeCompare: boolean;
+  oozeVoxels: number;
+  oozeTriangles: number;
+  oozeDraws: number;
+  setOozeRes: (res: 16 | 32 | 48) => void;
+  setOozeMat: (mat: 'opaque' | 'shell') => void;
+  setOozeAnim: (anim: string) => void;
+  setOozeDist: (d: 1 | 2) => void;
+  setOozeView: (v: 'game' | 'orbit' | 'free') => void;
+  setOozeCompare: (on: boolean) => void;
+  resetOoze: () => void;
+  debugOoze: () => ReturnType<OozeLab['debug']>;
 };
 
 const STATS_WINDOW_MS = 2000;
@@ -131,6 +149,13 @@ async function boot(): Promise<void> {
   const btnMatch = document.getElementById('btn-match') as HTMLButtonElement;
   const btnSeeThrough = document.getElementById('btn-see-through') as HTMLButtonElement;
   const sliderWarmth = document.getElementById('slider-warmth') as HTMLInputElement;
+  const btnOozeRes = document.getElementById('btn-ooze-res') as HTMLButtonElement;
+  const btnOozeMat = document.getElementById('btn-ooze-mat') as HTMLButtonElement;
+  const btnOozeAnim = document.getElementById('btn-ooze-anim') as HTMLButtonElement;
+  const btnOozeDist = document.getElementById('btn-ooze-dist') as HTMLButtonElement;
+  const btnOozeView = document.getElementById('btn-ooze-view') as HTMLButtonElement;
+  const btnOozeCompare = document.getElementById('btn-ooze-compare') as HTMLButtonElement;
+  const btnOozeReset = document.getElementById('btn-ooze-reset') as HTMLButtonElement;
   const loading = document.getElementById('loading')!;
 
   const preserveBuffer = new URLSearchParams(location.search).get('test') === '1';
@@ -288,7 +313,10 @@ async function boot(): Promise<void> {
   loading.textContent = 'Meshing voxels…';
   const [room, flames, actors]: [Awaited<ReturnType<typeof buildRoom>>, THREE.Texture[], LabActors] =
     await Promise.all([buildRoom(), loadFlameTextures(), buildLabActors()]);
-  scene.add(room.voxelGroup, room.flatGroup, room.propsGroup, actors.group);
+  loading.textContent = 'Meshing Gray Ooze…';
+  const ooze = await createOozeLab();
+  actors.group.visible = false;
+  scene.add(room.voxelGroup, room.flatGroup, room.propsGroup, actors.group, ooze.group);
 
   for (const flame of room.torchFlames) {
     flame.material = new THREE.SpriteMaterial({
@@ -493,6 +521,23 @@ async function boot(): Promise<void> {
     btnSeeThrough.setAttribute('aria-pressed', on ? 'true' : 'false');
   };
 
+  const syncOozeUi = (): void => {
+    btnOozeRes.textContent = `Res ${ooze.res}`;
+    btnOozeRes.setAttribute('aria-pressed', ooze.res === 32 ? 'true' : 'false');
+    btnOozeMat.textContent = ooze.mat === 'opaque' ? 'Wet stone' : 'Goo shell';
+    btnOozeMat.setAttribute('aria-pressed', ooze.mat === 'opaque' ? 'true' : 'false');
+    btnOozeAnim.textContent = `Anim ${ooze.anim}`;
+    btnOozeDist.textContent = ooze.dist === 1 ? '1 square' : '2 squares';
+    btnOozeDist.setAttribute('aria-pressed', 'true');
+    const viewLabel: Record<OozeView, string> = { game: 'Game cam', orbit: 'Orbit', free: 'Free cam' };
+    btnOozeView.textContent = viewLabel[ooze.view];
+    btnOozeView.setAttribute('aria-pressed', ooze.view === 'game' ? 'true' : 'false');
+    btnOozeCompare.textContent = ooze.compare ? 'Compare on' : 'Compare sprite';
+    btnOozeCompare.setAttribute('aria-pressed', ooze.compare ? 'true' : 'false');
+  };
+  syncOozeUi();
+  ooze.applyCamera(camera);
+
   btnShadows.addEventListener('click', (e) => {
     e.stopPropagation();
     setShadows(!shadowsOn);
@@ -518,6 +563,46 @@ async function boot(): Promise<void> {
     e.stopPropagation();
     setWarmth(Number(sliderWarmth.value) / 100);
   });
+  btnOozeRes.addEventListener('click', (e) => {
+    e.stopPropagation();
+    ooze.cycleResolution();
+    syncOozeUi();
+    syncShadows();
+  });
+  btnOozeMat.addEventListener('click', (e) => {
+    e.stopPropagation();
+    ooze.toggleMaterial();
+    syncOozeUi();
+    syncShadows();
+  });
+  btnOozeAnim.addEventListener('click', (e) => {
+    e.stopPropagation();
+    ooze.cycleAnim();
+    syncOozeUi();
+  });
+  btnOozeDist.addEventListener('click', (e) => {
+    e.stopPropagation();
+    ooze.setDist(ooze.dist === 1 ? 2 : 1);
+    ooze.setView('game');
+    syncOozeUi();
+  });
+  btnOozeView.addEventListener('click', (e) => {
+    e.stopPropagation();
+    const next: OozeView = ooze.view === 'game' ? 'orbit' : ooze.view === 'orbit' ? 'free' : 'game';
+    ooze.setView(next);
+    syncOozeUi();
+  });
+  btnOozeCompare.addEventListener('click', (e) => {
+    e.stopPropagation();
+    ooze.setCompare(!ooze.compare);
+    syncOozeUi();
+    syncShadows();
+  });
+  btnOozeReset.addEventListener('click', (e) => {
+    e.stopPropagation();
+    ooze.reset();
+    syncOozeUi();
+  });
 
   const facing = (): [number, number] => {
     const a = ((yaw % (Math.PI * 2)) + Math.PI * 2) % (Math.PI * 2);
@@ -532,6 +617,12 @@ async function boot(): Promise<void> {
   };
 
   const step = (dir: 1 | -1): void => {
+    if (ooze.view !== 'free') {
+      ooze.setView('free');
+      syncOozeUi();
+      camera.position.copy(camPos(gridX, gridZ));
+      applyCamera();
+    }
     if (moving) return;
     const [dx, dz] = facing();
     const nx = gridX + dx * dir;
@@ -558,6 +649,12 @@ async function boot(): Promise<void> {
 
   /** 90° in-place turn, same ease as proto3d. dir +1 = left (CCW). */
   const turn = (dir: 1 | -1): void => {
+    if (ooze.view !== 'free') {
+      ooze.setView('free');
+      syncOozeUi();
+      camera.position.copy(camPos(gridX, gridZ));
+      applyCamera();
+    }
     if (moving) return;
     moving = true;
     const from = yaw;
@@ -613,6 +710,11 @@ async function boot(): Promise<void> {
     const dy = y - lastY;
     lastX = x;
     lastY = y;
+    if (ooze.view === 'game') return;
+    if (ooze.view === 'orbit') {
+      ooze.orbitDrag(dx, dy);
+      return;
+    }
     yaw -= dx * LOOK_SENS;
     pitch -= dy * LOOK_SENS;
     pitch = Math.max(-PITCH_MAX, Math.min(PITCH_MAX, pitch));
@@ -729,6 +831,53 @@ async function boot(): Promise<void> {
       });
       return { shadowMapEnabled: renderer.shadowMap.enabled, ...counts };
     },
+    oozeRes: ooze.res,
+    oozeMat: ooze.mat,
+    oozeAnim: ooze.anim,
+    oozeDist: ooze.dist,
+    oozeView: ooze.view,
+    oozeCompare: ooze.compare,
+    oozeVoxels: ooze.stats.voxels,
+    oozeTriangles: ooze.stats.triangles,
+    oozeDraws: ooze.stats.draws,
+    setOozeRes: (r) => {
+      ooze.setResolution(r);
+      syncOozeUi();
+      api.oozeRes = ooze.res;
+    },
+    setOozeMat: (m) => {
+      ooze.setMaterial(m);
+      syncOozeUi();
+      api.oozeMat = ooze.mat;
+    },
+    setOozeAnim: (a) => {
+      ooze.setAnim(a as OozeAnim);
+      syncOozeUi();
+      api.oozeAnim = ooze.anim;
+    },
+    setOozeDist: (d) => {
+      ooze.setDist(d);
+      ooze.setView('game');
+      syncOozeUi();
+      api.oozeDist = ooze.dist;
+      api.oozeView = ooze.view;
+    },
+    setOozeView: (v) => {
+      ooze.setView(v);
+      syncOozeUi();
+      api.oozeView = ooze.view;
+    },
+    setOozeCompare: (on) => {
+      ooze.setCompare(on);
+      syncOozeUi();
+      syncShadows();
+      api.oozeCompare = ooze.compare;
+    },
+    resetOoze: () => {
+      ooze.reset();
+      syncOozeUi();
+    },
+    debugOoze: () => ooze.debug(),
     debugActors: () => {
       const slimeMat = actors.slime.material as THREE.MeshPhysicalMaterial;
       const depthMat = actors.slime.customDepthMaterial as THREE.MeshDepthMaterial | undefined;
@@ -816,6 +965,10 @@ async function boot(): Promise<void> {
     faceSlimeToCamera(actors.slime, camera);
     bobSlime(actors.slime, actors.slimeBaseY, now, !preserveBuffer);
 
+    const dtSec = dt / 1000;
+    ooze.update(now, dtSec, camera, preserveBuffer);
+    if (ooze.view !== 'free') ooze.applyCamera(camera);
+
     const draws = renderFrame();
     api.draws = draws;
     if (frameSamples.length > 0) {
@@ -836,13 +989,23 @@ async function boot(): Promise<void> {
     api.warmth = warmth;
     api.matchGame = matchGame;
     api.seeThrough = seeThrough;
+    api.oozeRes = ooze.res;
+    api.oozeMat = ooze.mat;
+    api.oozeAnim = ooze.anim;
+    api.oozeDist = ooze.dist;
+    api.oozeView = ooze.view;
+    api.oozeCompare = ooze.compare;
+    api.oozeVoxels = ooze.stats.voxels;
+    api.oozeTriangles = ooze.stats.triangles;
+    api.oozeDraws = ooze.stats.draws;
     if (now - lastHud >= 200) {
       lastHud = now;
+      const matLabel = ooze.mat === 'opaque' ? 'wet' : 'shell';
       statsEl.innerHTML =
         `<div><b>${api.fps}</b> fps</div>` +
         `<div>${api.avgMs.toFixed(1)} ms avg · <b>${api.worstMs.toFixed(1)}</b> ms worst</div>` +
-        `<div>${room.stats.voxels.toLocaleString()} vx · ${draws} draws</div>` +
-        `<div>${room.stats.triangles.toLocaleString()} tri</div>`;
+        `<div>${ooze.stats.voxels.toLocaleString()} ooze vx · ${draws} draws</div>` +
+        `<div>${ooze.stats.triangles.toLocaleString()} ooze tri · ${ooze.res} · ${matLabel}</div>`;
     }
   };
   requestAnimationFrame(loop);
