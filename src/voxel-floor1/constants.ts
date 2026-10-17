@@ -146,6 +146,8 @@ export const IRON_COLOR = 0x2a2826;
 export const RUST_COLOR = 0x4a4844;
 export const WOOD_COLOR = 0x5c3318;
 export const GOLD_COLOR = 0xb07a18;
+/** Padlock brass — brighter than the cup gold so it reads at phone size. */
+export const BRASS_COLOR = 0xf4c430;
 export const BRACKET_LAYER = 1;
 
 export {

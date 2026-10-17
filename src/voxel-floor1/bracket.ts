@@ -9,6 +9,7 @@ import {
   BRACKET_VOX,
   BRACKET_WALL_GAP,
   CELL,
+  BRASS_COLOR,
   GOLD_COLOR,
   IRON_COLOR,
   RUST_COLOR,
@@ -116,18 +117,18 @@ export function buildBracketOccupancy(capped: boolean): {
     fillBox(volume, dims, 4, 44, 16, 12, 46, 16, MAT_RUST);
     fillBox(volume, dims, 5, 46, 9, 11, 47, 15, MAT_IRON);
     fillBox(volume, dims, 5, 46, 15, 11, 47, 15, MAT_RUST);
-    // Hasp strap on the cap front, padlock hanging in front of the handle.
-    fillBox(volume, dims, 6, 40, 16, 10, 43, 19, MAT_IRON);
-    fillBox(volume, dims, 7, 37, 16, 9, 40, 19, MAT_IRON);
-    fillBox(volume, dims, 5, 31, 15, 11, 37, 21, MAT_IRON);
-    fillBox(volume, dims, 5, 31, 21, 11, 37, 21, MAT_RUST);
-    fillBox(volume, dims, 5, 31, 15, 5, 37, 21, MAT_RUST);
-    fillBox(volume, dims, 11, 31, 15, 11, 37, 21, MAT_RUST);
-    fillBox(volume, dims, 5, 31, 15, 11, 31, 21, MAT_RUST);
-    fillBox(volume, dims, 5, 37, 17, 5, 43, 21, MAT_IRON);
-    fillBox(volume, dims, 11, 37, 17, 11, 43, 21, MAT_IRON);
-    fillBox(volume, dims, 5, 43, 17, 11, 43, 21, MAT_IRON);
-    fillBox(volume, dims, 7, 33, 21, 9, 35, 21, MAT_GOLD);
+    // Iron staple on the cap. A U-shackle hangs below the front lip, then a
+    // chunky brass padlock (~1.5× cup width) so the lock reads at phone size.
+    fillBox(volume, dims, 6, 38, 16, 10, 42, 19, MAT_IRON);
+    fillBox(volume, dims, 4, 32, 18, 5, 42, 21, MAT_IRON);
+    fillBox(volume, dims, 10, 32, 18, 11, 42, 21, MAT_IRON);
+    fillBox(volume, dims, 4, 41, 18, 11, 42, 21, MAT_IRON);
+    fillBox(volume, dims, 4, 32, 18, 11, 33, 21, MAT_IRON);
+    fillBox(volume, dims, 4, 24, 16, 11, 32, 21, MAT_GOLD);
+    fillBox(volume, dims, 4, 24, 16, 4, 32, 20, MAT_RUST);
+    fillBox(volume, dims, 11, 24, 16, 11, 32, 20, MAT_RUST);
+    fillBox(volume, dims, 4, 24, 16, 11, 24, 20, MAT_RUST);
+    fillBox(volume, dims, 7, 27, 21, 8, 30, 21, MAT_IRON);
   }
   let voxelCount = 0;
   for (let i = 0; i < volume.length; i++) if (volume[i]) voxelCount += 1;
@@ -171,6 +172,7 @@ const MATS: Record<number, THREE.MeshBasicMaterial> = {
   [MAT_WOOD]: matteMat(WOOD_COLOR),
   [MAT_GOLD]: matteMat(GOLD_COLOR)
 };
+const BRASS_MAT = matteMat(BRASS_COLOR);
 
 export function meshBracket(spec: SconceSpec): THREE.Group {
   const group = new THREE.Group();
@@ -182,7 +184,7 @@ export function meshBracket(spec: SconceSpec): THREE.Group {
     const meshed = greedyMesh(occ, dims, toWorld, { cullNeg: [false, false, false] });
     const geo = geometryFrom(meshed.mesh);
     if (!geo) continue;
-    const mesh = new THREE.Mesh(geo, MATS[id]);
+    const mesh = new THREE.Mesh(geo, id === MAT_GOLD && spec.capped ? BRASS_MAT : MATS[id]);
     mesh.layers.set(BRACKET_LAYER);
     mesh.userData.noShadow = true;
     mesh.castShadow = false;

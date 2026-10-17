@@ -1,3 +1,5 @@
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
 import * as THREE from 'three';
 import { poseGridCamera } from '../src/voxel-floor1/camera';
@@ -9,12 +11,14 @@ import {
   BRACKET_FLAME_W,
   BRACKET_VOX,
   BRACKET_WALL_GAP,
+  BRASS_COLOR,
   CAMERA_FAR,
   CAMERA_FOV,
   CAMERA_NEAR,
   CAMERA_VIEW_ASPECT,
   CELL,
   CUTOUT_ALPHA_TEST,
+  GOLD_COLOR,
   WALL_MOUNT_NEAR_CULL,
   WALL_TEXELS
 } from '../src/voxel-floor1/constants';
@@ -38,6 +42,7 @@ import {
   MAT_WOOD,
   meshBracket
 } from '../src/voxel-floor1/bracket';
+import { floor1Map, isWalkableTile, tileAt } from '../src/voxel-floor1/layout';
 import { cameraSpaceDepth, nearPlaneCulled, objectNearPlaneCulled } from '../src/voxel-floor1/near-cull';
 
 const lit = floor1Sconces.find((s) => s.x === 0 && s.y === 6)!;
@@ -337,24 +342,45 @@ describe('voxel-floor1 capped sconces', () => {
     expect(cupCovered).toBe(5 * 4 * 5);
     const { volume: openVol } = buildBracketOccupancy(false);
     expect(openVol.includes(MAT_GOLD)).toBe(true);
-    let lockMetal = 0;
-    let keyhole = 0;
-    for (let d = 18; d < D; d++) {
+    let brass = 0;
+    let brassUMin = W;
+    let brassUMax = 0;
+    let brassVMax = 0;
+    let shackle = 0;
+    for (let d = 0; d < D; d++) {
       for (let v = 0; v < H; v++) {
         for (let u = 0; u < W; u++) {
           const id = volume[u + v * W + d * W * H];
-          if (id === MAT_IRON || id === MAT_RUST) lockMetal += 1;
-          if (id === MAT_GOLD) keyhole += 1;
+          if (id === MAT_GOLD && v < 37) {
+            brass += 1;
+            if (u < brassUMin) brassUMin = u;
+            if (u > brassUMax) brassUMax = u;
+            if (v > brassVMax) brassVMax = v;
+          }
+          if ((id === MAT_IRON || id === MAT_RUST) && d >= 18 && v >= 32 && v <= 42) shackle += 1;
         }
       }
     }
-    expect(lockMetal).toBeGreaterThan(20);
-    expect(keyhole).toBeGreaterThan(0);
-    expect(keyhole).toBeLessThan(16);
+    expect(brass).toBeGreaterThan(40);
+    expect(brassUMax - brassUMin + 1).toBeGreaterThanOrEqual(7);
+    expect(brassVMax).toBeLessThan(37);
+    expect(shackle).toBeGreaterThan(10);
     const cap = matBounds(true, MAT_IRON, 37, 6);
     expect(cap.vMin).toBeLessThanOrEqual(37);
     expect(cap.uSpan).toBeGreaterThanOrEqual(9);
-    expect(cap.dMax).toBeGreaterThanOrEqual(20);
+  });
+
+  it('paints the hanging padlock in brighter brass than the open cup', () => {
+    const luma = (hex: number) => {
+      const r = (hex >> 16) & 255;
+      const g = (hex >> 8) & 255;
+      const b = hex & 255;
+      return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+    };
+    expect(luma(BRASS_COLOR)).toBeGreaterThan(luma(GOLD_COLOR));
+    const bracket = readFileSync(resolve(__dirname, '../src/voxel-floor1/bracket.ts'), 'utf8');
+    expect(bracket).toContain('BRASS_COLOR');
+    expect(bracket).toContain('spec.capped');
   });
 
   it('faces the same capped sconces as Classic and keeps the sealed line', () => {
@@ -366,5 +392,9 @@ describe('voxel-floor1 capped sconces', () => {
     expect(deadWest).toMatchObject({ x: 4, y: 6, face: 'W', capped: false, lit: false });
     expect(facingSconce(floor1Sconces, 9, 1, 2)).toBeUndefined();
     expect(TORCH_CAPPED_PROMPT).toBe("Sealed. It'll take forge-fire to open.");
+    // (8,1) is the west wall of this alcove — along-wall shots stand in (10,1).
+    expect(isWalkableTile(tileAt(floor1Map, 9, 1))).toBe(true);
+    expect(isWalkableTile(tileAt(floor1Map, 8, 1))).toBe(false);
+    expect(isWalkableTile(tileAt(floor1Map, 10, 1))).toBe(true);
   });
 });
