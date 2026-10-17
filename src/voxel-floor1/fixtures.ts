@@ -62,6 +62,10 @@ export function sconceKey(s: Pick<SconceSpec, 'x' | 'y' | 'face'>): string {
   return `${s.x},${s.y},${s.face}`;
 }
 
+export function beamKey(b: Pick<SunbeamSpec, 'x' | 'y'>): string {
+  return `beam:${b.x},${b.y}`;
+}
+
 /** Flame / light origin on the voxel cup, standing off the wall. */
 export function torchWorldPos(s: SconceSpec): { x: number; y: number; z: number } {
   const { nx, nz } = FACE_INTO_ROOM[s.face];

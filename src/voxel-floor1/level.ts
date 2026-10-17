@@ -11,10 +11,12 @@ import {
   farBakeMaterial,
   flatGeometryWithBake,
   geometryWithBake,
+  litFarBeams,
   litFarTorches,
   patchBakeMaterial,
   setBakeBlends as applyBakeBlends,
-  tileInTorchFlood,
+  tileInLightFlood,
+  type FarBeam,
   type FarTorch
 } from './bake';
 
@@ -87,6 +89,7 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
   }
 
   const torches: FarTorch[] = litFarTorches(map, floor1Sconces);
+  const beams: FarBeam[] = litFarBeams(map, floor1Sunbeams);
   const mats = new Map<string, THREE.MeshPhysicalMaterial>();
   const farMats = new Map<string, THREE.MeshBasicMaterial>();
   for (const file of needed) {
@@ -133,17 +136,24 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
     clearGroup(voxelGroup);
     clearGroup(flatGroup);
     const voxelByFile = new Map<string, PreparedFace[]>();
+    const farLitByFile = new Map<string, PreparedFace[]>();
     const flats: PreparedFace[] = [];
     let voxelFaces = 0;
     for (const face of prepared) {
       const dist = chebyshev(px, py, face.tx, face.tz);
-      // Keep each torch's 2.5-tile pool even when the party is far down the hall.
-      if (dist > CULL_CHEB && !tileInTorchFlood(face.tx, face.tz, torches)) continue;
+      const inFlood = tileInLightFlood(face.tx, face.tz, torches, beams);
+      // Keep each torch/beam pool even when the party is far down the hall.
+      if (dist > CULL_CHEB && !inFlood) continue;
       if (dist <= VOXEL_CHEB) {
         const list = voxelByFile.get(face.file) ?? [];
         list.push(face);
         voxelByFile.set(face.file, list);
         voxelFaces += 1;
+      } else if (inFlood) {
+        // Same dense voxel mesh as near — 4-vert flats miss the wall/beam hotspot.
+        const list = farLitByFile.get(face.file) ?? [];
+        list.push(face);
+        farLitByFile.set(face.file, list);
       } else {
         flats.push(face);
       }
@@ -154,7 +164,8 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
       const mat = mats.get(file);
       const geo = geometryWithBake(
         faces.map((f) => ({ mesh: f.mesh, tx: f.tx, tz: f.tz })),
-        torches
+        torches,
+        beams
       );
       if (!mat || !geo) continue;
       liveTris += (geo.getIndex()?.count ?? 0) / 3;
@@ -165,6 +176,25 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
       mesh.receiveShadow = true;
       mesh.name = `voxel:${file}`;
       voxelGroup.add(mesh);
+    }
+
+    for (const [file, faces] of farLitByFile) {
+      const mat = farMats.get(file);
+      const geo = geometryWithBake(
+        faces.map((f) => ({ mesh: f.mesh, tx: f.tx, tz: f.tz })),
+        torches,
+        beams
+      );
+      if (!mat || !geo) continue;
+      liveTris += (geo.getIndex()?.count ?? 0) / 3;
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.userData.castWhenOn = false;
+      mesh.userData.receiveWhenOn = false;
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      mesh.frustumCulled = false;
+      mesh.name = `far-lit:${file}`;
+      flatGroup.add(mesh);
     }
 
     const flatsByFile = new Map<string, PreparedFace[]>();
@@ -178,7 +208,8 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
       const geo = flatGeometryWithBake(
         list.map((f) => ({ pose: f.pose, tx: f.tx, tz: f.tz })),
         torches,
-        CELL
+        CELL,
+        beams
       );
       if (!mat || !geo) continue;
       liveTris += (geo.getIndex()?.count ?? 0) / 3;
@@ -193,7 +224,7 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
     }
 
     stats.voxelFaces = voxelFaces;
-    stats.flatFaces = flats.length;
+    stats.flatFaces = flats.length + [...farLitByFile.values()].reduce((n, list) => n + list.length, 0);
     stats.triangles = liveTris;
     stats.draws = voxelGroup.children.length + flatGroup.children.length;
   };
@@ -213,7 +244,7 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
       return true;
     },
     setBakeBlends: (blends, flick = 1) => {
-      applyBakeBlends([...mats.values(), ...farMats.values()], torches, blends, flick);
+      applyBakeBlends([...mats.values(), ...farMats.values()], torches, blends, flick, beams);
     }
   };
 }

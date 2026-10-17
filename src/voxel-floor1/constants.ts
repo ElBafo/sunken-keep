@@ -40,8 +40,8 @@ export const SWIPE_THRESHOLD = 50;
 /** Real cubes within this Chebyshev distance; flat-but-lit beyond. */
 export const VOXEL_CHEB = 3;
 /**
- * Draw as far as Classic fog (FOG_FAR / CELL). Torch-flood faces are kept
- * even past this — the 2.5-tile bubble must stay visible down a long hall.
+ * Draw as far as Classic fog (FOG_FAR / CELL). Torch- and beam-flood faces
+ * are kept even past this — the lit patch must stay visible down a long hall.
  */
 export const CULL_CHEB = Math.ceil(FOG_FAR / CELL);
 
@@ -95,6 +95,15 @@ export const SUNBEAM_INTENSITY = 0.38 * 8;
 export const SUNBEAM_DISTANCE = CELL * 2.4;
 export const SUNBEAM_RADIUS_TILES = 2.0;
 export const SUNBEAM_ANGLE = Math.PI / 7;
+/** Same penumbra / decay the SpotLight and the far bake use. */
+export const SUNBEAM_PENUMBRA = 0.45;
+export const SUNBEAM_DECAY = 1.2;
+/** Linear RGB of SUNBEAM_COLOR — shared by SpotLights and the far bake. */
+export const SUNBEAM_RGB: [number, number, number] = [
+  ((SUNBEAM_COLOR >> 16) & 255) / 255,
+  ((SUNBEAM_COLOR >> 8) & 255) / 255,
+  (SUNBEAM_COLOR & 255) / 255
+];
 export const SHAFT_WIDTH_TILES = 0.55;
 export const SHAFT_OPACITY = 1;
 

@@ -7,9 +7,12 @@ import {
   SHADOW_MAP_MOBILE,
   SUNBEAM_ANGLE,
   SUNBEAM_COLOR,
+  SUNBEAM_DECAY,
   SUNBEAM_DISTANCE,
   SUNBEAM_INTENSITY,
+  SUNBEAM_PENUMBRA,
   SUNBEAM_RADIUS_TILES,
+  SUNBEAM_RGB,
   SCONCE_RADIUS_TILES,
   TORCH_COLOR,
   TORCH_DECAY,
@@ -23,6 +26,7 @@ import {
 } from './constants';
 import {
   FACE_INTO_ROOM,
+  beamKey,
   floodReach,
   sconceIsLit,
   sconceKey,
@@ -112,8 +116,16 @@ export class Floor1Lights {
     }
 
     for (let i = 0; i < MAX_ACTIVE_SUNBEAMS; i++) {
-      const spot = new THREE.SpotLight(SUNBEAM_COLOR, 0, SUNBEAM_DISTANCE, SUNBEAM_ANGLE, 0.45, 1.2);
+      const spot = new THREE.SpotLight(
+        SUNBEAM_COLOR,
+        0,
+        SUNBEAM_DISTANCE,
+        SUNBEAM_ANGLE,
+        SUNBEAM_PENUMBRA,
+        SUNBEAM_DECAY
+      );
       spot.name = `sunbeam-${i}`;
+      spot.color.setRGB(SUNBEAM_RGB[0], SUNBEAM_RGB[1], SUNBEAM_RGB[2]);
       spot.castShadow = false;
       this.group.add(spot, spot.target);
       this.sunbeamSlots.push(spot);
@@ -131,6 +143,9 @@ export class Floor1Lights {
       const key = sconceKey(s);
       this.reach.set(key, floodReach(this.map, room.x, room.y, SCONCE_RADIUS_TILES));
       this.blends.set(key, 0);
+    }
+    for (const b of sunbeams) {
+      this.blends.set(beamKey(b), 0);
     }
     scene.add(this.group);
     this.stats.torches = sconces.length;
@@ -194,27 +209,43 @@ export class Floor1Lights {
       if (row.blend > 0.35) torchActive += 1;
     }
 
-    const beams = this.sunbeams
+    const rankedBeams = this.sunbeams
       .map((b) => ({
         b,
+        key: beamKey(b),
         dist: Math.hypot(b.x - px, b.y - py),
         inRange: Math.hypot(b.x - px, b.y - py) <= SUNBEAM_RADIUS_TILES + 1
       }))
-      .filter((row) => row.inRange)
       .sort((a, b) => a.dist - b.dist);
+    const desiredBeams = new Set(
+      rankedBeams
+        .filter((row) => row.inRange)
+        .slice(0, MAX_ACTIVE_SUNBEAMS)
+        .map((row) => row.key)
+    );
+    for (const row of rankedBeams) {
+      const want = desiredBeams.has(row.key) ? 1 : 0;
+      const cur = this.blends.get(row.key) ?? 0;
+      this.blends.set(row.key, freezeFlicker ? want : cur + (want - cur) * Math.max(fade, 0.04));
+    }
+
+    const byBeamBlend = rankedBeams
+      .map((row) => ({ ...row, blend: this.blends.get(row.key) ?? 0 }))
+      .filter((row) => row.blend > 0.015)
+      .sort((a, b) => b.blend - a.blend);
 
     let beamActive = 0;
     for (let i = 0; i < this.sunbeamSlots.length; i++) {
       const spot = this.sunbeamSlots[i];
-      const row = beams[i];
+      const row = byBeamBlend[i];
       if (!row) {
         spot.intensity = 0;
         continue;
       }
       spot.position.set(row.b.wx, CELL, row.b.wz);
       spot.target.position.set(row.b.wx, 0.05, row.b.wz);
-      spot.intensity = SUNBEAM_INTENSITY;
-      beamActive += 1;
+      spot.intensity = SUNBEAM_INTENSITY * row.blend;
+      if (row.blend > 0.35) beamActive += 1;
     }
 
     this.stats.torchesActive = torchActive;
