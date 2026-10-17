@@ -244,7 +244,7 @@ async function boot(): Promise<void> {
   scene.add(props.group);
   const openings = await buildFloor1Openings(floor1Map, lightMode === 'all');
   scene.add(openings.group);
-  const markers = buildFloor1Markers(floor1Map);
+  const markers = await buildFloor1Markers(floor1Map);
   scene.add(markers.group);
 
   const resize = (): void => {

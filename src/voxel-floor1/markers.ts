@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CELL } from './constants';
+import { BRACKET_VOX, CELL, EYE_HEIGHT } from './constants';
 import { tileFlatPose } from '../voxel-lab/faces';
 import { tileAt, type FloorMap } from './layout';
 
@@ -13,14 +13,22 @@ export type MarkerSpec = {
   /** Secret cell that must be open before this marker shows. */
   secretX: number;
   secretY: number;
+  art: string;
 };
 
 /**
  * Classic floor-1 secret contents (from public/levels/floor1.ts):
  * - (5,1) secret + carving_secret — 1-square alcove, plate "We gave much. We need more."
  * - (5,13) secret opens west to (4,13) journal_page 1 (Orrun's journal).
- * Sprites land in a later step; these are stand-in markers so the spaces aren't empty.
  */
+export const CARVING_SECRET_NEAR = 'art/decals/carving_secret_near.png';
+export const JOURNAL_PAGE_NEAR = 'art/dungeon/item_journal_page_near.png';
+/** Near PNG is 44×28 (40×24 plate + 2px glow). Same texel size as the wall. */
+export const CARVING_SECRET_PX: [number, number] = [44, 28];
+export const JOURNAL_PAGE_PX: [number, number] = [80, 60];
+/** Classic item height is a quarter-wall billboard. */
+export const JOURNAL_PAGE_HEIGHT = 0.25 * CELL;
+
 export const floor1SecretMarkers: readonly MarkerSpec[] = [
   {
     id: 'carving_secret',
@@ -30,6 +38,7 @@ export const floor1SecretMarkers: readonly MarkerSpec[] = [
     secretX: 5,
     secretY: 1,
     face: 'N',
+    art: CARVING_SECRET_NEAR,
     prompt: '"We gave much. We need more."'
   },
   {
@@ -39,6 +48,7 @@ export const floor1SecretMarkers: readonly MarkerSpec[] = [
     y: 13,
     secretX: 5,
     secretY: 13,
+    art: JOURNAL_PAGE_NEAR,
     prompt: "Orrun's journal. The ink still holds."
   }
 ];
@@ -54,41 +64,136 @@ export function markerUnlocked(map: FloorMap, spec: MarkerSpec): boolean {
   return !!tileAt(map, spec.secretX, spec.secretY)?.secretOpen;
 }
 
-export function buildFloor1Markers(map: FloorMap): {
+function cutoutMat(map: THREE.Texture): THREE.MeshBasicMaterial {
+  map.wrapS = THREE.ClampToEdgeWrapping;
+  map.wrapT = THREE.ClampToEdgeWrapping;
+  map.magFilter = THREE.NearestFilter;
+  map.minFilter = THREE.NearestFilter;
+  map.generateMipmaps = false;
+  map.needsUpdate = true;
+  return new THREE.MeshBasicMaterial({
+    map,
+    color: 0xffffff,
+    transparent: true,
+    alphaTest: 0.08,
+    depthTest: true,
+    depthWrite: true,
+    fog: true,
+    toneMapped: false,
+    side: THREE.DoubleSide,
+    polygonOffset: true,
+    polygonOffsetFactor: -2,
+    polygonOffsetUnits: -2
+  });
+}
+
+async function loadArt(rel: string): Promise<THREE.Texture> {
+  if (typeof Image === 'undefined') throw new Error('no Image');
+  const url = `${import.meta.env.BASE_URL}${rel}`;
+  const img = new Image();
+  img.decoding = 'async';
+  img.src = url;
+  await img.decode();
+  const texture = new THREE.Texture(img);
+  texture.colorSpace = THREE.SRGBColorSpace;
+  texture.magFilter = THREE.NearestFilter;
+  texture.minFilter = THREE.NearestFilter;
+  texture.generateMipmaps = false;
+  texture.needsUpdate = true;
+  return texture;
+}
+
+/** Fallback only when Classic art cannot decode (unit tests). Chiselled stone, not a grey quad. */
+function carvedStoneTexture(w: number, h: number): THREE.DataTexture {
+  const rgba = new Uint8Array(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const edge = x < 2 || y < 2 || x >= w - 2 || y >= h - 2;
+      const groove = (x + y) % 7 === 0 || (x - y + 16) % 9 === 0;
+      const n = edge ? 48 : groove ? 72 : 96 + ((x * 13 + y * 7) % 18);
+      rgba[i] = n;
+      rgba[i + 1] = n - 4;
+      rgba[i + 2] = n - 10;
+      rgba[i + 3] = 255;
+    }
+  }
+  const tex = new THREE.DataTexture(rgba, w, h, THREE.RGBAFormat);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+function parchmentTexture(w: number, h: number): THREE.DataTexture {
+  const rgba = new Uint8Array(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const line = y > 10 && y < h - 8 && y % 8 === 0 && x > 8 && x < w - 8;
+      rgba[i] = line ? 90 : 196;
+      rgba[i + 1] = line ? 70 : 176;
+      rgba[i + 2] = line ? 48 : 137;
+      rgba[i + 3] = 255;
+    }
+  }
+  const tex = new THREE.DataTexture(rgba, w, h, THREE.RGBAFormat);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+export async function buildFloor1Markers(map: FloorMap): Promise<{
   group: THREE.Group;
   update: () => void;
   interact: (px: number, py: number, dir: number) => string | null;
-} {
+}> {
   const group = new THREE.Group();
   group.name = 'floor1-markers';
   const nodes: Array<{ spec: MarkerSpec; obj: THREE.Object3D }> = [];
 
+  let carvingMap: THREE.Texture;
+  let journalMap: THREE.Texture;
+  try {
+    [carvingMap, journalMap] = await Promise.all([loadArt(CARVING_SECRET_NEAR), loadArt(JOURNAL_PAGE_NEAR)]);
+  } catch {
+    carvingMap = carvedStoneTexture(CARVING_SECRET_PX[0], CARVING_SECRET_PX[1]);
+    journalMap = parchmentTexture(JOURNAL_PAGE_PX[0], JOURNAL_PAGE_PX[1]);
+  }
+
   for (const spec of floor1SecretMarkers) {
     let obj: THREE.Object3D;
     if (spec.kind === 'journal') {
-      const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(0.42, 0.03, 0.56),
-        new THREE.MeshBasicMaterial({ color: 0xc4b089, fog: true })
-      );
-      mesh.position.set(spec.x * CELL, 0.025, spec.y * CELL);
+      const w = JOURNAL_PAGE_HEIGHT * (JOURNAL_PAGE_PX[0] / JOURNAL_PAGE_PX[1]);
+      const mesh = new THREE.Mesh(new THREE.PlaneGeometry(w, JOURNAL_PAGE_HEIGHT), cutoutMat(journalMap));
+      mesh.position.set(spec.x * CELL + CELL * 0.25, JOURNAL_PAGE_HEIGHT * 0.5, spec.y * CELL);
+      mesh.rotation.y = -Math.PI / 2;
       mesh.userData.noShadow = true;
       mesh.castShadow = false;
       mesh.receiveShadow = false;
+      mesh.frustumCulled = false;
+      mesh.renderOrder = 4;
       mesh.name = spec.id;
       obj = mesh;
     } else {
       const face = spec.face ?? 'N';
       const pose = tileFlatPose(face, spec.x, spec.y, CELL, 'center');
+      const [pw, ph] = CARVING_SECRET_PX;
       const mesh = new THREE.Mesh(
-        new THREE.BoxGeometry(0.72, 0.72, 0.06),
-        new THREE.MeshBasicMaterial({ color: 0x6a6e66, fog: true })
+        new THREE.PlaneGeometry(pw * BRACKET_VOX, ph * BRACKET_VOX),
+        cutoutMat(carvingMap)
       );
       const [dx, dz] = FACE_DELTA[face];
-      mesh.position.set(pose.x - dx * 0.04, pose.y, pose.z - dz * 0.04);
+      mesh.position.set(pose.x - dx * 0.05, EYE_HEIGHT, pose.z - dz * 0.05);
       mesh.rotation.y = pose.rotY;
       mesh.userData.noShadow = true;
       mesh.castShadow = false;
       mesh.receiveShadow = false;
+      mesh.frustumCulled = false;
+      mesh.renderOrder = 4;
       mesh.name = spec.id;
       obj = mesh;
     }

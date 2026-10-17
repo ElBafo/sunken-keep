@@ -262,18 +262,43 @@ describe('voxel-floor1 capped sconces', () => {
   const dead = floor1Sconces.filter((s) => !s.lit && !s.capped);
   const litSconces = floor1Sconces.filter((s) => s.lit);
 
-  function ironAboveCup(cappedLid: boolean): number {
+  function ironCapVoxels(cappedLid: boolean): number {
     const { volume, dims } = buildBracketOccupancy(cappedLid);
     const [W, H, D] = dims;
     let n = 0;
-    for (let d = 0; d < D; d++) {
-      for (let v = 42; v < H; v++) {
+    for (let d = 6; d < D; d++) {
+      for (let v = 40; v < H; v++) {
         for (let u = 0; u < W; u++) {
           if (volume[u + v * W + d * W * H] === MAT_IRON) n += 1;
         }
       }
     }
     return n;
+  }
+
+  function matBounds(cappedLid: boolean, id: number, minV = 0, minD = 0) {
+    const { volume, dims } = buildBracketOccupancy(cappedLid);
+    const [W, H, D] = dims;
+    let uMin = W;
+    let uMax = 0;
+    let vMin = H;
+    let vMax = 0;
+    let dMin = D;
+    let dMax = 0;
+    for (let d = minD; d < D; d++) {
+      for (let v = minV; v < H; v++) {
+        for (let u = 0; u < W; u++) {
+          if (volume[u + v * W + d * W * H] !== id) continue;
+          if (u < uMin) uMin = u;
+          if (u > uMax) uMax = u;
+          if (v < vMin) vMin = v;
+          if (v > vMax) vMax = v;
+          if (d < dMin) dMin = d;
+          if (d > dMax) dMax = d;
+        }
+      }
+    }
+    return { uMin, uMax, vMin, vMax, dMin, dMax, uSpan: uMax - uMin + 1, dSpan: dMax - dMin + 1 };
   }
 
   it('caps only Classic floor-1 sealed sconces, not dead unlit brackets', () => {
@@ -291,23 +316,18 @@ describe('voxel-floor1 capped sconces', () => {
     }
   });
 
-  it('puts a dark iron lid over the cup and leaves unlit brackets open', () => {
-    expect(ironAboveCup(true)).toBeGreaterThan(20);
-    expect(ironAboveCup(false)).toBe(0);
-    const { volume: capVol, dims } = buildBracketOccupancy(true);
-    const [W, H, D] = dims;
-    let lidUMin = W;
-    let lidUMax = 0;
-    for (let d = 0; d < D; d++) {
-      for (let v = 41; v < H; v++) {
-        for (let u = 0; u < W; u++) {
-          if (capVol[u + v * W + d * W * H] !== MAT_IRON) continue;
-          if (u < lidUMin) lidUMin = u;
-          if (u > lidUMax) lidUMax = u;
-        }
-      }
-    }
-    expect(lidUMax - lidUMin + 1).toBeGreaterThanOrEqual(6);
+  it('puts a dark iron dome over the cup, wider than the gold, and leaves unlit brackets open', () => {
+    expect(ironCapVoxels(true)).toBeGreaterThan(80);
+    expect(ironCapVoxels(false)).toBe(0);
+    const gold = matBounds(true, MAT_GOLD);
+    const cap = matBounds(true, MAT_IRON, 40, 6);
+    expect(gold.uSpan).toBeGreaterThan(0);
+    expect(gold.vMin).toBeLessThan(cap.vMin);
+    expect(cap.uSpan).toBeGreaterThan(gold.uSpan);
+    expect(cap.dSpan).toBeGreaterThan(gold.dSpan);
+    expect(cap.vMax).toBeGreaterThan(gold.vMax);
+    expect(cap.uMin).toBeLessThan(gold.uMin);
+    expect(cap.uMax).toBeGreaterThan(gold.uMax);
   });
 
   it('faces the same capped sconces as Classic and keeps the sealed line', () => {

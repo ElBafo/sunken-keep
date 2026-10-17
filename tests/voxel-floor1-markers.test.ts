@@ -1,6 +1,14 @@
+import { existsSync, readFileSync } from 'fs';
+import { resolve } from 'path';
 import { describe, expect, it, beforeEach } from 'vitest';
 import { floor1 } from '../public/levels/floor1';
-import { buildFloor1Markers, floor1SecretMarkers, markerUnlocked } from '../src/voxel-floor1/markers';
+import {
+  buildFloor1Markers,
+  CARVING_SECRET_NEAR,
+  floor1SecretMarkers,
+  JOURNAL_PAGE_NEAR,
+  markerUnlocked
+} from '../src/voxel-floor1/markers';
 import { floor1Map, resetFloor1Doors, tileAt } from '../src/voxel-floor1/layout';
 
 describe('voxel-floor1 secret placeholders match Classic contents', () => {
@@ -17,6 +25,7 @@ describe('voxel-floor1 secret placeholders match Classic contents', () => {
       y: 1,
       secretX: 5,
       secretY: 1,
+      art: CARVING_SECRET_NEAR,
       prompt: '"We gave much. We need more."'
     });
     expect(floor1SecretMarkers[1]).toMatchObject({
@@ -24,12 +33,20 @@ describe('voxel-floor1 secret placeholders match Classic contents', () => {
       y: 13,
       secretX: 5,
       secretY: 13,
+      art: JOURNAL_PAGE_NEAR,
       prompt: "Orrun's journal. The ink still holds."
     });
+    expect(existsSync(resolve(__dirname, '../public', CARVING_SECRET_NEAR))).toBe(true);
+    expect(existsSync(resolve(__dirname, '../public', JOURNAL_PAGE_NEAR))).toBe(true);
+    const src = readFileSync(resolve(__dirname, '../src/voxel-floor1/markers.ts'), 'utf8');
+    expect(src).toContain('PlaneGeometry');
+    expect(src).not.toContain('BoxGeometry');
+    expect(src).not.toContain('0x6a6e66');
+    expect(src).not.toContain('0x3d403c');
   });
 
-  it('hides markers until the matching secret opens, then returns Classic tap lines', () => {
-    const markers = buildFloor1Markers(floor1Map);
+  it('hides markers until the matching secret opens, then returns Classic tap lines', async () => {
+    const markers = await buildFloor1Markers(floor1Map);
     expect(markerUnlocked(floor1Map, floor1SecretMarkers[0])).toBe(false);
     expect(markers.group.children.every((child) => child.visible === false)).toBe(true);
     expect(markers.interact(5, 1, 0)).toBeNull();
