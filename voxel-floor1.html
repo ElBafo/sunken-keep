@@ -45,6 +45,16 @@
       pointer-events: none;
     }
     #hud[hidden] { display: none; }
+    #gfx {
+      position: fixed;
+      top: max(10px, env(safe-area-inset-top));
+      right: 10px;
+      z-index: 5;
+    }
+    #gfx .lab {
+      min-width: 88px;
+      font-size: 12px;
+    }
     #stats {
       pointer-events: auto;
       user-select: text;
@@ -116,6 +126,9 @@
   <div id="loading">Loading textures…</div>
   <div id="hud" hidden>
     <div id="stats">—</div>
+  </div>
+  <div id="gfx">
+    <button id="btn-quality" class="lab" type="button" aria-label="Graphics quality">Gfx Max</button>
   </div>
   <div id="move">
     <button id="btn-left" class="lab turn" type="button" aria-label="Turn left">Turn Left</button>

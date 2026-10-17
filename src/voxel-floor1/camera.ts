@@ -41,12 +41,12 @@ export class GridMover {
   dir: number;
   moving = false;
   kind: MoveKind = 'idle';
+  toX = 0;
+  toY = 0;
+  toDir = 0;
   private fromX = 0;
   private fromY = 0;
   private fromDir = 0;
-  private toX = 0;
-  private toY = 0;
-  private toDir = 0;
   private t0 = 0;
   private duration = MOVE_MS;
 

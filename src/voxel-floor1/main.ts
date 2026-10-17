@@ -25,7 +25,15 @@ import { GridMover } from './camera';
 import { lookColors } from '../voxel-lab/look';
 import { applyShadowToggle, recompileShadowShaders } from '../voxel-lab/shadows';
 import { floor1Sconces, floor1Sunbeams } from './fixtures';
-import { Floor1Lights, parseLightMode, type LightMode } from './lights';
+import {
+  Floor1Lights,
+  parseLightMode,
+  qualityFromLightMode,
+  readStoredQuality,
+  writeStoredQuality,
+  type LightMode,
+  type QualityLevel
+} from './lights';
 import { floor1Map } from './layout';
 import { buildFloor1 } from './level';
 import { buildFloor1Props } from './props';
@@ -50,6 +58,7 @@ type Floor1Api = {
   gridX: number;
   gridY: number;
   dir: number;
+  quality: QualityLevel;
   lantern: boolean;
   cell: number;
   eyeHeight: number;
@@ -76,6 +85,11 @@ type Floor1Api = {
     sunbeamsActive: number;
     total: number;
   };
+  stepWorstMs: number;
+  stepWorstWorkMs: number;
+  stepArrivalMs: number;
+  stepBuildMs: number;
+  cacheSize: number;
 };
 
 const STATS_WINDOW_MS = 2000;
@@ -101,9 +115,23 @@ async function boot(): Promise<void> {
 
   const params = new URLSearchParams(location.search);
   const preserveBuffer = params.get('test') === '1';
-  const lightMode = parseLightMode(location.search);
+  const lightMode = parseLightMode(location.search, readStoredQuality());
+  const quality = qualityFromLightMode(lightMode);
   const devHud = showDevHud();
   hud.hidden = !devHud;
+
+  const btnQuality = document.getElementById('btn-quality') as HTMLButtonElement | null;
+  const labelQuality = (q: QualityLevel): string => (q === 'max' ? 'Gfx Max' : 'Gfx Med');
+  if (btnQuality) {
+    btnQuality.textContent = labelQuality(quality);
+    btnQuality.addEventListener('click', (e) => {
+      e.stopPropagation();
+      writeStoredQuality(quality === 'max' ? 'medium' : 'max');
+      const url = new URL(location.href);
+      url.searchParams.delete('lights');
+      location.replace(url.toString());
+    });
+  }
 
   const renderer = new THREE.WebGLRenderer({
     canvas,
@@ -209,10 +237,12 @@ async function boot(): Promise<void> {
   };
 
   const placeLights = (now: number): void => {
-    lights.setParty(mover.x, mover.y, now, preserveBuffer);
+    const px = mover.kind === 'step' ? mover.toX : mover.x;
+    const py = mover.kind === 'step' ? mover.toY : mover.y;
+    lights.setParty(px, py, now, preserveBuffer);
     const flick = preserveBuffer ? 1 : 1 + 0.05 * Math.sin(now * 0.001 * 6.1);
     level.setBakeBlends(lights.blends, flick);
-    props.update(mover.x, mover.y, mover.dir, now, preserveBuffer);
+    props.update(px, py, mover.dir, now, preserveBuffer);
   };
 
   const renderFrame = (): { draws: number; tris: number } => {
@@ -257,18 +287,60 @@ async function boot(): Promise<void> {
     };
   };
 
+  // Draw 1px on the real framebuffer so uploads use the same programs as a frame.
+  const warmupVP = new THREE.Vector4();
+  const uploadPending = (): void => {
+    renderer.getViewport(warmupVP);
+    renderer.setRenderTarget(null);
+    renderer.setScissorTest(true);
+    renderer.setScissor(0, 0, 1, 1);
+    renderer.setViewport(0, 0, 1, 1);
+    renderer.render(scene, camera);
+    renderer.setScissorTest(false);
+    renderer.setViewport(warmupVP);
+  };
+
+  const prepareCell = (x: number, y: number): number => {
+    const created = level.prefetch(x, y);
+    if (created) level.warm(uploadPending);
+    level.activate(x, y);
+    return created ? level.lastBuildMs : 0;
+  };
+
+  let stepTracking = false;
+  let stepWorstMs = 0;
+  let stepWorstWorkMs = 0;
+  let stepArrivalMs = 0;
+  let stepBuildMs = 0;
+  let lastStepWorstMs = 0;
+  let lastStepWorstWorkMs = 0;
+  let lastStepArrivalMs = 0;
+  let lastStepBuildMs = 0;
+
+  const beginStep = (dirSign: 1 | -1): boolean => {
+    if (!mover.step(dirSign)) return false;
+    stepTracking = true;
+    stepWorstMs = 0;
+    stepWorstWorkMs = 0;
+    stepArrivalMs = 0;
+    stepBuildMs = prepareCell(mover.toX, mover.toY);
+    if (stepBuildMs > stepWorstMs) stepWorstMs = stepBuildMs;
+    if (stepBuildMs > stepWorstWorkMs) stepWorstWorkMs = stepBuildMs;
+    return true;
+  };
+
   const onArrived = (): void => {
-    level.setParty(mover.x, mover.y);
+    level.activate(mover.x, mover.y);
     placeLights(performance.now());
   };
 
   btnFwd.addEventListener('click', (e) => {
     e.stopPropagation();
-    mover.step(1);
+    beginStep(1);
   });
   btnBack.addEventListener('click', (e) => {
     e.stopPropagation();
-    mover.step(-1);
+    beginStep(-1);
   });
   btnLeft.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -306,8 +378,8 @@ async function boot(): Promise<void> {
       if (dx > 0) mover.turn(-1);
       else mover.turn(1);
     } else if (Math.abs(dy) > swipeThreshold) {
-      if (dy > 0) mover.step(-1);
-      else mover.step(1);
+      if (dy > 0) beginStep(-1);
+      else beginStep(1);
     }
   });
   canvas.addEventListener('pointercancel', () => {
@@ -315,8 +387,8 @@ async function boot(): Promise<void> {
   });
 
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') mover.step(1);
-    if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') mover.step(-1);
+    if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') beginStep(1);
+    if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') beginStep(-1);
     if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A' || e.key === 'q') mover.turn(1);
     if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D' || e.key === 'e') mover.turn(-1);
   });
@@ -339,6 +411,7 @@ async function boot(): Promise<void> {
     gridX: mover.x,
     gridY: mover.y,
     dir: mover.dir,
+    quality,
     lantern: true,
     cell: CELL,
     eyeHeight: camera.position.y,
@@ -350,14 +423,20 @@ async function boot(): Promise<void> {
     setPosition: (x, y, dir) => {
       mover.setPosition(x, y, dir);
       camera.rotation.x = CAMERA_PITCH;
+      prepareCell(x, y);
       onArrived();
     },
+    stepWorstMs: 0,
+    stepWorstWorkMs: 0,
+    stepArrivalMs: 0,
+    stepBuildMs: 0,
+    cacheSize: 1,
     setLookPitch: (rad) => {
       camera.rotation.x = rad;
       camera.updateMatrixWorld();
     },
-    stepForward: () => mover.step(1),
-    stepBack: () => mover.step(-1),
+    stepForward: () => beginStep(1),
+    stepBack: () => beginStep(-1),
     turnLeft: () => mover.turn(1),
     turnRight: () => mover.turn(-1),
     meanLuma: (band) => samplePixels(band).luma,
@@ -393,6 +472,7 @@ async function boot(): Promise<void> {
 
     const arrived = mover.update(now);
     if (arrived) onArrived();
+    else if (!stepTracking && !mover.moving && level.pump()) level.warm(uploadPending);
 
     if (!preserveBuffer) {
       const k = 1 + LANTERN_FLICKER * Math.sin((now / LANTERN_FLICKER_MS) * Math.PI * 2);
@@ -402,6 +482,20 @@ async function boot(): Promise<void> {
     placeLights(now);
 
     const frame = renderFrame();
+    const workMs = performance.now() - now;
+    if (stepTracking || arrived) {
+      if (workMs > stepWorstWorkMs) stepWorstWorkMs = workMs;
+      const spike = Math.max(dt, workMs);
+      if (spike > stepWorstMs) stepWorstMs = spike;
+    }
+    if (arrived) {
+      stepArrivalMs = workMs;
+      lastStepWorstMs = stepWorstMs;
+      lastStepWorstWorkMs = stepWorstWorkMs;
+      lastStepArrivalMs = stepArrivalMs;
+      lastStepBuildMs = stepBuildMs;
+      stepTracking = false;
+    }
     api.draws = frame.draws;
     api.gpuTriangles = renderer.info.render.triangles;
     api.programs = renderer.info.programs?.length ?? 0;
@@ -415,6 +509,11 @@ async function boot(): Promise<void> {
     api.eyeHeight = camera.position.y;
     api.aspect = camera.aspect;
     api.position = [camera.position.x, camera.position.y, camera.position.z];
+    api.stepWorstMs = lastStepWorstMs;
+    api.stepWorstWorkMs = lastStepWorstWorkMs;
+    api.stepArrivalMs = lastStepArrivalMs;
+    api.stepBuildMs = lastStepBuildMs;
+    api.cacheSize = level.cacheSize;
     if (frameSamples.length > 0) {
       const span = now - frameSamples[0].t || dt;
       const avgMs = frameSamples.reduce((s, s0) => s + s0.dt, 0) / frameSamples.length;
@@ -431,7 +530,8 @@ async function boot(): Promise<void> {
         `<div>${api.avgMs.toFixed(1)} ms avg · <b>${api.worstMs.toFixed(1)}</b> ms worst</div>` +
         `<div>${frame.draws} draws · ${level.stats.triangles.toLocaleString()} tri · ${api.programs} prog</div>` +
         `<div>${api.voxelFaces} vx faces · ${api.flatFaces} flat</div>` +
-        `<div>lights=${api.lights.mode} · ${api.lights.total} · ${api.lights.torchesActive}/${api.lights.torchesLit} torch · ${api.lights.sunbeamsActive}/${api.lights.sunbeams} beam</div>`;
+        `<div>gfx=${api.quality} · lights=${api.lights.mode} · ${api.lights.total} · ${api.lights.torchesActive}/${api.lights.torchesLit} torch · ${api.lights.sunbeamsActive}/${api.lights.sunbeams} beam</div>` +
+        `<div>step worst ${lastStepWorstMs.toFixed(1)} · arrive ${lastStepArrivalMs.toFixed(1)} · cache ${level.cacheSize}</div>`;
     }
   };
   requestAnimationFrame(loop);
