@@ -8,10 +8,13 @@ import {
   torchWorldPos,
   type SconceSpec
 } from './fixtures';
-import { lookColors } from '../voxel-lab/look';
+import { GAME_TORCH_RGB } from '../voxel-lab/look';
 import type { FloorMap } from './layout';
 
-/** Classic TORCH_INTENSITY — lighting factor multiplied by albedo, not added as a wash. */
+/**
+ * Classic TORCH_INTENSITY. Far surfaces are MeshBasic-style: texture × this
+ * warm factor, falling off from the flame. Not a halo, not an untextured add.
+ */
 export const BAKE_GAIN = 1.45;
 export const FAR_TORCH_SLOTS = 3;
 
@@ -128,38 +131,45 @@ export function geometryWithBake(
 }
 
 export function patchBakeMaterial(mat: THREE.MeshPhysicalMaterial): void {
-  const look = lookColors(1, false);
-  mat.userData.uFarColor = { value: new THREE.Vector3(look.torch[0], look.torch[1], look.torch[2]).multiplyScalar(BAKE_GAIN) };
+  // Classic vertex bake is sRGB torch × 1.45, then albedo multiply. Keep the
+  // same numbers so far bricks read warm-yellow, not a linear-orange wash.
+  mat.userData.uFarColor = {
+    value: new THREE.Vector3(GAME_TORCH_RGB[0], GAME_TORCH_RGB[1], GAME_TORCH_RGB[2]).multiplyScalar(BAKE_GAIN)
+  };
   mat.userData.uFarBlend = { value: new THREE.Vector3() };
-  mat.customProgramCacheKey = () => 'floor1-far-bake';
+  mat.customProgramCacheKey = () => 'floor1-far-bake-v2';
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uFarColor = mat.userData.uFarColor;
     shader.uniforms.uFarBlend = mat.userData.uFarBlend;
-    shader.vertexShader = shader.vertexShader
-      .replace(
-        '#include <common>',
-        `#include <common>
+    if (!shader.vertexShader.includes('attribute vec3 aFarW')) {
+      shader.vertexShader = shader.vertexShader
+        .replace(
+          '#include <common>',
+          `#include <common>
 attribute vec3 aFarW;
 varying vec3 vFarW;`
-      )
-      .replace(
-        '#include <begin_vertex>',
-        `#include <begin_vertex>
+        )
+        .replace(
+          '#include <begin_vertex>',
+          `#include <begin_vertex>
 vFarW = aFarW;`
-      );
-    shader.fragmentShader = shader.fragmentShader
-      .replace(
-        '#include <common>',
-        `#include <common>
+        );
+    }
+    if (!shader.fragmentShader.includes('uFarColor')) {
+      shader.fragmentShader = shader.fragmentShader
+        .replace(
+          '#include <common>',
+          `#include <common>
 varying vec3 vFarW;
 uniform vec3 uFarColor;
 uniform vec3 uFarBlend;`
-      )
-      .replace(
-        '#include <opaque_fragment>',
-        `outgoingLight += diffuseColor.rgb * uFarColor * dot(vFarW, uFarBlend);
+        )
+        .replace(
+          '#include <opaque_fragment>',
+          `outgoingLight += diffuseColor.rgb * uFarColor * max(dot(vFarW, uFarBlend), 0.0);
 #include <opaque_fragment>`
-      );
+        );
+    }
   };
   mat.needsUpdate = true;
 }

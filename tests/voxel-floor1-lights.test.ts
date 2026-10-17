@@ -116,6 +116,10 @@ describe('far torch bake lights the painted texture', () => {
     expect(south).toBeTruthy();
     const near = bakeWeights(6, 5, 6 * CELL, 0.1, 5 * CELL, torches);
     expect(near[0] + near[1] + near[2]).toBeGreaterThan(0.2);
+    const wall = bakeWeights(6, 5, 6 * CELL, CELL / 2, 5 * CELL - CELL / 2, torches);
+    expect(wall[0] + wall[1] + wall[2]).toBeGreaterThan(0.15);
+    const ceil = bakeWeights(6, 5, 6 * CELL, CELL - 0.05, 5 * CELL, torches);
+    expect(ceil[0] + ceil[1] + ceil[2]).toBeGreaterThan(0.1);
     const start = bakeWeights(3, 14, 3 * CELL, 0.1, 14 * CELL, torches);
     expect(start[0] + start[1] + start[2]).toBe(0);
   });
@@ -149,10 +153,13 @@ describe('voxel-floor1 still does not import proto3d', () => {
     const main = readFileSync(resolve(__dirname, '../src/voxel-floor1/main.ts'), 'utf8');
     expect(main).toContain('setBakeBlends');
     expect(main).toContain('CAMERA_VIEW_ASPECT');
+    expect(main).toContain('CAMERA_VIEW_W');
     expect(main).toContain('setLookPitch');
+    expect(main).toContain('renderer.setSize(CAMERA_VIEW_W, CAMERA_VIEW_H, false)');
     expect(main).not.toContain('TorchLightPools');
     const bake = readFileSync(resolve(__dirname, '../src/voxel-floor1/bake.ts'), 'utf8');
-    expect(bake).toContain('diffuseColor.rgb * uFarColor');
+    expect(bake).toContain('outgoingLight += diffuseColor.rgb * uFarColor');
+    expect(bake).toContain('GAME_TORCH_RGB');
     expect(bake).not.toContain('AdditiveBlending');
   });
 });

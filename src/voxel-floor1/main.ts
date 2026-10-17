@@ -5,6 +5,8 @@ import {
   CAMERA_NEAR,
   CAMERA_PITCH,
   CAMERA_VIEW_ASPECT,
+  CAMERA_VIEW_H,
+  CAMERA_VIEW_W,
   CELL,
   FOG_FAR,
   FOG_NEAR,
@@ -50,6 +52,10 @@ type Floor1Api = {
   cell: number;
   eyeHeight: number;
   fov: number;
+  aspect: number;
+  near: number;
+  canvas: { w: number; h: number };
+  position: [number, number, number];
   setPosition: (x: number, y: number, dir: number) => void;
   setLookPitch: (rad: number) => void;
   stepForward: () => boolean;
@@ -101,7 +107,7 @@ async function boot(): Promise<void> {
     powerPreference: 'high-performance',
     preserveDrawingBuffer: preserveBuffer
   });
-  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  renderer.setPixelRatio(1);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NoToneMapping;
   renderer.toneMappingExposure = 1;
@@ -175,15 +181,13 @@ async function boot(): Promise<void> {
   const resize = (): void => {
     const cssW = window.innerWidth;
     const cssH = window.innerHeight;
-    let w = cssW;
-    let h = w / CAMERA_VIEW_ASPECT;
-    if (h > cssH) {
-      h = cssH;
-      w = h * CAMERA_VIEW_ASPECT;
-    }
-    canvas.style.width = `${Math.round(w)}px`;
-    canvas.style.height = `${Math.round(h)}px`;
-    renderer.setSize(Math.round(w), Math.round(h), false);
+    const scale = Math.min(cssW / CAMERA_VIEW_W, cssH / CAMERA_VIEW_H);
+    const w = Math.max(1, Math.round(CAMERA_VIEW_W * scale));
+    const h = Math.max(1, Math.round(CAMERA_VIEW_H * scale));
+    canvas.style.width = `${w}px`;
+    canvas.style.height = `${h}px`;
+    canvas.style.imageRendering = 'pixelated';
+    renderer.setSize(CAMERA_VIEW_W, CAMERA_VIEW_H, false);
     camera.aspect = CAMERA_VIEW_ASPECT;
     camera.updateProjectionMatrix();
   };
@@ -340,6 +344,10 @@ async function boot(): Promise<void> {
     cell: CELL,
     eyeHeight: camera.position.y,
     fov: CAMERA_FOV,
+    aspect: CAMERA_VIEW_ASPECT,
+    near: CAMERA_NEAR,
+    canvas: { w: CAMERA_VIEW_W, h: CAMERA_VIEW_H },
+    position: [camera.position.x, camera.position.y, camera.position.z],
     setPosition: (x, y, dir) => {
       mover.setPosition(x, y, dir);
       camera.rotation.x = CAMERA_PITCH;
@@ -403,6 +411,9 @@ async function boot(): Promise<void> {
     api.gridX = mover.x;
     api.gridY = mover.y;
     api.dir = mover.dir;
+    api.eyeHeight = camera.position.y;
+    api.aspect = camera.aspect;
+    api.position = [camera.position.x, camera.position.y, camera.position.z];
     if (frameSamples.length > 0) {
       const span = now - frameSamples[0].t || dt;
       const avgMs = frameSamples.reduce((s, s0) => s + s0.dt, 0) / frameSamples.length;
