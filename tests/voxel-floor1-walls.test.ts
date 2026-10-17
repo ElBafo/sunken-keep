@@ -8,35 +8,20 @@ import { isBeamCeiling } from '../src/voxel-floor1/crack';
 import { floor1Sunbeams } from '../src/voxel-floor1/fixtures';
 import {
   artieFileFor,
+  ASHLAR_ZONES,
   DARK_ZONES,
   decorFace,
   FLOOR1_WALL_FILES,
   floor1DecorFaces,
   lookForSecret,
   lookForWall,
+  SOOT_2,
   STRONG,
+  textureFile,
   uniqueLooks,
-  wallKind
+  wallKind,
+  ZONE_FAMILY
 } from '../src/voxel-floor1/wall-look';
-
-const ALONG: Record<string, Array<[number, number]>> = {
-  N: [
-    [-1, 0],
-    [1, 0]
-  ],
-  S: [
-    [-1, 0],
-    [1, 0]
-  ],
-  E: [
-    [0, -1],
-    [0, 1]
-  ],
-  W: [
-    [0, -1],
-    [0, 1]
-  ]
-};
 
 function facesOf(kind: string) {
   return floor1DecorFaces.filter((f) => wallKind(f) === kind);
@@ -57,14 +42,29 @@ describe('floor-1 walls use Artie painted tiles', () => {
     }
   });
 
+  it('uses each face texture field as the source of truth', () => {
+    expect(floor1DecorFaces.every((f) => !!f.texture && !!f.wallFamily)).toBe(true);
+    for (const f of floor1DecorFaces) {
+      expect(artieFileFor(f.x, f.y, f.face)).toBe(textureFile(f));
+      expect(artieFileFor(f.x, f.y, f.face)).toBe(`walls_floor1/${f.texture}.png`);
+      expect(lookForWall(f.x, f.y, f.face)?.file).toBe(`walls_floor1/${f.texture}.png`);
+    }
+    const src = readFileSync(resolve(__dirname, '../src/voxel-floor1/wall-look.ts'), 'utf8');
+    expect(src).not.toContain('placeSparse');
+    expect(src).not.toContain('capStrong');
+    expect(src).not.toContain('assignSoot');
+  });
+
   it('maps zone materials onto the painted files and keeps the three 0.04 bulges', () => {
     expect(WALL_BULGE_FRAC).toBe(0.04);
     expect(wallKind(decorFace(0, 6, 'E')!)).toBe('ashlar');
     expect(lookForWall(0, 6, 'E')?.file.startsWith('walls_floor1/ashlar_')).toBe(true);
-    expect(lookForWall(4, 6, 'W')?.file.startsWith('walls_floor1/brick_')).toBe(true);
+    expect(lookForWall(4, 6, 'W')?.file.startsWith('walls_floor1/ashlar_')).toBe(true);
     expect(lookForWall(8, 1, 'E')?.file.startsWith('walls_floor1/banded_')).toBe(true);
-    expect(lookForWall(4, 6, 'E')?.file.startsWith('walls_floor1/plaster_')).toBe(true);
-    expect(lookForWall(9, 7, 'S')?.file.startsWith('walls_floor1/soot_')).toBe(true);
+    expect(lookForWall(4, 6, 'E')?.file.startsWith('walls_floor1/brick_')).toBe(true);
+    expect(decorFace(4, 6, 'E')?.zone).toBe('pantry');
+    expect(decorFace(4, 6, 'E')?.wallFamily).toBe('brick');
+    expect(lookForWall(9, 7, 'S')?.file).toBe(SOOT_2);
     expect(lookForWall(15, 1, 'S')?.file.startsWith('walls_floor1/etched_')).toBe(true);
     const bulges = floor1DecorFaces.filter((f) => f.bulge);
     expect(bulges).toHaveLength(3);
@@ -81,33 +81,70 @@ describe('floor-1 walls use Artie painted tiles', () => {
     );
   });
 
-  it('keeps strong-feature tiles sparse and not adjacent along a run', () => {
-    const check = (kind: 'ashlar' | 'brick' | 'plaster', file: string) => {
+  it('keeps strong-feature tiles at or below about 1 in 5 of that family', () => {
+    const check = (kind: 'ashlar' | 'brick', file: string) => {
       const faces = facesOf(kind);
       const hits = faces.filter((f) => artieFileFor(f.x, f.y, f.face) === file);
       const target = Math.max(1, Math.round(faces.length / 5));
       expect(hits.length).toBeGreaterThan(0);
       expect(hits.length).toBeLessThanOrEqual(target);
-      for (const f of hits) {
-        for (const [dx, dy] of ALONG[f.face]) {
-          expect(artieFileFor(f.x + dx, f.y + dy, f.face)).not.toBe(file);
-        }
-      }
     };
     check('ashlar', STRONG.ashlar_patched);
     check('brick', STRONG.brick_missing);
-    check('plaster', STRONG.plaster_flaking_2);
   });
 
-  it('uses soot_brick_1 on one wall row only', () => {
-    const soot = facesOf('soot');
-    const row = soot.filter((f) => artieFileFor(f.x, f.y, f.face) === 'walls_floor1/soot_brick_1.png');
-    const ys = new Set(row.map((f) => f.y));
-    expect(ys.size).toBe(1);
-    const y = [...ys][0];
-    expect(soot.some((f) => f.y !== y && artieFileFor(f.x, f.y, f.face) === 'walls_floor1/soot_brick_1.png')).toBe(
-      false
+  it('uses one stone type per room and never plaster on floor 1', () => {
+    expect(FLOOR1_WALL_FILES.some((f) => f.includes('plaster'))).toBe(false);
+    const texDir = resolve(__dirname, '../public/proto3d/tex3d/walls_floor1');
+    expect(readdirSync(texDir).some((n) => n.includes('plaster'))).toBe(false);
+    expect(readdirSync(texDir)).toEqual(
+      expect.arrayContaining(['brick_patched.png', 'soot_brick_2.png', 'ashlar_damp.png'])
     );
+
+    const kindsByZone = new Map<string, Set<string>>();
+    const kindsByViewer = new Map<string, Set<string>>();
+    const FACE_DELTA: Record<string, [number, number]> = {
+      N: [0, -1],
+      S: [0, 1],
+      E: [1, 0],
+      W: [-1, 0]
+    };
+    for (const f of floor1DecorFaces) {
+      const kind = wallKind(f);
+      expect(ZONE_FAMILY[f.zone]).toBe(kind);
+      expect(artieFileFor(f.x, f.y, f.face)?.includes('plaster')).toBeFalsy();
+      const zoneSet = kindsByZone.get(f.zone) ?? new Set();
+      zoneSet.add(kind);
+      kindsByZone.set(f.zone, zoneSet);
+      const [dx, dy] = FACE_DELTA[f.face];
+      const viewer = `${f.x + dx},${f.y + dy}`;
+      const viewSet = kindsByViewer.get(viewer) ?? new Set();
+      viewSet.add(kind);
+      kindsByViewer.set(viewer, viewSet);
+    }
+    for (const [zone, kinds] of kindsByZone) {
+      expect(kinds.size, zone).toBe(1);
+    }
+    for (const [viewer, kinds] of kindsByViewer) {
+      expect(kinds.size, viewer).toBe(1);
+    }
+    expect(ASHLAR_ZONES.has('entry_gate')).toBe(true);
+    expect(wallKind(decorFace(1, 13, 'E')!)).toBe('ashlar');
+    expect(wallKind(decorFace(3, 13, 'W')!)).toBe('ashlar');
+    expect(wallKind(decorFace(0, 6, 'E')!)).toBe('ashlar');
+    expect(wallKind(decorFace(4, 6, 'W')!)).toBe('ashlar');
+    expect(wallKind(decorFace(4, 6, 'E')!)).toBe('brick');
+    const main = readFileSync(resolve(__dirname, '../src/voxel-floor1/main.ts'), 'utf8');
+    expect(main).toContain("params.get('shot') === '1'");
+    expect(main).toContain('window.devicePixelRatio');
+  });
+
+  it('uses soot_brick_2 on every Pell soot face', () => {
+    const soot = facesOf('soot');
+    expect(soot.length).toBeGreaterThan(0);
+    expect(soot.every((f) => f.zone === 'pell')).toBe(true);
+    expect(soot.every((f) => artieFileFor(f.x, f.y, f.face) === SOOT_2)).toBe(true);
+    expect(soot.some((f) => (f.texture ?? '').includes('soot_brick_1'))).toBe(false);
   });
 
   it('does not recolour tiles or paint a floor-line tide stain', () => {

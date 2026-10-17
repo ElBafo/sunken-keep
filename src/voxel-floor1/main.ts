@@ -133,6 +133,7 @@ async function boot(): Promise<void> {
 
   const params = new URLSearchParams(location.search);
   const preserveBuffer = params.get('test') === '1';
+  const hiresShot = params.get('shot') === '1';
   const lightMode = parseLightMode(location.search, readStoredQuality());
   const quality = qualityFromLightMode(lightMode);
   const devHud = showDevHud();
@@ -167,7 +168,7 @@ async function boot(): Promise<void> {
     powerPreference: 'high-performance',
     preserveDrawingBuffer: preserveBuffer
   });
-  renderer.setPixelRatio(1);
+  renderer.setPixelRatio(hiresShot ? Math.max(1, window.devicePixelRatio || 1) : 1);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NoToneMapping;
   renderer.toneMappingExposure = 1;
@@ -250,12 +251,20 @@ async function boot(): Promise<void> {
   const resize = (): void => {
     const cssW = window.innerWidth;
     const cssH = window.innerHeight;
+    canvas.style.imageRendering = 'pixelated';
+    if (hiresShot) {
+      canvas.style.width = `${cssW}px`;
+      canvas.style.height = `${cssH}px`;
+      renderer.setSize(cssW, cssH, false);
+      camera.aspect = cssW / Math.max(1, cssH);
+      camera.updateProjectionMatrix();
+      return;
+    }
     const scale = Math.min(cssW / CAMERA_VIEW_W, cssH / CAMERA_VIEW_H);
     const w = Math.max(1, Math.round(CAMERA_VIEW_W * scale));
     const h = Math.max(1, Math.round(CAMERA_VIEW_H * scale));
     canvas.style.width = `${w}px`;
     canvas.style.height = `${h}px`;
-    canvas.style.imageRendering = 'pixelated';
     renderer.setSize(CAMERA_VIEW_W, CAMERA_VIEW_H, false);
     camera.aspect = CAMERA_VIEW_ASPECT;
     camera.updateProjectionMatrix();

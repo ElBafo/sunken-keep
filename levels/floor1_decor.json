@@ -16,6 +16,7 @@
   "purpose": "Chains, weapon racks and shield rows only in guard_hall. Clan banners only in muster_hall, antechamber, guard_hall. Set-piece carvings (ancestor faces, beard reliefs, pillars, heraldry, rune lintels, waymarkers) only at doorways, junctions and room ends.",
   "variants": "Every wall face gets one of clean, damp, cracked, patched. No face matches its neighbour along the wall or another face seen from the same square (checked: 0 matches).",
   "noFloodCues": "Canon: the keep sank into the Mirefen mud but stayed dry inside. No tide lines, water-level stains, salt crust, barnacles or kelp anywhere.",
+  "oneStonePerRun": "Each room or corridor uses ONE wall family (wallFamily) on both sides; outerShell never changes the stone. Families change only at a door or a room boundary; inside a run only the variant changes. Textures are Artie walls_floor1 files. soot_brick_1 and plaster are unused on floor 1.",
   "swamp": "The swamp presses in from outside. outerShell faces (solid rock or mud behind them) get seepage: wet_sheen outside dark zones, matte_dark (darkened, no specular) inside them. swampPressure (0 to 1) per zone scales how many mud-and-root cracks the renderer may add on outerShell faces. Every face gets a thin damp strip at the floor line.",
   "bulge": "bulge faces push out at most 0.04 of a square, so they stay under the depth limit.",
   "fire": "The fire was paid away: cold braziers, empty forge niches and soot ghost marks where lamps once hung. None of them glow."
@@ -33,6 +34,7 @@
     ]
    ],
    "material": "brick",
+   "wallFamily": "ashlar",
    "swampPressure": 0.25,
    "variantWeights": {
     "clean": 2,
@@ -54,6 +56,7 @@
     ]
    ],
    "material": "brick",
+   "wallFamily": "ashlar",
    "swampPressure": 0.35,
    "variantWeights": {
     "clean": 1,
@@ -81,6 +84,7 @@
     ]
    ],
    "material": "brick",
+   "wallFamily": "ashlar",
    "swampPressure": 0.2,
    "variantWeights": {
     "clean": 3,
@@ -108,6 +112,7 @@
     ]
    ],
    "material": "brick_banded",
+   "wallFamily": "banded",
    "swampPressure": 0.15,
    "variantWeights": {
     "clean": 3,
@@ -135,6 +140,7 @@
     ]
    ],
    "material": "brick_banded",
+   "wallFamily": "banded",
    "swampPressure": 0.1,
    "variantWeights": {
     "clean": 3,
@@ -155,7 +161,8 @@
      7
     ]
    ],
-   "material": "plaster",
+   "material": "brick",
+   "wallFamily": "brick",
    "swampPressure": 0.15,
    "variantWeights": {
     "clean": 2,
@@ -163,7 +170,7 @@
     "cracked": 2,
     "patched": 2
    },
-   "story": "Store room, grey plaster flaking to brick."
+   "story": "Store room, plain inner brick with patched gaps where shelves were torn out."
   },
   {
    "id": "hook_corridor",
@@ -177,6 +184,7 @@
     ]
    ],
    "material": "brick",
+   "wallFamily": "brick",
    "swampPressure": 0.15,
    "variantWeights": {
     "clean": 2,
@@ -198,6 +206,7 @@
     ]
    ],
    "material": "soot",
+   "wallFamily": "soot",
    "swampPressure": 0.15,
    "variantWeights": {
     "clean": 2,
@@ -225,6 +234,7 @@
     ]
    ],
    "material": "brick",
+   "wallFamily": "brick",
    "swampPressure": 0.35,
    "variantWeights": {
     "clean": 1,
@@ -246,6 +256,7 @@
     ]
    ],
    "material": "etched",
+   "wallFamily": "etched",
    "swampPressure": 0.2,
    "variantWeights": {
     "clean": 2,
@@ -267,6 +278,7 @@
     ]
    ],
    "material": "etched",
+   "wallFamily": "etched",
    "swampPressure": 0.25,
    "variantWeights": {
     "clean": 1,
@@ -288,6 +300,7 @@
     ]
    ],
    "material": "brick",
+   "wallFamily": "brick",
    "swampPressure": 0.3,
    "variantWeights": {
     "clean": 2,
@@ -301,7 +314,6 @@
  "materials": {
   "brick": "current wall brick",
   "brick_banded": "brick with a darker band course at waist height (guard rooms)",
-  "plaster": "grey plaster flaking to brick",
   "soot": "soot-blackened brick with oil streaks",
   "etched": "stone eaten smooth and pitted, matte"
  },
@@ -313,6 +325,8 @@
    "zone": "water_hall",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_damp",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -324,6 +338,8 @@
    "zone": "water_hall",
    "material": "brick",
    "variant": "patched",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_patched",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -335,6 +351,8 @@
    "zone": "water_hall",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_damp",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -346,6 +364,8 @@
    "zone": "antechamber",
    "material": "brick_banded",
    "variant": "clean",
+   "wallFamily": "banded",
+   "texture": "banded_1",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -357,6 +377,8 @@
    "zone": "antechamber",
    "material": "brick_banded",
    "variant": "patched",
+   "wallFamily": "banded",
+   "texture": "banded_2",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -368,6 +390,8 @@
    "zone": "guard_hall",
    "material": "brick_banded",
    "variant": "clean",
+   "wallFamily": "banded",
+   "texture": "banded_1",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -379,6 +403,8 @@
    "zone": "guard_hall",
    "material": "brick_banded",
    "variant": "cracked",
+   "wallFamily": "banded",
+   "texture": "banded_2",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -390,6 +416,8 @@
    "zone": "guard_hall",
    "material": "brick_banded",
    "variant": "clean",
+   "wallFamily": "banded",
+   "texture": "banded_1",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -401,6 +429,8 @@
    "zone": "guard_hall",
    "material": "brick_banded",
    "variant": "cracked",
+   "wallFamily": "banded",
+   "texture": "banded_2",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -412,6 +442,8 @@
    "zone": "guard_hall",
    "material": "brick_banded",
    "variant": "clean",
+   "wallFamily": "banded",
+   "texture": "banded_1",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -423,6 +455,8 @@
    "zone": "water_hall",
    "material": "brick",
    "variant": "patched",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_patched",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -434,6 +468,8 @@
    "zone": "antechamber",
    "material": "brick_banded",
    "variant": "clean",
+   "wallFamily": "banded",
+   "texture": "banded_1",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -445,6 +481,8 @@
    "zone": "water_hall",
    "material": "brick",
    "variant": "cracked",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_cracked",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -456,6 +494,8 @@
    "zone": "guard_hall",
    "material": "brick_banded",
    "variant": "cracked",
+   "wallFamily": "banded",
+   "texture": "banded_2",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -467,6 +507,8 @@
    "zone": "guard_hall",
    "material": "brick_banded",
    "variant": "cracked",
+   "wallFamily": "banded",
+   "texture": "banded_2",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -478,6 +520,8 @@
    "zone": "antechamber",
    "material": "brick_banded",
    "variant": "clean",
+   "wallFamily": "banded",
+   "texture": "banded_1",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -489,6 +533,8 @@
    "zone": "guard_hall",
    "material": "brick_banded",
    "variant": "cracked",
+   "wallFamily": "banded",
+   "texture": "banded_2",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -500,6 +546,8 @@
    "zone": "guard_hall",
    "material": "brick_banded",
    "variant": "cracked",
+   "wallFamily": "banded",
+   "texture": "banded_2",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -511,6 +559,8 @@
    "zone": "slime_trail",
    "material": "etched",
    "variant": "clean",
+   "wallFamily": "etched",
+   "texture": "etched_1",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -522,6 +572,8 @@
    "zone": "slime_trail",
    "material": "etched",
    "variant": "cracked",
+   "wallFamily": "etched",
+   "texture": "etched_2",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -533,6 +585,8 @@
    "zone": "slime_trail",
    "material": "etched",
    "variant": "damp",
+   "wallFamily": "etched",
+   "texture": "etched_1",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -544,6 +598,8 @@
    "zone": "slime_trail",
    "material": "etched",
    "variant": "cracked",
+   "wallFamily": "etched",
+   "texture": "etched_2",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -555,6 +611,8 @@
    "zone": "slime_trail",
    "material": "etched",
    "variant": "clean",
+   "wallFamily": "etched",
+   "texture": "etched_1",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -566,6 +624,8 @@
    "zone": "water_hall",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_damp",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -577,6 +637,8 @@
    "zone": "slime_trail",
    "material": "etched",
    "variant": "cracked",
+   "wallFamily": "etched",
+   "texture": "etched_2",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -588,6 +650,8 @@
    "zone": "water_hall",
    "material": "brick",
    "variant": "patched",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_patched",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -599,6 +663,8 @@
    "zone": "antechamber",
    "material": "brick_banded",
    "variant": "patched",
+   "wallFamily": "banded",
+   "texture": "banded_2",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -610,6 +676,8 @@
    "zone": "antechamber",
    "material": "brick_banded",
    "variant": "clean",
+   "wallFamily": "banded",
+   "texture": "banded_1",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -621,6 +689,8 @@
    "zone": "water_hall",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_clean",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -632,6 +702,8 @@
    "zone": "guard_hall",
    "material": "brick_banded",
    "variant": "clean",
+   "wallFamily": "banded",
+   "texture": "banded_1",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -643,6 +715,8 @@
    "zone": "guard_hall",
    "material": "brick_banded",
    "variant": "cracked",
+   "wallFamily": "banded",
+   "texture": "banded_2",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -654,6 +728,8 @@
    "zone": "antechamber",
    "material": "brick_banded",
    "variant": "clean",
+   "wallFamily": "banded",
+   "texture": "banded_1",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -665,6 +741,8 @@
    "zone": "guard_hall",
    "material": "brick_banded",
    "variant": "clean",
+   "wallFamily": "banded",
+   "texture": "banded_1",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -676,6 +754,8 @@
    "zone": "guard_hall",
    "material": "brick_banded",
    "variant": "clean",
+   "wallFamily": "banded",
+   "texture": "banded_1",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -687,6 +767,8 @@
    "zone": "slime_trail",
    "material": "etched",
    "variant": "cracked",
+   "wallFamily": "etched",
+   "texture": "etched_2",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -698,6 +780,8 @@
    "zone": "slime_trail",
    "material": "etched",
    "variant": "clean",
+   "wallFamily": "etched",
+   "texture": "etched_1",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -709,6 +793,8 @@
    "zone": "slime_trail",
    "material": "etched",
    "variant": "cracked",
+   "wallFamily": "etched",
+   "texture": "etched_2",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -720,6 +806,8 @@
    "zone": "slime_trail",
    "material": "etched",
    "variant": "clean",
+   "wallFamily": "etched",
+   "texture": "etched_1",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -731,6 +819,8 @@
    "zone": "lair",
    "material": "etched",
    "variant": "cracked",
+   "wallFamily": "etched",
+   "texture": "etched_2",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -742,6 +832,8 @@
    "zone": "lair",
    "material": "etched",
    "variant": "damp",
+   "wallFamily": "etched",
+   "texture": "etched_1",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -753,6 +845,8 @@
    "zone": "water_hall",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_clean",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -764,6 +858,8 @@
    "zone": "muster_hall",
    "material": "brick",
    "variant": "clean",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_clean",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -775,6 +871,8 @@
    "zone": "water_hall",
    "material": "brick",
    "variant": "cracked",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_cracked",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -786,6 +884,8 @@
    "zone": "antechamber",
    "material": "brick_banded",
    "variant": "patched",
+   "wallFamily": "banded",
+   "texture": "banded_2",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -795,8 +895,10 @@
    "y": 4,
    "face": "S",
    "zone": "pantry",
-   "material": "plaster",
+   "material": "brick",
    "variant": "cracked",
+   "wallFamily": "brick",
+   "texture": "brick_cracked",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -808,6 +910,8 @@
    "zone": "antechamber",
    "material": "brick_banded",
    "variant": "clean",
+   "wallFamily": "banded",
+   "texture": "banded_1",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -817,8 +921,10 @@
    "y": 4,
    "face": "S",
    "zone": "pantry",
-   "material": "plaster",
+   "material": "brick",
    "variant": "clean",
+   "wallFamily": "brick",
+   "texture": "brick_base",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -830,6 +936,8 @@
    "zone": "antechamber",
    "material": "brick_banded",
    "variant": "patched",
+   "wallFamily": "banded",
+   "texture": "banded_2",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -839,8 +947,10 @@
    "y": 4,
    "face": "S",
    "zone": "pantry",
-   "material": "plaster",
+   "material": "brick",
    "variant": "cracked",
+   "wallFamily": "brick",
+   "texture": "brick_cracked",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -852,6 +962,8 @@
    "zone": "guard_hall",
    "material": "brick_banded",
    "variant": "clean",
+   "wallFamily": "banded",
+   "texture": "banded_1",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -863,6 +975,8 @@
    "zone": "guard_hall",
    "material": "brick_banded",
    "variant": "cracked",
+   "wallFamily": "banded",
+   "texture": "banded_2",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -874,6 +988,8 @@
    "zone": "lair",
    "material": "etched",
    "variant": "damp",
+   "wallFamily": "etched",
+   "texture": "etched_1",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -885,6 +1001,8 @@
    "zone": "lair",
    "material": "etched",
    "variant": "cracked",
+   "wallFamily": "etched",
+   "texture": "etched_2",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -896,6 +1014,8 @@
    "zone": "muster_hall",
    "material": "brick",
    "variant": "clean",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_clean",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -907,6 +1027,8 @@
    "zone": "hook_corridor",
    "material": "brick",
    "variant": "cracked",
+   "wallFamily": "brick",
+   "texture": "brick_cracked",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -916,8 +1038,10 @@
    "y": 5,
    "face": "W",
    "zone": "pantry",
-   "material": "plaster",
+   "material": "brick",
    "variant": "patched",
+   "wallFamily": "brick",
+   "texture": "brick_patched",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -929,6 +1053,8 @@
    "zone": "guard_hall",
    "material": "brick_banded",
    "variant": "cracked",
+   "wallFamily": "banded",
+   "texture": "banded_2",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -940,6 +1066,8 @@
    "zone": "hook_corridor",
    "material": "brick",
    "variant": "patched",
+   "wallFamily": "brick",
+   "texture": "brick_base",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -951,6 +1079,8 @@
    "zone": "guard_hall",
    "material": "brick_banded",
    "variant": "clean",
+   "wallFamily": "banded",
+   "texture": "banded_1",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -962,6 +1092,8 @@
    "zone": "hook_corridor",
    "material": "brick",
    "variant": "cracked",
+   "wallFamily": "brick",
+   "texture": "brick_cracked",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -973,6 +1105,8 @@
    "zone": "guard_hall",
    "material": "brick_banded",
    "variant": "cracked",
+   "wallFamily": "banded",
+   "texture": "banded_2",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -984,6 +1118,8 @@
    "zone": "hook_corridor",
    "material": "brick",
    "variant": "clean",
+   "wallFamily": "brick",
+   "texture": "brick_base",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -995,6 +1131,8 @@
    "zone": "guard_hall",
    "material": "brick_banded",
    "variant": "clean",
+   "wallFamily": "banded",
+   "texture": "banded_1",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -1006,6 +1144,8 @@
    "zone": "guard_hall",
    "material": "brick_banded",
    "variant": "patched",
+   "wallFamily": "banded",
+   "texture": "banded_2",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -1017,6 +1157,8 @@
    "zone": "lair",
    "material": "etched",
    "variant": "cracked",
+   "wallFamily": "etched",
+   "texture": "etched_2",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1028,6 +1170,8 @@
    "zone": "lair",
    "material": "etched",
    "variant": "damp",
+   "wallFamily": "etched",
+   "texture": "etched_1",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1039,6 +1183,8 @@
    "zone": "muster_hall",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_damp",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -1050,6 +1196,8 @@
    "zone": "muster_hall",
    "material": "brick",
    "variant": "patched",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_patched",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -1059,8 +1207,10 @@
    "y": 6,
    "face": "E",
    "zone": "pantry",
-   "material": "plaster",
+   "material": "brick",
    "variant": "cracked",
+   "wallFamily": "brick",
+   "texture": "brick_cracked",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1072,6 +1222,8 @@
    "zone": "muster_hall",
    "material": "brick",
    "variant": "clean",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_clean",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1083,6 +1235,8 @@
    "zone": "hook_corridor",
    "material": "brick",
    "variant": "cracked",
+   "wallFamily": "brick",
+   "texture": "brick_cracked",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1094,6 +1248,8 @@
    "zone": "lair",
    "material": "etched",
    "variant": "damp",
+   "wallFamily": "etched",
+   "texture": "etched_1",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1105,6 +1261,8 @@
    "zone": "lair",
    "material": "etched",
    "variant": "cracked",
+   "wallFamily": "etched",
+   "texture": "etched_2",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1116,6 +1274,8 @@
    "zone": "muster_hall",
    "material": "brick",
    "variant": "clean",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_clean",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -1125,8 +1285,10 @@
    "y": 7,
    "face": "E",
    "zone": "pantry",
-   "material": "plaster",
+   "material": "brick",
    "variant": "damp",
+   "wallFamily": "brick",
+   "texture": "brick_missing",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1138,6 +1300,8 @@
    "zone": "muster_hall",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_damp",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1149,6 +1313,8 @@
    "zone": "hook_corridor",
    "material": "brick",
    "variant": "patched",
+   "wallFamily": "brick",
+   "texture": "brick_patched",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1158,8 +1324,10 @@
    "y": 7,
    "face": "W",
    "zone": "pantry",
-   "material": "plaster",
+   "material": "brick",
    "variant": "patched",
+   "wallFamily": "brick",
+   "texture": "brick_patched",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -1171,6 +1339,8 @@
    "zone": "hook_corridor",
    "material": "brick",
    "variant": "cracked",
+   "wallFamily": "brick",
+   "texture": "brick_cracked",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1182,6 +1352,8 @@
    "zone": "pell",
    "material": "soot",
    "variant": "patched",
+   "wallFamily": "soot",
+   "texture": "soot_brick_2",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1193,6 +1365,8 @@
    "zone": "hook_corridor",
    "material": "brick",
    "variant": "clean",
+   "wallFamily": "brick",
+   "texture": "brick_base",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1204,6 +1378,8 @@
    "zone": "pell",
    "material": "soot",
    "variant": "cracked",
+   "wallFamily": "soot",
+   "texture": "soot_brick_2",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1215,6 +1391,8 @@
    "zone": "hook_corridor",
    "material": "brick",
    "variant": "cracked",
+   "wallFamily": "brick",
+   "texture": "brick_cracked",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1226,6 +1404,8 @@
    "zone": "pell",
    "material": "soot",
    "variant": "patched",
+   "wallFamily": "soot",
+   "texture": "soot_brick_2",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1237,6 +1417,8 @@
    "zone": "hook_corridor",
    "material": "brick",
    "variant": "clean",
+   "wallFamily": "brick",
+   "texture": "brick_base",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1248,6 +1430,8 @@
    "zone": "pell",
    "material": "soot",
    "variant": "cracked",
+   "wallFamily": "soot",
+   "texture": "soot_brick_2",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1259,6 +1443,8 @@
    "zone": "stair_room",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "brick",
+   "texture": "brick_base",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1270,6 +1456,8 @@
    "zone": "stair_room",
    "material": "brick",
    "variant": "cracked",
+   "wallFamily": "brick",
+   "texture": "brick_cracked",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1281,6 +1469,8 @@
    "zone": "stair_room",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "brick",
+   "texture": "brick_cracked",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1292,6 +1482,8 @@
    "zone": "lair",
    "material": "etched",
    "variant": "cracked",
+   "wallFamily": "etched",
+   "texture": "etched_2",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1303,6 +1495,8 @@
    "zone": "stair_room",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "brick",
+   "texture": "brick_base",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1314,6 +1508,8 @@
    "zone": "lair",
    "material": "etched",
    "variant": "damp",
+   "wallFamily": "etched",
+   "texture": "etched_1",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1325,6 +1521,8 @@
    "zone": "muster_hall",
    "material": "brick",
    "variant": "patched",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_cracked",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -1336,6 +1534,8 @@
    "zone": "entry_gate",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_clean",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -1347,6 +1547,8 @@
    "zone": "muster_hall",
    "material": "brick",
    "variant": "clean",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_clean",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -1358,6 +1560,8 @@
    "zone": "entry_gate",
    "material": "brick",
    "variant": "clean",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_clean",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -1369,6 +1573,8 @@
    "zone": "cellar",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "brick",
+   "texture": "brick_base",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -1378,8 +1584,10 @@
    "y": 8,
    "face": "N",
    "zone": "pantry",
-   "material": "plaster",
+   "material": "brick",
    "variant": "clean",
+   "wallFamily": "brick",
+   "texture": "brick_base",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1391,6 +1599,8 @@
    "zone": "cellar",
    "material": "brick",
    "variant": "patched",
+   "wallFamily": "brick",
+   "texture": "brick_patched",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1402,6 +1612,8 @@
    "zone": "cellar",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "brick",
+   "texture": "brick_missing",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -1411,8 +1623,10 @@
    "y": 8,
    "face": "N",
    "zone": "pantry",
-   "material": "plaster",
+   "material": "brick",
    "variant": "cracked",
+   "wallFamily": "brick",
+   "texture": "brick_cracked",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1424,6 +1638,8 @@
    "zone": "cellar",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "brick",
+   "texture": "brick_missing",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1435,6 +1651,8 @@
    "zone": "cellar",
    "material": "brick",
    "variant": "patched",
+   "wallFamily": "brick",
+   "texture": "brick_patched",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1446,6 +1664,8 @@
    "zone": "pell",
    "material": "soot",
    "variant": "cracked",
+   "wallFamily": "soot",
+   "texture": "soot_brick_2",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1457,6 +1677,8 @@
    "zone": "pell",
    "material": "soot",
    "variant": "patched",
+   "wallFamily": "soot",
+   "texture": "soot_brick_2",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1468,6 +1690,8 @@
    "zone": "stair_room",
    "material": "brick",
    "variant": "cracked",
+   "wallFamily": "brick",
+   "texture": "brick_cracked",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1479,6 +1703,8 @@
    "zone": "stair_room",
    "material": "brick",
    "variant": "cracked",
+   "wallFamily": "brick",
+   "texture": "brick_cracked",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1490,6 +1716,8 @@
    "zone": "entry_gate",
    "material": "brick",
    "variant": "cracked",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_cracked",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -1501,6 +1729,8 @@
    "zone": "cellar",
    "material": "brick",
    "variant": "patched",
+   "wallFamily": "brick",
+   "texture": "brick_patched",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1512,6 +1742,8 @@
    "zone": "entry_gate",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_damp",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1523,6 +1755,8 @@
    "zone": "pell",
    "material": "soot",
    "variant": "patched",
+   "wallFamily": "soot",
+   "texture": "soot_brick_2",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1534,6 +1768,8 @@
    "zone": "cellar",
    "material": "brick",
    "variant": "cracked",
+   "wallFamily": "brick",
+   "texture": "brick_cracked",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1545,6 +1781,8 @@
    "zone": "pell",
    "material": "soot",
    "variant": "clean",
+   "wallFamily": "soot",
+   "texture": "soot_brick_2",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1556,6 +1794,8 @@
    "zone": "stair_room",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "brick",
+   "texture": "brick_base",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1567,6 +1807,8 @@
    "zone": "stair_room",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "brick",
+   "texture": "brick_base",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": true
@@ -1578,6 +1820,8 @@
    "zone": "entry_gate",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_damp",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -1589,6 +1833,8 @@
    "zone": "cellar",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "brick",
+   "texture": "brick_base",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1600,6 +1846,8 @@
    "zone": "entry_gate",
    "material": "brick",
    "variant": "patched",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_patched",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1611,6 +1859,8 @@
    "zone": "pell",
    "material": "soot",
    "variant": "clean",
+   "wallFamily": "soot",
+   "texture": "soot_brick_2",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1622,6 +1872,8 @@
    "zone": "cellar",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "brick",
+   "texture": "brick_base",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1633,6 +1885,8 @@
    "zone": "pell",
    "material": "soot",
    "variant": "patched",
+   "wallFamily": "soot",
+   "texture": "soot_brick_2",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1644,6 +1898,8 @@
    "zone": "stair_room",
    "material": "brick",
    "variant": "clean",
+   "wallFamily": "brick",
+   "texture": "brick_base",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1655,6 +1911,8 @@
    "zone": "stair_room",
    "material": "brick",
    "variant": "clean",
+   "wallFamily": "brick",
+   "texture": "brick_base",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1666,6 +1924,8 @@
    "zone": "entry_gate",
    "material": "brick",
    "variant": "cracked",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_cracked",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": true
@@ -1677,6 +1937,8 @@
    "zone": "cellar",
    "material": "brick",
    "variant": "cracked",
+   "wallFamily": "brick",
+   "texture": "brick_cracked",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1688,6 +1950,8 @@
    "zone": "entry_gate",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_clean",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1699,6 +1963,8 @@
    "zone": "cellar",
    "material": "brick",
    "variant": "patched",
+   "wallFamily": "brick",
+   "texture": "brick_patched",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -1710,6 +1976,8 @@
    "zone": "pell",
    "material": "soot",
    "variant": "patched",
+   "wallFamily": "soot",
+   "texture": "soot_brick_2",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1721,6 +1989,8 @@
    "zone": "pell",
    "material": "soot",
    "variant": "cracked",
+   "wallFamily": "soot",
+   "texture": "soot_brick_2",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1732,6 +2002,8 @@
    "zone": "pell",
    "material": "soot",
    "variant": "patched",
+   "wallFamily": "soot",
+   "texture": "soot_brick_2",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1743,6 +2015,8 @@
    "zone": "pell",
    "material": "soot",
    "variant": "cracked",
+   "wallFamily": "soot",
+   "texture": "soot_brick_2",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1754,6 +2028,8 @@
    "zone": "pell",
    "material": "soot",
    "variant": "clean",
+   "wallFamily": "soot",
+   "texture": "soot_brick_2",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1765,6 +2041,8 @@
    "zone": "stair_room",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "brick",
+   "texture": "brick_missing",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1776,6 +2054,8 @@
    "zone": "stair_room",
    "material": "brick",
    "variant": "cracked",
+   "wallFamily": "brick",
+   "texture": "brick_cracked",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1787,6 +2067,8 @@
    "zone": "stair_room",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "brick",
+   "texture": "brick_missing",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1798,6 +2080,8 @@
    "zone": "stair_room",
    "material": "brick",
    "variant": "clean",
+   "wallFamily": "brick",
+   "texture": "brick_base",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1809,6 +2093,8 @@
    "zone": "stair_room",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "brick",
+   "texture": "brick_base",
    "outerShell": true,
    "seepage": "matte_dark",
    "bulge": false
@@ -1820,6 +2106,8 @@
    "zone": "entry_gate",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_damp",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -1831,6 +2119,8 @@
    "zone": "cellar",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "brick",
+   "texture": "brick_base",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1842,6 +2132,8 @@
    "zone": "entry_gate",
    "material": "brick",
    "variant": "patched",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_patched",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1853,6 +2145,8 @@
    "zone": "cellar",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "brick",
+   "texture": "brick_missing",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": true
@@ -1864,6 +2158,8 @@
    "zone": "entry_gate",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_damp",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -1875,6 +2171,8 @@
    "zone": "entry_gate",
    "material": "brick",
    "variant": "clean",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_clean",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -1886,6 +2184,8 @@
    "zone": "entry_gate",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_damp",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -1897,6 +2197,8 @@
    "zone": "cellar",
    "material": "brick",
    "variant": "patched",
+   "wallFamily": "brick",
+   "texture": "brick_patched",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1908,6 +2210,8 @@
    "zone": "entry_gate",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_damp",
    "outerShell": false,
    "seepage": null,
    "bulge": false
@@ -1919,6 +2223,8 @@
    "zone": "cellar",
    "material": "brick",
    "variant": "cracked",
+   "wallFamily": "brick",
+   "texture": "brick_cracked",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -1930,6 +2236,8 @@
    "zone": "entry_gate",
    "material": "brick",
    "variant": "cracked",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_cracked",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -1941,6 +2249,8 @@
    "zone": "cellar",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "brick",
+   "texture": "brick_cracked",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -1952,6 +2262,8 @@
    "zone": "entry_gate",
    "material": "brick",
    "variant": "cracked",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_cracked",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -1963,6 +2275,8 @@
    "zone": "cellar",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "brick",
+   "texture": "brick_base",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -1974,6 +2288,8 @@
    "zone": "cellar",
    "material": "brick",
    "variant": "patched",
+   "wallFamily": "brick",
+   "texture": "brick_patched",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -1985,6 +2301,8 @@
    "zone": "entry_gate",
    "material": "brick",
    "variant": "patched",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_cracked",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -1996,6 +2314,8 @@
    "zone": "entry_gate",
    "material": "brick",
    "variant": "damp",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_clean",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false
@@ -2007,6 +2327,8 @@
    "zone": "entry_gate",
    "material": "brick",
    "variant": "clean",
+   "wallFamily": "ashlar",
+   "texture": "ashlar_clean",
    "outerShell": true,
    "seepage": "wet_sheen",
    "bulge": false

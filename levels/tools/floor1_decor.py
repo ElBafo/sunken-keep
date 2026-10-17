@@ -37,8 +37,8 @@ Z=[
   'Between the cistern door (4,2) and the guard hall.'),
  ('guard_hall','Guard hall',[(8,1,13,4),(14,2,14,2)],'brick_banded',0.1,{'clean':3,'damp':1,'cracked':3,'patched':2},
   'The guard level\'s main room: racks, shields, chains. Sunbeam at (11,2), fallen beams.'),
- ('pantry','Pantry',[(5,5,7,7)],'plaster',0.15,{'clean':2,'damp':2,'cracked':2,'patched':2},
-  'Store room, grey plaster flaking to brick.'),
+ ('pantry','Pantry',[(5,5,7,7)],'brick',0.15,{'clean':2,'damp':2,'cracked':2,'patched':2},
+  'Store room, plain inner brick with patched gaps where shelves were torn out.'),
  ('hook_corridor','Hook corridor',[(8,6,11,7)],'brick',0.15,{'clean':2,'damp':1,'cracked':3,'patched':2},
   'Dark passage toward the lamp-keeper. Soot starts here.'),
  ('pell','Lamp-keeper\'s rooms',[(9,8,13,10)],'soot',0.15,{'clean':2,'damp':1,'cracked':2,'patched':3},
@@ -227,7 +227,7 @@ out={
   'fire':'The fire was paid away: cold braziers, empty forge niches and soot ghost marks where lamps once hung. None of them glow.'
  },
  'zones':[{'id':z[0],'name':z[1],'viewerSquares':[list(r) for r in z[2]],'material':z[3],'swampPressure':z[4],'variantWeights':z[5],'story':z[6]} for z in Z],
- 'materials':{'brick':'current wall brick','brick_banded':'brick with a darker band course at waist height (guard rooms)','plaster':'grey plaster flaking to brick','soot':'soot-blackened brick with oil streaks','etched':'stone eaten smooth and pitted, matte'},
+ 'materials':{'brick':'current wall brick','brick_banded':'brick with a darker band course at waist height (guard rooms)','soot':'soot-blackened brick with oil streaks','etched':'stone eaten smooth and pitted, matte'},
  'faces':[{'x':x,'y':y,'face':f,'zone':z,'material':ZD[z][3],'variant':assign[(x,y,f)],'outerShell':outer(x,y,f),'seepage':(('matte_dark' if z in DARK else 'wet_sheen') if outer(x,y,f) else None),'bulge':(x,y,f) in BULGE} for x,y,f,z in faces],
  'decorations':dec,
  'dressingOverrides':[

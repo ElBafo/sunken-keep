@@ -2,12 +2,33 @@ import { ROUGH_MATTE } from '../voxel-lab/constants';
 import type { VolumeFromPixels } from '../voxel-lab/classify';
 import type { FaceId } from '../voxel-lab/faces';
 import { WALL_BULGE_FRAC } from './constants';
-import { faceHash } from './variants';
 import floor1DecorJson from '../../levels/floor1_decor.json';
 
-export type WallKind = 'ashlar' | 'brick' | 'banded' | 'plaster' | 'soot' | 'etched';
+export type WallKind = 'ashlar' | 'brick' | 'banded' | 'soot' | 'etched';
 export type WallVariant = 'clean' | 'damp' | 'cracked' | 'patched';
 export type Seepage = 'wet_sheen' | 'matte_dark' | null;
+
+/** One stone family per room / corridor. Matches Levie's zone `wallFamily`. */
+export const ZONE_FAMILY: Record<string, WallKind> = {
+  entry_gate: 'ashlar',
+  water_hall: 'ashlar',
+  muster_hall: 'ashlar',
+  antechamber: 'banded',
+  guard_hall: 'banded',
+  pantry: 'brick',
+  hook_corridor: 'brick',
+  pell: 'soot',
+  cellar: 'brick',
+  slime_trail: 'etched',
+  lair: 'etched',
+  stair_room: 'brick'
+};
+
+export const ASHLAR_ZONES = new Set(
+  Object.entries(ZONE_FAMILY)
+    .filter(([, kind]) => kind === 'ashlar')
+    .map(([zone]) => zone)
+);
 
 export type DecorFace = {
   x: number;
@@ -19,6 +40,8 @@ export type DecorFace = {
   outerShell: boolean;
   seepage: Seepage;
   bulge: boolean;
+  wallFamily?: string;
+  texture?: string;
 };
 
 export type WallLook = {
@@ -44,9 +67,6 @@ export const FLOOR1_WALL_FILES = [
   'walls_floor1/brick_cracked.png',
   'walls_floor1/brick_patched.png',
   'walls_floor1/brick_missing.png',
-  'walls_floor1/plaster_flaking_1.png',
-  'walls_floor1/plaster_flaking_2.png',
-  'walls_floor1/soot_brick_1.png',
   'walls_floor1/soot_brick_2.png',
   'walls_floor1/etched_1.png',
   'walls_floor1/etched_2.png',
@@ -56,9 +76,10 @@ export const FLOOR1_WALL_FILES = [
 
 const STRONG = {
   ashlar_patched: 'walls_floor1/ashlar_patched.png',
-  brick_missing: 'walls_floor1/brick_missing.png',
-  plaster_flaking_2: 'walls_floor1/plaster_flaking_2.png'
+  brick_missing: 'walls_floor1/brick_missing.png'
 } as const;
+
+export const SOOT_2 = 'walls_floor1/soot_brick_2.png';
 
 export const floor1DecorFaces = (floor1DecorJson as { faces: DecorFace[] }).faces;
 
@@ -68,12 +89,13 @@ export function decorFace(x: number, y: number, face: string): DecorFace | undef
   return FACE_INDEX.get(`${x},${y},${face}`);
 }
 
+function isWallKind(value: string | undefined): value is WallKind {
+  return value === 'ashlar' || value === 'brick' || value === 'banded' || value === 'soot' || value === 'etched';
+}
+
 export function wallKind(f: DecorFace): WallKind {
-  if (f.material === 'brick_banded') return 'banded';
-  if (f.material === 'plaster') return 'plaster';
-  if (f.material === 'soot') return 'soot';
-  if (f.material === 'etched') return 'etched';
-  if (f.material === 'brick' && f.outerShell) return 'ashlar';
+  if (isWallKind(f.wallFamily)) return f.wallFamily;
+  if (ZONE_FAMILY[f.zone]) return ZONE_FAMILY[f.zone];
   return 'brick';
 }
 
@@ -81,113 +103,24 @@ function faceKey(f: Pick<DecorFace, 'x' | 'y' | 'face'>): string {
   return `${f.x},${f.y},${f.face}`;
 }
 
-const ALONG: Record<string, Array<[number, number]>> = {
-  N: [
-    [-1, 0],
-    [1, 0]
-  ],
-  S: [
-    [-1, 0],
-    [1, 0]
-  ],
-  E: [
-    [0, -1],
-    [0, 1]
-  ],
-  W: [
-    [0, -1],
-    [0, 1]
-  ]
+const FACE_DELTA: Record<string, [number, number]> = {
+  N: [0, -1],
+  S: [0, 1],
+  E: [1, 0],
+  W: [-1, 0]
 };
 
-function alongKeys(f: DecorFace): string[] {
-  return (ALONG[f.face] ?? []).map(([dx, dy]) => `${f.x + dx},${f.y + dy},${f.face}`);
-}
-
-function pairFile(kind: 'etched' | 'banded', f: DecorFace): string {
-  const i = faceHash(f.x, f.y, f.face, kind === 'etched' ? 5 : 7) % 2;
-  return kind === 'etched'
-    ? i === 0
-      ? 'walls_floor1/etched_1.png'
-      : 'walls_floor1/etched_2.png'
-    : i === 0
-      ? 'walls_floor1/banded_1.png'
-      : 'walls_floor1/banded_2.png';
-}
-
-function defaultFile(kind: WallKind, f: DecorFace): string {
-  if (kind === 'ashlar') {
-    if (f.variant === 'cracked') return 'walls_floor1/ashlar_cracked.png';
-    if (f.variant === 'damp') return 'walls_floor1/ashlar_damp.png';
-    return 'walls_floor1/ashlar_clean.png';
-  }
-  if (kind === 'brick') {
-    if (f.variant === 'cracked') return 'walls_floor1/brick_cracked.png';
-    if (f.variant === 'patched') return 'walls_floor1/brick_patched.png';
-    return 'walls_floor1/brick_base.png';
-  }
-  if (kind === 'plaster') return 'walls_floor1/plaster_flaking_1.png';
-  if (kind === 'soot') return 'walls_floor1/soot_brick_2.png';
-  if (kind === 'etched') return pairFile('etched', f);
-  return pairFile('banded', f);
-}
-
-/** Strong-feature tiles: about 1 in 5 of that material, never neighbours along a run. */
-function placeSparse(
-  assigned: Map<string, string>,
-  faces: DecorFace[],
-  file: string,
-  prefer?: (f: DecorFace) => boolean
-): void {
-  const target = Math.max(1, Math.round(faces.length / 5));
-  const ranked = [...faces].sort((a, b) => {
-    const pa = prefer?.(a) ? 0 : 1;
-    const pb = prefer?.(b) ? 0 : 1;
-    if (pa !== pb) return pa - pb;
-    return faceHash(a.x, a.y, a.face, 21) - faceHash(b.x, b.y, b.face, 21);
-  });
-  let n = 0;
-  for (const f of ranked) {
-    if (n >= target) break;
-    if (alongKeys(f).some((k) => assigned.get(k) === file)) continue;
-    assigned.set(faceKey(f), file);
-    n += 1;
-  }
+/** Levie's `texture` field is the source of truth — Artie's stem, no extra mapping. */
+export function textureFile(f: DecorFace): string {
+  const raw = f.texture?.trim();
+  if (!raw) return 'walls_floor1/brick_base.png';
+  const name = raw.replace(/^.*\//, '').replace(/\.png$/i, '');
+  return `walls_floor1/${name}.png`;
 }
 
 function assignArtieFiles(): Map<string, string> {
   const assigned = new Map<string, string>();
-  const byKind = new Map<WallKind, DecorFace[]>();
-  for (const f of floor1DecorFaces) {
-    const kind = wallKind(f);
-    const list = byKind.get(kind) ?? [];
-    list.push(f);
-    byKind.set(kind, list);
-    assigned.set(faceKey(f), defaultFile(kind, f));
-  }
-
-  placeSparse(assigned, byKind.get('ashlar') ?? [], STRONG.ashlar_patched, (f) => f.variant === 'patched');
-  placeSparse(assigned, byKind.get('brick') ?? [], STRONG.brick_missing);
-  placeSparse(assigned, byKind.get('plaster') ?? [], STRONG.plaster_flaking_2);
-
-  const soot = byKind.get('soot') ?? [];
-  const yCount = new Map<number, number>();
-  for (const f of soot) yCount.set(f.y, (yCount.get(f.y) ?? 0) + 1);
-  let sootRow: number | null = null;
-  let best = -1;
-  for (const [y, n] of yCount) {
-    if (n > best) {
-      best = n;
-      sootRow = y;
-    }
-  }
-  for (const f of soot) {
-    assigned.set(
-      faceKey(f),
-      f.y === sootRow ? 'walls_floor1/soot_brick_1.png' : 'walls_floor1/soot_brick_2.png'
-    );
-  }
-
+  for (const f of floor1DecorFaces) assigned.set(faceKey(f), textureFile(f));
   return assigned;
 }
 
@@ -199,7 +132,7 @@ function isMatteLook(kind: WallKind, seepage: Seepage, zone: string): boolean {
 
 export function lookFromDecor(f: DecorFace): WallLook {
   const kind = wallKind(f);
-  const file = ARTIE_FILE.get(faceKey(f)) ?? defaultFile(kind, f);
+  const file = ARTIE_FILE.get(faceKey(f)) ?? textureFile(f);
   const matte = isMatteLook(kind, f.seepage, f.zone);
   return {
     key: matte ? `${file}:matte` : file,
@@ -216,13 +149,6 @@ export function lookForWall(x: number, y: number, face: string): WallLook | unde
   const f = decorFace(x, y, face);
   return f ? lookFromDecor(f) : undefined;
 }
-
-const FACE_DELTA: Record<string, [number, number]> = {
-  N: [0, -1],
-  S: [0, 1],
-  E: [1, 0],
-  W: [-1, 0]
-};
 
 const FALLBACK_LOOK: WallLook = {
   key: 'walls_floor1/brick_base.png',
