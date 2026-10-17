@@ -58,17 +58,17 @@ describe('voxel-floor1 sconce near-cull', () => {
             if (v > plateVMax) plateVMax = v;
             if (d > plateDMax) plateDMax = d;
           }
-          if (d > 0 && (u < 3 || u > 12)) offWallWide += 1;
+          if (d > 0 && (u < 2 || u > 13)) offWallWide += 1;
         }
       }
     }
     const plateW = (plateUMax - plateUMin + 1) * BRACKET_VOX;
     const plateH = (plateVMax - plateVMin + 1) * BRACKET_VOX;
     const plateT = (plateDMax + 1) * BRACKET_VOX;
-    expect(plateW).toBeGreaterThan(0.07);
-    expect(plateW).toBeLessThan(0.14);
-    expect(plateH).toBeGreaterThan(0.28);
-    expect(plateH).toBeLessThan(0.38);
+    expect(plateW).toBeGreaterThan(0.12);
+    expect(plateW).toBeLessThan(0.2);
+    expect(plateH).toBeGreaterThan(0.45);
+    expect(plateH).toBeLessThan(0.65);
     expect(plateT).toBeGreaterThan(0.02);
     expect(plateT).toBeLessThan(0.06);
     expect(offWallWide).toBe(0);
@@ -108,6 +108,30 @@ describe('voxel-floor1 sconce near-cull', () => {
     expect(handleH).toBeLessThan(0.5);
     expect(woodTopD).toBeGreaterThan(woodBotD);
     expect(woodTopSpan).toBeGreaterThan(woodBotSpan);
+    let goldMinV = H;
+    let goldMaxV = 0;
+    let woodUMin = W;
+    let woodUMax = 0;
+    for (let d = 0; d < D; d++) {
+      for (let v = 0; v < H; v++) {
+        for (let u = 0; u < W; u++) {
+          const id = volume[u + v * W + d * W * H];
+          if (id === MAT_GOLD) {
+            if (v < goldMinV) goldMinV = v;
+            if (v > goldMaxV) goldMaxV = v;
+          }
+          if (id === MAT_WOOD) {
+            if (u < woodUMin) woodUMin = u;
+            if (u > woodUMax) woodUMax = u;
+          }
+        }
+      }
+    }
+    const goldH = (goldMaxV - goldMinV + 1) * BRACKET_VOX;
+    const handleW = (woodUMax - woodUMin + 1) * BRACKET_VOX;
+    expect(goldH).toBeGreaterThan(0.03);
+    expect(goldH).toBeLessThan(handleH * 0.22);
+    expect(plateW).toBeGreaterThanOrEqual(handleW * 2 - BRACKET_VOX);
   });
 
   it('shows the torch at rest in its room looking along the wall', () => {

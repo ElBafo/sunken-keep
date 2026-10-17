@@ -23,7 +23,7 @@ export const MAT_WOOD = 3;
 export const MAT_GOLD = 4;
 
 const HANDLE_LEN = 28;
-const HANDLE_V0 = 8;
+const HANDLE_V0 = 10;
 const HANDLE_D0 = 4;
 const TILT = Math.tan((18 * Math.PI) / 180);
 
@@ -55,9 +55,8 @@ function fillBox(
 }
 
 function handleWidth(i: number): number {
-  if (i < 7) return 2;
-  if (i < 17) return 3;
-  return 4;
+  if (i < 10) return 2;
+  return 3;
 }
 
 function handleSlice(i: number): { u0: number; u1: number; v: number; d0: number; d1: number } {
@@ -80,27 +79,28 @@ export function buildBracketOccupancy(capped: boolean): {
 } {
   const dims = BRACKET_DIMS;
   const volume = new Uint8Array(dims[0] * dims[1] * dims[2]);
-  // Dark bevelled frame — 8×22×3 (12.5 × 34.4 × 4.7 cm), wide enough to read around the stick.
-  fillBox(volume, dims, 4, 14, 0, 11, 35, 2, MAT_RUST);
-  // Raised mid-grey inner plate, a few cm thick.
-  fillBox(volume, dims, 5, 15, 0, 10, 34, 3, MAT_IRON);
+  // Plate ~2× handle width, taller than the collar so it shows on all four sides.
+  // 10×36×3 texels (15.6 × 56 × 4.7 cm). Dark bevel, stone-mid inner.
+  fillBox(volume, dims, 3, 5, 0, 12, 40, 2, MAT_RUST);
+  fillBox(volume, dims, 4, 6, 0, 11, 39, 3, MAT_IRON);
   // Short arm from the plate's middle out to the collar.
-  fillBox(volume, dims, 7, 22, 3, 9, 26, 7, MAT_IRON);
-  // Iron ring wrapping the handle (2-texel front band).
-  fillBox(volume, dims, 6, 22, 8, 10, 22, 12, MAT_IRON);
-  fillBox(volume, dims, 6, 26, 8, 10, 26, 12, MAT_IRON);
-  fillBox(volume, dims, 6, 23, 8, 6, 25, 12, MAT_IRON);
-  fillBox(volume, dims, 10, 23, 8, 10, 25, 12, MAT_IRON);
-  fillBox(volume, dims, 7, 23, 8, 9, 25, 8, MAT_IRON);
-  fillBox(volume, dims, 7, 23, 11, 9, 25, 12, MAT_IRON);
+  fillBox(volume, dims, 7, 21, 3, 9, 25, 7, MAT_IRON);
+  // Collar: same mid-grey iron, darker edge (not a pale band).
+  fillBox(volume, dims, 6, 21, 8, 10, 21, 12, MAT_RUST);
+  fillBox(volume, dims, 6, 25, 8, 10, 25, 12, MAT_RUST);
+  fillBox(volume, dims, 6, 22, 8, 6, 24, 12, MAT_RUST);
+  fillBox(volume, dims, 10, 22, 8, 10, 24, 12, MAT_RUST);
+  fillBox(volume, dims, 7, 22, 8, 9, 24, 8, MAT_IRON);
+  fillBox(volume, dims, 7, 22, 12, 9, 24, 12, MAT_RUST);
+  fillBox(volume, dims, 7, 22, 9, 9, 24, 11, MAT_IRON);
   // Tapered wood: narrow bottom, wider top, 18° out from the wall.
   for (let i = 0; i < HANDLE_LEN; i++) {
     const s = handleSlice(i);
     fillBox(volume, dims, s.u0, s.v, s.d0, s.u1, s.v, s.d1, MAT_WOOD);
   }
-  // Yellow-gold cup / wrap, slightly wider than the handle top.
-  fillBox(volume, dims, 5, 36, 11, 10, 40, 16, MAT_GOLD);
-  if (capped) fillBox(volume, dims, 5, 41, 11, 10, 42, 16, MAT_IRON);
+  // Gold wrap: ~1/6 of the handle, a short band right under the flame.
+  fillBox(volume, dims, 6, 38, 12, 10, 41, 16, MAT_GOLD);
+  if (capped) fillBox(volume, dims, 6, 42, 12, 10, 43, 16, MAT_IRON);
   let voxelCount = 0;
   for (let i = 0; i < volume.length; i++) if (volume[i]) voxelCount += 1;
   return { volume, dims, voxelCount };

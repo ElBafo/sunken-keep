@@ -104,8 +104,8 @@ describe('voxel iron brackets', () => {
     const g = (IRON_COLOR >> 8) & 255;
     const b = IRON_COLOR & 255;
     const luma = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
-    expect(luma).toBeGreaterThan(0.35);
-    expect(luma).toBeLessThan(0.7);
+    expect(luma).toBeGreaterThan(0.28);
+    expect(luma).toBeLessThan(0.48);
   });
 });
 
