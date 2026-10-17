@@ -84,7 +84,7 @@ export class Floor1Lights {
       const point = new THREE.PointLight(TORCH_COLOR, 0, TORCH_DISTANCE, 2);
       point.name = `torch-point-${i}`;
       point.color.setRGB(torchRgb[0], torchRgb[1], torchRgb[2]);
-      point.castShadow = true;
+      point.castShadow = false;
       point.shadow.mapSize.set(shadowSize, shadowSize);
       point.shadow.camera.near = 0.05;
       point.shadow.camera.far = TORCH_DISTANCE;
@@ -157,12 +157,15 @@ export class Floor1Lights {
       const pos = torchWorldPos(row.s);
       const { nx, nz } = FACE_INTO_ROOM[row.s.face];
       const flick = torchFlicker(now, i * 1.7, freezeFlicker);
-      slot.point.position.set(pos.x, pos.y, pos.z);
+      // Pull the fill ~22 cm off the wall like the lab so the mount does not blow out.
+      const lx = pos.x + nx * 0.22;
+      const lz = pos.z + nz * 0.22;
+      slot.point.position.set(lx, pos.y, lz);
       slot.spot.position.copy(slot.point.position);
-      slot.spot.target.position.set(pos.x + nx * 2.4, 0.12, pos.z + nz * 2.4);
+      slot.spot.target.position.set(lx + nx * 2.4, 0.12, lz + nz * 2.4);
       slot.point.intensity = TORCH_INTENSITY * flick;
       slot.spot.intensity = TORCH_SPOT_INTENSITY * flick;
-      slot.point.castShadow = true;
+      slot.point.castShadow = false;
       slot.spot.castShadow = true;
       torchActive += 1;
     }
@@ -198,7 +201,6 @@ export class Floor1Lights {
   shadowLights(): Array<{ light: THREE.Light; active: boolean }> {
     const out: Array<{ light: THREE.Light; active: boolean }> = [];
     for (const slot of this.torchSlots) {
-      out.push({ light: slot.point, active: slot.point.intensity > 0 });
       out.push({ light: slot.spot, active: slot.spot.intensity > 0 });
     }
     return out;

@@ -102,7 +102,7 @@ export async function buildFloor1Props(
     const g = new THREE.Group();
     g.name = `sconce:${spec.x},${spec.y},${spec.face}`;
 
-    const side = new THREE.Mesh(new THREE.PlaneGeometry(w, h), cutoutStandard(sideMap, state === 'lit' ? 0xff9a48 : 0));
+    const side = new THREE.Mesh(new THREE.PlaneGeometry(w, h), cutoutStandard(sideMap));
     side.position.set(poses.side.x, poses.side.y, poses.side.z);
     side.rotation.y = rotY - Math.PI / 2;
     side.castShadow = false;
@@ -110,10 +110,7 @@ export async function buildFloor1Props(
     side.userData.noShadow = true;
     side.renderOrder = 2;
 
-    const front = new THREE.Mesh(
-      new THREE.PlaneGeometry(w, h),
-      cutoutStandard(frontMap, state === 'lit' ? 0xff9a48 : 0)
-    );
+    const front = new THREE.Mesh(new THREE.PlaneGeometry(w, h), cutoutStandard(frontMap));
     front.position.set(poses.front.x, poses.front.y, poses.front.z);
     front.rotation.y = rotY;
     front.castShadow = false;
