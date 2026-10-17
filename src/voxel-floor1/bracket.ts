@@ -60,17 +60,17 @@ export function buildBracketOccupancy(capped: boolean): {
   // Flush plate — one texel thick, small, against the stone.
   fillBox(volume, dims, 6, 10, 0, 9, 21, 0, MAT_IRON);
   fillBox(volume, dims, 6, 12, 0, 6, 18, 0, MAT_RUST);
-  // Arm.
-  fillBox(volume, dims, 7, 15, 1, 8, 16, 13, MAT_IRON);
+  // Slim arm out to the cup (long enough to sit at the along-corridor FOV edge).
+  fillBox(volume, dims, 7, 15, 1, 8, 16, 25, MAT_IRON);
   fillBox(volume, dims, 7, 13, 1, 8, 14, 6, MAT_IRON);
   // Cup: open top, low front lip so the painted flame reads.
-  fillBox(volume, dims, 5, 14, 12, 10, 14, 17, MAT_IRON);
-  fillBox(volume, dims, 5, 14, 12, 5, 19, 17, MAT_IRON);
-  fillBox(volume, dims, 10, 14, 12, 10, 19, 17, MAT_IRON);
-  fillBox(volume, dims, 6, 14, 12, 9, 19, 12, MAT_IRON);
-  fillBox(volume, dims, 6, 14, 17, 9, 16, 17, MAT_IRON);
-  fillBox(volume, dims, 5, 19, 12, 10, 19, 17, MAT_BRASS);
-  if (capped) fillBox(volume, dims, 5, 20, 12, 10, 21, 17, MAT_IRON);
+  fillBox(volume, dims, 5, 14, 24, 10, 14, 29, MAT_IRON);
+  fillBox(volume, dims, 5, 14, 24, 5, 19, 29, MAT_IRON);
+  fillBox(volume, dims, 10, 14, 24, 10, 19, 29, MAT_IRON);
+  fillBox(volume, dims, 6, 14, 24, 9, 19, 24, MAT_IRON);
+  fillBox(volume, dims, 6, 14, 29, 9, 16, 29, MAT_IRON);
+  fillBox(volume, dims, 5, 19, 24, 10, 19, 29, MAT_BRASS);
+  if (capped) fillBox(volume, dims, 5, 20, 24, 10, 21, 29, MAT_IRON);
   let voxelCount = 0;
   for (let i = 0; i < volume.length; i++) if (volume[i]) voxelCount += 1;
   return { volume, dims, voxelCount };

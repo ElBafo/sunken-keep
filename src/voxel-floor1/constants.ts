@@ -113,13 +113,13 @@ export const SHAFT_OPACITY = 1;
 /** Wall `tex3d` PNGs are 128² on a CELL-metre face. Bracket voxels match that. */
 export const WALL_TEXELS = 128;
 export const BRACKET_VOX = CELL / WALL_TEXELS;
-export const BRACKET_DIMS: [number, number, number] = [16, 28, 20];
+export const BRACKET_DIMS: [number, number, number] = [16, 28, 32];
 /** Flush with the stone — a 1-texel plate, not a standing slab. */
 export const BRACKET_WALL_GAP = 0;
 /** Cup centre in occupancy (u, v, d), used for flame / light origin. */
 export const BRACKET_CUP_U = 8;
 export const BRACKET_CUP_V = 18;
-export const BRACKET_CUP_D = 15;
+export const BRACKET_CUP_D = 27;
 export const BRACKET_FLAME_OUT = BRACKET_CUP_D * BRACKET_VOX;
 export const BRACKET_FLAME_LIFT = 0.04 + (BRACKET_CUP_V - BRACKET_DIMS[1] / 2) * BRACKET_VOX;
 export const IRON_COLOR = 0x1a120e;

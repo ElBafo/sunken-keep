@@ -72,6 +72,8 @@ describe('voxel-floor1 sconce near-cull', () => {
     const group = meshBracket(lit);
     expect(objectNearPlaneCulled(group, along)).toBe(false);
     expect(hideWallProp(lit.x, lit.y, lit.face, 1, 6, 0)).toBe(true);
+    const halfH = Math.atan(Math.tan(((CAMERA_FOV * Math.PI) / 180) / 2) * CAMERA_VIEW_ASPECT);
+    expect(Math.abs(pos.x - along.position.x) / depth).toBeLessThan(Math.tan(halfH));
   });
 
   it('hides the torch when the camera is back-to it in its own square', () => {
