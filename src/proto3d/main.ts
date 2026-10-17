@@ -66,6 +66,13 @@ import { copyForOpenNote, resolveLocale, saveLocale, StoryText, type Locale, typ
 import { qualityFromSearch, QualityLevel } from './quality';
 import type { LabLook } from './lab-look';
 import { LAB_LANTERN_RGB, LAB_TORCH_RGB, labLightFromSearch, syncLabLightQuery } from './lab-light';
+import type { LabRenderer } from './lab-render';
+import {
+  heightReliefFromSearch,
+  labRenderFromSearch,
+  syncHeightReliefQuery,
+  syncLabRenderQuery
+} from './lab-render-opt-in';
 import type { VoxelMode } from './voxel-mode';
 import { syncVoxelQuery, voxelFromSearch } from './voxel-opt-in';
 import {
@@ -74,6 +81,7 @@ import {
   devFromSearch,
   type DevDist,
   type DevEnemy,
+  type DevRenderMode,
   type DevResMode
 } from './dev-opt-in';
 import type { DevOoze } from './dev-ooze';
@@ -170,6 +178,9 @@ class Game {
   private voxelWanted = false;
   private labLook: LabLook | null = null;
   private labWanted = false;
+  private labWorld: LabRenderer | null = null;
+  private labWorldWanted = false;
+  private heightReliefWanted = true;
   private devWanted = false;
   private devPanel: DevPanel | null = null;
   private devOoze: DevOoze | null = null;
@@ -286,6 +297,8 @@ class Game {
 
     this.voxelWanted = voxelFromSearch(params);
     this.labWanted = labLightFromSearch(params);
+    this.labWorldWanted = labRenderFromSearch(params);
+    this.heightReliefWanted = heightReliefFromSearch(params);
     this.devWanted = devFromSearch(params);
     this.settingsMenu = new SettingsMenu(this.story, {
       getLayout: () => getLayoutMode(),
@@ -295,6 +308,10 @@ class Game {
       setVoxel: (on) => {
         this.voxelWanted = on;
         syncVoxelQuery(on);
+        if (this.labWorld?.enabled) {
+          this.settingsMenu.refreshLabels();
+          return;
+        }
         if (on) void this.enableVoxel();
         else this.voxel?.disable();
         if (this.labLook?.enabled) this.labLook.refresh();
@@ -304,12 +321,20 @@ class Game {
       setLabLight: (on) => {
         this.labWanted = on;
         syncLabLightQuery(on);
+        if (this.labWorld?.enabled) {
+          this.settingsMenu.refreshLabels();
+          return;
+        }
         if (on) void this.enableLabLook();
         else {
           this.labLook?.disable();
           this.voxel?.syncLights();
         }
         this.settingsMenu.refreshLabels();
+      },
+      getHeightRelief: () => this.heightReliefWanted,
+      setHeightRelief: (on) => {
+        this.setHeightReliefDev(on);
       }
     });
     this.fitStage();
@@ -568,8 +593,11 @@ class Game {
     this.vertexLighting.registerScene(this.renderer.scene);
     this.vertexLighting.updateAllMeshes(this.renderer.scene);
     if (lightDebug) this.applyLightDebug(lightDebug);
-    if (this.labWanted) await this.enableLabLook();
-    if (this.voxelWanted) await this.enableVoxel();
+    if (this.labWorldWanted) await this.enableLabWorld();
+    else {
+      if (this.labWanted) await this.enableLabLook();
+      if (this.voxelWanted) await this.enableVoxel();
+    }
     if (this.devWanted) await this.mountDevPanel();
 
     this.darkFx = new DarkFx();
@@ -632,6 +660,7 @@ class Game {
   }
 
   private async enableVoxel() {
+    if (this.labWorld?.enabled) return;
     if (!this.renderer || !this.vertexLighting || !this.spriteManager) return;
     if (!this.voxel) {
       const { VoxelMode } = await import('./voxel-mode');
@@ -654,6 +683,7 @@ class Game {
   }
 
   private async enableLabLook() {
+    if (this.labWorld?.enabled) return;
     if (!this.renderer || !this.vertexLighting || !this.spriteManager) return;
     if (!this.labLook) {
       const { LabLook } = await import('./lab-look');
@@ -668,6 +698,62 @@ class Game {
     if (this.lightDebug && this.lightDebug !== 'final') this.applyLightDebug(this.lightDebug);
   }
 
+  private async enableLabWorld() {
+    if (!this.renderer || !this.vertexLighting || !this.spriteManager) return;
+    this.labLook?.disable();
+    this.voxel?.disable();
+    if (!this.labWorld) {
+      const { createLabRenderer } = await import('./lab-render');
+      this.labWorld = await createLabRenderer();
+    }
+    this.labWorld.enable({
+      scene: this.renderer.scene,
+      camera: this.renderer.camera,
+      renderer: this.renderer,
+      floor: floor1,
+      sconces: floor1Sconces,
+      sunbeams: this.dressing?.marks.sunbeams ?? [],
+      sprites: this.spriteManager,
+      lighting: this.vertexLighting,
+      partyX: this.player.x,
+      partyY: this.player.y,
+      oil: this.oil,
+      heightRelief: this.heightReliefWanted
+    });
+  }
+
+  private setHeightReliefDev(on: boolean) {
+    this.heightReliefWanted = on;
+    syncHeightReliefQuery(on);
+    this.labWorld?.setHeightRelief(on);
+    this.settingsMenu?.refreshLabels();
+    this.devPanel?.refresh();
+  }
+
+  private disableLabWorld() {
+    this.labWorld?.disable();
+  }
+
+  private syncLabWorld() {
+    if (!this.labWorld?.enabled) return;
+    this.labWorld.syncMap(floor1, this.player.x, this.player.y);
+    this.labWorld.syncTorches(floor1Sconces);
+    this.labWorld.setOil(this.oil);
+    this.labWorld.refreshClassicHiding(this.renderer.scene);
+  }
+
+  private async setLabWorldDev(on: boolean) {
+    this.labWorldWanted = on;
+    syncLabRenderQuery(on);
+    if (on) await this.enableLabWorld();
+    else {
+      this.disableLabWorld();
+      if (this.labWanted) await this.enableLabLook();
+      if (this.voxelWanted) await this.enableVoxel();
+    }
+    this.settingsMenu?.refreshLabels();
+  }
+
   private async mountDevPanel() {
     if (this.devPanel || !this.renderer) return;
     const { mountDevPanel } = await import('./dev-panel');
@@ -678,6 +764,16 @@ class Game {
         this.devPanel?.refresh();
       },
       pixelSize: () => this.renderer.internalBufferSize(),
+      getRender: () => (this.labWorld?.enabled ? 'lab' : 'classic'),
+      setRender: async (mode: DevRenderMode) => {
+        await this.setLabWorldDev(mode === 'lab');
+        this.devPanel?.refresh();
+      },
+      getHeightRelief: () => this.heightReliefWanted,
+      setHeightRelief: async (on) => {
+        this.setHeightReliefDev(on);
+      },
+      tris: () => this.renderer.lastSceneTris,
       getLight: () => (this.labLook?.enabled ? 'lab' : 'classic'),
       setLight: async (mode) => {
         await this.setLabLightDev(mode === 'lab');
@@ -715,6 +811,7 @@ class Game {
   private async setLabLightDev(on: boolean) {
     this.labWanted = on;
     syncLabLightQuery(on);
+    if (this.labWorld?.enabled) return;
     if (on) await this.enableLabLook();
     else {
       this.labLook?.disable();
@@ -727,6 +824,7 @@ class Game {
   private async setVoxelDev(on: boolean) {
     this.voxelWanted = on;
     syncVoxelQuery(on);
+    if (this.labWorld?.enabled) return;
     if (on) await this.enableVoxel();
     else this.voxel?.disable();
     if (this.labLook?.enabled) this.labLook.refresh();
@@ -912,6 +1010,7 @@ class Game {
       // Hide wall mounts for the dest pose on the tap, not on the next rAF.
       this.cullWallMounts(performance.now());
       this.syncVoxelParty(this.player.moveToX, this.player.moveToY);
+      this.labWorld?.setParty(this.player.moveToX, this.player.moveToY);
       return;
     }
     if (result === 'secret') {
@@ -1708,6 +1807,7 @@ class Game {
     this.torches.setParty(this.player.x, this.player.y, this.player.dir);
     this.syncCarriedLight();
     this.vertexLighting.relight();
+    this.syncLabWorld();
     this.updateOilHud();
     this.updateDoorButton();
     this.rebuildAudioFromState();
@@ -1851,6 +1951,7 @@ class Game {
     this.updateOilHud();
     saveProgress(floor1Sconces, this.oil, this.persist);
     this.vertexLighting.updateAllMeshes(this.renderer.scene);
+    this.labWorld?.setOil(this.oil);
     if (prev > 0 && next <= 0) this.showPrompt(this.storyLog('lantern_out'));
   }
 
@@ -1884,6 +1985,7 @@ class Game {
     const now = performance.now();
     this.torches.snuff(sconce, now);
     this.vertexLighting.relight();
+    this.labWorld?.syncTorches(floor1Sconces);
     const pos = torchWorldPos(sconce);
     this.audioManager.playPositional('torch_extinguish', pos.x, pos.y, pos.z, 1);
     this.audioManager.stopTorchLoop(sconce);
@@ -2328,6 +2430,7 @@ class Game {
     this.vertexLighting.relight();
     this.voxel?.refresh();
     this.labLook?.refresh();
+    this.syncLabWorld();
   }
 
   private refreshOccupancy() {
@@ -2377,6 +2480,8 @@ class Game {
       this.vertexLighting?.relight();
       this.voxel?.refresh();
       this.labLook?.refresh();
+      this.labWorld?.clearRubble();
+      this.syncLabWorld();
     }
   }
 
@@ -2389,6 +2494,8 @@ class Game {
     this.vertexLighting.updateAllMeshes(this.renderer.scene);
     this.voxel?.refresh();
     this.labLook?.refresh();
+    this.labWorld?.setRubble(x, y, true);
+    this.syncLabWorld();
   }
 
   private syncCaveInWorld() {
@@ -2898,6 +3005,7 @@ class Game {
     this.sceneBuilder.doors.startSlide(visual, opening, performance.now());
     this.audioManager.playDoor(opening ? 'door_open' : 'door_close', x, y);
     this.vertexLighting.relight();
+    this.syncLabWorld();
   }
 
   exposeDebugApi() {
@@ -3243,11 +3351,23 @@ class Game {
       setVoxel: (on: boolean) => {
         this.voxelWanted = on;
         syncVoxelQuery(on);
+        if (this.labWorld?.enabled) return Promise.resolve();
         if (on) return this.enableVoxel();
         this.voxel?.disable();
         return Promise.resolve();
       },
       voxelStats: () => this.voxel?.stats() ?? { enabled: false, voxels: 0, triangles: 0, active: 0 },
+      labRender: () => this.labWorld?.enabled === true,
+      setLabRender: (on: boolean) => this.setLabWorldDev(on),
+      heightRelief: () => this.heightReliefWanted,
+      setHeightRelief: (on: boolean) => this.setHeightReliefDev(on),
+      labRenderStats: () => this.labWorld?.stats() ?? { enabled: false, faces: 0, voxelFaces: 0, triangles: 0, lights: { torches: 0, litTorches: 0, sunbeams: 0, lantern: 0 } },
+      labWallKeys: () => this.labWorld?.wallKeys() ?? [],
+      lanternWorld: () => {
+        const v = this.labWorld?.lanternWorld();
+        return v ? v.toArray() : null;
+      },
+      triangles: () => this.renderer.lastSceneTris,
       labLight: () => this.labLook?.enabled === true,
       setLabLight: (on: boolean) => {
         this.labWanted = on;
@@ -3714,6 +3834,7 @@ class Game {
         res: this.renderer?.internalRes ?? 270,
         pixels: this.renderer?.internalBufferSize() ?? { w: 0, h: 0 },
         light: this.labLook?.enabled ? 'lab' : 'classic',
+        render: this.labWorld?.enabled ? 'lab' : 'classic',
         voxel: this.voxel?.enabled === true,
         compare: this.devCompare,
         enemy: this.devEnemy,
@@ -3794,6 +3915,7 @@ class Game {
         this.sceneBuilder.doors.startSlide(visual, true, performance.now());
         this.audioManager.playDoor('door_open', x, y);
         this.vertexLighting.relight();
+        this.syncLabWorld();
         return true;
       },
       closeDoor: (x: number, y: number) => {
@@ -3802,6 +3924,7 @@ class Game {
         this.sceneBuilder.doors.startSlide(visual, false, performance.now());
         this.audioManager.playDoor('door_close', x, y);
         this.vertexLighting.relight();
+        this.syncLabWorld();
         return true;
       },
       snapDoor: (x: number, y: number, open: boolean) => {
@@ -3809,6 +3932,7 @@ class Game {
         if (!visual) return;
         this.sceneBuilder.doors.snapOpen(visual, open);
         this.vertexLighting.relight();
+        this.syncLabWorld();
         this.renderer.render();
       }
     };
@@ -3945,8 +4069,9 @@ class Game {
         this.combat?.noteStep(this.nowSec());
         this.vertexLighting.setPartyPosition(this.player.x, this.player.y);
         this.vertexLighting.updateAllMeshes(this.renderer.scene);
-        this.syncVoxelParty();
-        this.audioManager.checkBones(this.player.x, this.player.y);
+      this.syncVoxelParty();
+      this.labWorld?.setParty(this.player.x, this.player.y);
+      this.audioManager.checkBones(this.player.x, this.player.y);
         this.updateDoorButton();
       }
 
@@ -3985,6 +4110,10 @@ class Game {
     this.vertexLighting.setFlickerTime(now);
     this.voxel?.syncLights();
     this.labLook?.sync();
+    if (this.labWorld?.enabled) {
+      this.labWorld.syncTorches(floor1Sconces);
+      this.labWorld.update(now);
+    }
     this.hud?.draw(this.nowMs());
     if (!paused) {
       this.fireSlimeReveal();
@@ -4004,7 +4133,10 @@ class Game {
       if (this.fpsCounter) {
         const draws = this.renderer.lastSceneDraws;
         const vx = this.voxel?.enabled ? ` · vx ${this.voxel.stats().voxels}` : '';
-        this.fpsCounter.textContent = `FPS: ${fps} · ${draws} draws${vx}`;
+        const lab = this.labWorld?.enabled
+          ? ` · lab ${this.renderer.lastSceneTris} tris`
+          : '';
+        this.fpsCounter.textContent = `FPS: ${fps} · ${draws} draws${vx}${lab}`;
       }
       this.lastFps = fps;
       this.fpsFrames = 0;

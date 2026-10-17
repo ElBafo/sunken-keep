@@ -90,6 +90,10 @@ function stubDom() {
   add('settings-lab-light-hint');
   const labOn = add('btn-lab-light-on');
   const labOff = add('btn-lab-light-off');
+  add('settings-height-relief-label');
+  add('settings-height-relief-hint');
+  add('btn-height-relief-on');
+  add('btn-height-relief-off');
   add('btn-settings-close');
   const menuBtn = add('btn-menu');
   vi.stubGlobal('document', {

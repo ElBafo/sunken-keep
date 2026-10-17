@@ -160,6 +160,8 @@ describe('lab light menu and HTML', () => {
     expect(proto).toContain('>Classic</button>');
     expect(proto).toContain('id="btn-voxel-on"');
     expect(proto).toContain('id="btn-voxel-off"');
+    expect(proto).toContain('id="btn-height-relief-on"');
+    expect(proto).toContain('id="btn-height-relief-off"');
     const labIdx = proto.indexOf('id="settings-lab-light-label"');
     const voxelIdx = proto.indexOf('id="settings-voxel-label"');
     expect(labIdx).toBeGreaterThan(0);

@@ -556,20 +556,23 @@
     }
     #settings-layout-row,
     #settings-voxel-row,
-    #settings-lab-light-row {
+    #settings-lab-light-row,
+    #settings-height-relief-row {
       display: flex;
       gap: 8px;
     }
     #settings-layout-hint,
     #settings-voxel-hint,
-    #settings-lab-light-hint {
+    #settings-lab-light-hint,
+    #settings-height-relief-hint {
       margin: 6px 0 12px;
       color: #918d7d;
       font-size: 11px;
       line-height: 1.35;
     }
     #settings-voxel-label,
-    #settings-lab-light-label {
+    #settings-lab-light-label,
+    #settings-height-relief-label {
       margin: 0 0 8px;
       font-size: 13px;
     }
@@ -591,7 +594,8 @@
     }
     #settings-layout-row .settings-btn,
     #settings-voxel-row .settings-btn,
-    #settings-lab-light-row .settings-btn { flex: 1; }
+    #settings-lab-light-row .settings-btn,
+    #settings-height-relief-row .settings-btn { flex: 1; }
     .settings-btn.selected {
       color: #ffbe5a;
     }
@@ -655,6 +659,12 @@
           <button id="btn-lab-light-off" class="settings-btn selected" type="button" aria-pressed="true">Classic</button>
         </div>
         <p id="settings-lab-light-hint">Lab: warm pools, glossy stone. Classic: the painted look.</p>
+        <p id="settings-height-relief-label">Height relief</p>
+        <div id="settings-height-relief-row">
+          <button id="btn-height-relief-on" class="settings-btn selected" type="button" aria-pressed="true">On</button>
+          <button id="btn-height-relief-off" class="settings-btn" type="button" aria-pressed="false">Off</button>
+        </div>
+        <p id="settings-height-relief-hint">Artie's wall and door maps. Textures without a map stay flat.</p>
         <p id="settings-voxel-label">3D walls</p>
         <div id="settings-voxel-row">
           <button id="btn-voxel-on" class="settings-btn" type="button" aria-pressed="false">On</button>

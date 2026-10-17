@@ -4,10 +4,12 @@ import {
   cycleCombos,
   cycleTable,
   DEV_LIGHT_MODES,
+  DEV_RENDER_MODES,
   DEV_RES_MODES,
   type DevDist,
   type DevEnemy,
   type DevLightMode,
+  type DevRenderMode,
   type DevResMode,
   type DevSnapshot,
   frameWindowStats,
@@ -22,6 +24,11 @@ export type DevHost = {
   pixelSize: () => { w: number; h: number };
   getLight: () => DevLightMode;
   setLight: (mode: DevLightMode) => Promise<void>;
+  getRender?: () => DevRenderMode;
+  setRender?: (mode: DevRenderMode) => Promise<void>;
+  getHeightRelief?: () => boolean;
+  setHeightRelief?: (on: boolean) => Promise<void> | void;
+  tris?: () => number;
   getVoxel: () => boolean;
   setVoxel: (on: boolean) => Promise<void>;
   getCompare: () => boolean;
@@ -169,6 +176,17 @@ export class DevPanel {
     body.hidden = true;
 
     body.appendChild(this.modeRow('Res', DEV_RES_MODES, () => this.host.getRes(), (v) => this.host.setRes(v), String));
+    if (this.host.getRender && this.host.setRender) {
+      body.appendChild(
+        this.modeRow(
+          'Render',
+          DEV_RENDER_MODES,
+          () => this.host.getRender!(),
+          (v) => void this.host.setRender!(v),
+          (v) => (v === 'lab' ? 'Lab' : 'Classic')
+        )
+      );
+    }
     body.appendChild(
       this.modeRow(
         'Light',
@@ -178,6 +196,11 @@ export class DevPanel {
         (v) => (v === 'lab' ? 'Lab' : 'Classic')
       )
     );
+    if (this.host.getHeightRelief && this.host.setHeightRelief) {
+      body.appendChild(
+        this.toggleRow('Height', () => this.host.getHeightRelief!(), (on) => void this.host.setHeightRelief!(on))
+      );
+    }
     body.appendChild(this.toggleRow('3D walls', () => this.host.getVoxel(), (on) => void this.host.setVoxel(on)));
     body.appendChild(this.toggleRow('Compare', () => this.host.getCompare(), (on) => void this.host.setCompare(on)));
     body.appendChild(
@@ -239,22 +262,33 @@ export class DevPanel {
         ? `DEV · ${snap.res === 'native' ? snap.pixelW : snap.res} · ${snap.fps || '--'}fps`
         : 'DEV · iPhone Air';
     }
+    const render = snap.render ?? 'classic';
+    const tris = snap.tris != null ? ` · ${snap.tris} tris` : '';
+    const height = snap.heightRelief ? 'ht on' : 'ht off';
     this.statsEl.textContent =
-      `${snap.res === 'native' ? `native ${snap.pixelW}` : snap.res}×${snap.pixelH} · ${snap.light}` +
+      `${snap.res === 'native' ? `native ${snap.pixelW}` : snap.res}×${snap.pixelH} · ${render}` +
+      ` · ${height}` +
+      ` · light ${snap.light}` +
       ` · voxel ${snap.voxel ? 'on' : 'off'} · ${snap.compare ? `${snap.enemy} ${snap.dist}sq` : 'free'}\n` +
       `${snap.fps} fps · avg ${win.avg.toFixed(1)} · p95 ${win.p95.toFixed(1)} ms (5s)` +
-      ` · ${snap.draws} draws`;
+      ` · ${snap.draws} draws${tris}`;
     for (const row of this.root.querySelectorAll('.row[data-key]')) {
       const key = (row as HTMLElement).dataset.key;
       const selected =
         key === 'Res'
           ? String(this.host.getRes())
-          : key === 'Light'
+          : key === 'Render'
+            ? this.host.getRender?.() ?? 'classic'
+            : key === 'Light'
             ? this.host.getLight()
             : key === 'Enemy'
               ? this.host.getEnemy()
               : key === 'Dist'
                 ? String(this.host.getDist())
+                : key === 'Height'
+                  ? this.host.getHeightRelief?.()
+                    ? 'On'
+                    : 'Off'
                 : key === '3D walls'
                   ? this.host.getVoxel()
                     ? 'On'
@@ -276,6 +310,9 @@ export class DevPanel {
       pixelW: px.w,
       pixelH: px.h,
       light: this.host.getLight(),
+      render: this.host.getRender?.() ?? 'classic',
+      heightRelief: this.host.getHeightRelief?.() ?? true,
+      tris: this.host.tris?.(),
       voxel: this.host.getVoxel(),
       enemy: this.host.getEnemy(),
       dist: this.host.getDist(),
