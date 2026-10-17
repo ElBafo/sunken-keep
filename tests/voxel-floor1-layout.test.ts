@@ -23,6 +23,9 @@ import {
   floor1Map,
   isSolidTile,
   isWalkableTile,
+  listDoors,
+  listSecrets,
+  resetFloor1Doors,
   tileAt
 } from '../src/voxel-floor1/layout';
 import { pickVariantIndex } from '../src/voxel-floor1/variants';
@@ -69,10 +72,41 @@ describe('doors and secrets are plain blocking walls', () => {
     expect(canStep(floor1Map, 5, 1)).toBe(false);
   });
 
-  it('does not emit floor/ceiling on door or secret cells', () => {
+  it('unblocks stepping once a door or secret is open, without changing baked faces', () => {
+    resetFloor1Doors();
+    const before = enumerateFaces(floor1Map).length;
+    const door = tileAt(floor1Map, 4, 2)!;
+    door.doorOpen = true;
+    expect(canStep(floor1Map, 4, 2)).toBe(true);
+    expect(enumerateFaces(floor1Map).length).toBe(before);
+    door.doorOpen = false;
+    const secret = tileAt(floor1Map, 5, 1)!;
+    secret.secretOpen = true;
+    expect(canStep(floor1Map, 5, 1)).toBe(true);
+    expect(enumerateFaces(floor1Map).length).toBe(before);
+    resetFloor1Doors();
+  });
+
+  it('keeps Classic floor-1 door and secret cells', () => {
+    expect(listDoors()).toEqual([
+      { x: 4, y: 2, locked: true },
+      { x: 14, y: 2, locked: false },
+      { x: 19, y: 5, locked: false },
+      { x: 6, y: 8, locked: false }
+    ]);
+    expect(listSecrets()).toEqual([
+      { x: 5, y: 1 },
+      { x: 5, y: 13 }
+    ]);
+  });
+
+  it('emits floor on door and secret cells, not stone faces into those openings', () => {
     const faces = enumerateFaces(floor1Map);
-    expect(faces.some((f) => f.tx === 4 && f.tz === 2)).toBe(false);
-    expect(faces.some((f) => f.tx === 5 && f.tz === 1)).toBe(false);
+    expect(faces.some((f) => f.kind === 'floor' && f.tx === 4 && f.tz === 2)).toBe(true);
+    expect(faces.some((f) => f.kind === 'floor' && f.tx === 5 && f.tz === 1)).toBe(true);
+    expect(faces.some((f) => f.tx === 3 && f.tz === 2 && f.face === 'E')).toBe(false);
+    expect(faces.some((f) => f.tx === 5 && f.tz === 2 && f.face === 'W')).toBe(false);
+    expect(faces.some((f) => f.tx === 4 && f.tz === 2 && f.face === 'N')).toBe(true);
     expect(faces.some((f) => f.kind === 'floor' && f.tx === 2 && f.tz === 14)).toBe(true);
   });
 

@@ -108,7 +108,7 @@ const NEIGHBORS: Array<[number, number]> = [
   [0, -1]
 ];
 
-/** Closed doors / secrets block, same as this page's walkability. */
+/** Closed doors / secrets block flood the same way they block stepping. */
 export function floodReach(map: FloorMap, originX: number, originY: number, radius: number): Set<string> {
   const reach = new Set<string>();
   if (!isWalkableTile(tileAt(map, originX, originY))) return reach;

@@ -360,6 +360,7 @@ describe('voxel-floor1 still does not import proto3d', () => {
     expect(main).toContain('btn-quality');
     expect(main).toContain("lightMode === 'all'");
     expect(main).toContain('beginStep');
+    expect(main).toContain('buildFloor1Openings');
     expect(main).toContain('prepareCell');
     expect(main).toContain('setScissor');
     expect(main).toContain("mover.kind === 'step' ? mover.toX");

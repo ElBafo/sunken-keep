@@ -22,7 +22,7 @@ import {
   LANTERN_SPOT_MAP_DESKTOP,
   LANTERN_SPOT_MAP_MOBILE
 } from './constants';
-import { GridMover } from './camera';
+import { facingCell, GridMover } from './camera';
 import { lookColors } from '../voxel-lab/look';
 import { applyShadowToggle, recompileShadowShaders } from '../voxel-lab/shadows';
 import { floor1Sconces, floor1Sunbeams } from './fixtures';
@@ -35,8 +35,9 @@ import {
   type LightMode,
   type QualityLevel
 } from './lights';
-import { floor1Map } from './layout';
+import { floor1Map, tileAt } from './layout';
 import { buildFloor1 } from './level';
+import { buildFloor1Openings } from './openings';
 import { buildFloor1Props } from './props';
 
 THREE.ColorManagement.enabled = true;
@@ -78,6 +79,18 @@ type Floor1Api = {
   meanLuma: (band?: { y0?: number; y1?: number }) => number;
   meanRgb: (band?: { y0?: number; y1?: number }) => { r: number; g: number; b: number; rb: number };
   sconceVisible: (x: number, y: number, face: string) => boolean;
+  hasKey: boolean;
+  giveKey: () => void;
+  prompt: string;
+  doorAhead: () => { x: number; y: number } | null;
+  handleDoor: (x?: number, y?: number) => string;
+  snapDoor: (x: number, y: number, open: boolean) => boolean;
+  doorOpen: (x: number, y: number) => boolean;
+  doorBusy: (x: number, y: number) => boolean;
+  doorLocked: (x: number, y: number) => boolean;
+  openSecret: (x: number, y: number) => boolean;
+  secretOpen: (x: number, y: number) => boolean;
+  interact: () => string;
   lights: {
     mode: LightMode;
     lantern: number;
@@ -123,6 +136,16 @@ async function boot(): Promise<void> {
   const devHud = showDevHud();
   hud.hidden = !devHud;
 
+  const promptEl = document.getElementById('prompt') as HTMLDivElement | null;
+  const btnDoor = document.getElementById('btn-door') as HTMLButtonElement | null;
+  let hasKey = params.get('key') === '1';
+  let promptText = '';
+  const showPrompt = (text: string): void => {
+    promptText = text;
+    if (!promptEl) return;
+    promptEl.textContent = text;
+    promptEl.hidden = !text;
+  };
   const btnQuality = document.getElementById('btn-quality') as HTMLButtonElement | null;
   const labelQuality = (q: QualityLevel): string => (q === 'max' ? 'Gfx Max' : 'Gfx Med');
   if (btnQuality) {
@@ -217,6 +240,8 @@ async function boot(): Promise<void> {
   loading.textContent = 'Placing torches…';
   const props = await buildFloor1Props(floor1Sconces, floor1Sunbeams);
   scene.add(props.group);
+  const openings = await buildFloor1Openings(floor1Map, lightMode === 'all');
+  scene.add(openings.group);
 
   const resize = (): void => {
     const cssW = window.innerWidth;
@@ -256,6 +281,7 @@ async function boot(): Promise<void> {
       preserveBuffer,
       mover.kind === 'step' ? { x: mover.toX, y: mover.toY, dir: mover.toDir } : null
     );
+    openings.system.setBakeBlends(lights.blends, flick);
   };
 
   const renderFrame = (): { draws: number; tris: number } => {
@@ -330,7 +356,55 @@ async function boot(): Promise<void> {
   let lastStepArrivalMs = 0;
   let lastStepBuildMs = 0;
 
+  const facing = (): { x: number; y: number } => facingCell(mover.x, mover.y, mover.dir);
+  const doorAhead = (): { x: number; y: number } | null => {
+    const pos = facing();
+    const tile = tileAt(floor1Map, pos.x, pos.y);
+    return tile?.door ? pos : null;
+  };
+  const handleDoor = (x?: number, y?: number): string => {
+    const ahead = doorAhead();
+    const tx = x ?? ahead?.x;
+    const ty = y ?? ahead?.y;
+    if (tx == null || ty == null || !ahead || ahead.x !== tx || ahead.y !== ty) return 'none';
+    const result = openings.system.tryDoor(tx, ty, hasKey, performance.now());
+    if (result === 'locked') showPrompt('The door is locked. A red rune glows.');
+    if (result === 'unlocking') {
+      hasKey = false;
+      showPrompt('The key turns. The lock groans open.');
+    }
+    if (result === 'toggled') showPrompt('');
+    return result;
+  };
+  const interact = (): string => {
+    const pos = facing();
+    const tile = tileAt(floor1Map, pos.x, pos.y);
+    if (tile?.secret && !tile.secretOpen) {
+      const ok = openings.system.openSecret(pos.x, pos.y, performance.now());
+      if (ok) showPrompt('The stone grinds aside.');
+      return ok ? 'secret' : 'none';
+    }
+    if (tile?.door) return handleDoor(pos.x, pos.y);
+    return 'none';
+  };
+  const syncDoorButton = (): void => {
+    if (!btnDoor) return;
+    const pos = facing();
+    const tile = tileAt(floor1Map, pos.x, pos.y);
+    const show = !!(tile?.door || (tile?.secret && !tile.secretOpen));
+    btnDoor.classList.toggle('visible', show);
+    btnDoor.textContent = tile?.secret ? 'Push' : tile?.doorLocked && !tile.doorOpen ? 'Unlock' : 'Open';
+  };
+
   const beginStep = (dirSign: 1 | -1): boolean => {
+    if (dirSign === 1) {
+      const pos = facing();
+      const tile = tileAt(floor1Map, pos.x, pos.y);
+      if (tile?.secret && !tile.secretOpen) {
+        interact();
+        return false;
+      }
+    }
     if (!mover.step(dirSign)) return false;
     stepTracking = true;
     stepWorstMs = 0;
@@ -386,7 +460,10 @@ async function boot(): Promise<void> {
     swipeDown = false;
     const dx = e.clientX - swipeX;
     const dy = e.clientY - swipeY;
-    if (Math.abs(dx) < 18 && Math.abs(dy) < 18) return;
+    if (Math.abs(dx) < 18 && Math.abs(dy) < 18) {
+      interact();
+      return;
+    }
     if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > swipeThreshold) {
       if (dx > 0) mover.turn(-1);
       else mover.turn(1);
@@ -404,6 +481,12 @@ async function boot(): Promise<void> {
     if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') beginStep(-1);
     if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A' || e.key === 'q') mover.turn(1);
     if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D' || e.key === 'e') mover.turn(-1);
+    if (e.key === ' ' || e.key === 'Enter' || e.key === 'f' || e.key === 'F') interact();
+    if (e.key === 'k' || e.key === 'K') hasKey = true;
+  });
+  btnDoor?.addEventListener('click', (e) => {
+    e.stopPropagation();
+    interact();
   });
 
   const api: Floor1Api = {
@@ -462,6 +545,27 @@ async function boot(): Promise<void> {
       return { r: s.r, g: s.g, b: s.b, rb: s.rb };
     },
     sconceVisible: (x, y, face) => props.sconceVisible(x, y, face),
+    hasKey,
+    giveKey: () => {
+      hasKey = true;
+    },
+    get prompt() {
+      return promptText;
+    },
+    doorAhead,
+    handleDoor,
+    snapDoor: (x, y, open) => {
+      const visual = openings.system.get(x, y);
+      if (!visual || visual.kind !== 'door') return false;
+      openings.system.snapOpen(visual, open);
+      return true;
+    },
+    doorOpen: (x, y) => openings.system.isOpen(x, y),
+    doorBusy: (x, y) => openings.system.isBusy(x, y),
+    doorLocked: (x, y) => openings.system.isLocked(x, y),
+    openSecret: (x, y) => openings.system.openSecret(x, y, performance.now()),
+    secretOpen: (x, y) => openings.system.isOpen(x, y),
+    interact,
     lights: lights.stats
   };
   (window as unknown as { __voxelFloor1: Floor1Api }).__voxelFloor1 = api;
@@ -491,6 +595,9 @@ async function boot(): Promise<void> {
     const arrived = mover.update(now);
     if (arrived) onArrived();
     else if (!stepTracking && !mover.moving && level.pump()) level.warm(uploadPending);
+    openings.system.update(now);
+    syncDoorButton();
+    api.hasKey = hasKey;
 
     if (!preserveBuffer) {
       const k = 1 + LANTERN_FLICKER * Math.sin((now / LANTERN_FLICKER_MS) * Math.PI * 2);
