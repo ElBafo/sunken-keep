@@ -1,0 +1,135 @@
+import dressingAct1 from '../../public/levels/dressing_act1.json';
+import { floor1 as rawFloor1 } from '../../public/levels/floor1';
+import { CELL, SCONCE_FRONT_OFFSET_TILES, SCONCE_HEIGHT_TILES, SCONCE_WIDTH_TILES, WALL_MOUNT_INSET } from './constants';
+import { isWalkableTile, tileAt, type FloorMap } from './layout';
+
+export type WallFace = 'N' | 'E' | 'S' | 'W';
+
+export type SconceSpec = {
+  x: number;
+  y: number;
+  face: WallFace;
+  lit: boolean;
+  capped?: boolean;
+  empty?: boolean;
+};
+
+export type SunbeamSpec = {
+  x: number;
+  y: number;
+  wx: number;
+  wy: number;
+  wz: number;
+};
+
+/** Same as proto3d FACE_INTO_ROOM — duplicated so this page does not import proto3d. */
+export const FACE_INTO_ROOM: Record<WallFace, { nx: number; nz: number; rotY: number }> = {
+  N: { nx: 0, nz: -1, rotY: Math.PI },
+  E: { nx: 1, nz: 0, rotY: Math.PI / 2 },
+  S: { nx: 0, nz: 1, rotY: 0 },
+  W: { nx: -1, nz: 0, rotY: -Math.PI / 2 }
+};
+
+export const floor1Sconces: SconceSpec[] = (rawFloor1.sconces ?? []) as SconceSpec[];
+
+const dressingFloor1 = dressingAct1.floor1 as { sunbeam?: Array<{ x: number; y: number }> };
+
+export const floor1Sunbeams: SunbeamSpec[] = (dressingFloor1.sunbeam ?? []).map((item) => ({
+  x: item.x,
+  y: item.y,
+  wx: item.x * CELL,
+  wy: CELL - 0.008,
+  wz: item.y * CELL
+}));
+
+export function sconceRoom(s: SconceSpec): { x: number; y: number } {
+  const { nx, nz } = FACE_INTO_ROOM[s.face];
+  return { x: s.x + Math.round(nx), y: s.y + Math.round(nz) };
+}
+
+export function sconceIsLit(s: SconceSpec): boolean {
+  return !!s.lit && !s.capped && !s.empty;
+}
+
+export function torchWorldPos(s: SconceSpec): { x: number; y: number; z: number } {
+  const { nx, nz } = FACE_INTO_ROOM[s.face];
+  const dist = CELL / 2 + SCONCE_FRONT_OFFSET_TILES * CELL;
+  return {
+    x: s.x * CELL + nx * dist,
+    y: CELL / 2 + 0.1 * CELL,
+    z: s.y * CELL + nz * dist
+  };
+}
+
+export function torchBracketPoses(s: SconceSpec): {
+  side: { x: number; y: number; z: number };
+  front: { x: number; y: number; z: number };
+  flame: { x: number; y: number; z: number };
+} {
+  const { nx, nz } = FACE_INTO_ROOM[s.face];
+  const wallX = s.x * CELL + nx * (CELL / 2);
+  const wallZ = s.y * CELL + nz * (CELL / 2);
+  const w = SCONCE_WIDTH_TILES * CELL;
+  const h = SCONCE_HEIGHT_TILES * CELL;
+  const inset = WALL_MOUNT_INSET;
+  const flameH = 0.3125 * CELL;
+  const midY = CELL / 2;
+  const x = wallX + nx * inset;
+  const z = wallZ + nz * inset;
+  return {
+    side: { x: wallX + nx * (w / 2), y: midY, z: wallZ + nz * (w / 2) },
+    front: { x, y: midY, z },
+    flame: { x, y: midY + h / 2 - flameH / 2, z }
+  };
+}
+
+const NEIGHBORS: Array<[number, number]> = [
+  [1, 0],
+  [-1, 0],
+  [0, 1],
+  [0, -1]
+];
+
+/** Closed doors / secrets block, same as this page's walkability. */
+export function floodReach(map: FloorMap, originX: number, originY: number, radius: number): Set<string> {
+  const reach = new Set<string>();
+  if (!isWalkableTile(tileAt(map, originX, originY))) return reach;
+  const queue: Array<[number, number]> = [[originX, originY]];
+  reach.add(`${originX},${originY}`);
+  let q = 0;
+  while (q < queue.length) {
+    const [x, y] = queue[q++];
+    for (const [dx, dy] of NEIGHBORS) {
+      const nx = x + dx;
+      const ny = y + dy;
+      const key = `${nx},${ny}`;
+      if (reach.has(key)) continue;
+      if (!isWalkableTile(tileAt(map, nx, ny))) continue;
+      if (Math.hypot(nx - originX, ny - originY) > radius) continue;
+      reach.add(key);
+      queue.push([nx, ny]);
+    }
+  }
+  return reach;
+}
+
+export function hideWallProp(
+  wallX: number,
+  wallY: number,
+  face: WallFace,
+  partyX: number,
+  partyY: number,
+  dir: number
+): boolean {
+  const room = sconceRoom({ x: wallX, y: wallY, face, lit: false });
+  if (room.x !== partyX || room.y !== partyY) return false;
+  const deltas = [
+    [0, -1],
+    [1, 0],
+    [0, 1],
+    [-1, 0]
+  ] as const;
+  const [dx, dy] = deltas[dir & 3];
+  return wallX !== partyX + dx || wallY !== partyY + dy;
+}
+

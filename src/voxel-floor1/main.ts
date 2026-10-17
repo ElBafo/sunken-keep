@@ -18,8 +18,11 @@ import {
 import { GridMover } from './camera';
 import { lookColors } from '../voxel-lab/look';
 import { applyShadowToggle, recompileShadowShaders } from '../voxel-lab/shadows';
+import { floor1Sconces, floor1Sunbeams } from './fixtures';
+import { Floor1Lights } from './lights';
 import { floor1Map } from './layout';
 import { buildFloor1 } from './level';
+import { buildFloor1Props } from './props';
 
 THREE.ColorManagement.enabled = true;
 
@@ -50,6 +53,15 @@ type Floor1Api = {
   turnRight: () => boolean;
   meanLuma: (band?: { y0?: number; y1?: number }) => number;
   meanRgb: (band?: { y0?: number; y1?: number }) => { r: number; g: number; b: number; rb: number };
+  lights: {
+    lantern: number;
+    torches: number;
+    torchesLit: number;
+    torchesActive: number;
+    sunbeams: number;
+    sunbeamsActive: number;
+    total: number;
+  };
 };
 
 const STATS_WINDOW_MS = 2000;
@@ -148,6 +160,13 @@ async function boot(): Promise<void> {
   const level = await buildFloor1(floor1Map, mover.x, mover.y);
   scene.add(level.group);
 
+  const lights = new Floor1Lights(floor1Map);
+  lights.attach(scene, floor1Sconces, floor1Sunbeams);
+
+  loading.textContent = 'Placing torches…';
+  const props = await buildFloor1Props(floor1Sconces, floor1Sunbeams);
+  scene.add(props.group);
+
   const resize = (): void => {
     const w = window.innerWidth;
     const h = window.innerHeight;
@@ -159,13 +178,24 @@ async function boot(): Promise<void> {
   window.addEventListener('resize', resize);
   window.visualViewport?.addEventListener('resize', resize);
 
+  let lastLightKey = '';
   const syncShadows = (): void => {
     applyShadowToggle({
       on: true,
       renderer,
-      lights: [{ light: lanternSpot, active: true }],
+      lights: [{ light: lanternSpot, active: true }, ...lights.shadowLights()],
       roots: [scene]
     });
+  };
+
+  const placeLights = (now: number): void => {
+    lights.setParty(mover.x, mover.y, now, preserveBuffer);
+    props.update(mover.x, mover.y, mover.dir, now, preserveBuffer);
+    const key = `${lights.stats.torchesActive}:${lights.stats.sunbeamsActive}`;
+    if (key !== lastLightKey) {
+      lastLightKey = key;
+      syncShadows();
+    }
   };
 
   const renderFrame = (): number => {
@@ -211,7 +241,9 @@ async function boot(): Promise<void> {
   };
 
   const onArrived = (): void => {
-    if (level.setParty(mover.x, mover.y)) syncShadows();
+    const remeshed = level.setParty(mover.x, mover.y);
+    placeLights(performance.now());
+    if (remeshed) syncShadows();
   };
 
   btnFwd.addEventListener('click', (e) => {
@@ -305,10 +337,12 @@ async function boot(): Promise<void> {
     meanRgb: (band) => {
       const s = samplePixels(band);
       return { r: s.r, g: s.g, b: s.b, rb: s.rb };
-    }
+    },
+    lights: lights.stats
   };
   (window as unknown as { __voxelFloor1: Floor1Api }).__voxelFloor1 = api;
 
+  placeLights(performance.now());
   syncShadows();
   renderFrame();
   recompileShadowShaders([scene]);
@@ -338,9 +372,11 @@ async function boot(): Promise<void> {
       lanternLight.intensity = LANTERN_INTENSITY * k;
       lanternSpot.intensity = LANTERN_SPOT_INTENSITY * k;
     }
+    placeLights(now);
 
     const draws = renderFrame();
     api.draws = draws;
+    api.lights = lights.stats;
     api.triangles = level.stats.triangles;
     api.voxelFaces = level.stats.voxelFaces;
     api.flatFaces = level.stats.flatFaces;
@@ -362,7 +398,8 @@ async function boot(): Promise<void> {
         `<div><b>${api.fps}</b> fps</div>` +
         `<div>${api.avgMs.toFixed(1)} ms avg · <b>${api.worstMs.toFixed(1)}</b> ms worst</div>` +
         `<div>${draws} draws · ${api.triangles.toLocaleString()} tri</div>` +
-        `<div>${api.voxelFaces} vx faces · ${api.flatFaces} flat</div>`;
+        `<div>${api.voxelFaces} vx faces · ${api.flatFaces} flat</div>` +
+        `<div>${api.lights.total} lights · ${api.lights.torchesActive}/${api.lights.torchesLit} torch · ${api.lights.sunbeamsActive}/${api.lights.sunbeams} beam</div>`;
     }
   };
   requestAnimationFrame(loop);

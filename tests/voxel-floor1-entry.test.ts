@@ -48,6 +48,8 @@ describe('voxel-floor1 is a standalone Vite page', () => {
     expect(main).not.toContain("from '../proto3d/");
     expect(main).not.toContain('lab-render');
     expect(main).toContain("from '../voxel-lab/look'");
+    expect(main).toContain('torchesActive');
+    expect(main).toContain('sunbeamsActive');
     expect(existsSync(resolve(__dirname, '../src/voxel-floor1/level.ts'))).toBe(true);
   });
 });
