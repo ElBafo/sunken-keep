@@ -433,7 +433,7 @@ export function farBakeMaterial(map: THREE.Texture): THREE.MeshBasicMaterial {
   return mat;
 }
 
-export type BakeBlendKind = 'complement' | 'full';
+export type BakeBlendKind = 'complement' | 'full' | 'off';
 
 export function setBakeBlends(
   mats: Iterable<THREE.Material>,
@@ -444,25 +444,27 @@ export function setBakeBlends(
   kind: BakeBlendKind = 'complement'
 ): void {
   const torchV = new THREE.Vector3();
-  for (let i = 0; i < FAR_TORCH_SLOTS; i++) {
-    const t = torches[i];
-    if (!t) {
-      torchV.setComponent(i, 0);
-      continue;
-    }
-    const real = blends.get(t.key) ?? 0;
-    const w = kind === 'full' ? 1 : Math.max(0, 1 - real);
-    torchV.setComponent(i, w * flick);
-  }
   const beamV = new THREE.Vector3();
-  for (let i = 0; i < FAR_BEAM_SLOTS; i++) {
-    const b = beams[i];
-    if (!b) {
-      beamV.setComponent(i, 0);
-      continue;
+  if (kind !== 'off') {
+    for (let i = 0; i < FAR_TORCH_SLOTS; i++) {
+      const t = torches[i];
+      if (!t) {
+        torchV.setComponent(i, 0);
+        continue;
+      }
+      const real = blends.get(t.key) ?? 0;
+      const w = kind === 'full' ? 1 : Math.max(0, 1 - real);
+      torchV.setComponent(i, w * flick);
     }
-    const real = blends.get(b.key) ?? 0;
-    beamV.setComponent(i, kind === 'full' ? 1 : Math.max(0, 1 - real));
+    for (let i = 0; i < FAR_BEAM_SLOTS; i++) {
+      const b = beams[i];
+      if (!b) {
+        beamV.setComponent(i, 0);
+        continue;
+      }
+      const real = blends.get(b.key) ?? 0;
+      beamV.setComponent(i, kind === 'full' ? 1 : Math.max(0, 1 - real));
+    }
   }
   for (const mat of mats) {
     const u = mat.userData.uFarBlend as { value: THREE.Vector3 } | undefined;

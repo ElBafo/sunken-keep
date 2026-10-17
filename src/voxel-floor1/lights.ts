@@ -24,7 +24,6 @@ import {
   TORCH_SPOT_DISTANCE,
   TORCH_SPOT_INTENSITY
 } from './constants';
-import { FAR_BEAM_SLOTS, FAR_TORCH_SLOTS } from './bake';
 import {
   FACE_INTO_ROOM,
   beamKey,
@@ -77,6 +76,14 @@ export function parseLightMode(search: string): LightMode {
   return 'bake';
 }
 
+/** One real light per lit torch and per beam — not the bake/pool cap of 3. */
+export function allModeSlotCounts(
+  sconces: SconceSpec[],
+  sunbeams: SunbeamSpec[]
+): { torches: number; beams: number } {
+  return { torches: sconces.filter(sconceIsLit).length, beams: sunbeams.length };
+}
+
 export class Floor1Lights {
   group = new THREE.Group();
   blends = new Map<string, number>();
@@ -88,12 +95,14 @@ export class Floor1Lights {
   private map: FloorMap;
   private reach = new Map<string, Set<string>>();
   private lastNow = 0;
+  private shadowSize: number;
   stats: LightStats;
 
   constructor(map: FloorMap, mode: LightMode = 'bake') {
     this.map = map;
     this.mode = mode;
     this.group.name = 'floor1-lights';
+    this.shadowSize = isMobile() ? SHADOW_MAP_MOBILE : SHADOW_MAP_DESKTOP;
     this.stats = {
       mode,
       lantern: 1,
@@ -104,53 +113,8 @@ export class Floor1Lights {
       sunbeamsActive: 0,
       total: 1
     };
-    const shadowSize = isMobile() ? SHADOW_MAP_MOBILE : SHADOW_MAP_DESKTOP;
-    const torchN = mode === 'all' ? FAR_TORCH_SLOTS : MAX_ACTIVE_TORCHES;
-    const beamN = mode === 'all' ? FAR_BEAM_SLOTS : MAX_ACTIVE_SUNBEAMS;
-
-    for (let i = 0; i < torchN; i++) {
-      const point = new THREE.PointLight(TORCH_COLOR, SLOT_HOLD, TORCH_DISTANCE, TORCH_DECAY);
-      point.name = `torch-point-${i}`;
-      point.color.setRGB(TORCH_RGB[0], TORCH_RGB[1], TORCH_RGB[2]);
-      point.castShadow = false;
-      point.shadow.mapSize.set(shadowSize, shadowSize);
-      point.shadow.camera.near = 0.05;
-      point.shadow.camera.far = TORCH_DISTANCE;
-      point.shadow.camera.updateProjectionMatrix();
-      point.shadow.bias = -0.0004;
-      point.shadow.normalBias = 0.008;
-      point.shadow.radius = 1;
-      const spot = new THREE.SpotLight(TORCH_COLOR, SLOT_HOLD, TORCH_SPOT_DISTANCE, TORCH_SPOT_ANGLE, 0.32, 1.4);
-      spot.name = `torch-spot-${i}`;
-      spot.color.setRGB(TORCH_RGB[0], TORCH_RGB[1], TORCH_RGB[2]);
-      // Shadow flag stays put after boot so NUM_SPOT_LIGHT_SHADOWS never changes.
-      spot.castShadow = true;
-      spot.shadow.mapSize.set(shadowSize, shadowSize);
-      spot.shadow.bias = -0.00015;
-      spot.shadow.normalBias = 0.012;
-      spot.shadow.radius = 1;
-      spot.shadow.camera.near = 0.2;
-      spot.shadow.camera.far = 8;
-      spot.shadow.camera.updateProjectionMatrix();
-      this.group.add(point, spot, spot.target);
-      this.torchSlots.push({ point, spot, key: '' });
-    }
-
-    for (let i = 0; i < beamN; i++) {
-      const spot = new THREE.SpotLight(
-        SUNBEAM_COLOR,
-        SLOT_HOLD,
-        SUNBEAM_DISTANCE,
-        SUNBEAM_ANGLE,
-        SUNBEAM_PENUMBRA,
-        SUNBEAM_DECAY
-      );
-      spot.name = `sunbeam-${i}`;
-      spot.color.setRGB(SUNBEAM_RGB[0], SUNBEAM_RGB[1], SUNBEAM_RGB[2]);
-      spot.castShadow = false;
-      this.group.add(spot, spot.target);
-      this.sunbeamSlots.push(spot);
-    }
+    // Bake/pool keep the small cap. All waits for attach() so every fixture gets a slot.
+    if (mode !== 'all') this.allocSlots(MAX_ACTIVE_TORCHES, MAX_ACTIVE_SUNBEAMS);
   }
 
   attach(scene: THREE.Scene, sconces: SconceSpec[], sunbeams: SunbeamSpec[]): void {
@@ -158,6 +122,10 @@ export class Floor1Lights {
     this.sunbeams = sunbeams;
     this.reach.clear();
     this.blends.clear();
+    if (this.mode === 'all') {
+      const n = allModeSlotCounts(sconces, sunbeams);
+      this.allocSlots(n.torches, n.beams);
+    }
     for (const s of sconces) {
       if (!sconceIsLit(s)) continue;
       const room = sconceRoom(s);
@@ -275,6 +243,54 @@ export class Floor1Lights {
       out.push({ light: slot.spot, active: true });
     }
     return out;
+  }
+
+  private allocSlots(torchN: number, beamN: number): void {
+    if (this.torchSlots.length > 0 || this.sunbeamSlots.length > 0) return;
+    const shadowSize = this.shadowSize;
+    for (let i = 0; i < torchN; i++) {
+      const point = new THREE.PointLight(TORCH_COLOR, SLOT_HOLD, TORCH_DISTANCE, TORCH_DECAY);
+      point.name = `torch-point-${i}`;
+      point.color.setRGB(TORCH_RGB[0], TORCH_RGB[1], TORCH_RGB[2]);
+      point.castShadow = false;
+      point.shadow.mapSize.set(shadowSize, shadowSize);
+      point.shadow.camera.near = 0.05;
+      point.shadow.camera.far = TORCH_DISTANCE;
+      point.shadow.camera.updateProjectionMatrix();
+      point.shadow.bias = -0.0004;
+      point.shadow.normalBias = 0.008;
+      point.shadow.radius = 1;
+      const spot = new THREE.SpotLight(TORCH_COLOR, SLOT_HOLD, TORCH_SPOT_DISTANCE, TORCH_SPOT_ANGLE, 0.32, 1.4);
+      spot.name = `torch-spot-${i}`;
+      spot.color.setRGB(TORCH_RGB[0], TORCH_RGB[1], TORCH_RGB[2]);
+      // Shadow flag stays put after boot so NUM_SPOT_LIGHT_SHADOWS never changes.
+      spot.castShadow = true;
+      spot.shadow.mapSize.set(shadowSize, shadowSize);
+      spot.shadow.bias = -0.00015;
+      spot.shadow.normalBias = 0.012;
+      spot.shadow.radius = 1;
+      spot.shadow.camera.near = 0.2;
+      spot.shadow.camera.far = 8;
+      spot.shadow.camera.updateProjectionMatrix();
+      this.group.add(point, spot, spot.target);
+      this.torchSlots.push({ point, spot, key: '' });
+    }
+
+    for (let i = 0; i < beamN; i++) {
+      const spot = new THREE.SpotLight(
+        SUNBEAM_COLOR,
+        SLOT_HOLD,
+        SUNBEAM_DISTANCE,
+        SUNBEAM_ANGLE,
+        SUNBEAM_PENUMBRA,
+        SUNBEAM_DECAY
+      );
+      spot.name = `sunbeam-${i}`;
+      spot.color.setRGB(SUNBEAM_RGB[0], SUNBEAM_RGB[1], SUNBEAM_RGB[2]);
+      spot.castShadow = false;
+      this.group.add(spot, spot.target);
+      this.sunbeamSlots.push(spot);
+    }
   }
 
   private placeAll(lit: SconceSpec[], now: number, freezeFlicker: boolean): void {
