@@ -339,6 +339,9 @@ describe('voxel-floor1 still does not import proto3d', () => {
     expect(main).toContain('writeStoredQuality');
     expect(main).toContain('btn-quality');
     expect(main).toContain("lightMode === 'all'");
+    expect(main).toContain('beginStep');
+    expect(main).toContain('prepareCell');
+    expect(main).toContain('warmupRT');
     expect(main).not.toContain('lastLightKey');
     expect(main).not.toContain('if (remeshed) syncShadows()');
     const bake = readFileSync(resolve(__dirname, '../src/voxel-floor1/bake.ts'), 'utf8');
@@ -388,6 +391,10 @@ describe('voxel-floor1 still does not import proto3d', () => {
     expect(level).toContain('realLights');
     expect(level).toContain(", 'off'");
     expect(level).toContain('dist <= VOXEL_CHEB');
+    expect(level).toContain('prefetch');
+    expect(level).toContain('MAX_CELLS');
+    expect(level).toContain('pendingWarm');
+    expect(level).toContain('pumpQueue');
     expect(level).toContain('receiveWhenOn = false');
     expect(level).toContain('frustumCulled = false');
     expect(level).not.toContain('inFlood) {');

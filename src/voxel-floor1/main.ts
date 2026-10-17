@@ -85,6 +85,10 @@ type Floor1Api = {
     sunbeamsActive: number;
     total: number;
   };
+  stepWorstMs: number;
+  stepArrivalMs: number;
+  stepBuildMs: number;
+  cacheSize: number;
 };
 
 const STATS_WINDOW_MS = 2000;
@@ -280,18 +284,54 @@ async function boot(): Promise<void> {
     };
   };
 
+  const warmupRT = new THREE.WebGLRenderTarget(1, 1, { depthBuffer: false, stencilBuffer: false });
+  const uploadPending = (): void => {
+    const sh = renderer.shadowMap.enabled;
+    renderer.shadowMap.enabled = false;
+    const prev = renderer.getRenderTarget();
+    renderer.setRenderTarget(warmupRT);
+    renderer.render(scene, camera);
+    renderer.setRenderTarget(prev);
+    renderer.shadowMap.enabled = sh;
+  };
+
+  const prepareCell = (x: number, y: number): number => {
+    const created = level.prefetch(x, y);
+    if (created) level.warm(uploadPending);
+    level.activate(x, y);
+    return created ? level.lastBuildMs : 0;
+  };
+
+  let stepTracking = false;
+  let stepWorstMs = 0;
+  let stepArrivalMs = 0;
+  let stepBuildMs = 0;
+  let lastStepWorstMs = 0;
+  let lastStepArrivalMs = 0;
+  let lastStepBuildMs = 0;
+
+  const beginStep = (dirSign: 1 | -1): boolean => {
+    if (!mover.step(dirSign)) return false;
+    stepTracking = true;
+    stepWorstMs = 0;
+    stepArrivalMs = 0;
+    stepBuildMs = prepareCell(mover.toX, mover.toY);
+    if (stepBuildMs > stepWorstMs) stepWorstMs = stepBuildMs;
+    return true;
+  };
+
   const onArrived = (): void => {
-    level.setParty(mover.x, mover.y);
+    level.activate(mover.x, mover.y);
     placeLights(performance.now());
   };
 
   btnFwd.addEventListener('click', (e) => {
     e.stopPropagation();
-    mover.step(1);
+    beginStep(1);
   });
   btnBack.addEventListener('click', (e) => {
     e.stopPropagation();
-    mover.step(-1);
+    beginStep(-1);
   });
   btnLeft.addEventListener('click', (e) => {
     e.stopPropagation();
@@ -329,8 +369,8 @@ async function boot(): Promise<void> {
       if (dx > 0) mover.turn(-1);
       else mover.turn(1);
     } else if (Math.abs(dy) > swipeThreshold) {
-      if (dy > 0) mover.step(-1);
-      else mover.step(1);
+      if (dy > 0) beginStep(-1);
+      else beginStep(1);
     }
   });
   canvas.addEventListener('pointercancel', () => {
@@ -338,8 +378,8 @@ async function boot(): Promise<void> {
   });
 
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') mover.step(1);
-    if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') mover.step(-1);
+    if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') beginStep(1);
+    if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') beginStep(-1);
     if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A' || e.key === 'q') mover.turn(1);
     if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D' || e.key === 'e') mover.turn(-1);
   });
@@ -374,14 +414,19 @@ async function boot(): Promise<void> {
     setPosition: (x, y, dir) => {
       mover.setPosition(x, y, dir);
       camera.rotation.x = CAMERA_PITCH;
+      prepareCell(x, y);
       onArrived();
     },
+    stepWorstMs: 0,
+    stepArrivalMs: 0,
+    stepBuildMs: 0,
+    cacheSize: 1,
     setLookPitch: (rad) => {
       camera.rotation.x = rad;
       camera.updateMatrixWorld();
     },
-    stepForward: () => mover.step(1),
-    stepBack: () => mover.step(-1),
+    stepForward: () => beginStep(1),
+    stepBack: () => beginStep(-1),
     turnLeft: () => mover.turn(1),
     turnRight: () => mover.turn(-1),
     meanLuma: (band) => samplePixels(band).luma,
@@ -417,6 +462,7 @@ async function boot(): Promise<void> {
 
     const arrived = mover.update(now);
     if (arrived) onArrived();
+    else if (!stepTracking && !mover.moving && level.pump()) level.warm(uploadPending);
 
     if (!preserveBuffer) {
       const k = 1 + LANTERN_FLICKER * Math.sin((now / LANTERN_FLICKER_MS) * Math.PI * 2);
@@ -426,6 +472,18 @@ async function boot(): Promise<void> {
     placeLights(now);
 
     const frame = renderFrame();
+    const workMs = performance.now() - now;
+    if (stepTracking || arrived) {
+      const spike = Math.max(dt, workMs);
+      if (spike > stepWorstMs) stepWorstMs = spike;
+    }
+    if (arrived) {
+      stepArrivalMs = workMs;
+      lastStepWorstMs = stepWorstMs;
+      lastStepArrivalMs = stepArrivalMs;
+      lastStepBuildMs = stepBuildMs;
+      stepTracking = false;
+    }
     api.draws = frame.draws;
     api.gpuTriangles = renderer.info.render.triangles;
     api.programs = renderer.info.programs?.length ?? 0;
@@ -439,6 +497,10 @@ async function boot(): Promise<void> {
     api.eyeHeight = camera.position.y;
     api.aspect = camera.aspect;
     api.position = [camera.position.x, camera.position.y, camera.position.z];
+    api.stepWorstMs = lastStepWorstMs;
+    api.stepArrivalMs = lastStepArrivalMs;
+    api.stepBuildMs = lastStepBuildMs;
+    api.cacheSize = level.cacheSize;
     if (frameSamples.length > 0) {
       const span = now - frameSamples[0].t || dt;
       const avgMs = frameSamples.reduce((s, s0) => s + s0.dt, 0) / frameSamples.length;
@@ -455,7 +517,8 @@ async function boot(): Promise<void> {
         `<div>${api.avgMs.toFixed(1)} ms avg · <b>${api.worstMs.toFixed(1)}</b> ms worst</div>` +
         `<div>${frame.draws} draws · ${level.stats.triangles.toLocaleString()} tri · ${api.programs} prog</div>` +
         `<div>${api.voxelFaces} vx faces · ${api.flatFaces} flat</div>` +
-        `<div>gfx=${api.quality} · lights=${api.lights.mode} · ${api.lights.total} · ${api.lights.torchesActive}/${api.lights.torchesLit} torch · ${api.lights.sunbeamsActive}/${api.lights.sunbeams} beam</div>`;
+        `<div>gfx=${api.quality} · lights=${api.lights.mode} · ${api.lights.total} · ${api.lights.torchesActive}/${api.lights.torchesLit} torch · ${api.lights.sunbeamsActive}/${api.lights.sunbeams} beam</div>` +
+        `<div>step worst ${lastStepWorstMs.toFixed(1)} · arrive ${lastStepArrivalMs.toFixed(1)} · cache ${level.cacheSize}</div>`;
     }
   };
   requestAnimationFrame(loop);
