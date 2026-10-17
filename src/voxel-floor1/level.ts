@@ -13,7 +13,8 @@ import {
   geometryWithBake,
   litFarTorches,
   patchBakeMaterial,
-  setBakeBlends as applyBakeBlends
+  setBakeBlends as applyBakeBlends,
+  type FarTorch
 } from './bake';
 
 export interface LevelStats {
