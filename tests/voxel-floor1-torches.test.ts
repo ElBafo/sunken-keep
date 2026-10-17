@@ -34,6 +34,7 @@ import {
   cupWorldPos,
   MAT_GOLD,
   MAT_IRON,
+  MAT_RUST,
   MAT_WOOD,
   meshBracket
 } from '../src/voxel-floor1/bracket';
@@ -316,18 +317,44 @@ describe('voxel-floor1 capped sconces', () => {
     }
   });
 
-  it('puts a dark iron dome over the cup, wider than the gold, and leaves unlit brackets open', () => {
+  it('sheathes the gold cup completely and hangs a hasp and padlock on the front', () => {
     expect(ironCapVoxels(true)).toBeGreaterThan(80);
     expect(ironCapVoxels(false)).toBe(0);
-    const gold = matBounds(true, MAT_GOLD);
-    const cap = matBounds(true, MAT_IRON, 40, 6);
-    expect(gold.uSpan).toBeGreaterThan(0);
-    expect(gold.vMin).toBeLessThan(cap.vMin);
-    expect(cap.uSpan).toBeGreaterThan(gold.uSpan);
-    expect(cap.dSpan).toBeGreaterThan(gold.dSpan);
-    expect(cap.vMax).toBeGreaterThan(gold.vMax);
-    expect(cap.uMin).toBeLessThan(gold.uMin);
-    expect(cap.uMax).toBeGreaterThan(gold.uMax);
+    const { volume, dims } = buildBracketOccupancy(true);
+    const [W, H, D] = dims;
+    let cupGold = 0;
+    let cupCovered = 0;
+    for (let d = 9; d <= 13; d++) {
+      for (let v = 38; v <= 41; v++) {
+        for (let u = 6; u <= 10; u++) {
+          const id = volume[u + v * W + d * W * H];
+          if (id === MAT_GOLD) cupGold += 1;
+          if (id === MAT_IRON || id === MAT_RUST) cupCovered += 1;
+        }
+      }
+    }
+    expect(cupGold).toBe(0);
+    expect(cupCovered).toBe(5 * 4 * 5);
+    const { volume: openVol } = buildBracketOccupancy(false);
+    expect(openVol.includes(MAT_GOLD)).toBe(true);
+    let lockMetal = 0;
+    let keyhole = 0;
+    for (let d = 18; d < D; d++) {
+      for (let v = 0; v < H; v++) {
+        for (let u = 0; u < W; u++) {
+          const id = volume[u + v * W + d * W * H];
+          if (id === MAT_IRON || id === MAT_RUST) lockMetal += 1;
+          if (id === MAT_GOLD) keyhole += 1;
+        }
+      }
+    }
+    expect(lockMetal).toBeGreaterThan(20);
+    expect(keyhole).toBeGreaterThan(0);
+    expect(keyhole).toBeLessThan(8);
+    const cap = matBounds(true, MAT_IRON, 37, 6);
+    expect(cap.vMin).toBeLessThanOrEqual(37);
+    expect(cap.uSpan).toBeGreaterThanOrEqual(9);
+    expect(cap.dMax).toBeGreaterThanOrEqual(20);
   });
 
   it('faces the same capped sconces as Classic and keeps the sealed line', () => {

@@ -102,19 +102,31 @@ export function buildBracketOccupancy(capped: boolean): {
     const s = handleSlice(i);
     fillBox(volume, dims, s.u0, s.v, s.d0, s.u1, s.v, s.d1, MAT_WOOD);
   }
-  // Gold wrap: ~1/6 of the handle, a short band right under the flame / under the cap.
-  fillBox(volume, dims, 6, 38, 9, 10, 41, 13, MAT_GOLD);
-  if (capped) {
-    // Stepped dark-iron dome, wider than the gold cup and proud of it. Gold
-    // stays as a lip at v38. Rust on the front faces so the lid reads on stone.
-    fillBox(volume, dims, 3, 39, 7, 13, 43, 17, MAT_IRON);
-    fillBox(volume, dims, 3, 39, 17, 13, 43, 17, MAT_RUST);
-    fillBox(volume, dims, 3, 39, 7, 3, 43, 17, MAT_RUST);
-    fillBox(volume, dims, 13, 39, 7, 13, 43, 17, MAT_RUST);
-    fillBox(volume, dims, 4, 43, 8, 12, 46, 16, MAT_IRON);
-    fillBox(volume, dims, 4, 43, 16, 12, 46, 16, MAT_RUST);
+  // Gold wrap: ~1/6 of the handle, a short band right under the flame.
+  if (!capped) {
+    fillBox(volume, dims, 6, 38, 9, 10, 41, 13, MAT_GOLD);
+  } else {
+    // Iron sleeve from below the wrap to a dome, covering the cup on every
+    // side so no gold reads from front, side, or 45°.
+    fillBox(volume, dims, 3, 37, 7, 13, 44, 17, MAT_IRON);
+    fillBox(volume, dims, 3, 37, 17, 13, 44, 17, MAT_RUST);
+    fillBox(volume, dims, 3, 37, 7, 3, 44, 17, MAT_RUST);
+    fillBox(volume, dims, 13, 37, 7, 13, 44, 17, MAT_RUST);
+    fillBox(volume, dims, 4, 44, 8, 12, 46, 16, MAT_IRON);
+    fillBox(volume, dims, 4, 44, 16, 12, 46, 16, MAT_RUST);
     fillBox(volume, dims, 5, 46, 9, 11, 47, 15, MAT_IRON);
     fillBox(volume, dims, 5, 46, 15, 11, 47, 15, MAT_RUST);
+    // Hasp: strap on the cap front, padlock hanging through it.
+    fillBox(volume, dims, 6, 42, 17, 10, 44, 19, MAT_IRON);
+    fillBox(volume, dims, 7, 38, 17, 9, 42, 19, MAT_IRON);
+    fillBox(volume, dims, 6, 36, 18, 10, 40, 21, MAT_IRON);
+    fillBox(volume, dims, 6, 36, 18, 6, 40, 21, MAT_RUST);
+    fillBox(volume, dims, 10, 36, 18, 10, 40, 21, MAT_RUST);
+    fillBox(volume, dims, 6, 36, 21, 10, 36, 21, MAT_RUST);
+    fillBox(volume, dims, 6, 40, 19, 6, 44, 21, MAT_IRON);
+    fillBox(volume, dims, 10, 40, 19, 10, 44, 21, MAT_IRON);
+    fillBox(volume, dims, 6, 44, 19, 10, 44, 21, MAT_IRON);
+    fillBox(volume, dims, 8, 37, 21, 8, 39, 21, MAT_GOLD);
   }
   let voxelCount = 0;
   for (let i = 0; i < volume.length; i++) if (volume[i]) voxelCount += 1;
