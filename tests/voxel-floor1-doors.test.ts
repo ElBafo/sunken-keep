@@ -8,8 +8,15 @@ import {
   DOOR_SLIDE,
   DOOR_UNLOCK_LEAD_MS
 } from '../src/voxel-floor1/constants';
-import { OpeningSystem, type OpeningVisual } from '../src/voxel-floor1/openings';
-import { floor1Map, resetFloor1Doors, tileAt } from '../src/voxel-floor1/layout';
+import {
+  OpeningSystem,
+  pickSecretTellTexels,
+  recessSecretTell,
+  type OpeningVisual
+} from '../src/voxel-floor1/openings';
+import { floor1Map, openingViews, resetFloor1Doors, tileAt } from '../src/voxel-floor1/layout';
+import { WALL_VARIANTS } from '../src/voxel-floor1/constants';
+import { pickVariant } from '../src/voxel-floor1/variants';
 
 function fakeDoor(locked: boolean): OpeningVisual {
   const tile = tileAt(floor1Map, 4, 2)!;
@@ -112,8 +119,54 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     const openings = readFileSync(resolve(dir, 'openings.ts'), 'utf8');
     expect(openings).toContain('door_panel.png');
     expect(openings).toContain('door_open.png');
-    expect(openings).toContain('secret_closed.png');
+    expect(openings).toContain('WALL_VARIANTS');
+    expect(openings).toContain('recessSecretTell');
+    expect(openings).not.toContain('secret_closed.png');
     expect(openings).toContain('greedyMesh');
     expect(openings).toContain('patchBakeMaterial');
+  });
+
+  it('hashes secret faces like neighbouring stone walls', () => {
+    const views = openingViews(floor1Map, 5, 1);
+    expect(views.length).toBeGreaterThan(0);
+    for (const view of views) {
+      expect(view.wallX).toBe(5);
+      expect(view.wallY).toBe(1);
+      expect(WALL_VARIANTS).toContain(pickVariant(WALL_VARIANTS, view.wallX, view.wallY, view.wallFace));
+    }
+  });
+
+  it('recesses a single field brick by one depth layer', () => {
+    const W = 128;
+    const H = 128;
+    const D = 3;
+    const data = new Uint8ClampedArray(W * H * 4);
+    for (let i = 0; i < W * H; i++) {
+      data[i * 4] = 8;
+      data[i * 4 + 1] = 8;
+      data[i * 4 + 2] = 8;
+      data[i * 4 + 3] = 255;
+    }
+    for (let y = 61; y <= 71; y++) {
+      for (let x = 50; x <= 66; x++) {
+        const i = (y * W + x) * 4;
+        data[i] = 140;
+        data[i + 1] = 140;
+        data[i + 2] = 140;
+      }
+    }
+    const texels = pickSecretTellTexels({ width: W, height: H, data }, 0);
+    expect(texels.length).toBeGreaterThan(80);
+    expect(texels.length).toBeLessThan(250);
+    const volume = new Uint8Array(W * H * D);
+    volume.fill(1);
+    const recessed = recessSecretTell(volume, [W, H, D], texels);
+    let pulled = 0;
+    for (const [u, v] of texels) {
+      if (!recessed[u + v * W + 2 * W * H]) pulled += 1;
+      expect(recessed[u + v * W]).toBe(1);
+    }
+    expect(pulled).toBe(texels.length);
+    expect(recessed[0 + 0 * W + 2 * W * H]).toBe(1);
   });
 });

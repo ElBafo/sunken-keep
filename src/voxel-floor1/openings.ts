@@ -19,7 +19,8 @@ import {
   DOOR_PANEL_INSET,
   DOOR_SLIDE,
   DOOR_UNLOCK_LEAD_MS,
-  LAYER_SIZE
+  LAYER_SIZE,
+  WALL_VARIANTS
 } from './constants';
 import { floor1Sconces, floor1Sunbeams } from './fixtures';
 import {
@@ -30,6 +31,7 @@ import {
   type FloorMap,
   type FloorTile
 } from './layout';
+import { faceHash, pickVariant } from './variants';
 
 const INSET: Record<'N' | 'E' | 'S' | 'W', [number, number]> = {
   N: [0, -1],
@@ -69,6 +71,102 @@ function offsetToWorld(
     const p = base(u, v, d);
     return [p[0] + nx * dist, p[1], p[2] + nz * dist];
   };
+}
+
+const MORTAR_LUMA = 30 / 255;
+
+type PixelImage = { width: number; height: number; data: ArrayLike<number> };
+
+function pixelLuma(image: PixelImage, x: number, y: number): number {
+  const i = (y * image.width + x) * 4;
+  const r = image.data[i];
+  const g = image.data[i + 1];
+  const b = image.data[i + 2];
+  return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+}
+
+/**
+ * One field brick (not the frieze, quoins, or plinth). Used as the secret-wall tell.
+ * Returns voxel (u, v) with v=0 at the floor.
+ */
+export function pickSecretTellTexels(image: PixelImage, seed: number): Array<[number, number]> {
+  const W = image.width;
+  const H = image.height;
+  const seen = new Uint8Array(W * H);
+  const bricks: Array<{ area: number; cx: number; cy: number; texels: Array<[number, number]> }> = [];
+  const dirs: Array<[number, number]> = [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1]
+  ];
+  for (let py = 0; py < H; py++) {
+    for (let px = 0; px < W; px++) {
+      const start = px + py * W;
+      if (seen[start] || pixelLuma(image, px, py) < MORTAR_LUMA) continue;
+      const stack = [start];
+      seen[start] = 1;
+      const texels: Array<[number, number]> = [];
+      let sx = 0;
+      let sy = 0;
+      let minx = px;
+      let maxx = px;
+      let miny = py;
+      let maxy = py;
+      while (stack.length) {
+        const i = stack.pop()!;
+        const x = i % W;
+        const y = (i / W) | 0;
+        texels.push([x, H - 1 - y]);
+        sx += x;
+        sy += y;
+        if (x < minx) minx = x;
+        if (x > maxx) maxx = x;
+        if (y < miny) miny = y;
+        if (y > maxy) maxy = y;
+        for (const [dx, dy] of dirs) {
+          const nx = x + dx;
+          const ny = y + dy;
+          if (nx < 0 || ny < 0 || nx >= W || ny >= H) continue;
+          const ni = nx + ny * W;
+          if (seen[ni] || pixelLuma(image, nx, ny) < MORTAR_LUMA) continue;
+          seen[ni] = 1;
+          stack.push(ni);
+        }
+      }
+      const area = texels.length;
+      if (area < 80 || area > 250) continue;
+      if (minx <= 8 || maxx >= W - 9) continue;
+      if (miny < 24 || maxy > 98) continue;
+      bricks.push({ area, cx: sx / area, cy: sy / area, texels });
+    }
+  }
+  if (!bricks.length) return [];
+  bricks.sort((a, b) => a.cx + a.cy * 10 - (b.cx + b.cy * 10));
+  return bricks[seed % bricks.length].texels;
+}
+
+/** Pull one brick back by a single depth layer (1 texel of wall relief). */
+export function recessSecretTell(
+  volume: Uint8Array,
+  dims: [number, number, number],
+  texels: Array<[number, number]>
+): Uint8Array {
+  const out = new Uint8Array(volume);
+  const [W, H, D] = dims;
+  const slice = W * H;
+  for (const [u, v] of texels) {
+    if (u < 0 || v < 0 || u >= W || v >= H) continue;
+    let maxK = -1;
+    for (let k = D - 1; k >= 0; k--) {
+      if (out[u + v * W + k * slice]) {
+        maxK = k;
+        break;
+      }
+    }
+    if (maxK >= 1) out[u + v * W + maxK * slice] = 0;
+  }
+  return out;
 }
 
 function meshVolume(
@@ -248,14 +346,20 @@ export async function buildFloor1Openings(
   const torches = litFarTorches(map, floor1Sconces);
   const beams = litFarBeams(map, floor1Sunbeams);
 
-  const [panelPng, framePng, secretPng] = await Promise.all([
+  const wallFiles = [...WALL_VARIANTS];
+  const pngs = await Promise.all([
     loadPng('door_panel.png'),
     loadPng('door_open.png'),
-    loadPng('secret_closed.png')
+    ...wallFiles.map((file) => loadPng(file))
   ]);
+  const panelPng = pngs[0];
+  const framePng = pngs[1];
+  const wallPngs = new Map<string, (typeof panelPng)>();
+  wallFiles.forEach((file, i) => wallPngs.set(file, pngs[i + 2]));
   const panelVol = volumeFromImageData(panelPng.data);
   const frameVol = volumeFromImageData(framePng.data);
-  const secretVol = volumeFromImageData(secretPng.data);
+  const wallVols = new Map<string, ReturnType<typeof volumeFromImageData>>();
+  for (const file of wallFiles) wallVols.set(file, volumeFromImageData(wallPngs.get(file)!.data));
 
   const makeMat = (png: typeof panelPng, vol: { roughness: Uint8Array; dims: [number, number, number] }) => {
     const mat = voxelMaterial(png.texture, pbrMap(vol.roughness, vol.dims[0], vol.dims[1]));
@@ -265,12 +369,22 @@ export async function buildFloor1Openings(
   };
   const panelMat = makeMat(panelPng, panelVol);
   const frameMat = makeMat(framePng, frameVol);
-  const secretMat = makeMat(secretPng, secretVol);
-  system.bindLights(torches, beams, realLights, [panelMat, frameMat, secretMat]);
+  const wallMats = new Map<string, THREE.MeshPhysicalMaterial>();
+  for (const file of wallFiles) {
+    wallMats.set(file, makeMat(wallPngs.get(file)!, wallVols.get(file)!));
+  }
+  system.bindLights(torches, beams, realLights, [panelMat, frameMat, ...wallMats.values()]);
 
   const addFace = (
     visual: OpeningVisual,
-    view: { tx: number; tz: number; face: FaceId },
+    view: {
+      tx: number;
+      tz: number;
+      face: FaceId;
+      wallX: number;
+      wallY: number;
+      wallFace: 'N' | 'E' | 'S' | 'W';
+    },
     kind: OpeningKind
   ): void => {
     const face = view.face as 'N' | 'E' | 'S' | 'W';
@@ -300,28 +414,29 @@ export async function buildFloor1Openings(
         group.add(slider);
         visual.panels.push(slider);
       }
-    } else {
-      const secretGeo = meshVolume(
-        secretVol.volume,
-        secretVol.dims,
-        toWorld,
-        view.tx,
-        view.tz,
-        torches,
-        beams
-      );
-      if (secretGeo) {
-        const slider = new THREE.Group();
-        slider.name = `secret:${visual.x},${visual.y}:${face}`;
-        const wall = new THREE.Mesh(secretGeo, secretMat);
-        wall.castShadow = true;
-        wall.receiveShadow = true;
-        wall.frustumCulled = false;
-        slider.add(wall);
-        slider.frustumCulled = false;
-        group.add(slider);
-        visual.panels.push(slider);
-      }
+      return;
+    }
+    const file = pickVariant(WALL_VARIANTS, view.wallX, view.wallY, view.wallFace);
+    const src = wallVols.get(file)!;
+    const png = wallPngs.get(file)!;
+    const mat = wallMats.get(file)!;
+    const tell = pickSecretTellTexels(png.data, faceHash(view.wallX, view.wallY, view.wallFace, 9));
+    const volume = recessSecretTell(src.volume, src.dims, tell);
+    const secretWorld = makeToWorld(view.face, view.tx, view.tz, src.dims, LAYER_SIZE, CELL, 'center');
+    const secretGeo = meshVolume(volume, src.dims, secretWorld, view.tx, view.tz, torches, beams);
+    if (secretGeo) {
+      const slider = new THREE.Group();
+      slider.name = `secret:${visual.x},${visual.y}:${face}`;
+      const wall = new THREE.Mesh(secretGeo, mat);
+      wall.castShadow = true;
+      wall.receiveShadow = true;
+      wall.frustumCulled = false;
+      wall.userData.secretTell = tell.length;
+      wall.userData.secretFile = file;
+      slider.add(wall);
+      slider.frustumCulled = false;
+      group.add(slider);
+      visual.panels.push(slider);
     }
   };
 

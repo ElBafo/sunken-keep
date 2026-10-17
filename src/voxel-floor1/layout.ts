@@ -40,7 +40,7 @@ export const floor1Map: FloorMap = {
 const OPEN_TO_WALL: ReadonlyArray<{
   dx: number;
   dz: number;
-  face: FaceId;
+  face: 'N' | 'E' | 'S' | 'W';
   wallFace: 'N' | 'E' | 'S' | 'W';
 }> = [
   { dx: 0, dz: -1, face: 'N', wallFace: 'S' },
@@ -120,14 +120,35 @@ export function openingViews(
   map: FloorMap,
   x: number,
   y: number
-): Array<{ tx: number; tz: number; face: FaceId }> {
-  const views: Array<{ tx: number; tz: number; face: FaceId }> = [];
+): Array<{
+  tx: number;
+  tz: number;
+  face: FaceId;
+  wallX: number;
+  wallY: number;
+  wallFace: 'N' | 'E' | 'S' | 'W';
+}> {
+  const views: Array<{
+    tx: number;
+    tz: number;
+    face: FaceId;
+    wallX: number;
+    wallY: number;
+    wallFace: 'N' | 'E' | 'S' | 'W';
+  }> = [];
   for (const spec of OPEN_TO_WALL) {
     const tx = x + spec.dx;
     const tz = y + spec.dz;
     const neighbor = tileAt(map, tx, tz);
     if (!neighbor || neighbor.wall) continue;
-    views.push({ tx, tz, face: spec.wallFace });
+    views.push({
+      tx,
+      tz,
+      face: spec.wallFace,
+      wallX: x,
+      wallY: y,
+      wallFace: spec.face
+    });
   }
   return views;
 }
