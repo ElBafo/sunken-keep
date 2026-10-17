@@ -1,6 +1,13 @@
 import dressingAct1 from '../../public/levels/dressing_act1.json';
 import { floor1 as rawFloor1 } from '../../public/levels/floor1';
-import { CELL, SCONCE_FRONT_OFFSET_TILES, SCONCE_HEIGHT_TILES, SCONCE_WIDTH_TILES, WALL_MOUNT_INSET } from './constants';
+import {
+  BRACKET_FLAME_LIFT,
+  BRACKET_FLAME_OUT,
+  CELL,
+  SCONCE_HEIGHT_TILES,
+  SCONCE_WIDTH_TILES,
+  WALL_MOUNT_INSET
+} from './constants';
 import { isWalkableTile, tileAt, type FloorMap } from './layout';
 
 export type WallFace = 'N' | 'E' | 'S' | 'W';
@@ -51,12 +58,17 @@ export function sconceIsLit(s: SconceSpec): boolean {
   return !!s.lit && !s.capped && !s.empty;
 }
 
+export function sconceKey(s: Pick<SconceSpec, 'x' | 'y' | 'face'>): string {
+  return `${s.x},${s.y},${s.face}`;
+}
+
+/** Flame / light origin on the voxel cup, standing off the wall. */
 export function torchWorldPos(s: SconceSpec): { x: number; y: number; z: number } {
   const { nx, nz } = FACE_INTO_ROOM[s.face];
-  const dist = CELL / 2 + SCONCE_FRONT_OFFSET_TILES * CELL;
+  const dist = CELL / 2 + BRACKET_FLAME_OUT;
   return {
     x: s.x * CELL + nx * dist,
-    y: CELL / 2 + 0.1 * CELL,
+    y: CELL / 2 + BRACKET_FLAME_LIFT,
     z: s.y * CELL + nz * dist
   };
 }

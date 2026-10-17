@@ -1,10 +1,20 @@
 import * as THREE from 'three';
 import { volumeFromImageData, type VolumeFromPixels } from '../voxel-lab/classify';
-import { makeToWorld, tileFlatPose, type FaceId } from '../voxel-lab/faces';
-import { geometryFrom, loadPng, pbrMap, voxelMaterial, type PngPixels } from '../voxel-lab/materials';
-import { greedyMesh, mergeMeshes, type MeshArrays } from '../voxel-lab/mesher';
-import { CELL, CULL_CHEB, LAYER_SIZE, VOXEL_CHEB } from './constants';
+import { makeToWorld, tileFlatPose } from '../voxel-lab/faces';
+import { loadPng, pbrMap, voxelMaterial, type PngPixels } from '../voxel-lab/materials';
+import { greedyMesh, type MeshArrays } from '../voxel-lab/mesher';
+import { CELL, CRACKED_CEILING_FILE, CULL_CHEB, LAYER_SIZE, VOXEL_CHEB } from './constants';
+import { floor1Sconces, floor1Sunbeams } from './fixtures';
 import { chebyshev, enumerateFaces, type FaceJob, type FloorMap } from './layout';
+import { isBeamCeiling, loadCrackedCeiling } from './crack';
+import {
+  farBakeMaterial,
+  flatGeometryWithBake,
+  geometryWithBake,
+  litFarTorches,
+  patchBakeMaterial,
+  setBakeBlends as applyBakeBlends
+} from './bake';
 
 export interface LevelStats {
   voxels: number;
@@ -22,6 +32,7 @@ export interface BuiltLevel {
   stats: LevelStats;
   /** Rebuilds nearby voxel/flat meshes. False when the party cell did not change. */
   setParty: (x: number, y: number) => boolean;
+  setBakeBlends: (blends: Map<string, number>, flick?: number) => void;
 }
 
 type PreparedFace = FaceJob & {
@@ -29,19 +40,18 @@ type PreparedFace = FaceJob & {
   pose: ReturnType<typeof tileFlatPose>;
 };
 
-function applyPose(mesh: THREE.Object3D, face: FaceId, tx: number, tz: number): void {
-  const pose = tileFlatPose(face, tx, tz, CELL, 'center');
-  mesh.position.set(pose.x, pose.y, pose.z);
-  mesh.rotation.set(pose.rotX, pose.rotY, 0);
-}
-
 export async function buildFloor1(map: FloorMap, partyX: number, partyY: number): Promise<BuiltLevel> {
   const jobs = enumerateFaces(map);
+  for (const job of jobs) {
+    if (job.kind === 'ceiling' && isBeamCeiling(job.tx, job.tz, floor1Sunbeams)) {
+      job.file = CRACKED_CEILING_FILE;
+    }
+  }
   const needed = [...new Set(jobs.map((j) => j.file))];
   const pngs = new Map<string, PngPixels>();
   await Promise.all(
     needed.map(async (file) => {
-      pngs.set(file, await loadPng(file));
+      pngs.set(file, file === CRACKED_CEILING_FILE ? await loadCrackedCeiling() : await loadPng(file));
     })
   );
 
@@ -74,14 +84,20 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
     });
   }
 
+  const torches: FarTorch[] = litFarTorches(map, floor1Sconces);
   const mats = new Map<string, THREE.MeshPhysicalMaterial>();
+  const farMats = new Map<string, THREE.MeshBasicMaterial>();
   for (const file of needed) {
     const png = pngs.get(file);
     const rough = roughByFile.get(file);
     if (!png || !rough) continue;
     const mat = voxelMaterial(png.texture, rough);
     mat.name = file;
+    patchBakeMaterial(mat);
     mats.set(file, mat);
+    const farMat = farBakeMaterial(png.texture);
+    farMat.name = `far:${file}`;
+    farMats.set(file, farMat);
   }
 
   const group = new THREE.Group();
@@ -92,7 +108,6 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
   flatGroup.name = 'flats';
   group.add(voxelGroup, flatGroup);
 
-  const planeGeo = new THREE.PlaneGeometry(CELL, CELL);
   const stats: LevelStats = {
     voxels,
     triangles: 0,
@@ -108,14 +123,14 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
     while (g.children.length) {
       const child = g.children[0] as THREE.Mesh;
       g.remove(child);
-      if (child.geometry && child.geometry !== planeGeo) child.geometry.dispose();
+      if (child.geometry) child.geometry.dispose();
     }
   };
 
   const remesh = (px: number, py: number): void => {
     clearGroup(voxelGroup);
     clearGroup(flatGroup);
-    const voxelByFile = new Map<string, MeshArrays[]>();
+    const voxelByFile = new Map<string, PreparedFace[]>();
     const flats: PreparedFace[] = [];
     let voxelFaces = 0;
     for (const face of prepared) {
@@ -123,7 +138,7 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
       if (dist > CULL_CHEB) continue;
       if (dist <= VOXEL_CHEB) {
         const list = voxelByFile.get(face.file) ?? [];
-        list.push(face.mesh);
+        list.push(face);
         voxelByFile.set(face.file, list);
         voxelFaces += 1;
       } else {
@@ -132,9 +147,12 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
     }
 
     let liveTris = 0;
-    for (const [file, meshes] of voxelByFile) {
+    for (const [file, faces] of voxelByFile) {
       const mat = mats.get(file);
-      const geo = geometryFrom(mergeMeshes(meshes));
+      const geo = geometryWithBake(
+        faces.map((f) => ({ mesh: f.mesh, tx: f.tx, tz: f.tz })),
+        torches
+      );
       if (!mat || !geo) continue;
       liveTris += (geo.getIndex()?.count ?? 0) / 3;
       const mesh = new THREE.Mesh(geo, mat);
@@ -152,24 +170,22 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
       list.push(face);
       flatsByFile.set(face.file, list);
     }
-    const dummy = new THREE.Object3D();
     for (const [file, list] of flatsByFile) {
-      const mat = mats.get(file);
-      if (!mat) continue;
-      const mesh = new THREE.InstancedMesh(planeGeo, mat, list.length);
+      const mat = farMats.get(file);
+      const geo = flatGeometryWithBake(
+        list.map((f) => ({ pose: f.pose, tx: f.tx, tz: f.tz })),
+        torches,
+        CELL
+      );
+      if (!mat || !geo) continue;
+      liveTris += (geo.getIndex()?.count ?? 0) / 3;
+      const mesh = new THREE.Mesh(geo, mat);
       const isFloor = file.startsWith('floor_');
-      for (let i = 0; i < list.length; i++) {
-        applyPose(dummy, list[i].face, list[i].tx, list[i].tz);
-        dummy.updateMatrix();
-        mesh.setMatrixAt(i, dummy.matrix);
-      }
-      mesh.instanceMatrix.needsUpdate = true;
       mesh.userData.castWhenOn = !isFloor;
       mesh.castShadow = !isFloor;
       mesh.receiveShadow = true;
       mesh.name = `flat:${file}`;
       flatGroup.add(mesh);
-      liveTris += list.length * 2;
     }
 
     stats.voxelFaces = voxelFaces;
@@ -191,6 +207,9 @@ export async function buildFloor1(map: FloorMap, partyX: number, partyY: number)
       lastY = y;
       remesh(x, y);
       return true;
+    },
+    setBakeBlends: (blends, flick = 1) => {
+      applyBakeBlends([...mats.values(), ...farMats.values()], torches, blends, flick);
     }
   };
 }

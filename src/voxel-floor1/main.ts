@@ -3,7 +3,13 @@ import {
   CAMERA_FAR,
   CAMERA_FOV,
   CAMERA_NEAR,
+  CAMERA_PITCH,
+  CAMERA_VIEW_ASPECT,
+  CAMERA_VIEW_H,
+  CAMERA_VIEW_W,
   CELL,
+  FOG_FAR,
+  FOG_NEAR,
   LANTERN_COLOR,
   LANTERN_DISTANCE,
   LANTERN_FLICKER,
@@ -46,7 +52,12 @@ type Floor1Api = {
   cell: number;
   eyeHeight: number;
   fov: number;
+  aspect: number;
+  near: number;
+  canvas: { w: number; h: number };
+  position: [number, number, number];
   setPosition: (x: number, y: number, dir: number) => void;
+  setLookPitch: (rad: number) => void;
   stepForward: () => boolean;
   stepBack: () => boolean;
   turnLeft: () => boolean;
@@ -96,7 +107,7 @@ async function boot(): Promise<void> {
     powerPreference: 'high-performance',
     preserveDrawingBuffer: preserveBuffer
   });
-  renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+  renderer.setPixelRatio(1);
   renderer.outputColorSpace = THREE.SRGBColorSpace;
   renderer.toneMapping = THREE.NoToneMapping;
   renderer.toneMappingExposure = 1;
@@ -109,9 +120,9 @@ async function boot(): Promise<void> {
 
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(fog);
-  scene.fog = new THREE.Fog(fog, 10, 22);
+  scene.fog = new THREE.Fog(fog, FOG_NEAR, FOG_FAR);
 
-  const camera = new THREE.PerspectiveCamera(CAMERA_FOV, 1, CAMERA_NEAR, CAMERA_FAR);
+  const camera = new THREE.PerspectiveCamera(CAMERA_FOV, CAMERA_VIEW_ASPECT, CAMERA_NEAR, CAMERA_FAR);
   camera.rotation.order = 'YXZ';
 
   const hemi = new THREE.HemisphereLight(0x2a241c, 0x080605, 0.04);
@@ -168,10 +179,16 @@ async function boot(): Promise<void> {
   scene.add(props.group);
 
   const resize = (): void => {
-    const w = window.innerWidth;
-    const h = window.innerHeight;
-    renderer.setSize(w, h, false);
-    camera.aspect = w / Math.max(1, h);
+    const cssW = window.innerWidth;
+    const cssH = window.innerHeight;
+    const scale = Math.min(cssW / CAMERA_VIEW_W, cssH / CAMERA_VIEW_H);
+    const w = Math.max(1, Math.round(CAMERA_VIEW_W * scale));
+    const h = Math.max(1, Math.round(CAMERA_VIEW_H * scale));
+    canvas.style.width = `${w}px`;
+    canvas.style.height = `${h}px`;
+    canvas.style.imageRendering = 'pixelated';
+    renderer.setSize(CAMERA_VIEW_W, CAMERA_VIEW_H, false);
+    camera.aspect = CAMERA_VIEW_ASPECT;
     camera.updateProjectionMatrix();
   };
   resize();
@@ -190,6 +207,8 @@ async function boot(): Promise<void> {
 
   const placeLights = (now: number): void => {
     lights.setParty(mover.x, mover.y, now, preserveBuffer);
+    const flick = preserveBuffer ? 1 : 1 + 0.05 * Math.sin(now * 0.001 * 6.1);
+    level.setBakeBlends(lights.blends, flick);
     props.update(mover.x, mover.y, mover.dir, now, preserveBuffer);
     const key = `${lights.stats.torchesActive}:${lights.stats.sunbeamsActive}`;
     if (key !== lastLightKey) {
@@ -198,11 +217,11 @@ async function boot(): Promise<void> {
     }
   };
 
-  const renderFrame = (): number => {
+  const renderFrame = (): { draws: number; tris: number } => {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.setRenderTarget(null);
     renderer.render(scene, camera);
-    return renderer.info.render.calls;
+    return { draws: renderer.info.render.calls, tris: renderer.info.render.triangles };
   };
 
   const samplePixels = (
@@ -325,9 +344,18 @@ async function boot(): Promise<void> {
     cell: CELL,
     eyeHeight: camera.position.y,
     fov: CAMERA_FOV,
+    aspect: CAMERA_VIEW_ASPECT,
+    near: CAMERA_NEAR,
+    canvas: { w: CAMERA_VIEW_W, h: CAMERA_VIEW_H },
+    position: [camera.position.x, camera.position.y, camera.position.z],
     setPosition: (x, y, dir) => {
       mover.setPosition(x, y, dir);
+      camera.rotation.x = CAMERA_PITCH;
       onArrived();
+    },
+    setLookPitch: (rad) => {
+      camera.rotation.x = rad;
+      camera.updateMatrixWorld();
     },
     stepForward: () => mover.step(1),
     stepBack: () => mover.step(-1),
@@ -374,8 +402,8 @@ async function boot(): Promise<void> {
     }
     placeLights(now);
 
-    const draws = renderFrame();
-    api.draws = draws;
+    const frame = renderFrame();
+    api.draws = frame.draws;
     api.lights = lights.stats;
     api.triangles = level.stats.triangles;
     api.voxelFaces = level.stats.voxelFaces;
@@ -383,6 +411,9 @@ async function boot(): Promise<void> {
     api.gridX = mover.x;
     api.gridY = mover.y;
     api.dir = mover.dir;
+    api.eyeHeight = camera.position.y;
+    api.aspect = camera.aspect;
+    api.position = [camera.position.x, camera.position.y, camera.position.z];
     if (frameSamples.length > 0) {
       const span = now - frameSamples[0].t || dt;
       const avgMs = frameSamples.reduce((s, s0) => s + s0.dt, 0) / frameSamples.length;
@@ -397,7 +428,7 @@ async function boot(): Promise<void> {
       statsEl.innerHTML =
         `<div><b>${api.fps}</b> fps</div>` +
         `<div>${api.avgMs.toFixed(1)} ms avg · <b>${api.worstMs.toFixed(1)}</b> ms worst</div>` +
-        `<div>${draws} draws · ${api.triangles.toLocaleString()} tri</div>` +
+        `<div>${frame.draws} draws · ${level.stats.triangles.toLocaleString()} tri</div>` +
         `<div>${api.voxelFaces} vx faces · ${api.flatFaces} flat</div>` +
         `<div>${api.lights.total} lights · ${api.lights.torchesActive}/${api.lights.torchesLit} torch · ${api.lights.sunbeamsActive}/${api.lights.sunbeams} beam</div>`;
     }

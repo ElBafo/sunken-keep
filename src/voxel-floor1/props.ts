@@ -1,51 +1,14 @@
 import * as THREE from 'three';
-import {
-  CELL,
-  SCONCE_ANIM_FPS,
-  SCONCE_HEIGHT_TILES,
-  SCONCE_WIDTH_TILES
-} from './constants';
-import {
-  FACE_INTO_ROOM,
-  hideWallProp,
-  sconceIsLit,
-  torchBracketPoses,
-  type SconceSpec,
-  type SunbeamSpec
-} from './fixtures';
+import { CELL, SCONCE_ANIM_FPS, SHAFT_OPACITY, SHAFT_WIDTH_TILES } from './constants';
+import { hideWallProp, sconceIsLit, torchWorldPos, type SconceSpec, type SunbeamSpec } from './fixtures';
 import { loadPng } from '../voxel-lab/materials';
+import { flameOnBracket, meshBracket } from './bracket';
 
 type TorchVisual = {
   spec: SconceSpec;
   group: THREE.Group;
-  flame: THREE.Mesh;
-  flameMat: THREE.MeshBasicMaterial;
+  flame: THREE.Sprite | null;
 };
-
-function cutoutStandard(map: THREE.Texture, emissive = 0): THREE.MeshStandardMaterial {
-  return new THREE.MeshStandardMaterial({
-    map,
-    transparent: true,
-    alphaTest: 0.2,
-    roughness: 0.55,
-    metalness: 0.05,
-    emissive: new THREE.Color(emissive),
-    emissiveIntensity: emissive ? 0.55 : 0,
-    side: THREE.DoubleSide
-  });
-}
-
-function cutoutBasic(map: THREE.Texture): THREE.MeshBasicMaterial {
-  return new THREE.MeshBasicMaterial({
-    map,
-    transparent: true,
-    alphaTest: 0.15,
-    depthWrite: false,
-    fog: false,
-    toneMapped: false,
-    side: THREE.DoubleSide
-  });
-}
 
 export async function buildFloor1Props(
   sconces: SconceSpec[],
@@ -57,104 +20,50 @@ export async function buildFloor1Props(
   const group = new THREE.Group();
   group.name = 'floor1-props';
 
-  const [
-    litFront,
-    litSide,
-    deadFront,
-    deadSide,
-    cappedFront,
-    cappedSide,
-    flame1,
-    flame2,
-    flame3,
-    flame4,
-    crack,
-    shaft1,
-    shaft2
-  ] = await Promise.all([
-    loadPng('torch/bracket_lit_front.png'),
-    loadPng('torch/bracket_lit_side.png'),
-    loadPng('torch/bracket_dead_front.png'),
-    loadPng('torch/bracket_dead_side.png'),
-    loadPng('torch/bracket_capped_front.png'),
-    loadPng('torch/bracket_capped_side.png'),
+  const [flame1, flame2, flame3, flame4, shaft1, shaft2] = await Promise.all([
     loadPng('torch/flame_calm_1.png'),
     loadPng('torch/flame_calm_2.png'),
     loadPng('torch/flame_calm_3.png'),
     loadPng('torch/flame_calm_4.png'),
-    loadPng('../atmo/ceiling_crack.png'),
     loadPng('../atmo/shaft_1.png'),
     loadPng('../atmo/shaft_2.png')
   ]);
 
   const flames = [flame1.texture, flame2.texture, flame3.texture, flame4.texture];
-  const w = SCONCE_WIDTH_TILES * CELL;
-  const h = SCONCE_HEIGHT_TILES * CELL;
-  const flameH = 0.3125 * CELL;
+  const flameMat = new THREE.SpriteMaterial({
+    map: flames[0],
+    transparent: true,
+    depthWrite: false,
+    fog: false,
+    toneMapped: false,
+    alphaTest: 0.12
+  });
+  const flameW = 0.42;
+  const flameH = 0.62;
   const visuals: TorchVisual[] = [];
 
   for (const spec of sconces) {
-    const state = spec.capped ? 'capped' : sconceIsLit(spec) ? 'lit' : 'dead';
-    const frontMap = state === 'lit' ? litFront.texture : state === 'capped' ? cappedFront.texture : deadFront.texture;
-    const sideMap = state === 'lit' ? litSide.texture : state === 'capped' ? cappedSide.texture : deadSide.texture;
-    const { rotY } = FACE_INTO_ROOM[spec.face];
-    const poses = torchBracketPoses(spec);
     const g = new THREE.Group();
     g.name = `sconce:${spec.x},${spec.y},${spec.face}`;
+    g.add(meshBracket(spec));
 
-    const side = new THREE.Mesh(new THREE.PlaneGeometry(w, h), cutoutStandard(sideMap));
-    side.position.set(poses.side.x, poses.side.y, poses.side.z);
-    side.rotation.y = rotY - Math.PI / 2;
-    side.castShadow = false;
-    side.receiveShadow = true;
-    side.userData.noShadow = true;
-    side.renderOrder = 2;
+    let flame: THREE.Sprite | null = null;
+    if (flameOnBracket(spec) && sconceIsLit(spec)) {
+      flame = new THREE.Sprite(flameMat);
+      const pos = torchWorldPos(spec);
+      flame.position.set(pos.x, pos.y + 0.06, pos.z);
+      flame.scale.set(flameW, flameH, 1);
+      flame.userData.noShadow = true;
+      flame.renderOrder = 3;
+      g.add(flame);
+    }
 
-    const front = new THREE.Mesh(new THREE.PlaneGeometry(w, h), cutoutStandard(frontMap));
-    front.position.set(poses.front.x, poses.front.y, poses.front.z);
-    front.rotation.y = rotY;
-    front.castShadow = false;
-    front.receiveShadow = true;
-    front.userData.noShadow = true;
-    front.renderOrder = 2;
-
-    const flameMat = cutoutBasic(flames[0]);
-    const flame = new THREE.Mesh(new THREE.PlaneGeometry(w, flameH), flameMat);
-    flame.position.set(poses.flame.x, poses.flame.y, poses.flame.z);
-    flame.rotation.y = rotY;
-    flame.userData.noShadow = true;
-    flame.renderOrder = 3;
-    flame.visible = state === 'lit';
-
-    g.add(side, front, flame);
     group.add(g);
-    visuals.push({ spec, group: g, flame, flameMat });
+    visuals.push({ spec, group: g, flame });
   }
 
   sunbeams.forEach((beam, index) => {
-    const crackMat = new THREE.MeshBasicMaterial({
-      map: crack.texture,
-      transparent: true,
-      depthWrite: false,
-      blending: THREE.CustomBlending,
-      blendEquation: THREE.AddEquation,
-      blendSrc: THREE.ZeroFactor,
-      blendDst: THREE.OneMinusSrcAlphaFactor,
-      fog: true,
-      side: THREE.DoubleSide,
-      toneMapped: false,
-      polygonOffset: true,
-      polygonOffsetFactor: -2,
-      polygonOffsetUnits: -2
-    });
-    const crackMesh = new THREE.Mesh(new THREE.PlaneGeometry(CELL, CELL), crackMat);
-    crackMesh.rotation.x = Math.PI / 2;
-    crackMesh.position.set(beam.wx, beam.wy, beam.wz);
-    crackMesh.userData.noShadow = true;
-    crackMesh.renderOrder = 4;
-    group.add(crackMesh);
-
-    const width = 0.4 * CELL;
+    const width = SHAFT_WIDTH_TILES * CELL;
     const height = CELL - 0.04;
     const midY = beam.wy - height / 2;
     const slant = ((12 + (index % 3) * 5) * Math.PI) / 180;
@@ -167,9 +76,11 @@ export async function buildFloor1Props(
       blending: THREE.AdditiveBlending,
       side: THREE.DoubleSide,
       fog: true,
-      opacity: 0.88,
+      opacity: SHAFT_OPACITY,
       toneMapped: false
     });
+    const coreMat = shaftMat.clone();
+    coreMat.opacity = 0.55;
     for (const rotY of [Math.PI / 4, (Math.PI * 3) / 4]) {
       const holder = new THREE.Group();
       holder.position.set(beam.wx, midY, beam.wz);
@@ -178,7 +89,11 @@ export async function buildFloor1Props(
       shaft.rotation.z = slant * sign;
       shaft.renderOrder = 6;
       shaft.userData.noShadow = true;
-      holder.add(shaft);
+      const core = new THREE.Mesh(new THREE.PlaneGeometry(width * 0.45, height), coreMat);
+      core.rotation.z = slant * sign * 0.6;
+      core.renderOrder = 7;
+      core.userData.noShadow = true;
+      holder.add(shaft, core);
       group.add(holder);
     }
   });
@@ -186,13 +101,12 @@ export async function buildFloor1Props(
   const frameMs = 1000 / SCONCE_ANIM_FPS;
   const update = (px: number, py: number, dir: number, now: number, freeze: boolean): void => {
     const frame = flames[Math.floor((freeze ? 0 : now) / frameMs) % flames.length];
+    if (flameMat.map !== frame) {
+      flameMat.map = frame;
+      flameMat.needsUpdate = true;
+    }
     for (const v of visuals) {
-      const hide = hideWallProp(v.spec.x, v.spec.y, v.spec.face, px, py, dir);
-      v.group.visible = !hide;
-      if (v.flame.visible && v.flameMat.map !== frame) {
-        v.flameMat.map = frame;
-        v.flameMat.needsUpdate = true;
-      }
+      v.group.visible = !hideWallProp(v.spec.x, v.spec.y, v.spec.face, px, py, dir);
     }
   };
 

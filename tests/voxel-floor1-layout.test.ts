@@ -2,7 +2,20 @@ import { describe, expect, it } from 'vitest';
 import spec from '../public/proto3d/camera.json';
 import { floor1 } from '../public/levels/floor1';
 import { pickVariantIndex as gamePick } from '../src/proto3d/texture-variants';
-import { CELL, EYE_HEIGHT, CAMERA_FOV, CAMERA_NEAR, MOVE_MS, WALL_VARIANTS } from '../src/voxel-floor1/constants';
+import {
+  CELL,
+  EYE_HEIGHT,
+  CAMERA_FOV,
+  CAMERA_NEAR,
+  CAMERA_VIEW_ASPECT,
+  CAMERA_VIEW_H,
+  CAMERA_VIEW_W,
+  FOG_FAR,
+  FOG_NEAR,
+  MOVE_MS,
+  VOXEL_CHEB,
+  WALL_VARIANTS
+} from '../src/voxel-floor1/constants';
 import { dirToRot, easeInOutQuad } from '../src/voxel-floor1/camera';
 import {
   canStep,
@@ -23,6 +36,12 @@ describe('voxel-floor1 uses the game camera spec and New Game start', () => {
     expect(CAMERA_FOV).toBe(spec.fov);
     expect(CAMERA_NEAR).toBe(spec.near);
     expect(MOVE_MS).toBe(180);
+    expect(CAMERA_VIEW_W).toBe(spec.view[0]);
+    expect(CAMERA_VIEW_H).toBe(spec.view[1]);
+    expect(CAMERA_VIEW_ASPECT).toBeCloseTo(270 / 380, 8);
+    expect(FOG_NEAR).toBe(10);
+    expect(FOG_FAR).toBe(28);
+    expect(VOXEL_CHEB).toBe(3);
   });
 
   it('starts at the same square and facing as New Game', () => {
