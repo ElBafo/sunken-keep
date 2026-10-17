@@ -75,6 +75,9 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     expect(visual.busy).toBe(false);
     expect(visual.panels[0].position.y).toBeCloseTo(DOOR_SLIDE, 5);
     expect(visual.panels[0].visible).toBe(false);
+    system.poseSlide(visual, 0.45);
+    expect(visual.panels[0].position.y).toBeCloseTo(DOOR_SLIDE * 0.45, 5);
+    expect(visual.busy).toBe(false);
   });
 
   it('opens a secret wall on bump and keeps overlay files off proto3d', () => {

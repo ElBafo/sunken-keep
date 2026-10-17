@@ -136,6 +136,20 @@ export class OpeningSystem {
     }
   }
 
+  poseSlide(visual: OpeningVisual, t: number): void {
+    const k = Math.min(1, Math.max(0, t));
+    const y = DOOR_SLIDE * k;
+    visual.busy = false;
+    visual.animFrom = y;
+    visual.animTo = y;
+    if (visual.kind === 'door') visual.tile.doorOpen = k > 0;
+    else visual.tile.secretOpen = k > 0;
+    for (const panel of visual.panels) {
+      panel.position.y = y;
+      panel.visible = k < 0.99;
+    }
+  }
+
   snapOpen(visual: OpeningVisual, open: boolean): void {
     visual.busy = false;
     if (visual.kind === 'door') {

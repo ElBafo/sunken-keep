@@ -85,6 +85,7 @@ type Floor1Api = {
   doorAhead: () => { x: number; y: number } | null;
   handleDoor: (x?: number, y?: number) => string;
   snapDoor: (x: number, y: number, open: boolean) => boolean;
+  poseDoor: (x: number, y: number, t: number) => boolean;
   doorOpen: (x: number, y: number) => boolean;
   doorBusy: (x: number, y: number) => boolean;
   doorLocked: (x: number, y: number) => boolean;
@@ -558,6 +559,12 @@ async function boot(): Promise<void> {
       const visual = openings.system.get(x, y);
       if (!visual || visual.kind !== 'door') return false;
       openings.system.snapOpen(visual, open);
+      return true;
+    },
+    poseDoor: (x, y, t) => {
+      const visual = openings.system.get(x, y);
+      if (!visual) return false;
+      openings.system.poseSlide(visual, t);
       return true;
     },
     doorOpen: (x, y) => openings.system.isOpen(x, y),
