@@ -16,6 +16,8 @@ import type { FloorMap } from './layout';
  * warm factor, falling off from the flame. Not a halo, not an untextured add.
  */
 export const BAKE_GAIN = 1.45;
+/** Classic FLOOR_AMBIENT[1] — unlit stone stays dark but readable. */
+export const FAR_AMBIENT = 0.068;
 export const FAR_TORCH_SLOTS = 3;
 
 export type FarTorch = {
@@ -195,7 +197,7 @@ export function geometryWithBake(
   return g;
 }
 
-const FAR_FACTOR = `min( vec3( 1.0 ), uFarColor * max( dot( vFarW, uFarBlend ), 0.0 ) )`;
+const FAR_FACTOR = `max( vec3( ${FAR_AMBIENT.toFixed(3)} ), min( vec3( 1.0 ), uFarColor * max( dot( vFarW, uFarBlend ), 0.0 ) ) )`;
 
 export function patchBakeMaterial(mat: THREE.Material): void {
   // Classic MeshBasic: texture × torch factor. Same numbers, no halo.
@@ -203,7 +205,7 @@ export function patchBakeMaterial(mat: THREE.Material): void {
     value: new THREE.Vector3(GAME_TORCH_RGB[0], GAME_TORCH_RGB[1], GAME_TORCH_RGB[2]).multiplyScalar(BAKE_GAIN)
   };
   mat.userData.uFarBlend = { value: new THREE.Vector3() };
-  mat.customProgramCacheKey = () => 'floor1-far-bake-v4';
+  mat.customProgramCacheKey = () => 'floor1-far-bake-v5';
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uFarColor = mat.userData.uFarColor;
     shader.uniforms.uFarBlend = mat.userData.uFarBlend;

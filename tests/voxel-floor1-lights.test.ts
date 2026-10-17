@@ -25,7 +25,7 @@ import {
 import { floor1Map, enumerateFaces, isWalkableTile, tileAt } from '../src/voxel-floor1/layout';
 import { buildBracketOccupancy, MAT_IRON } from '../src/voxel-floor1/bracket';
 import { compositeCrackedCeiling, crackedCeilingHasGap, isBeamCeiling } from '../src/voxel-floor1/crack';
-import { bakeWeights, litFarTorches } from '../src/voxel-floor1/bake';
+import { bakeWeights, FAR_AMBIENT, litFarTorches } from '../src/voxel-floor1/bake';
 
 describe('voxel-floor1 torches match the game sconce table', () => {
   it('uses floor1.sconces at the same squares and walls', () => {
@@ -158,6 +158,7 @@ describe('voxel-floor1 still does not import proto3d', () => {
     expect(main).toContain('renderer.setSize(CAMERA_VIEW_W, CAMERA_VIEW_H, false)');
     expect(main).not.toContain('TorchLightPools');
     const bake = readFileSync(resolve(__dirname, '../src/voxel-floor1/bake.ts'), 'utf8');
+    expect(FAR_AMBIENT).toBeCloseTo(0.068, 5);
     expect(bake).toContain('farBakeMaterial');
     expect(bake).toContain('MeshBasicMaterial');
     expect(bake).toContain('GAME_TORCH_RGB');
