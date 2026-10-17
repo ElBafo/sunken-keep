@@ -80,19 +80,19 @@ export function buildBracketOccupancy(capped: boolean): {
 } {
   const dims = BRACKET_DIMS;
   const volume = new Uint8Array(dims[0] * dims[1] * dims[2]);
-  // Dark bevelled frame — 6×22×2 (9.4 × 34.4 × 3.1 cm).
-  fillBox(volume, dims, 5, 14, 0, 10, 35, 1, MAT_RUST);
+  // Dark bevelled frame — 8×22×3 (12.5 × 34.4 × 4.7 cm), wide enough to read around the stick.
+  fillBox(volume, dims, 4, 14, 0, 11, 35, 2, MAT_RUST);
   // Raised mid-grey inner plate, a few cm thick.
-  fillBox(volume, dims, 6, 15, 0, 9, 34, 2, MAT_IRON);
+  fillBox(volume, dims, 5, 15, 0, 10, 34, 3, MAT_IRON);
   // Short arm from the plate's middle out to the collar.
   fillBox(volume, dims, 7, 22, 3, 9, 26, 7, MAT_IRON);
-  // Iron ring wrapping the handle.
+  // Iron ring wrapping the handle (2-texel front band).
   fillBox(volume, dims, 6, 22, 8, 10, 22, 12, MAT_IRON);
   fillBox(volume, dims, 6, 26, 8, 10, 26, 12, MAT_IRON);
   fillBox(volume, dims, 6, 23, 8, 6, 25, 12, MAT_IRON);
   fillBox(volume, dims, 10, 23, 8, 10, 25, 12, MAT_IRON);
   fillBox(volume, dims, 7, 23, 8, 9, 25, 8, MAT_IRON);
-  fillBox(volume, dims, 7, 23, 12, 9, 25, 12, MAT_IRON);
+  fillBox(volume, dims, 7, 23, 11, 9, 25, 12, MAT_IRON);
   // Tapered wood: narrow bottom, wider top, 18° out from the wall.
   for (let i = 0; i < HANDLE_LEN; i++) {
     const s = handleSlice(i);
@@ -128,18 +128,20 @@ function extract(volume: Uint8Array, id: number): Uint8Array {
   return out;
 }
 
-function matteMat(color: number): THREE.MeshLambertMaterial {
+function matteMat(color: number, emissive: number, emissiveIntensity: number): THREE.MeshLambertMaterial {
   return new THREE.MeshLambertMaterial({
     color,
-    emissive: 0x000000
+    emissive,
+    emissiveIntensity
   });
 }
 
 const MATS: Record<number, THREE.MeshLambertMaterial> = {
-  [MAT_IRON]: matteMat(IRON_COLOR),
-  [MAT_RUST]: matteMat(RUST_COLOR),
-  [MAT_WOOD]: matteMat(WOOD_COLOR),
-  [MAT_GOLD]: matteMat(GOLD_COLOR)
+  // Emissive lift so iron reads mid-grey without the torch point cooking the cup.
+  [MAT_IRON]: matteMat(IRON_COLOR, 0x3e444c, 0.55),
+  [MAT_RUST]: matteMat(RUST_COLOR, 0x14161a, 0.4),
+  [MAT_WOOD]: matteMat(WOOD_COLOR, 0x2a1408, 0.22),
+  [MAT_GOLD]: matteMat(GOLD_COLOR, 0x5a3a08, 0.35)
 };
 
 export function meshBracket(spec: SconceSpec): THREE.Group {

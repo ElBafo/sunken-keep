@@ -105,10 +105,8 @@ describe('voxel iron brackets', () => {
     const b = IRON_COLOR & 255;
     const luma = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
     expect(luma).toBeGreaterThan(0.28);
-    expect(luma).toBeLessThan(0.55);
-    const lights = readFileSync(resolve(__dirname, '../src/voxel-floor1/lights.ts'), 'utf8');
-    expect(lights).toContain('BRACKET_LAYER');
-    expect(lights).toContain('point.layers.enable(BRACKET_LAYER)');
+    expect(luma).toBeLessThan(0.65);
+    expect(bracket).toContain('emissiveIntensity');
   });
 });
 

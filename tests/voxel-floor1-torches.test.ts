@@ -58,7 +58,7 @@ describe('voxel-floor1 sconce near-cull', () => {
             if (v > plateVMax) plateVMax = v;
             if (d > plateDMax) plateDMax = d;
           }
-          if (d > 0 && (u < 4 || u > 11)) offWallWide += 1;
+          if (d > 0 && (u < 3 || u > 12)) offWallWide += 1;
         }
       }
     }
@@ -66,7 +66,7 @@ describe('voxel-floor1 sconce near-cull', () => {
     const plateH = (plateVMax - plateVMin + 1) * BRACKET_VOX;
     const plateT = (plateDMax + 1) * BRACKET_VOX;
     expect(plateW).toBeGreaterThan(0.07);
-    expect(plateW).toBeLessThan(0.12);
+    expect(plateW).toBeLessThan(0.14);
     expect(plateH).toBeGreaterThan(0.28);
     expect(plateH).toBeLessThan(0.38);
     expect(plateT).toBeGreaterThan(0.02);

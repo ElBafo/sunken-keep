@@ -125,11 +125,11 @@ export const BRACKET_FLAME_LIFT = 0.04 + (BRACKET_CUP_V - BRACKET_DIMS[1] / 2) *
 /** Point light in the flame above the gold cup, not inside the collar. */
 export const BRACKET_LIGHT_FORWARD = 0.06;
 export const BRACKET_LIGHT_UP = 0.16;
-/** Mid-grey iron so the plate reads under torchlight; darker bevel on the rim. */
-export const IRON_COLOR = 0x6e747c;
-export const RUST_COLOR = 0x3a4048;
-export const WOOD_COLOR = 0x8d5a2b;
-export const GOLD_COLOR = 0xc9a034;
+/** Cool mid-grey iron (not black); darker bevel so the plate reads on stone. */
+export const IRON_COLOR = 0x8a929c;
+export const RUST_COLOR = 0x2a2e34;
+export const WOOD_COLOR = 0x8a4e22;
+export const GOLD_COLOR = 0xd4a028;
 export const BRACKET_LAYER = 1;
 
 export {
