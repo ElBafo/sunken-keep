@@ -37,11 +37,10 @@ describe('voxel-floor1 secret placeholders match Classic contents', () => {
 
     tileAt(floor1Map, 5, 1)!.secretOpen = true;
     tileAt(floor1Map, 5, 13)!.secretOpen = true;
-    markers.update();
-    expect(markers.group.getObjectByName('carving_secret')?.visible).toBe(true);
-    expect(markers.group.getObjectByName('journal_page_1')?.visible).toBe(true);
     expect(markers.interact(5, 1, 0)).toBe('"We gave much. We need more."');
     expect(markers.interact(5, 13, 3)).toBe("Orrun's journal. The ink still holds.");
     expect(markers.interact(4, 13, 3)).toBe("Orrun's journal. The ink still holds.");
+    expect(markers.group.getObjectByName('carving_secret')?.visible).toBe(true);
+    expect(markers.group.getObjectByName('journal_page_1')?.visible).toBe(true);
   });
 });

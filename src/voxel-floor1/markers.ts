@@ -102,11 +102,12 @@ export function buildFloor1Markers(map: FloorMap): {
   };
 
   const interact = (px: number, py: number, dir: number): string | null => {
+    update();
     const [dx, dy] = FACE_DELTA[['N', 'E', 'S', 'W'][dir & 3] as 'N' | 'E' | 'S' | 'W'];
     const fx = px + dx;
     const fy = py + dy;
     for (const node of nodes) {
-      if (!markerUnlocked(map, node.spec) || !node.obj.visible) continue;
+      if (!markerUnlocked(map, node.spec)) continue;
       const on = node.spec.x === px && node.spec.y === py;
       const ahead = node.spec.x === fx && node.spec.y === fy;
       const facingPlaque = node.spec.kind === 'carving' && on && node.spec.face === ['N', 'E', 'S', 'W'][dir & 3];
