@@ -287,13 +287,17 @@ async function boot(): Promise<void> {
     };
   };
 
-  // Keep shadowMap on so warmup does not compile a second MeshPhysical variant.
-  const warmupRT = new THREE.WebGLRenderTarget(1, 1);
+  // Draw 1px on the real framebuffer so uploads use the same programs as a frame.
+  const warmupVP = new THREE.Vector4();
   const uploadPending = (): void => {
-    const prev = renderer.getRenderTarget();
-    renderer.setRenderTarget(warmupRT);
+    renderer.getViewport(warmupVP);
+    renderer.setRenderTarget(null);
+    renderer.setScissorTest(true);
+    renderer.setScissor(0, 0, 1, 1);
+    renderer.setViewport(0, 0, 1, 1);
     renderer.render(scene, camera);
-    renderer.setRenderTarget(prev);
+    renderer.setScissorTest(false);
+    renderer.setViewport(warmupVP);
   };
 
   const prepareCell = (x: number, y: number): number => {
