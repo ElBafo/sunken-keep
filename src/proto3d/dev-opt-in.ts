@@ -8,6 +8,9 @@ export type DevResMode = (typeof DEV_RES_MODES)[number];
 export const DEV_LIGHT_MODES = ['classic', 'lab'] as const;
 export type DevLightMode = (typeof DEV_LIGHT_MODES)[number];
 
+export const DEV_RENDER_MODES = ['classic', 'lab'] as const;
+export type DevRenderMode = (typeof DEV_RENDER_MODES)[number];
+
 export type DevEnemy = 'slime' | 'ooze';
 export type DevDist = 1 | 2;
 
@@ -84,6 +87,8 @@ export type DevSnapshot = {
   pixelW: number;
   pixelH: number;
   light: DevLightMode;
+  render?: DevRenderMode;
+  heightRelief?: boolean;
   voxel: boolean;
   enemy: DevEnemy;
   dist: DevDist;
@@ -92,6 +97,7 @@ export type DevSnapshot = {
   avg: number;
   p95: number;
   draws: number;
+  tris?: number;
   palette: boolean;
 };
 

@@ -303,7 +303,9 @@
    "lab_light": "Lighting",
    "lab_light_lab": "Lab",
    "lab_light_classic": "Classic",
-   "lab_light_hint": "Lab: warm pools, glossy stone. Classic: the painted look."
+   "lab_light_hint": "Lab: warm pools, glossy stone. Classic: the painted look.",
+   "height_relief": "Height relief",
+   "height_relief_hint": "Artie's wall and door maps. Textures without a map stay flat."
   },
   "tap_to_start": "Tap to start"
  },

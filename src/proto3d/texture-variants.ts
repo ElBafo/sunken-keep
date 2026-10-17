@@ -30,7 +30,12 @@ const BASE_FILES = [
   'sconce_lit_3.png'
 ];
 
-export function listedTex3dFiles(): string[] {
+/** Artist drop-in `wall_plain_height.png` — not a colour / variant texture. */
+export function isHeightMapFilename(file: string): boolean {
+  return /_height\.png$/i.test(file.replace(/^.*\//, ''));
+}
+
+function rawTex3dPngs(): string[] {
   const baked =
     typeof __TEX3D_FILES__ !== 'undefined' && Array.isArray(__TEX3D_FILES__)
       ? __TEX3D_FILES__
@@ -39,10 +44,23 @@ export function listedTex3dFiles(): string[] {
   return names.filter((f) => f.endsWith('.png'));
 }
 
+/** Colour / albedo PNGs only. Height maps stay off the Classic load path. */
+export function listedTex3dFiles(): string[] {
+  return rawTex3dPngs().filter((f) => !isHeightMapFilename(f));
+}
+
+/** Optional `<albedo>_height.png` files for the lab-world relief hook. */
+const ARTIST_HEIGHT_MAPS = ['wall_plain_height.png', 'door_open_height.png', 'door_panel_height.png'];
+
+export function listedHeightMapFiles(): string[] {
+  return [...new Set([...rawTex3dPngs().filter(isHeightMapFilename), ...ARTIST_HEIGHT_MAPS])];
+}
+
 /** `wall_plain.png` plus `wall_plain_2.png`, `wall_plain_3.png`, … in numeric order. */
 export function variantFilenames(surface: VariantSurface, files: readonly string[]): string[] {
+  const colour = files.filter((f) => !isHeightMapFilename(f));
   const base = `${surface}.png`;
-  const extras = files
+  const extras = colour
     .map((f) => {
       const m = f.match(new RegExp(`^${surface}_(\\d+)\\.png$`));
       return m ? { file: f, n: Number(m[1]) } : null;
@@ -51,7 +69,7 @@ export function variantFilenames(surface: VariantSurface, files: readonly string
     .filter((x): x is { file: string; n: number } => x !== null && x.n >= 2 && x.n !== 32 && x.n !== 64)
     .sort((a, b) => a.n - b.n)
     .map((x) => x.file);
-  return files.includes(base) ? [base, ...extras] : extras;
+  return colour.includes(base) ? [base, ...extras] : extras;
 }
 
 export function faceHash(x: number, y: number, face: string, salt: number): number {

@@ -21,6 +21,10 @@ export class SettingsMenu {
   private labOffBtn: HTMLButtonElement | null = null;
   private labLabelEl: HTMLElement | null = null;
   private labHintEl: HTMLElement | null = null;
+  private heightOnBtn: HTMLButtonElement | null = null;
+  private heightOffBtn: HTMLButtonElement | null = null;
+  private heightLabelEl: HTMLElement | null = null;
+  private heightHintEl: HTMLElement | null = null;
   private closeBtn: HTMLButtonElement | null = null;
   private story: StoryText;
   private getLayout: () => LayoutMode;
@@ -30,6 +34,8 @@ export class SettingsMenu {
   private setVoxel: (on: boolean) => void;
   private getLabLight: () => boolean;
   private setLabLight: (on: boolean) => void;
+  private getHeightRelief: () => boolean;
+  private setHeightRelief: (on: boolean) => void;
 
   constructor(
     story: StoryText,
@@ -41,6 +47,8 @@ export class SettingsMenu {
       setVoxel?: (on: boolean) => void;
       getLabLight?: () => boolean;
       setLabLight?: (on: boolean) => void;
+      getHeightRelief?: () => boolean;
+      setHeightRelief?: (on: boolean) => void;
     }
   ) {
     this.story = story;
@@ -51,6 +59,8 @@ export class SettingsMenu {
     this.setVoxel = hooks.setVoxel ?? (() => {});
     this.getLabLight = hooks.getLabLight ?? (() => false);
     this.setLabLight = hooks.setLabLight ?? (() => {});
+    this.getHeightRelief = hooks.getHeightRelief ?? (() => true);
+    this.setHeightRelief = hooks.setHeightRelief ?? (() => {});
   }
 
   mount() {
@@ -68,6 +78,10 @@ export class SettingsMenu {
     this.labOffBtn = document.getElementById('btn-lab-light-off') as HTMLButtonElement | null;
     this.labLabelEl = document.getElementById('settings-lab-light-label');
     this.labHintEl = document.getElementById('settings-lab-light-hint');
+    this.heightOnBtn = document.getElementById('btn-height-relief-on') as HTMLButtonElement | null;
+    this.heightOffBtn = document.getElementById('btn-height-relief-off') as HTMLButtonElement | null;
+    this.heightLabelEl = document.getElementById('settings-height-relief-label');
+    this.heightHintEl = document.getElementById('settings-height-relief-hint');
     this.closeBtn = document.getElementById('btn-settings-close') as HTMLButtonElement | null;
     if (!this.host || this.host.dataset.bound) return;
     this.host.dataset.bound = '1';
@@ -100,6 +114,16 @@ export class SettingsMenu {
       e.preventDefault();
       e.stopPropagation();
       this.chooseLabLight(false);
+    });
+    this.heightOnBtn?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.chooseHeightRelief(true);
+    });
+    this.heightOffBtn?.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.chooseHeightRelief(false);
     });
     this.closeBtn?.addEventListener('click', (e) => {
       e.preventDefault();
@@ -142,6 +166,16 @@ export class SettingsMenu {
     }
     if (this.labOnBtn) this.labOnBtn.textContent = this.story.uiText('settings.lab_light_lab') || 'Lab';
     if (this.labOffBtn) this.labOffBtn.textContent = this.story.uiText('settings.lab_light_classic') || 'Classic';
+    if (this.heightLabelEl) {
+      this.heightLabelEl.textContent = this.story.uiText('settings.height_relief') || 'Height relief';
+    }
+    if (this.heightHintEl) {
+      this.heightHintEl.textContent =
+        this.story.uiText('settings.height_relief_hint') ||
+        "Artie's wall and door maps. Textures without a map stay flat.";
+    }
+    if (this.heightOnBtn) this.heightOnBtn.textContent = this.story.uiText('settings.on') || 'On';
+    if (this.heightOffBtn) this.heightOffBtn.textContent = this.story.uiText('settings.off') || 'Off';
     this.refreshChoice();
   }
 
@@ -161,6 +195,11 @@ export class SettingsMenu {
     this.labOffBtn?.classList.toggle('selected', !lab);
     this.labOnBtn?.setAttribute('aria-pressed', lab ? 'true' : 'false');
     this.labOffBtn?.setAttribute('aria-pressed', lab ? 'false' : 'true');
+    const height = this.getHeightRelief();
+    this.heightOnBtn?.classList.toggle('selected', height);
+    this.heightOffBtn?.classList.toggle('selected', !height);
+    this.heightOnBtn?.setAttribute('aria-pressed', height ? 'true' : 'false');
+    this.heightOffBtn?.setAttribute('aria-pressed', height ? 'false' : 'true');
   }
 
   private chooseLabLight(on: boolean) {
@@ -174,6 +213,13 @@ export class SettingsMenu {
     if (this.getVoxel() === on) return;
     this.playUi('ui_button');
     this.setVoxel(on);
+    this.refreshChoice();
+  }
+
+  private chooseHeightRelief(on: boolean) {
+    if (this.getHeightRelief() === on) return;
+    this.playUi('ui_button');
+    this.setHeightRelief(on);
     this.refreshChoice();
   }
 

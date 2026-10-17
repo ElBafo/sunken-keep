@@ -19,6 +19,7 @@ export class PixelRenderer {
   palette: string[] = [];
   paletteEnabled = true;
   lastSceneDraws = 0;
+  lastSceneTris = 0;
   /** Logical 3D view size from layout585.json `view`. */
   viewWidth: number;
   viewHeight: number;
@@ -287,6 +288,7 @@ export class PixelRenderer {
     this.renderer.clear();
     this.renderer.render(this.scene, this.camera);
     this.lastSceneDraws = this.renderer.info.render.calls;
+    this.lastSceneTris = this.renderer.info.render.triangles;
     
     // Render quantized upscale to screen
     this.renderer.setRenderTarget(null);
