@@ -11,7 +11,13 @@ import {
   SHAFT_WIDTH_TILES
 } from './constants';
 import { dirToRot, poseGridCamera } from './camera';
-import { FACE_INTO_ROOM, sconceIsLit, type SconceSpec, type SunbeamSpec } from './fixtures';
+import {
+  FACE_INTO_ROOM,
+  floor1FallenBeams,
+  sconceIsLit,
+  type SconceSpec,
+  type SunbeamSpec
+} from './fixtures';
 import { applyWallMountNearCull } from './near-cull';
 import { loadPng } from '../voxel-lab/materials';
 import { cupWorldPos, flameOnBracket, meshBracket } from './bracket';
@@ -57,13 +63,14 @@ export async function buildFloor1Props(
   const group = new THREE.Group();
   group.name = 'floor1-props';
 
-  const [flame1, flame2, flame3, flame4, shaft1, shaft2] = await Promise.all([
+  const [flame1, flame2, flame3, flame4, shaft1, shaft2, woodBeam] = await Promise.all([
     loadPng('torch/flame_teardrop_1.png'),
     loadPng('torch/flame_teardrop_2.png'),
     loadPng('torch/flame_teardrop_3.png'),
     loadPng('torch/flame_teardrop_4.png'),
     loadPng('../atmo/shaft_1.png'),
-    loadPng('../atmo/shaft_2.png')
+    loadPng('../atmo/shaft_2.png'),
+    loadPng('wood_beam.png')
   ]);
 
   const flames = [flame1.texture, flame2.texture, flame3.texture, flame4.texture];
@@ -99,6 +106,46 @@ export async function buildFloor1Props(
 
     group.add(g);
     visuals.push({ spec, group: g, flame });
+  }
+
+  woodBeam.texture.wrapS = THREE.RepeatWrapping;
+  woodBeam.texture.wrapT = THREE.RepeatWrapping;
+  const woodMat = new THREE.MeshBasicMaterial({
+    map: woodBeam.texture,
+    color: 0xffffff,
+    fog: true,
+    toneMapped: false
+  });
+  for (const pile of floor1FallenBeams) {
+    const wx = pile.x * CELL;
+    const wz = pile.y * CELL;
+    const sign = pile.mirror ? -1 : 1;
+    const addPlank = (
+      w: number,
+      h: number,
+      d: number,
+      x: number,
+      y: number,
+      z: number,
+      rx: number,
+      ry: number,
+      rz: number
+    ): void => {
+      const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), woodMat);
+      mesh.position.set(x, y, z);
+      mesh.rotation.set(rx, ry, rz);
+      mesh.castShadow = false;
+      mesh.receiveShadow = true;
+      mesh.name = `beams_fallen:${pile.x},${pile.y}`;
+      group.add(mesh);
+    };
+    addPlank(2.15, 0.28, 0.32, wx + 0.08 * sign, 0.62, wz - 0.06, 0.22, 0, sign * 0.62);
+    addPlank(1.55, 0.22, 0.26, wx - 0.18 * sign, 0.34, wz + 0.32, 0, 0.7 * sign, sign * -0.4);
+    addPlank(0.55, 0.28, 0.42, wx + 0.42 * sign, 0.14, wz + 0.4, 0, 0.4 * sign, sign * 0.18);
+    if (pile.x === 10 && pile.y === 1) {
+      addPlank(0.95, 0.14, 0.22, wx + 0.38, 0.1, wz - 0.42, 0.12, 0.55, 0.28);
+      addPlank(0.42, 0.12, 0.36, wx - 0.48, 0.08, wz + 0.18, 0.05, -0.35, 0.16);
+    }
   }
 
   sunbeams.forEach((beam, index) => {

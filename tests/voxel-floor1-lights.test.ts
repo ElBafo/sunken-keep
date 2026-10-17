@@ -7,6 +7,7 @@ import {
   FACE_INTO_ROOM,
   beamKey,
   floodReach,
+  floor1FallenBeams,
   floor1Sconces,
   floor1Sunbeams,
   sconceIsLit,
@@ -111,12 +112,21 @@ describe('voxel iron brackets', () => {
 });
 
 describe('voxel-floor1 crack beams match dressing_act1', () => {
-  it('places the same three floor-1 sunbeams as Classic', () => {
-    const src = dressing.floor1.sunbeam.map((s) => `${s.x},${s.y}`).sort();
+  it('keeps the water-hall beam, drops the west-hall double, and sits the guard-hall crack on (10,1)', () => {
+    const classic = dressing.floor1.sunbeam.map((s) => `${s.x},${s.y}`).sort();
+    expect(classic).toEqual(['11,2', '2,2', '2,6']);
     const got = floor1Sunbeams.map((s) => `${s.x},${s.y}`).sort();
-    expect(got).toEqual(src);
-    expect(floor1Sunbeams.some((s) => s.x === 11 && s.y === 2)).toBe(true);
+    expect(got).toEqual(['10,1', '2,2']);
+    expect(floor1Sunbeams.some((s) => s.x === 2 && s.y === 6)).toBe(false);
+    expect(floor1Sunbeams.some((s) => s.x === 11 && s.y === 2)).toBe(false);
+    expect(floor1Sunbeams).toHaveLength(2);
     expect(floor1Sunbeams[0].wx).toBeCloseTo(floor1Sunbeams[0].x * CELL, 8);
+  });
+
+  it('puts fallen planks on the crack square and the Classic debris piles', () => {
+    const keys = floor1FallenBeams.map((b) => `${b.x},${b.y}`).sort();
+    expect(keys).toEqual(['10,1', '10,3', '12,2', '12,4']);
+    expect(floor1FallenBeams.find((b) => b.x === 10 && b.y === 3)?.mirror).toBe(true);
   });
 
   it('uses a cracked ceiling only on beam squares', () => {
@@ -212,13 +222,15 @@ describe('far torch bake lights the painted texture', () => {
 describe('far beam bake matches the near SpotLight', () => {
   it('lights only the cone on reachable tiles, so unlit rooms stay dark', () => {
     const beams = litFarBeams(floor1Map, floor1Sunbeams);
-    expect(beams.length).toBe(3);
-    const beam = floor1Sunbeams.find((b) => b.x === 2 && b.y === 6);
+    expect(beams.length).toBe(2);
+    const beam = floor1Sunbeams.find((b) => b.x === 2 && b.y === 2);
     expect(beam).toBeTruthy();
-    const centre = bakeBeamWeights(2, 6, beam!.wx, 0.1, beam!.wz, beams);
+    const centre = bakeBeamWeights(2, 2, beam!.wx, 0.1, beam!.wz, beams);
     expect(centre[0] + centre[1] + centre[2]).toBeGreaterThan(0.15);
-    const neighbour = bakeBeamWeights(2, 7, beam!.wx, 0.1, beam!.wz + CELL, beams);
+    const neighbour = bakeBeamWeights(2, 3, beam!.wx, 0.1, beam!.wz + CELL, beams);
     expect(neighbour[0] + neighbour[1] + neighbour[2]).toBe(0);
+    const dropped = bakeBeamWeights(2, 6, 2 * CELL, 0.1, 6 * CELL, beams);
+    expect(dropped[0] + dropped[1] + dropped[2]).toBe(0);
     const start = bakeBeamWeights(3, 14, 3 * CELL, 0.1, 14 * CELL, beams);
     expect(start[0] + start[1] + start[2]).toBe(0);
   });
@@ -230,10 +242,13 @@ describe('far beam bake matches the near SpotLight', () => {
     expect(SUNBEAM_DECAY).toBeCloseTo(1.2, 8);
     expect(SUNBEAM_DISTANCE).toBe(CELL * 2.4);
     const beams = litFarBeams(floor1Map, floor1Sunbeams);
-    expect(tileInBeamFlood(2, 6, beams)).toBe(true);
-    expect(tileInBeamFlood(2, 7, beams)).toBe(true);
+    expect(tileInBeamFlood(2, 2, beams)).toBe(true);
+    expect(tileInBeamFlood(2, 3, beams)).toBe(true);
+    expect(tileInBeamFlood(2, 6, beams)).toBe(false);
+    expect(tileInBeamFlood(10, 1, beams)).toBe(true);
+    expect(tileInBeamFlood(11, 2, beams)).toBe(true);
     expect(tileInBeamFlood(3, 14, beams)).toBe(false);
-    expect(tileInLightFlood(2, 6, litFarTorches(floor1Map, floor1Sconces), beams)).toBe(true);
+    expect(tileInLightFlood(2, 2, litFarTorches(floor1Map, floor1Sconces), beams)).toBe(true);
     expect(spotAttenuation(1)).toBeCloseTo(1, 5);
     expect(spotAttenuation(Math.cos(SUNBEAM_ANGLE))).toBe(0);
   });
@@ -309,13 +324,13 @@ describe('light modes', () => {
     expect(n.torches).toBeGreaterThan(MAX_ACTIVE_TORCHES);
     expect(n.beams).toBeGreaterThan(MAX_ACTIVE_SUNBEAMS);
     expect(n.torches).toBe(3);
-    expect(n.beams).toBe(3);
+    expect(n.beams).toBe(2);
     const extra = allModeSlotCounts(
       [...floor1Sconces, { x: 9, y: 9, face: 'N', lit: true, capped: false }],
       [...floor1Sunbeams, { x: 0, y: 0, wx: 0, wy: 0, wz: 0 }]
     );
     expect(extra.torches).toBe(4);
-    expect(extra.beams).toBe(4);
+    expect(extra.beams).toBe(3);
   });
 });
 
@@ -341,6 +356,9 @@ describe('voxel-floor1 still does not import proto3d', () => {
     expect(props).toContain('BRACKET_FLAME_SINK');
     expect(props).toContain('lookAt');
     expect(props).toContain('flame_teardrop');
+    expect(props).toContain('wood_beam.png');
+    expect(props).toContain('floor1FallenBeams');
+    expect(props).toContain('beams_fallen');
     expect(props).not.toContain('quaternion.copy(camera.quaternion)');
     expect(props).not.toContain('hideWallProp');
     expect(props).not.toContain('THREE.Sprite');
