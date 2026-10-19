@@ -116,6 +116,8 @@ export const SUNBEAM_RGB: [number, number, number] = [
 ];
 export const SHAFT_WIDTH_TILES = 0.55;
 export const SHAFT_OPACITY = 1;
+/** Outer-shell bulge, as a fraction of one square. JSON caps it at 0.04. */
+export const WALL_BULGE_FRAC = 0.04;
 
 /** Wall `tex3d` PNGs are 128² on a CELL-metre face. Bracket voxels match that. */
 export const WALL_TEXELS = 128;

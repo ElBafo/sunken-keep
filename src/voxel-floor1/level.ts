@@ -1,12 +1,14 @@
 import * as THREE from 'three';
 import { volumeFromImageData, type VolumeFromPixels } from '../voxel-lab/classify';
 import { makeToWorld, tileFlatPose } from '../voxel-lab/faces';
-import { loadPng, pbrMap, voxelMaterial, type PngPixels } from '../voxel-lab/materials';
+import { loadPng, pbrMap, textureFromPixels, voxelMaterial, type PngPixels } from '../voxel-lab/materials';
 import { greedyMesh, type MeshArrays } from '../voxel-lab/mesher';
 import { CELL, CRACKED_CEILING_FILE, CULL_CHEB, LAYER_SIZE, VOXEL_CHEB } from './constants';
 import { floor1Sconces, floor1Sunbeams } from './fixtures';
 import { canStep, chebyshev, enumerateFaces, type FaceJob, type FloorMap } from './layout';
 import { isBeamCeiling, loadCrackedCeiling } from './crack';
+import { lookPixels } from './wall-once';
+import { bulgePose, bulgeWorld, finishVolume, type WallLook } from './wall-look';
 import {
   FAR_BAKE_SEGS,
   farBakeMaterial,
@@ -67,40 +69,69 @@ export async function buildFloor1(
       job.file = CRACKED_CEILING_FILE;
     }
   }
-  const needed = [...new Set(jobs.map((j) => j.file))];
+  const neededFiles = new Set<string>();
+  for (const job of jobs) {
+    neededFiles.add(job.file);
+    if (job.look?.baseFile) neededFiles.add(job.look.baseFile);
+  }
   const pngs = new Map<string, PngPixels>();
   await Promise.all(
-    needed.map(async (file) => {
+    [...neededFiles].map(async (file) => {
       pngs.set(file, file === CRACKED_CEILING_FILE ? await loadCrackedCeiling() : await loadPng(file));
     })
   );
 
   const volumes = new Map<string, VolumeFromPixels>();
-  const roughByFile = new Map<string, THREE.DataTexture>();
+  const texByBatch = new Map<string, THREE.Texture>();
+  const roughByBatch = new Map<string, THREE.DataTexture>();
   let voxels = 0;
   let quads = 0;
   let triangles = 0;
 
-  for (const file of needed) {
+  const usedLooks = new Map<string, WallLook>();
+  for (const job of jobs) {
+    if (job.look) usedLooks.set(job.look.key, job.look);
+  }
+
+  for (const file of neededFiles) {
     const png = pngs.get(file)!;
     const vol = volumeFromImageData(png.data);
     volumes.set(file, vol);
+    texByBatch.set(file, png.texture);
     voxels += vol.voxelCount;
-    roughByFile.set(file, pbrMap(vol.roughness, vol.dims[0], vol.dims[1]));
+    roughByBatch.set(file, pbrMap(vol.roughness, vol.dims[0], vol.dims[1]));
+  }
+
+  for (const look of usedLooks.values()) {
+    if (look.key === look.file) continue;
+    const feat = pngs.get(look.file);
+    if (!feat) continue;
+    const pixels = lookPixels(look.file, pngs, look.once, look.baseFile);
+    const vol = volumeFromImageData(pixels);
+    finishVolume(vol, look);
+    volumes.set(look.key, vol);
+    texByBatch.set(look.key, look.once ? textureFromPixels(pixels) : feat.texture);
+    voxels += vol.voxelCount;
+    roughByBatch.set(look.key, pbrMap(vol.roughness, vol.dims[0], vol.dims[1]));
   }
 
   const prepared: PreparedFace[] = [];
   for (const job of jobs) {
-    const vol = volumes.get(job.file);
+    const vol = volumes.get(job.batch);
     if (!vol) continue;
-    const toWorld = makeToWorld(job.face, job.tx, job.tz, vol.dims, LAYER_SIZE, CELL, 'center');
+    const toWorld = bulgeWorld(
+      job.face,
+      makeToWorld(job.face, job.tx, job.tz, vol.dims, LAYER_SIZE, CELL, 'center'),
+      job.bulge,
+      CELL
+    );
     const meshed = greedyMesh(vol.volume, vol.dims, toWorld);
     quads += meshed.quads;
     triangles += meshed.triangles;
     prepared.push({
       ...job,
       mesh: meshed.mesh,
-      pose: tileFlatPose(job.face, job.tx, job.tz, CELL, 'center')
+      pose: bulgePose(job.face, tileFlatPose(job.face, job.tx, job.tz, CELL, 'center'), job.bulge, CELL)
     });
   }
 
@@ -108,22 +139,21 @@ export async function buildFloor1(
   const beams: FarBeam[] = litFarBeams(map, floor1Sunbeams);
   const mats = new Map<string, THREE.MeshPhysicalMaterial>();
   const farMats = new Map<string, THREE.Material>();
-  for (const file of needed) {
-    const png = pngs.get(file);
-    const rough = roughByFile.get(file);
-    if (!png || !rough) continue;
-    const mat = voxelMaterial(png.texture, rough);
-    mat.name = file;
+  for (const [batch, tex] of texByBatch) {
+    const rough = roughByBatch.get(batch);
+    if (!tex || !rough) continue;
+    const mat = voxelMaterial(tex, rough);
+    mat.name = batch;
     if (!realLights) patchBakeMaterial(mat);
-    mats.set(file, mat);
+    mats.set(batch, mat);
     if (realLights) {
-      const farMat = voxelMaterial(png.texture, rough);
-      farMat.name = `far:${file}`;
-      farMats.set(file, farMat);
+      const farMat = voxelMaterial(tex, rough);
+      farMat.name = `far:${batch}`;
+      farMats.set(batch, farMat);
     } else {
-      const farMat = farBakeMaterial(png.texture);
-      farMat.name = `far:${file}`;
-      farMats.set(file, farMat);
+      const farMat = farBakeMaterial(tex);
+      farMat.name = `far:${batch}`;
+      farMats.set(batch, farMat);
     }
   }
 
@@ -196,9 +226,9 @@ export async function buildFloor1(
       // Keep each torch/beam pool even when the party is far down the hall.
       if (dist > CULL_CHEB && !inFlood) continue;
       if (dist <= VOXEL_CHEB) {
-        const list = voxelByFile.get(face.file) ?? [];
+        const list = voxelByFile.get(face.batch) ?? [];
         list.push(face);
-        voxelByFile.set(face.file, list);
+        voxelByFile.set(face.batch, list);
         voxelFaces += 1;
       } else {
         // Bake: flood stays as subdivided MeshBasic. Max: unbaked
@@ -236,9 +266,9 @@ export async function buildFloor1(
 
     const flatsByFile = new Map<string, Array<PreparedFace & { segs: number }>>();
     for (const face of flats) {
-      const list = flatsByFile.get(face.file) ?? [];
+      const list = flatsByFile.get(face.batch) ?? [];
       list.push(face);
-      flatsByFile.set(face.file, list);
+      flatsByFile.set(face.batch, list);
     }
     for (const [file, list] of flatsByFile) {
       const mat = farMats.get(file);
