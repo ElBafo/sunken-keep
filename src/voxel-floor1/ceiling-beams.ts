@@ -365,8 +365,8 @@ export function sootyOakMap(src: THREE.Texture): THREE.Texture {
     const g = pix.data[i + 1] / 255;
     const b = pix.data[i + 2] / 255;
     const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    const sat = 0.2;
-    const dim = 0.58;
+    const sat = 0.28;
+    const dim = 0.74;
     pix.data[i] = Math.round((luma + (r - luma) * sat) * dim * 255);
     pix.data[i + 1] = Math.round((luma + (g - luma) * sat) * dim * 255);
     pix.data[i + 2] = Math.round((luma + (b - luma) * sat) * dim * 255);
@@ -453,7 +453,7 @@ export function meshCeilingBeams(map: THREE.Texture, boxes: CeilingBeamBox[]): T
   albedo.needsUpdate = true;
   const mat = new THREE.MeshPhysicalMaterial({
     map: albedo,
-    color: new THREE.Color(0.72, 0.7, 0.66),
+    color: new THREE.Color(0.84, 0.82, 0.78),
     roughness: 0.94,
     metalness: 0,
     envMapIntensity: 0
