@@ -69,6 +69,7 @@ describe('floor-1 floor and ceiling come from Levie’s map', () => {
     const level = readFileSync(resolve(__dirname, '../src/voxel-floor1/level.ts'), 'utf8');
     expect(level).toContain('paintedShellMaterial');
     expect(level).toContain("face.kind !== 'floor' && face.kind !== 'ceiling'");
+    expect(level).toContain('CAMERA_NEAR + 0.12');
     expect(level).not.toContain('pixelsForRelief');
     const painted = readFileSync(resolve(__dirname, '../src/voxel-floor1/painted.ts'), 'utf8');
     expect(painted).toContain('NearestMipmapNearestFilter');

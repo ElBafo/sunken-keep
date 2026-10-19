@@ -403,9 +403,20 @@ function mergeGeometries(geos: THREE.BufferGeometry[]): THREE.BufferGeometry | n
     const n = g.getAttribute('normal');
     const u = g.getAttribute('uv');
     const ix = g.getIndex();
-    pos.set(p.array as ArrayLike<number> as Float32Array, vo * 3);
-    if (n) nrm.set(n.array as ArrayLike<number> as Float32Array, vo * 3);
-    if (u) uv.set(u.array as ArrayLike<number> as Float32Array, vo * 2);
+    for (let i = 0; i < p.count; i++) {
+      pos[(vo + i) * 3] = p.getX(i);
+      pos[(vo + i) * 3 + 1] = p.getY(i);
+      pos[(vo + i) * 3 + 2] = p.getZ(i);
+      if (n) {
+        nrm[(vo + i) * 3] = n.getX(i);
+        nrm[(vo + i) * 3 + 1] = n.getY(i);
+        nrm[(vo + i) * 3 + 2] = n.getZ(i);
+      }
+      if (u) {
+        uv[(vo + i) * 2] = u.getX(i);
+        uv[(vo + i) * 2 + 1] = u.getY(i);
+      }
+    }
     if (ix) {
       for (let i = 0; i < ix.count; i++) idx[io++] = ix.getX(i) + vBase;
     } else {

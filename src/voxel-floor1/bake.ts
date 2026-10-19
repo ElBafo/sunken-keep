@@ -266,7 +266,7 @@ function packFlatQuad(
   pose: { x: number; y: number; z: number; rotX: number; rotY: number },
   tx: number,
   tz: number,
-  cell: number,
+  size: number,
   segs: number,
   torches: FarTorch[],
   beams: FarBeam[]
@@ -278,7 +278,7 @@ function packFlatQuad(
   farW: number[];
   farB: number[];
 } {
-  const hw = cell / 2;
+  const hw = size / 2;
   const positions: number[] = [];
   const normals: number[] = [];
   const uvs: number[] = [];
@@ -287,10 +287,10 @@ function packFlatQuad(
   const cols = segs + 1;
   for (let j = 0; j <= segs; j++) {
     const v = j / segs;
-    const py = -hw + v * cell;
+    const py = -hw + v * size;
     for (let i = 0; i <= segs; i++) {
       const u = i / segs;
-      const px = -hw + u * cell;
+      const px = -hw + u * size;
       const p = rotateOffset(px, py, 0, pose.rotX, pose.rotY);
       positions.push(p[0] + pose.x, p[1] + pose.y, p[2] + pose.z);
       normals.push(n[0], n[1], n[2]);
@@ -317,13 +317,14 @@ export function flatGeometryWithBake(
     tx: number;
     tz: number;
     segs?: number;
+    size?: number;
   }>,
   torches: FarTorch[],
   cell: number,
   beams: FarBeam[] = []
 ): THREE.BufferGeometry | null {
   const packed = items.map((item) =>
-    packFlatQuad(item.pose, item.tx, item.tz, cell, item.segs ?? 1, torches, beams)
+    packFlatQuad(item.pose, item.tx, item.tz, item.size ?? cell, item.segs ?? 1, torches, beams)
   );
   return geometryFromMerged(mergeFar(packed));
 }

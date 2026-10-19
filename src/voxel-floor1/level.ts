@@ -3,7 +3,7 @@ import { volumeFromImageData, type VolumeFromPixels } from '../voxel-lab/classif
 import { makeToWorld, tileFlatPose } from '../voxel-lab/faces';
 import { loadPng, pbrMap, textureFromPixels, voxelMaterial, type PngPixels } from '../voxel-lab/materials';
 import { greedyMesh, type MeshArrays } from '../voxel-lab/mesher';
-import { CELL, CRACKED_CEILING_FILE, CULL_CHEB, LAYER_SIZE, VOXEL_CHEB } from './constants';
+import { CAMERA_NEAR, CELL, CRACKED_CEILING_FILE, CULL_CHEB, LAYER_SIZE, VOXEL_CHEB } from './constants';
 import { floor1Sconces, floor1Sunbeams } from './fixtures';
 import { canStep, chebyshev, enumerateFaces, type FaceJob, type FloorMap } from './layout';
 import { isBeamCeiling, loadCrackedCeiling } from './crack';
@@ -301,7 +301,14 @@ export async function buildFloor1(
     for (const [file, list] of flatsByFile) {
       const mat = farMats.get(file);
       const geo = flatGeometryWithBake(
-        list.map((f) => ({ pose: f.pose, tx: f.tx, tz: f.tz, segs: f.segs })),
+        list.map((f) => ({
+          pose: f.pose,
+          tx: f.tx,
+          tz: f.tz,
+          segs: f.segs,
+          size:
+            f.kind === 'floor' || f.kind === 'ceiling' ? CELL + 2 * (CAMERA_NEAR + 0.12) : CELL
+        })),
         torches,
         CELL,
         beams
