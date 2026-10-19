@@ -222,7 +222,8 @@ function placeCorridor(map: FloorMap, zone: DecorZone, out: CeilingBeamBox[]): v
     const spineZ = mode(zs);
     const spine = cells.filter((c) => c.y === spineZ).map((c) => c.x);
     for (const [a, b] of runsOf(spine)) {
-      for (let x = a; x <= b; x += 2) {
+      const phase = b - a >= 2 ? 1 : 0;
+      for (let x = a + phase; x <= b; x += 2) {
         emitSpanZ(out, map, 'corridor', x * CELL, spineZ, spineZ);
       }
     }
@@ -231,7 +232,8 @@ function placeCorridor(map: FloorMap, zone: DecorZone, out: CeilingBeamBox[]): v
   const spineX = mode(xs);
   const spine = cells.filter((c) => c.x === spineX).map((c) => c.y);
   for (const [a, b] of runsOf(spine)) {
-    for (let y = a; y <= b; y += 2) {
+    const phase = b - a >= 2 ? 1 : 0;
+    for (let y = a + phase; y <= b; y += 2) {
       emitSpanX(out, map, 'corridor', y * CELL, spineX, spineX);
     }
   }
@@ -358,10 +360,13 @@ export function meshCeilingBeams(map: THREE.Texture, boxes: CeilingBeamBox[]): T
     metalness: 0.04,
     envMapIntensity: 0
   });
+  geo.computeBoundingSphere();
+  geo.computeBoundingBox();
   const mesh = new THREE.Mesh(geo, mat);
   mesh.name = 'ceiling-beams';
   mesh.castShadow = false;
   mesh.receiveShadow = true;
   mesh.userData.castWhenOn = false;
+  mesh.frustumCulled = false;
   return mesh;
 }

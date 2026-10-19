@@ -49,7 +49,7 @@ describe('floor-1 ceiling timber', () => {
   it('spans the start corridor short axis every 2 cells', () => {
     const corridor = beams.filter((b) => b.kind === 'corridor' && Math.abs(b.x - 2 * CELL) < 0.2);
     const rows = corridor.map((b) => Math.round(b.z / CELL)).sort((a, b) => a - b);
-    expect(rows).toEqual([8, 10, 12, 14]);
+    expect(rows).toEqual([9, 11, 13]);
     for (const b of corridor) {
       expect(b.sx).toBeGreaterThan(1.5);
       expect(b.sz).toBeCloseTo(BEAM_WIDTH, 5);
@@ -108,5 +108,16 @@ describe('floor-1 ceiling timber', () => {
     expect(mesh!.receiveShadow).toBe(true);
     const idx = mesh!.geometry.getIndex();
     expect(idx && idx.count / 3).toBe(beams.length * 12);
+    mesh!.geometry.computeBoundingBox();
+    const bb = mesh!.geometry.boundingBox!;
+    expect(bb.max.x - bb.min.x).toBeGreaterThan(10);
+    expect(bb.max.z - bb.min.z).toBeGreaterThan(10);
+    expect(bb.min.y).toBeGreaterThan(1.5);
+    const pos = mesh!.geometry.getAttribute('position');
+    let nonzero = 0;
+    for (let i = 0; i < pos.count; i++) {
+      if (Math.abs(pos.getX(i)) + Math.abs(pos.getZ(i)) > 1) nonzero += 1;
+    }
+    expect(nonzero).toBe(pos.count);
   });
 });
