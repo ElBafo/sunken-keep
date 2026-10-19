@@ -3,7 +3,12 @@ import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
 import floor1FloorCeil from '../levels/floor1_floorceil.json';
 import { CEILING_VARIANTS, FLOOR_VARIANTS } from '../src/voxel-floor1/constants';
-import { compositeCrackedCeiling, crackedCeilingHasGap, scaleNearest } from '../src/voxel-floor1/crack';
+import {
+  compositeCrackedCeiling,
+  crackedCeilingHasGap,
+  pixelsForRelief,
+  scaleNearest
+} from '../src/voxel-floor1/crack';
 import {
   enumerateFaces,
   floor1Map,
@@ -48,6 +53,17 @@ describe('floor-1 floor and ceiling come from Levie’s map', () => {
     expect(mappedCeilingFile(3, 14)).toBe('ceiling_4.png');
     expect(mappedFloorFile(99, 99)).toBeUndefined();
     expect(floor1FloorCeil.squares).toHaveLength(jobs.filter((j) => j.kind === 'floor').length);
+  });
+
+  it('keeps 256 albedo but voxelizes floor/ceiling on the 128 relief grid', () => {
+    const big = { width: 256, height: 256, data: new Uint8ClampedArray(256 * 256 * 4) };
+    const relief = pixelsForRelief(big);
+    expect(relief.width).toBe(128);
+    expect(relief.height).toBe(128);
+    expect(pixelsForRelief({ width: 128, height: 128, data: new Uint8ClampedArray(128 * 128 * 4) }).width).toBe(128);
+    const level = readFileSync(resolve(__dirname, '../src/voxel-floor1/level.ts'), 'utf8');
+    expect(level).toContain('pixelsForRelief(png.data)');
+    expect(level).toContain('texByBatch.set(file, png.texture)');
   });
 
   it('does not put floor or ceiling tiles on the wall mip/atlas path', () => {

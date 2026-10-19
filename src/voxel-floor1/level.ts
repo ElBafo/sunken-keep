@@ -6,7 +6,7 @@ import { greedyMesh, type MeshArrays } from '../voxel-lab/mesher';
 import { CELL, CRACKED_CEILING_FILE, CULL_CHEB, LAYER_SIZE, VOXEL_CHEB } from './constants';
 import { floor1Sconces, floor1Sunbeams } from './fixtures';
 import { canStep, chebyshev, enumerateFaces, type FaceJob, type FloorMap } from './layout';
-import { isBeamCeiling, loadCrackedCeiling } from './crack';
+import { isBeamCeiling, loadCrackedCeiling, pixelsForRelief } from './crack';
 import { lookPixels } from './wall-once';
 import { bulgePose, bulgeWorld, finishVolume, type WallLook } from './wall-look';
 import {
@@ -95,7 +95,7 @@ export async function buildFloor1(
 
   for (const file of neededFiles) {
     const png = pngs.get(file)!;
-    const vol = volumeFromImageData(png.data);
+    const vol = volumeFromImageData(pixelsForRelief(png.data));
     volumes.set(file, vol);
     texByBatch.set(file, png.texture);
     voxels += vol.voxelCount;
