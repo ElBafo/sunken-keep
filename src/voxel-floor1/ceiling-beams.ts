@@ -11,7 +11,6 @@ export const BEAM_CEIL_GAP = 0.04;
 export const BEAM_Y = CELL - BEAM_CEIL_GAP - BEAM_DEPTH / 2;
 const WALL_PAD = 0.08;
 const MIN_SPAN = 0.45;
-const UV_TILE = 0.5;
 
 const CORRIDOR_ZONES = new Set(['entry_gate', 'hook_corridor', 'slime_trail', 'lair']);
 const ROOM_ZONES = new Set([
@@ -289,14 +288,99 @@ export function listCeilingBeams(map: FloorMap): CeilingBeamBox[] {
   return out;
 }
 
-function scaleBoxUvs(geo: THREE.BufferGeometry, sx: number, sy: number, sz: number): void {
+function hash01(x: number, z: number, salt: number): number {
+  let n = Math.imul(Math.round(x * 100) ^ (Math.round(z * 100) << 8) ^ salt, 2246822519);
+  n ^= n >>> 15;
+  return ((n >>> 0) % 10000) / 10000;
+}
+
+type PlacedBeam = CeilingBeamBox & { uScale: number; uOffset: number; uFlip: boolean };
+
+/** Break long runs into uneven lengths so iron straps do not march every 0.5 m. */
+export function chunkCeilingBeams(boxes: CeilingBeamBox[]): PlacedBeam[] {
+  const out: PlacedBeam[] = [];
+  for (const b of boxes) {
+    const alongX = b.sx >= b.sz;
+    const len = alongX ? b.sx : b.sz;
+    const parts: number[] = [];
+    if (len <= 2.3) {
+      parts.push(len);
+    } else {
+      let remain = len;
+      let i = 0;
+      while (remain > 0.55) {
+        const want = 1.55 + hash01(b.x, b.z, 20 + i) * 1.7;
+        const take = remain <= want + 1.05 ? remain : Math.min(want, remain);
+        parts.push(take);
+        remain -= take;
+        i += 1;
+      }
+    }
+    let cursor = alongX ? b.x - b.sx / 2 : b.z - b.sz / 2;
+    for (let i = 0; i < parts.length; i++) {
+      const part = parts[i];
+      const mid = cursor + part / 2;
+      cursor += part;
+      out.push({
+        ...b,
+        x: alongX ? mid : b.x,
+        z: alongX ? b.z : mid,
+        sx: alongX ? part : b.sx,
+        sz: alongX ? b.sz : part,
+        uScale: 0.42 + hash01(b.x, b.z, 40 + i) * 0.28,
+        uOffset: hash01(b.x, b.z, 60 + i) * 0.55,
+        uFlip: hash01(b.x, b.z, 80 + i) > 0.5
+      });
+    }
+  }
+  return out;
+}
+
+function scaleBoxUvs(geo: THREE.BufferGeometry, placed: PlacedBeam): void {
   const uv = geo.getAttribute('uv');
-  const uScale = Math.max(sx, sz) / UV_TILE;
-  const vScale = Math.max(sy, Math.min(sx, sz)) / UV_TILE;
+  const vScale = Math.max(placed.sy, Math.min(placed.sx, placed.sz)) / 0.35;
   for (let i = 0; i < uv.count; i++) {
-    uv.setXY(i, uv.getX(i) * uScale, uv.getY(i) * vScale);
+    let u = uv.getX(i) * placed.uScale;
+    if (placed.uFlip) u = placed.uScale - u;
+    uv.setXY(i, u + placed.uOffset, uv.getY(i) * vScale);
   }
   uv.needsUpdate = true;
+}
+
+/** Pull the crate-bright plank toward sooty oak so it sits with the grey stone. */
+export function sootyOakMap(src: THREE.Texture): THREE.Texture {
+  const img = src.image as { width?: number; height?: number; naturalWidth?: number; naturalHeight?: number } | undefined;
+  const w = img?.naturalWidth || img?.width || 0;
+  const h = img?.naturalHeight || img?.height || 0;
+  if (!img || !w || !h || typeof document === 'undefined') return src;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return src;
+  ctx.drawImage(img as CanvasImageSource, 0, 0);
+  const pix = ctx.getImageData(0, 0, w, h);
+  for (let i = 0; i < pix.data.length; i += 4) {
+    const r = pix.data[i] / 255;
+    const g = pix.data[i + 1] / 255;
+    const b = pix.data[i + 2] / 255;
+    const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+    const sat = 0.2;
+    const dim = 0.58;
+    pix.data[i] = Math.round((luma + (r - luma) * sat) * dim * 255);
+    pix.data[i + 1] = Math.round((luma + (g - luma) * sat) * dim * 255);
+    pix.data[i + 2] = Math.round((luma + (b - luma) * sat) * dim * 255);
+  }
+  ctx.putImageData(pix, 0, 0);
+  const tex = new THREE.Texture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.generateMipmaps = false;
+  tex.needsUpdate = true;
+  return tex;
 }
 
 function mergeGeometries(geos: THREE.BufferGeometry[]): THREE.BufferGeometry | null {
@@ -340,24 +424,27 @@ function mergeGeometries(geos: THREE.BufferGeometry[]): THREE.BufferGeometry | n
 }
 
 export function meshCeilingBeams(map: THREE.Texture, boxes: CeilingBeamBox[]): THREE.Mesh | null {
-  const geos = boxes.map((b) => {
+  const placed = chunkCeilingBeams(boxes);
+  const geos = placed.map((b) => {
     const g = new THREE.BoxGeometry(b.sx, b.sy, b.sz);
-    scaleBoxUvs(g, b.sx, b.sy, b.sz);
+    scaleBoxUvs(g, b);
     g.translate(b.x, b.y, b.z);
     return g;
   });
   const geo = mergeGeometries(geos);
   if (!geo) return null;
-  map.wrapS = THREE.RepeatWrapping;
-  map.wrapT = THREE.RepeatWrapping;
-  map.magFilter = THREE.NearestFilter;
-  map.minFilter = THREE.NearestFilter;
-  map.generateMipmaps = false;
-  map.needsUpdate = true;
+  const albedo = sootyOakMap(map);
+  albedo.wrapS = THREE.RepeatWrapping;
+  albedo.wrapT = THREE.RepeatWrapping;
+  albedo.magFilter = THREE.NearestFilter;
+  albedo.minFilter = THREE.NearestFilter;
+  albedo.generateMipmaps = false;
+  albedo.needsUpdate = true;
   const mat = new THREE.MeshPhysicalMaterial({
-    map,
-    roughness: 0.82,
-    metalness: 0.04,
+    map: albedo,
+    color: new THREE.Color(0.72, 0.7, 0.66),
+    roughness: 0.94,
+    metalness: 0,
     envMapIntensity: 0
   });
   geo.computeBoundingSphere();

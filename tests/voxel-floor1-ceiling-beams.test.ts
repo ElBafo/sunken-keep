@@ -7,6 +7,7 @@ import {
   BEAM_DEPTH,
   BEAM_WIDTH,
   BEAM_Y,
+  chunkCeilingBeams,
   listCeilingBeams,
   meshCeilingBeams,
   skipCeilingBeamCell
@@ -94,6 +95,11 @@ describe('floor-1 ceiling timber', () => {
     expect(src).toContain('castWhenOn = false');
     expect(src).toContain('castShadow = false');
     expect(src).toContain('receiveShadow = true');
+    expect(src).toContain('sootyOakMap');
+    expect(src).toContain('chunkCeilingBeams');
+    expect(src).not.toContain('UV_TILE');
+    const html = readFileSync(resolve(__dirname, '../voxel-floor1.html'), 'utf8');
+    expect(html).not.toMatch(/#floor1-canvas[\s\S]*?translate\(-50%/);
     const props = readFileSync(resolve(__dirname, '../src/voxel-floor1/props.ts'), 'utf8');
     expect(props).toContain('meshCeilingBeams');
     expect(props).toContain('listCeilingBeams');
@@ -107,7 +113,8 @@ describe('floor-1 ceiling timber', () => {
     expect(mesh!.userData.castWhenOn).toBe(false);
     expect(mesh!.receiveShadow).toBe(true);
     const idx = mesh!.geometry.getIndex();
-    expect(idx && idx.count / 3).toBe(beams.length * 12);
+    expect(idx && idx.count % 12).toBe(0);
+    expect(idx && idx.count / 3).toBeGreaterThanOrEqual(beams.length * 12);
     mesh!.geometry.computeBoundingBox();
     const bb = mesh!.geometry.boundingBox!;
     expect(bb.max.x - bb.min.x).toBeGreaterThan(10);
@@ -119,5 +126,8 @@ describe('floor-1 ceiling timber', () => {
       if (Math.abs(pos.getX(i)) + Math.abs(pos.getZ(i)) > 1) nonzero += 1;
     }
     expect(nonzero).toBe(pos.count);
+    const placed = chunkCeilingBeams(beams);
+    expect(placed.every((p) => p.uScale < 0.8)).toBe(true);
+    expect(new Set(placed.map((p) => p.uOffset.toFixed(2))).size).toBeGreaterThan(6);
   });
 });
