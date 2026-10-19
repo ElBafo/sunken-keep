@@ -11,6 +11,7 @@ import {
 import { greedyMesh } from '../src/voxel-lab/mesher';
 import {
   OpeningSystem,
+  maskVolumeWithOpening,
   pickSecretTellTexels,
   recessSecretTell,
   type OpeningVisual
@@ -122,6 +123,10 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     expect(openings).toContain('FLOOR1_WALL_FILES');
     expect(openings).toContain('lookForSecret');
     expect(openings).toContain('lookForZoneBase');
+    expect(openings).toContain('maskVolumeWithOpening');
+    expect(openings).toContain('warnMissingWallTexture');
+    expect(openings).toContain('familyBaseFile');
+    expect(openings).not.toContain('using door_open');
     expect(openings).toContain('surroundFile');
     expect(main).toContain('listDoors(floor1Map)');
     expect(main).toContain('snapOpen(visual, true)');
@@ -160,6 +165,18 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
       expect(look.file.startsWith('walls_floor1/')).toBe(true);
       expect(look.bulge).toBe(0);
     }
+  });
+
+  it('keeps family-base stone only where the painted arch is solid', () => {
+    const wall = new Uint8Array(8).fill(1);
+    const opening = new Uint8Array(8);
+    opening[0] = 1;
+    opening[1] = 1;
+    const masked = maskVolumeWithOpening(wall, [2, 2, 2], opening, [2, 2, 2]);
+    expect(masked[0]).toBe(1);
+    expect(masked[1]).toBe(1);
+    expect(masked[2]).toBe(0);
+    expect(masked[4]).toBe(1);
   });
 
   it('recesses a single field brick by one depth layer', () => {

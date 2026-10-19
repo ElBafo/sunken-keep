@@ -15,6 +15,7 @@ import {
   floor1DecorFaces,
   faceUOffset,
   familyBaseFile,
+  familyBaseForMissingFile,
   lookForSecret,
   lookForWall,
   lookForZoneBase,
@@ -167,9 +168,12 @@ describe('floor-1 walls use Artie painted tiles', () => {
     expect(wallFileExists('walls_floor1/soot_brick_3.png')).toBe(false);
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     expect(lookForWall(14, 10, 'W')?.file).toBe(familyBaseFile('brick'));
-    expect(warn.mock.calls.some((c) => String(c[0]).includes('soot_brick_3') && String(c[0]).includes('brick_base'))).toBe(
-      true
-    );
+    expect(lookForWall(14, 10, 'W')?.file).toBe(familyBaseForMissingFile('walls_floor1/soot_brick_3.png', 'soot'));
+    expect(familyBaseForMissingFile('walls_floor1/soot_brick_3.png')).toBe(familyBaseFile('brick'));
+    expect(familyBaseForMissingFile('walls_floor1/ashlar_ghost.png')).toBe(familyBaseFile('ashlar'));
+    expect(
+      warn.mock.calls.some((c) => String(c[0]).includes('soot_brick_3') && String(c[0]).includes('brick_base'))
+    ).toBe(true);
     warn.mockRestore();
     expect(pell.some((f) => (f.texture ?? '').includes('soot_brick_1'))).toBe(false);
   });

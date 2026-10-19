@@ -105,6 +105,15 @@ export function familyBaseFile(kind: WallKind): string {
   return FAMILY_BASE[kind];
 }
 
+/** Infer a zone-family base when only the missing filename is known. */
+export function familyBaseForMissingFile(file: string, kind?: WallKind): string {
+  if (kind) return familyBaseFile(kind);
+  if (file.includes('ashlar')) return familyBaseFile('ashlar');
+  if (file.includes('banded')) return familyBaseFile('banded');
+  if (file.includes('etched')) return familyBaseFile('etched');
+  return familyBaseFile('brick');
+}
+
 export function wallFileExists(file: string): boolean {
   return KNOWN_WALL_FILES.has(file);
 }

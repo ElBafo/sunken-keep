@@ -8,7 +8,15 @@ import { floor1Sconces, floor1Sunbeams } from './fixtures';
 import { canStep, chebyshev, enumerateFaces, type FaceJob, type FloorMap } from './layout';
 import { isBeamCeiling, loadCrackedCeiling } from './crack';
 import { lookPixels } from './wall-once';
-import { bulgePose, bulgeWorld, familyBaseFile, finishVolume, warnMissingWallTexture, type WallLook } from './wall-look';
+import {
+  bulgePose,
+  bulgeWorld,
+  familyBaseFile,
+  familyBaseForMissingFile,
+  finishVolume,
+  warnMissingWallTexture,
+  type WallLook
+} from './wall-look';
 import {
   FAR_BAKE_SEGS,
   farBakeMaterial,
@@ -80,9 +88,9 @@ export async function buildFloor1(
       try {
         pngs.set(file, file === CRACKED_CEILING_FILE ? await loadCrackedCeiling() : await loadPng(file));
       } catch {
-        const fallback = familyBaseFile('brick');
+        const fallback = familyBaseForMissingFile(file);
         warnMissingWallTexture(file, fallback, 'load');
-        pngs.set(file, await loadPng(fallback));
+        pngs.set(file, await loadPng(fallback === file ? familyBaseFile('brick') : fallback));
       }
     })
   );

@@ -36,9 +36,11 @@ import {
   FLOOR1_WALL_FILES,
   applyUOffset,
   faceUOffset,
+  familyBaseFile,
   finishVolume,
   lookForSecret,
   lookForZoneBase,
+  warnMissingWallTexture,
   type WallLook
 } from './wall-look';
 
@@ -174,6 +176,39 @@ export function recessSecretTell(
       }
     }
     if (maxK >= 1) out[u + v * W + maxK * slice] = 0;
+  }
+  return out;
+}
+
+/** Keep family-base stone only where the painted arch is solid. */
+export function maskVolumeWithOpening(
+  wall: Uint8Array,
+  wallDims: [number, number, number],
+  opening: Uint8Array,
+  openingDims: [number, number, number]
+): Uint8Array {
+  const [wW, wH, wD] = wallDims;
+  const [oW, oH, oD] = openingDims;
+  const out = new Uint8Array(wall.length);
+  const wSlice = wW * wH;
+  const oSlice = oW * oH;
+  for (let v = 0; v < wH; v++) {
+    for (let u = 0; u < wW; u++) {
+      const ou = Math.min(oW - 1, Math.floor((u * oW) / wW));
+      const ov = Math.min(oH - 1, Math.floor((v * oH) / wH));
+      let solid = false;
+      for (let d = 0; d < oD; d++) {
+        if (opening[ou + ov * oW + d * oSlice]) {
+          solid = true;
+          break;
+        }
+      }
+      if (!solid) continue;
+      for (let d = 0; d < wD; d++) {
+        const i = u + v * wW + d * wSlice;
+        out[i] = wall[i];
+      }
+    }
   }
   return out;
 }
@@ -388,7 +423,6 @@ export async function buildFloor1Openings(
     return mat;
   };
   const panelMat = makeMat(panelPng, panelVol);
-  const frameMat = makeMat(framePng, frameVol);
   const secretMats = new Map<string, THREE.MeshPhysicalMaterial>();
   const surroundMats = new Map<string, THREE.MeshPhysicalMaterial>();
   const secretMat = (
@@ -403,15 +437,24 @@ export async function buildFloor1Openings(
     secretMats.set(look.key, mat);
     return mat;
   };
+  const wallPngOrFamilyBase = (look: WallLook, at: string) => {
+    const hit = wallPngs.get(look.file);
+    if (hit) return hit;
+    const fallback = familyBaseFile(look.kind);
+    warnMissingWallTexture(look.file, fallback, at);
+    return wallPngs.get(fallback);
+  };
+
   const surroundMat = (look: WallLook) => {
     const hit = surroundMats.get(look.key);
     if (hit) return hit;
-    const png = wallPngs.get(look.file);
-    if (!png) return frameMat;
+    const png = wallPngOrFamilyBase(look, `door-surround:${look.file}`);
+    if (!png) return null;
     png.texture.wrapS = THREE.RepeatWrapping;
     const src = volumeFromImageData(png.data);
     finishVolume(src, look);
     const mat = makeMat(png, src);
+    mat.name = look.file;
     surroundMats.set(look.key, mat);
     return mat;
   };
@@ -433,26 +476,34 @@ export async function buildFloor1Openings(
     const toWorld = makeToWorld(view.face, view.tx, view.tz, panelVol.dims, LAYER_SIZE, CELL, 'center');
     if (kind === 'door') {
       const surround = lookForZoneBase(view.tx, view.tz);
-      const frameGeo = meshVolume(
-        frameVol.volume,
-        frameVol.dims,
-        toWorld,
-        view.tx,
-        view.tz,
-        torches,
-        beams,
-        true
-      );
-      if (frameGeo) {
-        shiftFaceU(frameGeo, face, view.tx, view.tz);
-        const frame = new THREE.Mesh(frameGeo, surroundMat(surround));
-        frame.name = `door-frame:${visual.x},${visual.y}:${face}`;
-        frame.userData.surroundFile = surround.file;
-        frame.userData.surroundLook = surround.key;
-        frame.castShadow = true;
-        frame.receiveShadow = true;
-        frame.frustumCulled = false;
-        group.add(frame);
+      const wallPng = wallPngOrFamilyBase(surround, `door-frame:${visual.x},${visual.y}:${face}`);
+      const mat = surroundMat(surround);
+      if (wallPng && mat) {
+        const wallSrc = volumeFromImageData(wallPng.data);
+        finishVolume(wallSrc, surround);
+        const surroundVol = maskVolumeWithOpening(wallSrc.volume, wallSrc.dims, frameVol.volume, frameVol.dims);
+        const surroundWorld = makeToWorld(view.face, view.tx, view.tz, wallSrc.dims, LAYER_SIZE, CELL, 'center');
+        const frameGeo = meshVolume(
+          surroundVol,
+          wallSrc.dims,
+          surroundWorld,
+          view.tx,
+          view.tz,
+          torches,
+          beams,
+          true
+        );
+        if (frameGeo) {
+          shiftFaceU(frameGeo, face, view.tx, view.tz);
+          const frame = new THREE.Mesh(frameGeo, mat);
+          frame.name = `door-frame:${visual.x},${visual.y}:${face}`;
+          frame.userData.surroundFile = surround.file;
+          frame.userData.surroundLook = surround.key;
+          frame.castShadow = true;
+          frame.receiveShadow = true;
+          frame.frustumCulled = false;
+          group.add(frame);
+        }
       }
       const panelWorld = offsetToWorld(toWorld, inx, inz, DOOR_PANEL_INSET);
       const panelGeo = meshVolume(panelVol.volume, panelVol.dims, panelWorld, view.tx, view.tz, torches, beams);
@@ -471,7 +522,8 @@ export async function buildFloor1Openings(
       return;
     }
     const look = lookForSecret(view.wallX, view.wallY, view.wallFace, view.tx, view.tz);
-    const png = wallPngs.get(look.file)!;
+    const png = wallPngOrFamilyBase(look, `secret:${visual.x},${visual.y}:${face}`);
+    if (!png) return;
     const pixels = lookPixels(look.file, wallPngs, look.once, look.baseFile);
     const src = volumeFromImageData(pixels);
     finishVolume(src, look);
@@ -536,12 +588,7 @@ export async function buildFloor1Openings(
     system.register(visual);
   }
 
-  system.bindLights(torches, beams, realLights, [
-    panelMat,
-    frameMat,
-    ...secretMats.values(),
-    ...surroundMats.values()
-  ]);
+  system.bindLights(torches, beams, realLights, [panelMat, ...secretMats.values(), ...surroundMats.values()]);
 
   return { group, system };
 }
