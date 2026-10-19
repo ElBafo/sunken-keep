@@ -67,7 +67,7 @@ export const FLOOR_VARIANTS = [
   'floor_stone_3.png',
   'floor_stone_4.png'
 ] as const;
-export const CEILING_VARIANTS = ['ceiling.png', 'ceiling_2.png', 'ceiling_3.png', 'ceiling_4.png'] as const;
+export const CEILING_VARIANTS = ['ceiling_2.png', 'ceiling_3.png', 'ceiling_4.png'] as const;
 export const CRACKED_CEILING_FILE = 'ceiling_cracked.png';
 
 /** Same wall-mount sizes / flicker window as proto3d; duplicated so this page does not import it. */

@@ -21,6 +21,8 @@ import {
 import { applyWallMountNearCull } from './near-cull';
 import { loadPng } from '../voxel-lab/materials';
 import { cupWorldPos, flameOnBracket, meshBracket } from './bracket';
+import { listCeilingBeams, meshCeilingBeams } from './ceiling-beams';
+import { floor1Map } from './layout';
 
 type TorchVisual = {
   spec: SconceSpec;
@@ -110,6 +112,8 @@ export async function buildFloor1Props(
 
   woodBeam.texture.wrapS = THREE.RepeatWrapping;
   woodBeam.texture.wrapT = THREE.RepeatWrapping;
+  const ceiling = meshCeilingBeams(woodBeam.texture, listCeilingBeams(floor1Map));
+  if (ceiling) group.add(ceiling);
   const woodMat = new THREE.MeshBasicMaterial({
     map: woodBeam.texture,
     color: 0xffffff,
