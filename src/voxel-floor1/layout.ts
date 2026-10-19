@@ -1,9 +1,29 @@
 import { floor1 as rawFloor1 } from '../../public/levels/floor1';
+import floor1FloorCeilJson from '../../levels/floor1_floorceil.json';
 import type { FaceId } from '../voxel-lab/faces';
 import { CEILING_VARIANTS, FLOOR_VARIANTS, WALL_VARIANTS } from './constants';
 import { KNOT_FACE_NEIGHBORS, knotWallFile } from './knot-walls';
 import { pickVariant } from './variants';
 import { lookForWall, type WallLook } from './wall-look';
+
+type FloorCeilSquare = { x: number; y: number; floor: string; ceiling: string };
+
+function texName(stem: string): string {
+  return stem.endsWith('.png') ? stem : `${stem}.png`;
+}
+
+const FLOOR_CEIL = new Map<string, { floor: string; ceiling: string }>();
+for (const sq of (floor1FloorCeilJson as { squares: FloorCeilSquare[] }).squares) {
+  FLOOR_CEIL.set(`${sq.x},${sq.y}`, { floor: texName(sq.floor), ceiling: texName(sq.ceiling) });
+}
+
+export function mappedFloorFile(x: number, y: number): string | undefined {
+  return FLOOR_CEIL.get(`${x},${y}`)?.floor;
+}
+
+export function mappedCeilingFile(x: number, y: number): string | undefined {
+  return FLOOR_CEIL.get(`${x},${y}`)?.ceiling;
+}
 
 export type FloorTile = {
   wall?: boolean;
@@ -183,7 +203,7 @@ export function enumerateFaces(map: FloorMap): FaceJob[] {
   for (let z = 0; z < map.height; z++) {
     for (let x = 0; x < map.width; x++) {
       if (!isShellTile(map.tiles[z][x])) continue;
-      const floorFile = pickVariant(FLOOR_VARIANTS, x, z, 'F');
+      const floorFile = mappedFloorFile(x, z) ?? pickVariant(FLOOR_VARIANTS, x, z, 'F');
       jobs.push({
         face: 'floor',
         tx: x,
@@ -196,7 +216,7 @@ export function enumerateFaces(map: FloorMap): FaceJob[] {
         wallFace: 'F',
         bulge: 0
       });
-      const ceilFile = pickVariant(CEILING_VARIANTS, x, z, 'C');
+      const ceilFile = mappedCeilingFile(x, z) ?? pickVariant(CEILING_VARIANTS, x, z, 'C');
       jobs.push({
         face: 'ceiling',
         tx: x,

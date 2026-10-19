@@ -1,9 +1,29 @@
 import * as THREE from 'three';
 import { loadPng, type PngPixels } from '../voxel-lab/materials';
-import { pickVariant } from './variants';
 import { CEILING_VARIANTS, CRACKED_CEILING_FILE } from './constants';
+import { mappedCeilingFile } from './layout';
+import { pickVariant } from './variants';
 
 type Pixels = { width: number; height: number; data: Uint8ClampedArray | Uint8Array };
+
+/** Nearest-neighbour resize so a 128 crack overlay matches a 256 ceiling. */
+export function scaleNearest(src: Pixels, width: number, height: number): Pixels {
+  if (src.width === width && src.height === height) return src;
+  const data = new Uint8ClampedArray(width * height * 4);
+  for (let y = 0; y < height; y++) {
+    const sy = Math.min(src.height - 1, Math.floor((y * src.height) / height));
+    for (let x = 0; x < width; x++) {
+      const sx = Math.min(src.width - 1, Math.floor((x * src.width) / width));
+      const [r, g, b, a] = sample(src, sx, sy);
+      const i = (y * width + x) * 4;
+      data[i] = r;
+      data[i + 1] = g;
+      data[i + 2] = b;
+      data[i + 3] = a;
+    }
+  }
+  return { width, height, data };
+}
 
 function luma(r: number, g: number, b: number): number {
   return (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
@@ -99,9 +119,13 @@ export function isBeamCeiling(tx: number, tz: number, beams: Array<{ x: number; 
 }
 
 export async function loadCrackedCeiling(): Promise<PngPixels> {
-  const variant = pickVariant(CEILING_VARIANTS, 10, 1, 'C');
+  const variant = mappedCeilingFile(10, 1) ?? pickVariant(CEILING_VARIANTS, 10, 1, 'C');
   const [ceil, crack] = await Promise.all([loadPng(variant), loadPng('../atmo/ceiling_crack.png')]);
-  const image = compositeCrackedCeiling(ceil.data, crack.data);
+  const overlay =
+    crack.data.width < ceil.data.width || crack.data.height < ceil.data.height
+      ? scaleNearest(crack.data, ceil.data.width, ceil.data.height)
+      : crack.data;
+  const image = compositeCrackedCeiling(ceil.data, overlay);
   const canvas = document.createElement('canvas');
   canvas.width = image.width;
   canvas.height = image.height;
