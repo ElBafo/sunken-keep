@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { loadPng, type PngPixels } from '../voxel-lab/materials';
-import { CEILING_VARIANTS, CRACKED_CEILING_FILE, WALL_TEXELS } from './constants';
+import { CEILING_VARIANTS, CRACKED_CEILING_FILE } from './constants';
+import { enablePaintedSampling } from './painted';
 import { mappedCeilingFile } from './layout';
 import { pickVariant } from './variants';
 
@@ -23,12 +24,6 @@ export function scaleNearest(src: Pixels, width: number, height: number): Pixels
     }
   }
   return { width, height, data };
-}
-
-/** Relief / PBR stay on the 128 wall grid so a 256 albedo does not 4× the mesh. */
-export function pixelsForRelief(image: Pixels, texels = WALL_TEXELS): Pixels {
-  if (image.width <= texels && image.height <= texels) return image;
-  return scaleNearest(image, texels, texels);
 }
 
 function luma(r: number, g: number, b: number): number {
@@ -141,10 +136,7 @@ export async function loadCrackedCeiling(): Promise<PngPixels> {
   ctx.putImageData(put, 0, 0);
   const texture = new THREE.Texture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  texture.magFilter = THREE.NearestFilter;
-  texture.minFilter = THREE.NearestFilter;
-  texture.generateMipmaps = false;
-  texture.needsUpdate = true;
+  enablePaintedSampling(texture);
   const img = new Image();
   img.width = image.width;
   img.height = image.height;

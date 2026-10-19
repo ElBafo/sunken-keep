@@ -6,7 +6,8 @@ import { greedyMesh, type MeshArrays } from '../voxel-lab/mesher';
 import { CELL, CRACKED_CEILING_FILE, CULL_CHEB, LAYER_SIZE, VOXEL_CHEB } from './constants';
 import { floor1Sconces, floor1Sunbeams } from './fixtures';
 import { canStep, chebyshev, enumerateFaces, type FaceJob, type FloorMap } from './layout';
-import { isBeamCeiling, loadCrackedCeiling, pixelsForRelief } from './crack';
+import { isBeamCeiling, loadCrackedCeiling } from './crack';
+import { isPaintedShellFile, normalFromAlbedo, paintedShellMaterial } from './painted';
 import { lookPixels } from './wall-once';
 import { bulgePose, bulgeWorld, finishVolume, type WallLook } from './wall-look';
 import {
@@ -53,7 +54,7 @@ export interface BuiltLevel {
 }
 
 type PreparedFace = FaceJob & {
-  mesh: MeshArrays;
+  mesh: MeshArrays | null;
   pose: ReturnType<typeof tileFlatPose>;
 };
 
@@ -67,6 +68,7 @@ export async function buildFloor1(
   for (const job of jobs) {
     if (job.kind === 'ceiling' && isBeamCeiling(job.tx, job.tz, floor1Sunbeams)) {
       job.file = CRACKED_CEILING_FILE;
+      job.batch = CRACKED_CEILING_FILE;
     }
   }
   const neededFiles = new Set<string>();
@@ -84,6 +86,7 @@ export async function buildFloor1(
   const volumes = new Map<string, VolumeFromPixels>();
   const texByBatch = new Map<string, THREE.Texture>();
   const roughByBatch = new Map<string, THREE.DataTexture>();
+  const normalByBatch = new Map<string, THREE.Texture>();
   let voxels = 0;
   let quads = 0;
   let triangles = 0;
@@ -95,9 +98,13 @@ export async function buildFloor1(
 
   for (const file of neededFiles) {
     const png = pngs.get(file)!;
-    const vol = volumeFromImageData(pixelsForRelief(png.data));
-    volumes.set(file, vol);
     texByBatch.set(file, png.texture);
+    if (isPaintedShellFile(file)) {
+      normalByBatch.set(file, normalFromAlbedo(png.data));
+      continue;
+    }
+    const vol = volumeFromImageData(png.data);
+    volumes.set(file, vol);
     voxels += vol.voxelCount;
     roughByBatch.set(file, pbrMap(vol.roughness, vol.dims[0], vol.dims[1]));
   }
@@ -117,6 +124,13 @@ export async function buildFloor1(
 
   const prepared: PreparedFace[] = [];
   for (const job of jobs) {
+    const pose = bulgePose(job.face, tileFlatPose(job.face, job.tx, job.tz, CELL, 'center'), job.bulge, CELL);
+    if (job.kind === 'floor' || job.kind === 'ceiling') {
+      quads += 1;
+      triangles += 2;
+      prepared.push({ ...job, mesh: null, pose });
+      continue;
+    }
     const vol = volumes.get(job.batch);
     if (!vol) continue;
     const toWorld = bulgeWorld(
@@ -131,7 +145,7 @@ export async function buildFloor1(
     prepared.push({
       ...job,
       mesh: meshed.mesh,
-      pose: bulgePose(job.face, tileFlatPose(job.face, job.tx, job.tz, CELL, 'center'), job.bulge, CELL)
+      pose
     });
   }
 
@@ -140,6 +154,20 @@ export async function buildFloor1(
   const mats = new Map<string, THREE.MeshPhysicalMaterial>();
   const farMats = new Map<string, THREE.Material>();
   for (const [batch, tex] of texByBatch) {
+    if (isPaintedShellFile(batch)) {
+      const painted = paintedShellMaterial(tex, normalByBatch.get(batch), batch);
+      painted.name = batch;
+      mats.set(batch, painted);
+      if (realLights) {
+        farMats.set(batch, painted);
+      } else {
+        const farMat = farBakeMaterial(tex);
+        farMat.name = `far:${batch}`;
+        if (batch === CRACKED_CEILING_FILE) farMat.alphaTest = painted.alphaTest;
+        farMats.set(batch, farMat);
+      }
+      continue;
+    }
     const rough = roughByBatch.get(batch);
     if (!tex || !rough) continue;
     const mat = voxelMaterial(tex, rough);
@@ -225,7 +253,7 @@ export async function buildFloor1(
       const inFlood = tileInLightFlood(face.tx, face.tz, torches, beams);
       // Keep each torch/beam pool even when the party is far down the hall.
       if (dist > CULL_CHEB && !inFlood) continue;
-      if (dist <= VOXEL_CHEB) {
+      if (face.kind !== 'floor' && face.kind !== 'ceiling' && dist <= VOXEL_CHEB) {
         const list = voxelByFile.get(face.batch) ?? [];
         list.push(face);
         voxelByFile.set(face.batch, list);
@@ -249,7 +277,7 @@ export async function buildFloor1(
     for (const [file, faces] of voxelByFile) {
       const mat = mats.get(file);
       const geo = geometryWithBake(
-        faces.map((f) => ({ mesh: f.mesh, tx: f.tx, tz: f.tz })),
+        faces.map((f) => ({ mesh: f.mesh!, tx: f.tx, tz: f.tz })),
         torches,
         beams
       );
