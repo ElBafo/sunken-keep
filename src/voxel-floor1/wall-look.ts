@@ -73,6 +73,7 @@ export const FLOOR1_WALL_FILES = [
   'walls_floor1/brick_patched.png',
   'walls_floor1/brick_missing.png',
   'walls_floor1/soot_brick_2.png',
+  'walls_floor1/soot_brick_3.png',
   'walls_floor1/etched_1.png',
   'walls_floor1/etched_2.png',
   'walls_floor1/banded_1.png',
@@ -89,6 +90,7 @@ const STRONG = {
 } as const;
 
 export const SOOT_2 = 'walls_floor1/soot_brick_2.png';
+export const SOOT_3 = 'walls_floor1/soot_brick_3.png';
 
 /** Family base tile. Brick and soot zones share `brick_base`. */
 export const FAMILY_BASE: Record<WallKind, string> = {

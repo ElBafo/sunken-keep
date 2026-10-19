@@ -20,6 +20,7 @@ import {
   lookForWall,
   lookForZoneBase,
   SOOT_2,
+  SOOT_3,
   STRONG,
   textureFile,
   uniqueLooks,
@@ -164,16 +165,14 @@ describe('floor-1 walls use Artie painted tiles', () => {
     expect(pell.length).toBeGreaterThan(0);
     expect(pell.every((f) => wallKind(f) === 'brick')).toBe(true);
     expect(lookForWall(14, 9, 'W')?.file).toBe(SOOT_2);
-    expect(artieFileFor(14, 10, 'W')).toBe('walls_floor1/soot_brick_3.png');
-    expect(wallFileExists('walls_floor1/soot_brick_3.png')).toBe(false);
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    expect(lookForWall(14, 10, 'W')?.file).toBe(familyBaseFile('brick'));
-    expect(lookForWall(14, 10, 'W')?.file).toBe(familyBaseForMissingFile('walls_floor1/soot_brick_3.png', 'soot'));
-    expect(familyBaseForMissingFile('walls_floor1/soot_brick_3.png')).toBe(familyBaseFile('brick'));
+    expect(artieFileFor(14, 10, 'W')).toBe(SOOT_3);
+    expect(wallFileExists(SOOT_3)).toBe(true);
+    expect(lookForWall(14, 10, 'W')?.file).toBe(SOOT_3);
     expect(familyBaseForMissingFile('walls_floor1/ashlar_ghost.png')).toBe(familyBaseFile('ashlar'));
-    expect(
-      warn.mock.calls.some((c) => String(c[0]).includes('soot_brick_3') && String(c[0]).includes('brick_base'))
-    ).toBe(true);
+    expect(familyBaseForMissingFile('walls_floor1/soot_brick_9.png', 'soot')).toBe(familyBaseFile('brick'));
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    expect(lookForWall(14, 10, 'W')?.file).toBe(SOOT_3);
+    expect(warn).not.toHaveBeenCalled();
     warn.mockRestore();
     expect(pell.some((f) => (f.texture ?? '').includes('soot_brick_1'))).toBe(false);
   });
