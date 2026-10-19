@@ -288,67 +288,156 @@ export function listCeilingBeams(map: FloorMap): CeilingBeamBox[] {
   return out;
 }
 
+/** 64² wood_beam.png: one texel is one centimetre. */
+export const TEXEL_M = 0.01;
+export const WOOD_TILE_M = 64 * TEXEL_M;
+const STRAP_M = 0.05;
+const STRAP_U0 = 0.17;
+const STRAP_U1 = 0.3;
+
 function hash01(x: number, z: number, salt: number): number {
   let n = Math.imul(Math.round(x * 100) ^ (Math.round(z * 100) << 8) ^ salt, 2246822519);
   n ^= n >>> 15;
   return ((n >>> 0) % 10000) / 10000;
 }
 
-type PlacedBeam = CeilingBeamBox & { uScale: number; uOffset: number; uFlip: boolean };
+function alongX(b: Pick<CeilingBeamBox, 'sx' | 'sz'>): boolean {
+  return b.sx >= b.sz;
+}
 
-/** Break long runs into uneven lengths so iron straps do not march every 0.5 m. */
-export function chunkCeilingBeams(boxes: CeilingBeamBox[]): PlacedBeam[] {
-  const out: PlacedBeam[] = [];
+/** 2–3 iron bands per beam, jittered off a regular split. */
+export function listBeamStraps(boxes: CeilingBeamBox[]): CeilingBeamBox[] {
+  const out: CeilingBeamBox[] = [];
   for (const b of boxes) {
-    const alongX = b.sx >= b.sz;
-    const len = alongX ? b.sx : b.sz;
-    const parts: number[] = [];
-    if (len <= 2.3) {
-      parts.push(len);
-    } else {
-      let remain = len;
-      let i = 0;
-      while (remain > 0.55) {
-        const want = 1.55 + hash01(b.x, b.z, 20 + i) * 1.7;
-        const take = remain <= want + 1.05 ? remain : Math.min(want, remain);
-        parts.push(take);
-        remain -= take;
-        i += 1;
+    const xRun = alongX(b);
+    const len = xRun ? b.sx : b.sz;
+    const n = len < 2.4 ? 2 : 3;
+    const bases = n === 2 ? [0.27, 0.71] : [0.15, 0.49, 0.83];
+    const start = xRun ? b.x - b.sx / 2 : b.z - b.sz / 2;
+    for (let i = 0; i < n; i++) {
+      const t = Math.min(0.92, Math.max(0.08, bases[i] + (hash01(b.x, b.z, 3 + i) - 0.5) * 0.12));
+      const at = start + t * len;
+      if (xRun) {
+        out.push({
+          ...b,
+          x: at,
+          sx: STRAP_M,
+          sy: b.sy + 0.014,
+          sz: b.sz + 0.014,
+          kind: b.kind
+        });
+      } else {
+        out.push({
+          ...b,
+          z: at,
+          sx: b.sx + 0.014,
+          sy: b.sy + 0.014,
+          sz: STRAP_M,
+          kind: b.kind
+        });
       }
-    }
-    let cursor = alongX ? b.x - b.sx / 2 : b.z - b.sz / 2;
-    for (let i = 0; i < parts.length; i++) {
-      const part = parts[i];
-      const mid = cursor + part / 2;
-      cursor += part;
-      out.push({
-        ...b,
-        x: alongX ? mid : b.x,
-        z: alongX ? b.z : mid,
-        sx: alongX ? part : b.sx,
-        sz: alongX ? b.sz : part,
-        uScale: 0.42 + hash01(b.x, b.z, 40 + i) * 0.28,
-        uOffset: hash01(b.x, b.z, 60 + i) * 0.55,
-        uFlip: hash01(b.x, b.z, 80 + i) > 0.5
-      });
     }
   }
   return out;
 }
 
-function scaleBoxUvs(geo: THREE.BufferGeometry, placed: PlacedBeam): void {
+/** BoxGeometry faces: +X −X +Y −Y +Z −Z. U/V follow the face width/height. */
+const FACE_SIZE: Array<(s: CeilingBeamBox) => [number, number]> = [
+  (s) => [s.sz, s.sy],
+  (s) => [s.sz, s.sy],
+  (s) => [s.sx, s.sz],
+  (s) => [s.sx, s.sz],
+  (s) => [s.sx, s.sy],
+  (s) => [s.sx, s.sy]
+];
+
+function setWoodUvs(geo: THREE.BufferGeometry, box: CeilingBeamBox, uOffset: number): void {
   const uv = geo.getAttribute('uv');
-  const vScale = Math.max(placed.sy, Math.min(placed.sx, placed.sz)) / 0.35;
-  for (let i = 0; i < uv.count; i++) {
-    let u = uv.getX(i) * placed.uScale;
-    if (placed.uFlip) u = placed.uScale - u;
-    uv.setXY(i, u + placed.uOffset, uv.getY(i) * vScale);
+  for (let f = 0; f < 6; f++) {
+    const [wu, wv] = FACE_SIZE[f](box);
+    const uScale = wu / WOOD_TILE_M;
+    const vScale = wv / WOOD_TILE_M;
+    for (let k = 0; k < 4; k++) {
+      const i = f * 4 + k;
+      uv.setXY(i, uv.getX(i) * uScale + uOffset, uv.getY(i) * vScale);
+    }
   }
   uv.needsUpdate = true;
 }
 
-/** Pull the crate-bright plank toward sooty oak so it sits with the grey stone. */
-export function sootyOakMap(src: THREE.Texture): THREE.Texture {
+function setStrapUvs(geo: THREE.BufferGeometry, box: CeilingBeamBox): void {
+  const uv = geo.getAttribute('uv');
+  const thin = Math.min(box.sx, box.sz);
+  for (let f = 0; f < 6; f++) {
+    const [wu, wv] = FACE_SIZE[f](box);
+    for (let k = 0; k < 4; k++) {
+      const i = f * 4 + k;
+      const u0 = uv.getX(i);
+      const v0 = uv.getY(i);
+      if (Math.abs(wu - thin) < 0.02) {
+        uv.setXY(i, STRAP_U0 + u0 * (STRAP_U1 - STRAP_U0), v0);
+      } else if (Math.abs(wv - thin) < 0.02) {
+        uv.setXY(i, STRAP_U0 + v0 * (STRAP_U1 - STRAP_U0), u0);
+      } else {
+        uv.setXY(i, STRAP_U0 + u0 * (STRAP_U1 - STRAP_U0), v0 * (wv / WOOD_TILE_M));
+      }
+    }
+  }
+  uv.needsUpdate = true;
+}
+
+function sootyPixel(r: number, g: number, b: number): [number, number, number] {
+  const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  const sat = 0.28;
+  const dim = 0.74;
+  return [
+    (luma + (r - luma) * sat) * dim,
+    (luma + (g - luma) * sat) * dim,
+    (luma + (b - luma) * sat) * dim
+  ];
+}
+
+function inpaintWood(pix: ImageData): void {
+  const w = pix.width;
+  const h = pix.height;
+  const colScore = new Float32Array(w);
+  for (let x = 0; x < w; x++) {
+    let bright = 0;
+    for (let y = 0; y < h; y++) {
+      const i = (y * w + x) * 4;
+      const luma = 0.2126 * pix.data[i] + 0.7152 * pix.data[i + 1] + 0.0722 * pix.data[i + 2];
+      if (luma > 140) bright += 1;
+    }
+    colScore[x] = bright;
+  }
+  const strap = Array.from(colScore, (s) => s >= 3);
+  const woodCols: number[] = [];
+  for (let x = 0; x < w; x++) if (!strap[x]) woodCols.push(x);
+  if (woodCols.length < 8) return;
+  for (let x = 0; x < w; x++) {
+    if (!strap[x]) continue;
+    let src = woodCols[0];
+    let best = w;
+    for (const c of woodCols) {
+      const d = Math.abs(c - x);
+      if (d < best) {
+        best = d;
+        src = c;
+      }
+    }
+    for (let y = 0; y < h; y++) {
+      const a = (y * w + x) * 4;
+      const b = (y * w + src) * 4;
+      pix.data[a] = pix.data[b];
+      pix.data[a + 1] = pix.data[b + 1];
+      pix.data[a + 2] = pix.data[b + 2];
+      pix.data[a + 3] = pix.data[b + 3];
+    }
+  }
+}
+
+/** Pull the crate-bright plank toward sooty oak. `woodOnly` fills strap columns with grain. */
+export function sootyOakMap(src: THREE.Texture, woodOnly = false): THREE.Texture {
   const img = src.image as { width?: number; height?: number; naturalWidth?: number; naturalHeight?: number } | undefined;
   const w = img?.naturalWidth || img?.width || 0;
   const h = img?.naturalHeight || img?.height || 0;
@@ -360,16 +449,12 @@ export function sootyOakMap(src: THREE.Texture): THREE.Texture {
   if (!ctx) return src;
   ctx.drawImage(img as CanvasImageSource, 0, 0);
   const pix = ctx.getImageData(0, 0, w, h);
+  if (woodOnly) inpaintWood(pix);
   for (let i = 0; i < pix.data.length; i += 4) {
-    const r = pix.data[i] / 255;
-    const g = pix.data[i + 1] / 255;
-    const b = pix.data[i + 2] / 255;
-    const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    const sat = 0.28;
-    const dim = 0.74;
-    pix.data[i] = Math.round((luma + (r - luma) * sat) * dim * 255);
-    pix.data[i + 1] = Math.round((luma + (g - luma) * sat) * dim * 255);
-    pix.data[i + 2] = Math.round((luma + (b - luma) * sat) * dim * 255);
+    const [r, g, b] = sootyPixel(pix.data[i] / 255, pix.data[i + 1] / 255, pix.data[i + 2] / 255);
+    pix.data[i] = Math.round(r * 255);
+    pix.data[i + 1] = Math.round(g * 255);
+    pix.data[i + 2] = Math.round(b * 255);
   }
   ctx.putImageData(pix, 0, 0);
   const tex = new THREE.Texture(canvas);
@@ -434,37 +519,77 @@ function mergeGeometries(geos: THREE.BufferGeometry[]): THREE.BufferGeometry | n
   return out;
 }
 
-export function meshCeilingBeams(map: THREE.Texture, boxes: CeilingBeamBox[]): THREE.Mesh | null {
-  const placed = chunkCeilingBeams(boxes);
-  const geos = placed.map((b) => {
+function batchBoxes(
+  boxes: CeilingBeamBox[],
+  setUvs: (geo: THREE.BufferGeometry, box: CeilingBeamBox) => void
+): THREE.BufferGeometry | null {
+  const geos = boxes.map((b) => {
     const g = new THREE.BoxGeometry(b.sx, b.sy, b.sz);
-    scaleBoxUvs(g, b);
+    setUvs(g, b);
     g.translate(b.x, b.y, b.z);
     return g;
   });
   const geo = mergeGeometries(geos);
   if (!geo) return null;
-  const albedo = sootyOakMap(map);
-  albedo.wrapS = THREE.RepeatWrapping;
-  albedo.wrapT = THREE.RepeatWrapping;
-  albedo.magFilter = THREE.NearestFilter;
-  albedo.minFilter = THREE.NearestFilter;
-  albedo.generateMipmaps = false;
-  albedo.needsUpdate = true;
-  const mat = new THREE.MeshPhysicalMaterial({
-    map: albedo,
-    color: new THREE.Color(0.84, 0.82, 0.78),
-    roughness: 0.94,
-    metalness: 0,
-    envMapIntensity: 0
-  });
   geo.computeBoundingSphere();
   geo.computeBoundingBox();
+  return geo;
+}
+
+function beamMesh(name: string, geo: THREE.BufferGeometry, mat: THREE.Material): THREE.Mesh {
   const mesh = new THREE.Mesh(geo, mat);
-  mesh.name = 'ceiling-beams';
+  mesh.name = name;
   mesh.castShadow = false;
   mesh.receiveShadow = true;
   mesh.userData.castWhenOn = false;
   mesh.frustumCulled = false;
   return mesh;
+}
+
+/** Two batched MeshPhysical draws: wood grain at 1 cm/texel, then 2–3 iron rings. */
+export function meshCeilingBeams(map: THREE.Texture, boxes: CeilingBeamBox[]): THREE.Group | null {
+  if (!boxes.length) return null;
+  const woodGeo = batchBoxes(boxes, (g, b) => {
+    const start = alongX(b) ? b.x - b.sx / 2 : b.z - b.sz / 2;
+    setWoodUvs(g, b, start / WOOD_TILE_M + hash01(b.x, b.z, 1) * 0.35);
+  });
+  const strapGeo = batchBoxes(listBeamStraps(boxes), (g, b) => setStrapUvs(g, b));
+  if (!woodGeo && !strapGeo) return null;
+
+  const woodMap = sootyOakMap(map, true);
+  const strapMap = sootyOakMap(map, false);
+  const group = new THREE.Group();
+  group.name = 'ceiling-beams';
+  group.userData.castWhenOn = false;
+  if (woodGeo) {
+    group.add(
+      beamMesh(
+        'ceiling-beams-wood',
+        woodGeo,
+        new THREE.MeshPhysicalMaterial({
+          map: woodMap,
+          color: new THREE.Color(0.84, 0.82, 0.78),
+          roughness: 0.94,
+          metalness: 0,
+          envMapIntensity: 0
+        })
+      )
+    );
+  }
+  if (strapGeo) {
+    group.add(
+      beamMesh(
+        'ceiling-beams-straps',
+        strapGeo,
+        new THREE.MeshPhysicalMaterial({
+          map: strapMap,
+          color: new THREE.Color(0.55, 0.52, 0.5),
+          roughness: 0.52,
+          metalness: 0.38,
+          envMapIntensity: 0
+        })
+      )
+    );
+  }
+  return group;
 }

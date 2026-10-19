@@ -7,7 +7,9 @@ import {
   BEAM_DEPTH,
   BEAM_WIDTH,
   BEAM_Y,
-  chunkCeilingBeams,
+  TEXEL_M,
+  WOOD_TILE_M,
+  listBeamStraps,
   listCeilingBeams,
   meshCeilingBeams,
   skipCeilingBeamCell
@@ -88,7 +90,33 @@ describe('floor-1 ceiling timber', () => {
     }
   });
 
-  it('batches into one MeshPhysical mesh and does not add casters', () => {
+  it('places 2–3 uneven iron straps per beam', () => {
+    expect(TEXEL_M).toBeCloseTo(0.01, 8);
+    expect(WOOD_TILE_M).toBeCloseTo(0.64, 5);
+    for (const b of beams) {
+      const straps = listBeamStraps([b]);
+      const len = Math.max(b.sx, b.sz);
+      expect(straps.length).toBe(len < 2.4 ? 2 : 3);
+      const along = b.sx >= b.sz;
+      const start = along ? b.x - b.sx / 2 : b.z - b.sz / 2;
+      const ts = straps.map((s) => ((along ? s.x : s.z) - start) / len);
+      expect(Math.min(...ts)).toBeGreaterThan(0.05);
+      expect(Math.max(...ts)).toBeLessThan(0.95);
+      for (const s of straps) {
+        expect(Math.min(s.sx, s.sz)).toBeCloseTo(0.05, 5);
+        expect(s.sy).toBeGreaterThan(b.sy);
+      }
+    }
+    const firsts = beams.map((beam) => {
+      const s = listBeamStraps([beam])[0];
+      const run = beam.sx >= beam.sz;
+      const a = run ? beam.x - beam.sx / 2 : beam.z - beam.sz / 2;
+      return ((run ? s.x : s.z) - a) / Math.max(beam.sx, beam.sz);
+    });
+    expect(new Set(firsts.map((t) => t.toFixed(2))).size).toBeGreaterThan(4);
+  });
+
+  it('batches wood and straps into MeshPhysical meshes at 1 cm per texel', () => {
     const src = readFileSync(resolve(__dirname, '../src/voxel-floor1/ceiling-beams.ts'), 'utf8');
     expect(src).toContain('MeshPhysicalMaterial');
     expect(src).toContain('mergeGeometries');
@@ -96,7 +124,11 @@ describe('floor-1 ceiling timber', () => {
     expect(src).toContain('castShadow = false');
     expect(src).toContain('receiveShadow = true');
     expect(src).toContain('sootyOakMap');
-    expect(src).toContain('chunkCeilingBeams');
+    expect(src).toContain('listBeamStraps');
+    expect(src).toContain('setWoodUvs');
+    expect(src).toContain('[0.27, 0.71]');
+    expect(src).toContain('[0.15, 0.49, 0.83]');
+    expect(src).not.toContain('chunkCeilingBeams');
     expect(src).not.toContain('UV_TILE');
     const html = readFileSync(resolve(__dirname, '../voxel-floor1.html'), 'utf8');
     expect(html).not.toMatch(/#floor1-canvas[\s\S]*?translate\(-50%/);
@@ -104,30 +136,42 @@ describe('floor-1 ceiling timber', () => {
     expect(props).toContain('meshCeilingBeams');
     expect(props).toContain('listCeilingBeams');
     expect(props).toContain('wood_beam.png');
+
     const tex = new THREE.Texture();
-    const mesh = meshCeilingBeams(tex, beams);
-    expect(mesh).not.toBeNull();
-    expect(mesh!.isMesh).toBe(true);
-    expect(mesh!.material).toBeInstanceOf(THREE.MeshPhysicalMaterial);
-    expect(mesh!.castShadow).toBe(false);
-    expect(mesh!.userData.castWhenOn).toBe(false);
-    expect(mesh!.receiveShadow).toBe(true);
-    const idx = mesh!.geometry.getIndex();
-    expect(idx && idx.count % 12).toBe(0);
-    expect(idx && idx.count / 3).toBeGreaterThanOrEqual(beams.length * 12);
-    mesh!.geometry.computeBoundingBox();
-    const bb = mesh!.geometry.boundingBox!;
+    const group = meshCeilingBeams(tex, beams);
+    expect(group).not.toBeNull();
+    expect(group!.isGroup).toBe(true);
+    expect(group!.userData.castWhenOn).toBe(false);
+    const wood = group!.getObjectByName('ceiling-beams-wood') as THREE.Mesh;
+    const straps = group!.getObjectByName('ceiling-beams-straps') as THREE.Mesh;
+    expect(wood.isMesh).toBe(true);
+    expect(straps.isMesh).toBe(true);
+    expect(wood.material).toBeInstanceOf(THREE.MeshPhysicalMaterial);
+    expect(straps.material).toBeInstanceOf(THREE.MeshPhysicalMaterial);
+    for (const mesh of [wood, straps]) {
+      expect(mesh.castShadow).toBe(false);
+      expect(mesh.userData.castWhenOn).toBe(false);
+      expect(mesh.receiveShadow).toBe(true);
+    }
+    const woodIdx = wood.geometry.getIndex();
+    expect(woodIdx && woodIdx.count % 12).toBe(0);
+    expect(woodIdx && woodIdx.count / 3).toBe(beams.length * 12);
+    wood.geometry.computeBoundingBox();
+    const bb = wood.geometry.boundingBox!;
     expect(bb.max.x - bb.min.x).toBeGreaterThan(10);
     expect(bb.max.z - bb.min.z).toBeGreaterThan(10);
     expect(bb.min.y).toBeGreaterThan(1.5);
-    const pos = mesh!.geometry.getAttribute('position');
-    let nonzero = 0;
-    for (let i = 0; i < pos.count; i++) {
-      if (Math.abs(pos.getX(i)) + Math.abs(pos.getZ(i)) > 1) nonzero += 1;
-    }
-    expect(nonzero).toBe(pos.count);
-    const placed = chunkCeilingBeams(beams);
-    expect(placed.every((p) => p.uScale < 0.8)).toBe(true);
-    expect(new Set(placed.map((p) => p.uOffset.toFixed(2))).size).toBeGreaterThan(6);
+
+    const hall = beams.find((b) => b.kind === 'corridor' && Math.abs(b.x - 2 * CELL) < 0.2)!;
+    const one = meshCeilingBeams(tex, [hall])!;
+    const oneWood = one.getObjectByName('ceiling-beams-wood') as THREE.Mesh;
+    const uv = oneWood.geometry.getAttribute('uv');
+    const faceU = [16, 17, 18, 19].map((i) => uv.getX(i));
+    const faceV = [16, 17, 18, 19].map((i) => uv.getY(i));
+    expect(Math.max(...faceU) - Math.min(...faceU)).toBeCloseTo(hall.sx / WOOD_TILE_M, 3);
+    expect(Math.max(...faceV) - Math.min(...faceV)).toBeCloseTo(hall.sy / WOOD_TILE_M, 3);
+    expect(one.getObjectByName('ceiling-beams-straps')).toBeTruthy();
+    const strapIdx = (one.getObjectByName('ceiling-beams-straps') as THREE.Mesh).geometry.getIndex();
+    expect(strapIdx && strapIdx.count / 3).toBe(listBeamStraps([hall]).length * 12);
   });
 });
