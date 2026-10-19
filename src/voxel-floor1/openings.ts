@@ -180,7 +180,103 @@ export function recessSecretTell(
   return out;
 }
 
-/** Keep family-base stone only where the painted arch is solid. */
+/** Empty texels of the painted doorway void, ignoring thin mortar cracks. */
+export function openingHoleMask(opening: Uint8Array, dims: [number, number, number]): Uint8Array {
+  const [W, H, D] = dims;
+  const slice = W * H;
+  const empty = new Uint8Array(slice);
+  for (let v = 0; v < H; v++) {
+    for (let u = 0; u < W; u++) {
+      let solid = false;
+      for (let d = 0; d < D; d++) {
+        if (opening[u + v * W + d * slice]) {
+          solid = true;
+          break;
+        }
+      }
+      empty[u + v * W] = solid ? 0 : 1;
+    }
+  }
+  const erode = Math.min(W, H) < 8 ? 0 : Math.max(1, Math.round(Math.min(W, H) / 32));
+  const interior = new Uint8Array(slice);
+  for (let v = 0; v < H; v++) {
+    for (let u = 0; u < W; u++) {
+      let keep = 1;
+      for (let dy = -erode; dy <= erode && keep; dy++) {
+        const y = v + dy;
+        if (y < 0 || y >= H) {
+          keep = 0;
+          break;
+        }
+        for (let dx = -erode; dx <= erode; dx++) {
+          const x = u + dx;
+          if (x < 0 || x >= W || !empty[x + y * W]) {
+            keep = 0;
+            break;
+          }
+        }
+      }
+      interior[u + v * W] = keep;
+    }
+  }
+  const core = new Uint8Array(slice);
+  const stack: number[] = [];
+  const seeds: Array<[number, number]> = [
+    [W >> 1, H >> 1],
+    [W >> 1, ((H * 2) / 3) | 0],
+    [W >> 1, ((H * 3) / 4) | 0]
+  ];
+  for (const [su, sv] of seeds) {
+    const i = su + sv * W;
+    if (interior[i]) stack.push(i);
+  }
+  if (!stack.length) {
+    for (let i = 0; i < slice; i++) {
+      if (interior[i]) {
+        stack.push(i);
+        break;
+      }
+    }
+  }
+  const dirs: Array<[number, number]> = [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1]
+  ];
+  while (stack.length) {
+    const i = stack.pop()!;
+    if (core[i] || !interior[i]) continue;
+    core[i] = 1;
+    const u = i % W;
+    const v = (i / W) | 0;
+    for (const [dx, dy] of dirs) {
+      const nu = u + dx;
+      const nv = v + dy;
+      if (nu < 0 || nv < 0 || nu >= W || nv >= H) continue;
+      const ni = nu + nv * W;
+      if (!core[ni] && interior[ni]) stack.push(ni);
+    }
+  }
+  const hole = new Uint8Array(slice);
+  for (let v = 0; v < H; v++) {
+    for (let u = 0; u < W; u++) {
+      if (!core[u + v * W]) continue;
+      for (let dy = -erode; dy <= erode; dy++) {
+        const y = v + dy;
+        if (y < 0 || y >= H) continue;
+        for (let dx = -erode; dx <= erode; dx++) {
+          const x = u + dx;
+          if (x < 0 || x >= W) continue;
+          if (empty[x + y * W]) hole[x + y * W] = 1;
+        }
+      }
+    }
+  }
+  return hole;
+}
+
+/** Keep family-base stone, cutting only the painted doorway void. */
 export function maskVolumeWithOpening(
   wall: Uint8Array,
   wallDims: [number, number, number],
@@ -188,26 +284,16 @@ export function maskVolumeWithOpening(
   openingDims: [number, number, number]
 ): Uint8Array {
   const [wW, wH, wD] = wallDims;
-  const [oW, oH, oD] = openingDims;
-  const out = new Uint8Array(wall.length);
+  const hole = openingHoleMask(opening, openingDims);
+  const [oW, oH] = openingDims;
+  const out = new Uint8Array(wall);
   const wSlice = wW * wH;
-  const oSlice = oW * oH;
   for (let v = 0; v < wH; v++) {
     for (let u = 0; u < wW; u++) {
       const ou = Math.min(oW - 1, Math.floor((u * oW) / wW));
       const ov = Math.min(oH - 1, Math.floor((v * oH) / wH));
-      let solid = false;
-      for (let d = 0; d < oD; d++) {
-        if (opening[ou + ov * oW + d * oSlice]) {
-          solid = true;
-          break;
-        }
-      }
-      if (!solid) continue;
-      for (let d = 0; d < wD; d++) {
-        const i = u + v * wW + d * wSlice;
-        out[i] = wall[i];
-      }
+      if (!hole[ou + ov * oW]) continue;
+      for (let d = 0; d < wD; d++) out[u + v * wW + d * wSlice] = 0;
     }
   }
   return out;

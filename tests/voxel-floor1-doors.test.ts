@@ -124,6 +124,7 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     expect(openings).toContain('lookForSecret');
     expect(openings).toContain('lookForZoneBase');
     expect(openings).toContain('maskVolumeWithOpening');
+    expect(openings).toContain('openingHoleMask');
     expect(openings).toContain('warnMissingWallTexture');
     expect(openings).toContain('familyBaseFile');
     expect(openings).not.toContain('using door_open');
@@ -167,7 +168,7 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     }
   });
 
-  it('keeps family-base stone only where the painted arch is solid', () => {
+  it('cuts only the painted doorway void from family-base stone', () => {
     const wall = new Uint8Array(8).fill(1);
     const opening = new Uint8Array(8);
     opening[0] = 1;
