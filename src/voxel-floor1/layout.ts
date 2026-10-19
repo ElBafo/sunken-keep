@@ -1,9 +1,9 @@
 import { floor1 as rawFloor1 } from '../../public/levels/floor1';
 import type { FaceId } from '../voxel-lab/faces';
-import { CEILING_VARIANTS, FLOOR_VARIANTS, WALL_VARIANTS } from './constants';
+import { CEILING_VARIANTS, FLOOR_VARIANTS } from './constants';
 import { KNOT_FACE_NEIGHBORS, knotWallFile } from './knot-walls';
 import { pickVariant } from './variants';
-import { lookForWall, type WallLook } from './wall-look';
+import { faceUOffset, familyBaseLook, lookForWall, lookForZoneBase, type WallLook } from './wall-look';
 
 export type FloorTile = {
   wall?: boolean;
@@ -95,6 +95,8 @@ export type FaceJob = {
   wallFace: string;
   bulge: number;
   look?: WallLook;
+  /** World-tile U run so neighbouring wall faces continue. */
+  uOffset: number;
 };
 
 export type DoorSpec = { x: number; y: number; locked: boolean };
@@ -194,7 +196,8 @@ export function enumerateFaces(map: FloorMap): FaceJob[] {
         wallX: x,
         wallY: z,
         wallFace: 'F',
-        bulge: 0
+        bulge: 0,
+        uOffset: 0
       });
       const ceilFile = pickVariant(CEILING_VARIANTS, x, z, 'C');
       jobs.push({
@@ -207,15 +210,20 @@ export function enumerateFaces(map: FloorMap): FaceJob[] {
         wallX: x,
         wallY: z,
         wallFace: 'C',
-        bulge: 0
+        bulge: 0,
+        uOffset: 0
       });
       for (const spec of OPEN_TO_WALL) {
         const wx = x + spec.dx;
         const wz = z + spec.dz;
         if (!isTrueWall(tileAt(map, wx, wz))) continue;
         const knot = knotWallFile(wx, wz, spec.wallFace);
-        const look = knot ? undefined : lookForWall(wx, wz, spec.wallFace);
-        const file = knot ?? look?.file ?? pickVariant(WALL_VARIANTS, wx, wz, spec.wallFace);
+        const tile = map.tiles[z][x];
+        let look = knot ? undefined : lookForWall(wx, wz, spec.wallFace) ?? lookForZoneBase(x, z);
+        if (!knot && tile.door && look) {
+          look = familyBaseLook(look.kind, look.zone, look.seepage);
+        }
+        const file = knot ?? look?.file ?? lookForZoneBase(x, z).file;
         jobs.push({
           face: spec.face,
           tx: x,
@@ -227,7 +235,8 @@ export function enumerateFaces(map: FloorMap): FaceJob[] {
           wallY: wz,
           wallFace: spec.wallFace,
           bulge: look?.bulge ?? 0,
-          look
+          look,
+          uOffset: faceUOffset(spec.face, x, z)
         });
       }
     }

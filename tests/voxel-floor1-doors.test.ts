@@ -121,6 +121,11 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     expect(openings).toContain('door_open.png');
     expect(openings).toContain('FLOOR1_WALL_FILES');
     expect(openings).toContain('lookForSecret');
+    expect(openings).toContain('lookForZoneBase');
+    expect(openings).toContain('surroundFile');
+    expect(main).toContain('listDoors(floor1Map)');
+    expect(main).toContain('snapOpen(visual, true)');
+    expect(main).toContain('Demo only');
     expect(openings).not.toContain('applyWallLook');
     expect(openings).toContain('recessSecretTell');
     expect(openings).not.toContain('secret_closed.png');

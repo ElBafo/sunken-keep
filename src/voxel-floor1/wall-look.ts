@@ -9,21 +9,22 @@ export type WallKind = 'ashlar' | 'brick' | 'banded' | 'soot' | 'etched';
 export type WallVariant = 'clean' | 'damp' | 'cracked' | 'patched';
 export type Seepage = 'wet_sheen' | 'matte_dark' | null;
 
-/** One stone family per room / corridor. Matches Levie's zone `wallFamily`. */
-export const ZONE_FAMILY: Record<string, WallKind> = {
-  entry_gate: 'ashlar',
-  water_hall: 'ashlar',
-  muster_hall: 'ashlar',
-  antechamber: 'banded',
-  guard_hall: 'banded',
-  pantry: 'brick',
-  hook_corridor: 'brick',
-  pell: 'soot',
-  cellar: 'brick',
-  slime_trail: 'etched',
-  lair: 'etched',
-  stair_room: 'brick'
+function isWallKind(value: string | undefined): value is WallKind {
+  return value === 'ashlar' || value === 'brick' || value === 'banded' || value === 'soot' || value === 'etched';
+}
+
+type DecorZone = {
+  id: string;
+  wallFamily?: string;
+  viewerSquares: number[][];
 };
+
+export const floor1DecorZones = (floor1DecorJson as { zones: DecorZone[] }).zones;
+
+/** One stone family per room / corridor. Matches Levie's zone `wallFamily`. */
+export const ZONE_FAMILY: Record<string, WallKind> = Object.fromEntries(
+  floor1DecorZones.map((z) => [z.id, isWallKind(z.wallFamily) ? z.wallFamily : 'brick'])
+);
 
 export const ASHLAR_ZONES = new Set(
   Object.entries(ZONE_FAMILY)
@@ -89,16 +90,35 @@ const STRONG = {
 
 export const SOOT_2 = 'walls_floor1/soot_brick_2.png';
 
+/** Family base tile. Brick and soot zones share `brick_base`. */
+export const FAMILY_BASE: Record<WallKind, string> = {
+  ashlar: 'walls_floor1/ashlar_clean.png',
+  banded: 'walls_floor1/banded_1.png',
+  brick: 'walls_floor1/brick_base.png',
+  soot: 'walls_floor1/brick_base.png',
+  etched: 'walls_floor1/etched_1.png'
+};
+
+const KNOWN_WALL_FILES = new Set<string>(FLOOR1_WALL_FILES);
+
+export function familyBaseFile(kind: WallKind): string {
+  return FAMILY_BASE[kind];
+}
+
+export function wallFileExists(file: string): boolean {
+  return KNOWN_WALL_FILES.has(file);
+}
+
+export function warnMissingWallTexture(file: string, fallback: string, at: string): void {
+  console.warn(`[voxel-floor1] missing wall texture ${file} at ${at}; using ${fallback}`);
+}
+
 export const floor1DecorFaces = (floor1DecorJson as { faces: DecorFace[] }).faces;
 
 const FACE_INDEX = new Map(floor1DecorFaces.map((f) => [`${f.x},${f.y},${f.face}`, f]));
 
 export function decorFace(x: number, y: number, face: string): DecorFace | undefined {
   return FACE_INDEX.get(`${x},${y},${face}`);
-}
-
-function isWallKind(value: string | undefined): value is WallKind {
-  return value === 'ashlar' || value === 'brick' || value === 'banded' || value === 'soot' || value === 'etched';
 }
 
 export function wallKind(f: DecorFace): WallKind {
@@ -138,11 +158,21 @@ function isMatteLook(kind: WallKind, seepage: Seepage, zone: string): boolean {
   return seepage === 'matte_dark' || DARK_ZONES.has(zone) || kind === 'etched';
 }
 
+export function resolveWallFile(f: DecorFace): string {
+  const requested = ARTIE_FILE.get(faceKey(f)) ?? textureFile(f);
+  if (wallFileExists(requested)) return requested;
+  const fallback = familyBaseFile(wallKind(f));
+  warnMissingWallTexture(requested, fallback, `${f.x},${f.y},${f.face}`);
+  return fallback;
+}
+
 export function lookFromDecor(f: DecorFace): WallLook {
   const kind = wallKind(f);
-  const file = ARTIE_FILE.get(faceKey(f)) ?? textureFile(f);
+  const requested = ARTIE_FILE.get(faceKey(f)) ?? textureFile(f);
+  const file = resolveWallFile(f);
+  const missing = file !== requested;
   const matte = isMatteLook(kind, f.seepage, f.zone);
-  const baseFile = strongBaseFile(file);
+  const baseFile = missing ? undefined : strongBaseFile(file);
   const once = baseFile ? onceSlotFor(f.x, f.y, f.face) : undefined;
   const parts = [file];
   if (once) parts.push(`once:${once.v},${once.h}`);
@@ -151,7 +181,7 @@ export function lookFromDecor(f: DecorFace): WallLook {
     key: parts.join(':'),
     file,
     kind,
-    variant: f.variant,
+    variant: missing ? 'clean' : f.variant,
     seepage: f.seepage,
     zone: f.zone,
     bulge: f.bulge ? WALL_BULGE_FRAC : 0,
@@ -165,15 +195,49 @@ export function lookForWall(x: number, y: number, face: string): WallLook | unde
   return f ? lookFromDecor(f) : undefined;
 }
 
-const FALLBACK_LOOK: WallLook = {
-  key: 'walls_floor1/brick_base.png',
-  file: 'walls_floor1/brick_base.png',
-  kind: 'brick',
-  variant: 'clean',
-  seepage: null,
-  zone: 'antechamber',
-  bulge: 0
-};
+export function familyBaseLook(kind: WallKind, zone: string, seepage: Seepage = null): WallLook {
+  const file = familyBaseFile(kind);
+  const matte = isMatteLook(kind, seepage, zone);
+  return {
+    key: matte ? `${file}:matte` : file,
+    file,
+    kind,
+    variant: 'clean',
+    seepage,
+    zone,
+    bulge: 0
+  };
+}
+
+export function zoneAt(x: number, y: number): string | undefined {
+  for (const z of floor1DecorZones) {
+    for (const rect of z.viewerSquares) {
+      const [x0, y0, x1, y1] = rect;
+      if (x >= x0 && x <= x1 && y >= y0 && y <= y1) return z.id;
+    }
+  }
+  return undefined;
+}
+
+/** Family-base look for a viewer square — nooks, door surrounds, missing decor. */
+export function lookForZoneBase(x: number, y: number): WallLook {
+  const zone = zoneAt(x, y);
+  const kind = (zone && ZONE_FAMILY[zone]) || 'brick';
+  const seepage = zone && DARK_ZONES.has(zone) ? 'matte_dark' : null;
+  return familyBaseLook(kind, zone ?? 'antechamber', seepage);
+}
+
+/** Integer U run so neighbouring faces continue; corners share the wrap edge. */
+export function faceUOffset(face: string, tx: number, tz: number): number {
+  if (face === 'N' || face === 'S') return tx;
+  if (face === 'E' || face === 'W') return tz;
+  return 0;
+}
+
+export function applyUOffset(uvs: number[], offset: number): void {
+  if (!offset) return;
+  for (let i = 0; i < uvs.length; i += 2) uvs[i] += offset;
+}
 
 /** Secret faces copy a neighbour so they match the run, aside from the tell brick. */
 export function lookForSecret(wallX: number, wallY: number, wallFace: string, viewerX: number, viewerY: number): WallLook {
@@ -201,7 +265,7 @@ export function lookForSecret(wallX: number, wallY: number, wallFace: string, vi
     return row.x + dx === viewerX && row.y + dy === viewerY;
   });
   if (nearby) return { ...lookFromDecor(nearby), bulge: 0 };
-  return { ...FALLBACK_LOOK };
+  return lookForZoneBase(viewerX, viewerY);
 }
 
 export function uniqueLooks(): WallLook[] {

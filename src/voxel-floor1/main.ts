@@ -35,7 +35,7 @@ import {
   type LightMode,
   type QualityLevel
 } from './lights';
-import { floor1Map, tileAt } from './layout';
+import { floor1Map, listDoors, tileAt } from './layout';
 import { buildFloor1 } from './level';
 import { buildFloor1Markers } from './markers';
 import { buildFloor1Openings } from './openings';
@@ -245,6 +245,11 @@ async function boot(): Promise<void> {
   scene.add(props.group);
   const openings = await buildFloor1Openings(floor1Map, lightMode === 'all');
   scene.add(openings.group);
+  // Demo only: start with both locked doors open so every room is reachable. Classic is unchanged.
+  for (const spec of listDoors(floor1Map)) {
+    const visual = openings.system.get(spec.x, spec.y);
+    if (visual) openings.system.snapOpen(visual, true);
+  }
   const markers = await buildFloor1Markers(floor1Map);
   scene.add(markers.group);
 

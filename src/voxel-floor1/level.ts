@@ -8,7 +8,7 @@ import { floor1Sconces, floor1Sunbeams } from './fixtures';
 import { canStep, chebyshev, enumerateFaces, type FaceJob, type FloorMap } from './layout';
 import { isBeamCeiling, loadCrackedCeiling } from './crack';
 import { lookPixels } from './wall-once';
-import { bulgePose, bulgeWorld, finishVolume, type WallLook } from './wall-look';
+import { bulgePose, bulgeWorld, familyBaseFile, finishVolume, warnMissingWallTexture, type WallLook } from './wall-look';
 import {
   FAR_BAKE_SEGS,
   farBakeMaterial,
@@ -77,7 +77,13 @@ export async function buildFloor1(
   const pngs = new Map<string, PngPixels>();
   await Promise.all(
     [...neededFiles].map(async (file) => {
-      pngs.set(file, file === CRACKED_CEILING_FILE ? await loadCrackedCeiling() : await loadPng(file));
+      try {
+        pngs.set(file, file === CRACKED_CEILING_FILE ? await loadCrackedCeiling() : await loadPng(file));
+      } catch {
+        const fallback = familyBaseFile('brick');
+        warnMissingWallTexture(file, fallback, 'load');
+        pngs.set(file, await loadPng(fallback));
+      }
     })
   );
 
@@ -126,6 +132,10 @@ export async function buildFloor1(
       CELL
     );
     const meshed = greedyMesh(vol.volume, vol.dims, toWorld);
+    if (job.kind === 'wall' && job.uOffset) {
+      const uvs = meshed.mesh.uvs;
+      for (let i = 0; i < uvs.length; i += 2) uvs[i] += job.uOffset;
+    }
     quads += meshed.quads;
     triangles += meshed.triangles;
     prepared.push({
@@ -142,6 +152,10 @@ export async function buildFloor1(
   for (const [batch, tex] of texByBatch) {
     const rough = roughByBatch.get(batch);
     if (!tex || !rough) continue;
+    if (batch.startsWith('walls_floor1/')) {
+      tex.wrapS = THREE.RepeatWrapping;
+      rough.wrapS = THREE.RepeatWrapping;
+    }
     const mat = voxelMaterial(tex, rough);
     mat.name = batch;
     if (!realLights) patchBakeMaterial(mat);
@@ -273,7 +287,7 @@ export async function buildFloor1(
     for (const [file, list] of flatsByFile) {
       const mat = farMats.get(file);
       const geo = flatGeometryWithBake(
-        list.map((f) => ({ pose: f.pose, tx: f.tx, tz: f.tz, segs: f.segs })),
+        list.map((f) => ({ pose: f.pose, tx: f.tx, tz: f.tz, segs: f.segs, uOffset: f.uOffset })),
         torches,
         CELL,
         beams
