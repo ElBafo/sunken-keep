@@ -145,16 +145,23 @@ describe('floor-1 ceiling timber', () => {
     expect(iron.image.data[2]).toBeLessThan(24);
   });
 
-  it('tints ribs darker and warmer than the plank flats', () => {
+  it('tints ribs darker brown-grey oak, close to the plank hue', () => {
     const crate = sootyPixel(79 / 255, 60 / 255, 44 / 255);
+    const tinted = [crate[0] * WOOD_TINT.r, crate[1] * WOOD_TINT.g, crate[2] * WOOD_TINT.b];
     const plank = [50 / 255, 37 / 255, 28 / 255];
-    const crateLuma = 0.2126 * crate[0] + 0.7152 * crate[1] + 0.0722 * crate[2];
+    const tintedLuma = 0.2126 * tinted[0] + 0.7152 * tinted[1] + 0.0722 * tinted[2];
     const plankLuma = 0.2126 * plank[0] + 0.7152 * plank[1] + 0.0722 * plank[2];
-    expect(crateLuma).toBeLessThan(plankLuma);
-    expect(crate[0] / Math.max(1e-6, crate[2])).toBeGreaterThan(plank[0] / plank[2]);
+    const tintedRB = tinted[0] / Math.max(1e-6, tinted[2]);
+    const plankRB = plank[0] / plank[2];
+    expect(tintedLuma).toBeLessThan(plankLuma);
+    expect(tintedRB).toBeGreaterThan(plankRB * 0.75);
+    expect(tintedRB).toBeLessThan(plankRB * 1.45);
     expect(WOOD_TINT.r).toBeGreaterThan(WOOD_TINT.g);
     expect(WOOD_TINT.g).toBeGreaterThan(WOOD_TINT.b);
+    expect(WOOD_TINT.r - WOOD_TINT.b).toBeLessThan(0.28);
     expect(WOOD_TINT.r).toBeLessThan(0.8);
+    expect(src).not.toContain('new THREE.Color(0.7, 0.48, 0.28)');
+    expect(src).not.toContain('new THREE.Color(0.84, 0.82, 0.78)');
     expect(Math.max(STRAP_TINT.r, STRAP_TINT.g, STRAP_TINT.b)).toBeLessThan(0.22);
   });
 

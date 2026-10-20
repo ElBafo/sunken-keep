@@ -554,8 +554,8 @@ const STRAP_PROUD = 0.008;
 /** Centre iron column in wood_beam.png (texels 29–34: mid-grey band + rivet). */
 const STRAP_U0 = 0.45;
 const STRAP_U1 = 0.53;
-/** Warmer and darker than Artie's plank flats so the rib frames the boards. */
-export const WOOD_TINT = new THREE.Color(0.7, 0.48, 0.28);
+/** Darker than Artie's plank flats; hue stays a desaturated brown-grey oak. */
+export const WOOD_TINT = new THREE.Color(0.74, 0.64, 0.54);
 /** Near-black iron. The generated map carries at most a faint rivet glint. */
 export const STRAP_TINT = new THREE.Color(0.16, 0.14, 0.12);
 
@@ -655,15 +655,15 @@ export function ironStrapPixel(r: number, g: number, b: number): [number, number
   return [0.055 + lift * 0.3, 0.052 + lift * 0.24, 0.048 + lift * 0.2];
 }
 
-/** Crate wood is lighter/greyer than Artie's oak planks (mean luma ~0.155). */
+/** Crate wood is lighter than Artie's oak planks (mean luma ~0.155). Dim it; keep plank hue. */
 export function sootyPixel(r: number, g: number, b: number): [number, number, number] {
   const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  const sat = 1;
-  const dim = 0.55;
+  const sat = 0.55;
+  const dim = 0.6;
   return [
-    Math.min(1, (luma + (r - luma) * sat) * dim * 1.08),
-    Math.min(1, (luma + (g - luma) * sat) * dim * 0.88),
-    Math.min(1, (luma + (b - luma) * sat) * dim * 0.64)
+    (luma + (r - luma) * sat) * dim,
+    (luma + (g - luma) * sat) * dim,
+    (luma + (b - luma) * sat) * dim
   ];
 }
 
