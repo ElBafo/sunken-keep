@@ -1,13 +1,13 @@
 import * as THREE from 'three';
 import floor1DecorJson from '../../levels/floor1_decor.json';
-import { CELL } from './constants';
+import { CELL, CORNICE_DEPTH } from './constants';
 import { floor1Sunbeams } from './fixtures';
 import { isShellTile, isTrueWall, tileAt, type FloorMap, type FloorTile } from './layout';
 
 /**
  * Shallow ceiling rib: 0.14 m across, 0.09 m down, flush just under the slab.
- * Placement is grid-only — it does not read ceiling tile files (a plank ceiling
- * can replace the stone later without touching this module).
+ * Only pantry, guard hall, and muster hall. Ends rest on the cornice.
+ * Placement is grid-only — it does not read ceiling tile files.
  */
 export const BEAM_WIDTH = 0.14;
 export const BEAM_DEPTH = 0.09;
@@ -21,16 +21,8 @@ const JOIN_EPS = 0.002;
 const WALL_TOUCH = 0.02;
 const OVERLAP_EPS = 0.0005;
 
-const CORRIDOR_ZONES = new Set(['entry_gate', 'hook_corridor', 'slime_trail', 'lair']);
-const ROOM_ZONES = new Set([
-  'muster_hall',
-  'antechamber',
-  'guard_hall',
-  'pantry',
-  'pell',
-  'cellar',
-  'stair_room'
-]);
+const CORRIDOR_ZONES = new Set<string>();
+const ROOM_ZONES = new Set(['muster_hall', 'guard_hall', 'pantry']);
 const SKIP_ZONES = new Set(['water_hall']);
 
 type DecorZone = { id: string; viewerSquares: number[][] };
@@ -231,8 +223,8 @@ function makeRunBox(
   a: number,
   b: number
 ): CeilingBeamBox {
-  const u0 = a * CELL - CELL / 2;
-  const u1 = b * CELL + CELL / 2;
+  const u0 = a * CELL - CELL / 2 + CORNICE_DEPTH;
+  const u1 = b * CELL + CELL / 2 - CORNICE_DEPTH;
   if (alongX) {
     return { x: (u0 + u1) / 2, y: BEAM_Y, z: cross, sx: u1 - u0, sy: BEAM_DEPTH, sz: BEAM_WIDTH, kind };
   }
@@ -455,7 +447,8 @@ function endTouchesWall(map: FloorMap, box: CeilingBeamBox, which: 'min' | 'max'
     const ny = axis === 'x' ? cy : which === 'min' ? cy - 1 : cy + 1;
     if (!isTrueWall(tileAt(map, nx, ny))) return false;
     const face = (axis === 'x' ? cx : cy) * CELL + (which === 'min' ? -CELL / 2 : CELL / 2);
-    if (Math.abs(end - face) > WALL_TOUCH) return false;
+    const rest = face + (which === 'min' ? CORNICE_DEPTH : -CORNICE_DEPTH);
+    if (Math.abs(end - rest) > WALL_TOUCH) return false;
   }
   return others.length > 0;
 }

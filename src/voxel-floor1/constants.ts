@@ -68,11 +68,24 @@ export const FLOOR_VARIANTS = [
   'floor_stone_4.png'
 ] as const;
 export const CEILING_VARIANTS = [
+  'ceiling_rubble_1.png',
+  'ceiling_rubble_2.png',
+  'ceiling_rubble_3.png'
+] as const;
+export const PLANK_CEILING_VARIANTS = [
   'ceiling_planks_1.png',
   'ceiling_planks_2.png',
   'ceiling_planks_3.png'
 ] as const;
 export const CRACKED_CEILING_FILE = 'ceiling_cracked.png';
+
+/** Heavy stone band at the wall–ceiling join. 256×64 tile spans one CELL. */
+export const CORNICE_HEIGHT = 0.32;
+export const CORNICE_DEPTH = 0.12;
+export const CORNICE_TEXELS_U = 256;
+export const CORNICE_TEXELS_V = 64;
+/** Painted shadow line on the strip — mapped to the underside, not the front. */
+export const CORNICE_SHADOW_ROWS = { brick: 10, slab: 12 } as const;
 
 /** Same wall-mount sizes / flicker window as proto3d; duplicated so this page does not import it. */
 export const SCONCE_WIDTH_TILES = 0.25;

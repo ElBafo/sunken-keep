@@ -1,4 +1,4 @@
-# Floor 1 floor + ceiling variant map (Levie + Artie r2).
+# Floor 1 floor + ceiling variant map (Levie + Artie r2 floor / r3 ceiling).
 # Run from the repo root: python3 levels/tools/floor1_floorceil.py
 import hashlib
 import json
@@ -58,15 +58,10 @@ def zone_at(x, y):
     return None
 
 
-# Primary beams run E–W in these rooms, so plank boards (tile-x) rotate 90° onto Z.
-ROT90 = {
-    'entry_gate',
-    'muster_hall',
-    'pell',
-    'stair_room',
-    'cellar',
-    'lair',
-}
+# Planks stay only in these rooms. Beams run E–W there, so boards rotate 90° onto Z.
+# Rubble elsewhere is isotropic — no UV rotation.
+PLANK_ZONES = {'pantry', 'guard_hall'}
+ROT90 = set(PLANK_ZONES)
 
 # --- floor ---
 W_F = {'floor_stone': 2, 'floor_stone_2': 3, 'floor_stone_4': 2}
@@ -109,15 +104,17 @@ for p in sorted([p for p in sq if p not in floor], key=lambda p: hv('f', p)):
     cnt[t] = cnt.get(t, 0) + 1
 
 # --- ceiling ---
-C_W = {'ceiling_planks_1': 1, 'ceiling_planks_2': 1, 'ceiling_planks_3': 1}
+C_RUBBLE = {'ceiling_rubble_1': 1, 'ceiling_rubble_2': 1, 'ceiling_rubble_3': 1}
+C_PLANKS = {'ceiling_planks_1': 1, 'ceiling_planks_2': 1, 'ceiling_planks_3': 1}
 ceil = {}
 ceil_rot = {}
 for p in sorted(sq, key=lambda p: (p[1], p[0])):
+    zid = zone_at(*p)
+    pool = C_PLANKS if zid in PLANK_ZONES else C_RUBBLE
     nb = {ceil.get(q) for q in N4(*p)}
-    opts = [t for t in C_W if t not in nb] or list(C_W)
+    opts = [t for t in pool if t not in nb] or list(pool)
     t = min(opts, key=lambda t: (sum(1 for v in ceil.values() if v == t), hv('ct', p, t)))
     ceil[p] = t
-    zid = zone_at(*p)
     ceil_rot[p] = 90 if zid in ROT90 else 0
 
 fm = sum(
@@ -134,10 +131,10 @@ cm = sum(1 for p in sq for q in N4(*p) if q in ceil and ceil[q] == ceil[p])
 out = {
     'version': 2,
     'floor': 'floor1',
-    'for': 'PR #63 Artie floorceil r2 — edge-matched stone + plank ceiling',
+    'for': 'PR #63 Artie ceiling r3 — rubble + planks in pantry/guard hall',
     'rules': {
         'floor': 'floor_water locked on cistern and cellar pool squares; floor_stone locked on squares that touch water. Spread is floor_stone / _2 / _4. floor_stone_3 is a rare feature (at most 4, under a lamp or by a door, never adjacent). Tiles share edge bands so joints run through any mix; no per-cell flip or rotation.',
-        'ceiling': 'ceiling_planks_1/_2/_3 replace ceiling_2/3/4 (old files stay in tex3d unused). Boards run along tile x; a zone-wide 90° UV turn is applied only where primary beams run east–west so the ribs cross the boards. No 4-neighbour match. Overlays sit on top: sunbeam crack at daylight (11,2), roots at (1,2), copper pipes along y=1 (1-3, 9-13) and y=6 (8-11).',
+        'ceiling': 'ceiling_rubble_1/_2/_3 replace planks everywhere except pantry and guard_hall, which keep ceiling_planks_1/_2/_3. Rubble is edge-matched and isotropic (no UV rotation). Plank boards still run along tile x and take a zone-wide 90° UV turn in pantry/guard_hall so they cross the E–W beams. Overlays sit on top: sunbeam crack at daylight (11,2), roots at (1,2), copper pipes along y=1 (1-3, 9-13) and y=6 (8-11).',
     },
     'squares': [
         {

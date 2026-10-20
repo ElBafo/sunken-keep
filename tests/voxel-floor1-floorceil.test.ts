@@ -2,7 +2,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
 import floor1FloorCeil from '../levels/floor1_floorceil.json';
-import { CEILING_VARIANTS, FLOOR_VARIANTS } from '../src/voxel-floor1/constants';
+import { CEILING_VARIANTS, FLOOR_VARIANTS, PLANK_CEILING_VARIANTS } from '../src/voxel-floor1/constants';
 import { compositeCrackedCeiling, crackedCeilingHasGap, scaleNearest } from '../src/voxel-floor1/crack';
 import { isPaintedShellFile, normalFromAlbedo } from '../src/voxel-floor1/painted';
 import { shellUv } from '../src/voxel-floor1/bake';
@@ -24,18 +24,21 @@ function pngSize(name: string): { w: number; h: number } {
 }
 
 describe('floor-1 floor and ceiling come from Levie’s map', () => {
-  it('drops ceiling.png and ships 256² tiles that cover one cell', () => {
+  it('drops ceiling.png and ships 256² rubble plus leftover plank tiles', () => {
     expect(CEILING_VARIANTS).toEqual([
-      'ceiling_planks_1.png',
-      'ceiling_planks_2.png',
-      'ceiling_planks_3.png'
+      'ceiling_rubble_1.png',
+      'ceiling_rubble_2.png',
+      'ceiling_rubble_3.png'
     ]);
     expect(CEILING_VARIANTS).not.toContain('ceiling.png');
     expect(CEILING_VARIANTS.join()).not.toContain('ceiling_2');
-    for (const name of [...FLOOR_VARIANTS, ...CEILING_VARIANTS, 'floor_water.png']) {
+    expect(CEILING_VARIANTS.join()).not.toContain('planks');
+    for (const name of [...FLOOR_VARIANTS, ...CEILING_VARIANTS, ...PLANK_CEILING_VARIANTS, 'floor_water.png']) {
       expect(pngSize(name), name).toEqual({ w: 256, h: 256 });
     }
     expect(pngSize('wood_beam.png')).toEqual({ w: 64, h: 64 });
+    expect(pngSize('cornice_brick.png')).toEqual({ w: 256, h: 64 });
+    expect(pngSize('cornice_slab.png')).toEqual({ w: 256, h: 64 });
     expect(pngSize('ceiling_2.png')).toEqual({ w: 256, h: 256 });
   });
 
@@ -49,13 +52,20 @@ describe('floor-1 floor and ceiling come from Levie’s map', () => {
         expect(floor?.file).toBe(mappedFloorFile(x, y) ?? pickVariant(FLOOR_VARIANTS, x, y, 'F'));
         expect(ceil?.file).toBe(mappedCeilingFile(x, y) ?? pickVariant(CEILING_VARIANTS, x, y, 'C'));
         expect(ceil?.file).not.toBe('ceiling.png');
-        expect(ceil?.file.startsWith('ceiling_planks_') || ceil?.file === 'ceiling_cracked.png').toBe(true);
+        expect(
+          ceil?.file.startsWith('ceiling_rubble_') ||
+            ceil?.file.startsWith('ceiling_planks_') ||
+            ceil?.file === 'ceiling_cracked.png'
+        ).toBe(true);
       }
     }
     expect(mappedFloorFile(2, 2)).toBe('floor_water.png');
     expect(mappedFloorFile(2, 5)).toBe('floor_stone.png');
     expect(mappedFloorFile(3, 14)).toBe('floor_stone_2.png');
-    expect(mappedCeilingFile(3, 14)).toBe('ceiling_planks_1.png');
+    expect(mappedCeilingFile(3, 14)).toBe('ceiling_rubble_1.png');
+    expect(mappedCeilingFile(6, 6)?.startsWith('ceiling_planks_')).toBe(true);
+    expect(mappedCeilingFile(10, 2)?.startsWith('ceiling_planks_')).toBe(true);
+    expect(mappedCeilingFile(2, 11)?.startsWith('ceiling_rubble_')).toBe(true);
     expect(mappedFloorFile(99, 99)).toBeUndefined();
     expect(floor1FloorCeil.squares).toHaveLength(jobs.filter((j) => j.kind === 'floor').length);
   });
@@ -79,14 +89,20 @@ describe('floor-1 floor and ceiling come from Levie’s map', () => {
     }
   });
 
-  it('turns plank boards 90° only where primary beams run east–west', () => {
+  it('turns plank boards 90° only in pantry and guard hall', () => {
     expect(shellUv(0, 0, 0)).toEqual([0, 0]);
     expect(shellUv(1, 0, 90)).toEqual([0, 0]);
     expect(shellUv(1, 1, 90)).toEqual([1, 0]);
-    expect(mappedCeilingUvRot(2, 11)).toBe(90);
-    expect(mappedCeilingUvRot(2, 6)).toBe(90);
-    expect(mappedCeilingUvRot(10, 2)).toBe(0);
+    expect(mappedCeilingUvRot(2, 11)).toBe(0);
+    expect(mappedCeilingUvRot(2, 6)).toBe(0);
+    expect(mappedCeilingUvRot(6, 6)).toBe(90);
+    expect(mappedCeilingUvRot(10, 2)).toBe(90);
     expect(mappedCeilingUvRot(6, 2)).toBe(0);
+    for (const s of floor1FloorCeil.squares) {
+      const plank = s.ceiling.startsWith('ceiling_planks');
+      if (plank) expect(s.ceilingRot).toBe(90);
+      else expect(s.ceilingRot ?? 0).toBe(0);
+    }
     const jobs = enumerateFaces(floor1Map);
     for (const j of jobs.filter((f) => f.kind === 'floor')) {
       expect(j.uvRot).toBe(0);

@@ -38,7 +38,7 @@ describe('floor-1 ceiling timber', () => {
     expect(BEAM_DEPTH).toBeLessThanOrEqual(0.1);
     expect(BEAM_Y).toBeCloseTo(CELL - BEAM_CEIL_GAP - BEAM_DEPTH / 2, 5);
     expect(BEAM_Y).toBeGreaterThan(CELL - 0.16);
-    expect(beams.length).toBeGreaterThan(12);
+    expect(beams.length).toBeGreaterThan(6);
     for (const b of beams) {
       expect(b.y).toBeCloseTo(BEAM_Y, 5);
       expect(b.sy).toBeCloseTo(BEAM_DEPTH, 5);
@@ -54,16 +54,27 @@ describe('floor-1 ceiling timber', () => {
     expect(src).not.toContain('ceiling_cracked');
   });
 
-  it('spans the start corridor short axis every 2 cells', () => {
-    const corridor = beams.filter((b) => b.kind === 'corridor' && Math.abs(b.x - 2 * CELL) < 0.2);
-    const rows = corridor.map((b) => Math.round(b.z / CELL)).sort((a, b) => a - b);
-    expect(rows).toEqual([9, 11, 13]);
-    for (const b of corridor) {
-      expect(b.sx).toBeCloseTo(CELL, 5);
-      expect(b.sz).toBeCloseTo(BEAM_WIDTH, 5);
-      expect(b.x - b.sx / 2).toBeCloseTo(1.5 * CELL, 5);
-      expect(b.x + b.sx / 2).toBeCloseTo(2.5 * CELL, 5);
-    }
+  it('keeps timber only in pantry, guard hall, and muster hall', () => {
+    expect(beams.some((b) => b.kind === 'corridor')).toBe(false);
+    const corridor = beams.filter((b) => Math.abs(b.x - 2 * CELL) < 0.2 && b.z > 8 * CELL);
+    expect(corridor).toEqual([]);
+    const rooms = new Set(
+      beams.map((b) => {
+        const cx = Math.round(b.x / CELL);
+        const cz = Math.round(b.z / CELL);
+        if (cx >= 1 && cx <= 4 && cz >= 5 && cz <= 7) return 'muster';
+        if (cx >= 8 && cx <= 14 && cz >= 1 && cz <= 4) return 'guard';
+        if (cx >= 5 && cx <= 7 && cz >= 5 && cz <= 7) return 'pantry';
+        return `other:${cx},${cz}`;
+      })
+    );
+    expect(rooms.has('muster')).toBe(true);
+    expect(rooms.has('guard')).toBe(true);
+    expect(rooms.has('pantry')).toBe(true);
+    expect([...rooms].filter((r) => r.startsWith('other'))).toEqual([]);
+    const src = readFileSync(resolve(__dirname, '../src/voxel-floor1/ceiling-beams.ts'), 'utf8');
+    expect(src).toContain('CORNICE_DEPTH');
+    expect(src).toContain("'muster_hall', 'guard_hall', 'pantry'");
   });
 
   it('gives rooms a parallel pair plus crossing joists', () => {
@@ -223,7 +234,7 @@ describe('floor-1 ceiling timber', () => {
     expect(bb.max.z - bb.min.z).toBeGreaterThan(10);
     expect(bb.min.y).toBeGreaterThan(1.5);
 
-    const hall = beams.find((b) => b.kind === 'corridor' && Math.abs(b.x - 2 * CELL) < 0.2)!;
+    const hall = beams.find((b) => b.kind === 'room')!;
     const one = meshCeilingBeams(tex, [hall])!;
     const oneWood = one.getObjectByName('ceiling-beams-wood') as THREE.Mesh;
     const uv = oneWood.geometry.getAttribute('uv');

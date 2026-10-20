@@ -22,7 +22,9 @@ import { applyWallMountNearCull } from './near-cull';
 import { loadPng } from '../voxel-lab/materials';
 import { cupWorldPos, flameOnBracket, meshBracket } from './bracket';
 import { listCeilingBeams, meshCeilingBeams } from './ceiling-beams';
+import { listCorniceSegments, meshCornice } from './cornice';
 import { floor1Map } from './layout';
+import { enablePaintedSampling } from './painted';
 
 type TorchVisual = {
   spec: SconceSpec;
@@ -65,14 +67,16 @@ export async function buildFloor1Props(
   const group = new THREE.Group();
   group.name = 'floor1-props';
 
-  const [flame1, flame2, flame3, flame4, shaft1, shaft2, woodBeam] = await Promise.all([
+  const [flame1, flame2, flame3, flame4, shaft1, shaft2, woodBeam, corniceBrick, corniceSlab] = await Promise.all([
     loadPng('torch/flame_teardrop_1.png'),
     loadPng('torch/flame_teardrop_2.png'),
     loadPng('torch/flame_teardrop_3.png'),
     loadPng('torch/flame_teardrop_4.png'),
     loadPng('../atmo/shaft_1.png'),
     loadPng('../atmo/shaft_2.png'),
-    loadPng('wood_beam.png')
+    loadPng('wood_beam.png'),
+    loadPng('cornice_brick.png'),
+    loadPng('cornice_slab.png')
   ]);
 
   const flames = [flame1.texture, flame2.texture, flame3.texture, flame4.texture];
@@ -112,6 +116,10 @@ export async function buildFloor1Props(
 
   woodBeam.texture.wrapS = THREE.RepeatWrapping;
   woodBeam.texture.wrapT = THREE.RepeatWrapping;
+  enablePaintedSampling(corniceBrick.texture);
+  enablePaintedSampling(corniceSlab.texture);
+  const cornice = meshCornice(corniceBrick.texture, corniceSlab.texture, listCorniceSegments(floor1Map));
+  if (cornice) group.add(cornice);
   const ceiling = meshCeilingBeams(woodBeam.texture, listCeilingBeams(floor1Map));
   if (ceiling) group.add(ceiling);
   const woodMat = new THREE.MeshBasicMaterial({
