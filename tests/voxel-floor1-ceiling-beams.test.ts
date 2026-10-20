@@ -9,16 +9,20 @@ import {
   BEAM_WIDTH,
   BEAM_Y,
   STRAP_M,
+  STRAP_TINT,
   TEXEL_M,
   WOOD_TILE_M,
+  WOOD_TINT,
   auditCeilingBeams,
   cellOverlapsBeam,
   isBeamGridLine,
   ironStrapPixel,
   listBeamStraps,
   listCeilingBeams,
+  makeIronStrapMap,
   meshCeilingBeams,
-  skipCeilingBeamCell
+  skipCeilingBeamCell,
+  sootyPixel
 } from '../src/voxel-floor1/ceiling-beams';
 import { CELL } from '../src/voxel-floor1/constants';
 import { floor1Sunbeams } from '../src/voxel-floor1/fixtures';
@@ -127,11 +131,31 @@ describe('floor-1 ceiling timber', () => {
     const oak = [0.45 * 0.74, 0.32 * 0.74, 0.18 * 0.74];
     expect(src).toContain('STRAP_U0 = 0.45');
     expect(src).toContain('STRAP_U1 = 0.53');
+    expect(src).toContain('makeIronStrapMap');
+    expect(src).not.toContain('color: new THREE.Color(0.38, 0.35, 0.32)');
     expect(Math.max(...band)).toBeLessThan(0.08);
     expect(Math.max(...grain)).toBeLessThan(0.08);
     expect(Math.max(...band)).toBeLessThan(Math.max(...oak));
     expect(Math.max(...rivet)).toBeGreaterThan(Math.max(...band) + 0.08);
     expect(Math.max(...rivet)).toBeLessThan(0.35);
+    const iron = makeIronStrapMap();
+    expect(iron).toBeInstanceOf(THREE.DataTexture);
+    expect(iron.image.data[0]).toBeLessThan(24);
+    expect(iron.image.data[1]).toBeLessThan(24);
+    expect(iron.image.data[2]).toBeLessThan(24);
+  });
+
+  it('tints ribs darker and warmer than the plank flats', () => {
+    const crate = sootyPixel(79 / 255, 60 / 255, 44 / 255);
+    const plank = [50 / 255, 37 / 255, 28 / 255];
+    const crateLuma = 0.2126 * crate[0] + 0.7152 * crate[1] + 0.0722 * crate[2];
+    const plankLuma = 0.2126 * plank[0] + 0.7152 * plank[1] + 0.0722 * plank[2];
+    expect(crateLuma).toBeLessThan(plankLuma);
+    expect(crate[0] / Math.max(1e-6, crate[2])).toBeGreaterThan(plank[0] / plank[2]);
+    expect(WOOD_TINT.r).toBeGreaterThan(WOOD_TINT.g);
+    expect(WOOD_TINT.g).toBeGreaterThan(WOOD_TINT.b);
+    expect(WOOD_TINT.r).toBeLessThan(0.8);
+    expect(Math.max(STRAP_TINT.r, STRAP_TINT.g, STRAP_TINT.b)).toBeLessThan(0.22);
   });
 
   it('batches wood and straps into MeshPhysical meshes at 1 cm per texel', () => {
@@ -141,7 +165,9 @@ describe('floor-1 ceiling timber', () => {
     expect(src).toContain('castShadow = false');
     expect(src).toContain('receiveShadow = true');
     expect(src).toContain('sootyOakMap');
+    expect(src).toContain('sootyPixel');
     expect(src).toContain('ironStrapMap');
+    expect(src).toContain('makeIronStrapMap');
     expect(src).toContain('ironStrapPixel');
     expect(src).toContain('listBeamStraps');
     expect(src).toContain('setWoodUvs');
@@ -171,7 +197,11 @@ describe('floor-1 ceiling timber', () => {
     const woodMat = wood.material as THREE.MeshPhysicalMaterial;
     const strapMat = straps.material as THREE.MeshPhysicalMaterial;
     expect(strapMat.color.r).toBeLessThan(woodMat.color.r * 0.5);
-    expect(Math.max(strapMat.color.r, strapMat.color.g, strapMat.color.b)).toBeLessThan(0.45);
+    expect(Math.max(strapMat.color.r, strapMat.color.g, strapMat.color.b)).toBeLessThan(0.22);
+    expect(woodMat.color.r).toBeGreaterThan(woodMat.color.b);
+    expect(woodMat.color.r).toBeLessThan(0.8);
+    expect(strapMat.map).toBeInstanceOf(THREE.DataTexture);
+    expect(strapMat.map).not.toBe(tex);
     for (const mesh of [wood, straps]) {
       expect(mesh.castShadow).toBe(false);
       expect(mesh.userData.castWhenOn).toBe(false);

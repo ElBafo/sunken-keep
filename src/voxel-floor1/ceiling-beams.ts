@@ -554,7 +554,10 @@ const STRAP_PROUD = 0.008;
 /** Centre iron column in wood_beam.png (texels 29–34: mid-grey band + rivet). */
 const STRAP_U0 = 0.45;
 const STRAP_U1 = 0.53;
-const STRAP_FACE_EPS = 0.04;
+/** Warmer and darker than Artie's plank flats so the rib frames the boards. */
+export const WOOD_TINT = new THREE.Color(0.7, 0.48, 0.28);
+/** Near-black iron. The generated map carries at most a faint rivet glint. */
+export const STRAP_TINT = new THREE.Color(0.16, 0.14, 0.12);
 
 function hash01(x: number, z: number, salt: number): number {
   let n = Math.imul(Math.round(x * 100) ^ (Math.round(z * 100) << 8) ^ salt, 2246822519);
@@ -627,35 +630,18 @@ function setWoodUvs(geo: THREE.BufferGeometry, box: CeilingBeamBox, uOffset: num
 }
 
 function setStrapUvs(geo: THREE.BufferGeometry, box: CeilingBeamBox): void {
+  // Generated iron map — do not crop wood_beam.png (those texels are pale grey).
   const uv = geo.getAttribute('uv');
-  const thin = Math.min(box.sx, box.sz);
   for (let f = 0; f < 6; f++) {
     const [wu, wv] = FACE_SIZE[f](box);
+    const uScale = wu / WOOD_TILE_M;
+    const vScale = wv / WOOD_TILE_M;
     for (let k = 0; k < 4; k++) {
       const i = f * 4 + k;
-      const u0 = uv.getX(i);
-      const v0 = uv.getY(i);
-      if (Math.abs(wu - thin) < STRAP_FACE_EPS) {
-        uv.setXY(i, STRAP_U0 + u0 * (STRAP_U1 - STRAP_U0), v0);
-      } else if (Math.abs(wv - thin) < STRAP_FACE_EPS) {
-        uv.setXY(i, STRAP_U0 + v0 * (STRAP_U1 - STRAP_U0), u0);
-      } else {
-        uv.setXY(i, STRAP_U0 + u0 * (STRAP_U1 - STRAP_U0), v0 * (wv / WOOD_TILE_M));
-      }
+      uv.setXY(i, uv.getX(i) * uScale, uv.getY(i) * vScale);
     }
   }
   uv.needsUpdate = true;
-}
-
-function sootyPixel(r: number, g: number, b: number): [number, number, number] {
-  const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  const sat = 0.28;
-  const dim = 0.74;
-  return [
-    (luma + (r - luma) * sat) * dim,
-    (luma + (g - luma) * sat) * dim,
-    (luma + (b - luma) * sat) * dim
-  ];
 }
 
 /**
@@ -669,20 +655,40 @@ export function ironStrapPixel(r: number, g: number, b: number): [number, number
   return [0.055 + lift * 0.3, 0.052 + lift * 0.24, 0.048 + lift * 0.2];
 }
 
+/** Crate wood is lighter/greyer than Artie's oak planks (mean luma ~0.155). */
+export function sootyPixel(r: number, g: number, b: number): [number, number, number] {
+  const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  const sat = 1;
+  const dim = 0.55;
+  return [
+    Math.min(1, (luma + (r - luma) * sat) * dim * 1.08),
+    Math.min(1, (luma + (g - luma) * sat) * dim * 0.88),
+    Math.min(1, (luma + (b - luma) * sat) * dim * 0.64)
+  ];
+}
+
 function inpaintWood(pix: ImageData): void {
   const w = pix.width;
   const h = pix.height;
-  const colScore = new Float32Array(w);
+  const strap = new Array<boolean>(w).fill(false);
   for (let x = 0; x < w; x++) {
     let bright = 0;
+    let satSum = 0;
     for (let y = 0; y < h; y++) {
       const i = (y * w + x) * 4;
-      const luma = 0.2126 * pix.data[i] + 0.7152 * pix.data[i + 1] + 0.0722 * pix.data[i + 2];
+      const r = pix.data[i];
+      const g = pix.data[i + 1];
+      const b = pix.data[i + 2];
+      const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      const mx = Math.max(r, g, b);
+      const sat = mx <= 0 ? 0 : (mx - Math.min(r, g, b)) / mx;
       if (luma > 140) bright += 1;
+      satSum += sat;
     }
-    colScore[x] = bright;
+    const u = (x + 0.5) / w;
+    // Rivet cols are bright; the rest of the iron band is mid-grey / low-sat.
+    strap[x] = bright >= 3 || satSum / h < 0.28 || (u >= STRAP_U0 - 0.03 && u <= STRAP_U1 + 0.03);
   }
-  const strap = Array.from(colScore, (s) => s >= 3);
   const woodCols: number[] = [];
   for (let x = 0; x < w; x++) if (!strap[x]) woodCols.push(x);
   if (woodCols.length < 8) return;
@@ -744,17 +750,43 @@ function nearestMap(canvas: HTMLCanvasElement): THREE.Texture {
   return tex;
 }
 
+/** Near-black iron that does not sample wood_beam.png (those strap texels are pale). */
+export function makeIronStrapMap(): THREE.DataTexture {
+  const w = 32;
+  const h = 32;
+  const data = new Uint8Array(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const rivet = (y & 7) === 3 && x >= 13 && x <= 18;
+      data[i] = rivet ? 58 : 16;
+      data[i + 1] = rivet ? 52 : 15;
+      data[i + 2] = rivet ? 46 : 14;
+      data[i + 3] = 255;
+    }
+  }
+  const tex = new THREE.DataTexture(data, w, h, THREE.RGBAFormat);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.generateMipmaps = false;
+  tex.needsUpdate = true;
+  return tex;
+}
+
 /** Near-black iron from the pale strap columns; rivet stays a faint glint. */
 export function ironStrapMap(src: THREE.Texture): THREE.Texture {
   const img = src.image as { width?: number; height?: number; naturalWidth?: number; naturalHeight?: number } | undefined;
   const w = img?.naturalWidth || img?.width || 0;
   const h = img?.naturalHeight || img?.height || 0;
-  if (!img || !w || !h || typeof document === 'undefined') return src;
+  if (!img || !w || !h || typeof document === 'undefined') return makeIronStrapMap();
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext('2d');
-  if (!ctx) return src;
+  if (!ctx) return makeIronStrapMap();
   ctx.drawImage(img as CanvasImageSource, 0, 0);
   const pix = ctx.getImageData(0, 0, w, h);
   for (let i = 0; i < pix.data.length; i += 4) {
@@ -856,7 +888,7 @@ export function meshCeilingBeams(map: THREE.Texture, boxes: CeilingBeamBox[]): T
   if (!woodGeo && !strapGeo) return null;
 
   const woodMap = sootyOakMap(map, true);
-  const strapMap = ironStrapMap(map);
+  const strapMap = makeIronStrapMap();
   const group = new THREE.Group();
   group.name = 'ceiling-beams';
   group.userData.castWhenOn = false;
@@ -867,7 +899,7 @@ export function meshCeilingBeams(map: THREE.Texture, boxes: CeilingBeamBox[]): T
         woodGeo,
         new THREE.MeshPhysicalMaterial({
           map: woodMap,
-          color: new THREE.Color(0.84, 0.82, 0.78),
+          color: WOOD_TINT,
           roughness: 0.94,
           metalness: 0,
           envMapIntensity: 0
@@ -882,10 +914,13 @@ export function meshCeilingBeams(map: THREE.Texture, boxes: CeilingBeamBox[]): T
         strapGeo,
         new THREE.MeshPhysicalMaterial({
           map: strapMap,
-          color: new THREE.Color(0.38, 0.35, 0.32),
-          roughness: 0.62,
-          metalness: 0.36,
-          envMapIntensity: 0
+          color: STRAP_TINT,
+          roughness: 0.82,
+          metalness: 0.08,
+          envMapIntensity: 0,
+          polygonOffset: true,
+          polygonOffsetFactor: -1,
+          polygonOffsetUnits: -1
         })
       )
     );
