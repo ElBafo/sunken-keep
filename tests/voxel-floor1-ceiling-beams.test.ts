@@ -14,6 +14,7 @@ import {
   auditCeilingBeams,
   cellOverlapsBeam,
   isBeamGridLine,
+  ironStrapPixel,
   listBeamStraps,
   listCeilingBeams,
   meshCeilingBeams,
@@ -119,6 +120,20 @@ describe('floor-1 ceiling timber', () => {
     expect(new Set(firsts.map((t) => t.toFixed(2))).size).toBeGreaterThan(4);
   });
 
+  it('remaps the pale crate strap to near-black iron with a faint rivet', () => {
+    const band = ironStrapPixel(82 / 255, 84 / 255, 76 / 255);
+    const rivet = ironStrapPixel(170 / 255, 176 / 255, 167 / 255);
+    const grain = ironStrapPixel(56 / 255, 39 / 255, 29 / 255);
+    const oak = [0.45 * 0.74, 0.32 * 0.74, 0.18 * 0.74];
+    expect(src).toContain('STRAP_U0 = 0.45');
+    expect(src).toContain('STRAP_U1 = 0.53');
+    expect(Math.max(...band)).toBeLessThan(0.08);
+    expect(Math.max(...grain)).toBeLessThan(0.08);
+    expect(Math.max(...band)).toBeLessThan(Math.max(...oak));
+    expect(Math.max(...rivet)).toBeGreaterThan(Math.max(...band) + 0.08);
+    expect(Math.max(...rivet)).toBeLessThan(0.35);
+  });
+
   it('batches wood and straps into MeshPhysical meshes at 1 cm per texel', () => {
     expect(src).toContain('MeshPhysicalMaterial');
     expect(src).toContain('mergeGeometries');
@@ -126,6 +141,8 @@ describe('floor-1 ceiling timber', () => {
     expect(src).toContain('castShadow = false');
     expect(src).toContain('receiveShadow = true');
     expect(src).toContain('sootyOakMap');
+    expect(src).toContain('ironStrapMap');
+    expect(src).toContain('ironStrapPixel');
     expect(src).toContain('listBeamStraps');
     expect(src).toContain('setWoodUvs');
     expect(src).toContain('[0.27, 0.71]');
@@ -151,6 +168,10 @@ describe('floor-1 ceiling timber', () => {
     expect(straps.isMesh).toBe(true);
     expect(wood.material).toBeInstanceOf(THREE.MeshPhysicalMaterial);
     expect(straps.material).toBeInstanceOf(THREE.MeshPhysicalMaterial);
+    const woodMat = wood.material as THREE.MeshPhysicalMaterial;
+    const strapMat = straps.material as THREE.MeshPhysicalMaterial;
+    expect(strapMat.color.r).toBeLessThan(woodMat.color.r * 0.5);
+    expect(Math.max(strapMat.color.r, strapMat.color.g, strapMat.color.b)).toBeLessThan(0.45);
     for (const mesh of [wood, straps]) {
       expect(mesh.castShadow).toBe(false);
       expect(mesh.userData.castWhenOn).toBe(false);

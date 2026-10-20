@@ -551,8 +551,10 @@ export const WOOD_TILE_M = 64 * TEXEL_M;
 /** Iron strap width, scaled with the slimmer 0.14 m rib. */
 export const STRAP_M = 0.028;
 const STRAP_PROUD = 0.008;
-const STRAP_U0 = 0.17;
-const STRAP_U1 = 0.3;
+/** Centre iron column in wood_beam.png (texels 29–34: mid-grey band + rivet). */
+const STRAP_U0 = 0.45;
+const STRAP_U1 = 0.53;
+const STRAP_FACE_EPS = 0.04;
 
 function hash01(x: number, z: number, salt: number): number {
   let n = Math.imul(Math.round(x * 100) ^ (Math.round(z * 100) << 8) ^ salt, 2246822519);
@@ -633,9 +635,9 @@ function setStrapUvs(geo: THREE.BufferGeometry, box: CeilingBeamBox): void {
       const i = f * 4 + k;
       const u0 = uv.getX(i);
       const v0 = uv.getY(i);
-      if (Math.abs(wu - thin) < 0.02) {
+      if (Math.abs(wu - thin) < STRAP_FACE_EPS) {
         uv.setXY(i, STRAP_U0 + u0 * (STRAP_U1 - STRAP_U0), v0);
-      } else if (Math.abs(wv - thin) < 0.02) {
+      } else if (Math.abs(wv - thin) < STRAP_FACE_EPS) {
         uv.setXY(i, STRAP_U0 + v0 * (STRAP_U1 - STRAP_U0), u0);
       } else {
         uv.setXY(i, STRAP_U0 + u0 * (STRAP_U1 - STRAP_U0), v0 * (wv / WOOD_TILE_M));
@@ -654,6 +656,17 @@ function sootyPixel(r: number, g: number, b: number): [number, number, number] {
     (luma + (g - luma) * sat) * dim,
     (luma + (b - luma) * sat) * dim
   ];
+}
+
+/**
+ * wood_beam.png straps are mid-grey (~0.32–0.45 luma) with a ~0.68 rivet.
+ * Remap the body to near-black iron; only the rivet lifts as a faint highlight.
+ */
+export function ironStrapPixel(r: number, g: number, b: number): [number, number, number] {
+  const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  const t = Math.min(1, Math.max(0, (luma - 0.5) / 0.22));
+  const lift = t * t;
+  return [0.055 + lift * 0.3, 0.052 + lift * 0.24, 0.048 + lift * 0.2];
 }
 
 function inpaintWood(pix: ImageData): void {
@@ -716,6 +729,10 @@ export function sootyOakMap(src: THREE.Texture, woodOnly = false): THREE.Texture
     pix.data[i + 2] = Math.round(b * 255);
   }
   ctx.putImageData(pix, 0, 0);
+  return nearestMap(canvas);
+}
+
+function nearestMap(canvas: HTMLCanvasElement): THREE.Texture {
   const tex = new THREE.Texture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = THREE.RepeatWrapping;
@@ -725,6 +742,29 @@ export function sootyOakMap(src: THREE.Texture, woodOnly = false): THREE.Texture
   tex.generateMipmaps = false;
   tex.needsUpdate = true;
   return tex;
+}
+
+/** Near-black iron from the pale strap columns; rivet stays a faint glint. */
+export function ironStrapMap(src: THREE.Texture): THREE.Texture {
+  const img = src.image as { width?: number; height?: number; naturalWidth?: number; naturalHeight?: number } | undefined;
+  const w = img?.naturalWidth || img?.width || 0;
+  const h = img?.naturalHeight || img?.height || 0;
+  if (!img || !w || !h || typeof document === 'undefined') return src;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return src;
+  ctx.drawImage(img as CanvasImageSource, 0, 0);
+  const pix = ctx.getImageData(0, 0, w, h);
+  for (let i = 0; i < pix.data.length; i += 4) {
+    const [r, g, b] = ironStrapPixel(pix.data[i] / 255, pix.data[i + 1] / 255, pix.data[i + 2] / 255);
+    pix.data[i] = Math.round(r * 255);
+    pix.data[i + 1] = Math.round(g * 255);
+    pix.data[i + 2] = Math.round(b * 255);
+  }
+  ctx.putImageData(pix, 0, 0);
+  return nearestMap(canvas);
 }
 
 function mergeGeometries(geos: THREE.BufferGeometry[]): THREE.BufferGeometry | null {
@@ -816,7 +856,7 @@ export function meshCeilingBeams(map: THREE.Texture, boxes: CeilingBeamBox[]): T
   if (!woodGeo && !strapGeo) return null;
 
   const woodMap = sootyOakMap(map, true);
-  const strapMap = sootyOakMap(map, false);
+  const strapMap = ironStrapMap(map);
   const group = new THREE.Group();
   group.name = 'ceiling-beams';
   group.userData.castWhenOn = false;
@@ -842,9 +882,9 @@ export function meshCeilingBeams(map: THREE.Texture, boxes: CeilingBeamBox[]): T
         strapGeo,
         new THREE.MeshPhysicalMaterial({
           map: strapMap,
-          color: new THREE.Color(0.55, 0.52, 0.5),
-          roughness: 0.52,
-          metalness: 0.38,
+          color: new THREE.Color(0.38, 0.35, 0.32),
+          roughness: 0.62,
+          metalness: 0.36,
           envMapIntensity: 0
         })
       )
