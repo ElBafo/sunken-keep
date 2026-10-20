@@ -58,10 +58,10 @@ def zone_at(x, y):
     return None
 
 
-# Planks stay only in these rooms. Beams run E–W there, so boards rotate 90° onto Z.
-# Rubble elsewhere is isotropic — no UV rotation.
+# Planks stay only in these rooms. Their primary beams run N–S, so boards
+# (tile-x / E–W) already cross the ribs — no UV rotation. Rubble is isotropic.
 PLANK_ZONES = {'pantry', 'guard_hall'}
-ROT90 = set(PLANK_ZONES)
+ROT90 = set()
 
 # --- floor ---
 W_F = {'floor_stone': 2, 'floor_stone_2': 3, 'floor_stone_4': 2}
@@ -134,7 +134,7 @@ out = {
     'for': 'PR #63 Artie ceiling r3 — rubble + planks in pantry/guard hall',
     'rules': {
         'floor': 'floor_water locked on cistern and cellar pool squares; floor_stone locked on squares that touch water. Spread is floor_stone / _2 / _4. floor_stone_3 is a rare feature (at most 4, under a lamp or by a door, never adjacent). Tiles share edge bands so joints run through any mix; no per-cell flip or rotation.',
-        'ceiling': 'ceiling_rubble_1/_2/_3 replace planks everywhere except pantry and guard_hall, which keep ceiling_planks_1/_2/_3. Rubble is edge-matched and isotropic (no UV rotation). Plank boards still run along tile x and take a zone-wide 90° UV turn in pantry/guard_hall so they cross the E–W beams. Overlays sit on top: sunbeam crack at daylight (11,2), roots at (1,2), copper pipes along y=1 (1-3, 9-13) and y=6 (8-11).',
+        'ceiling': 'ceiling_rubble_1/_2/_3 replace planks everywhere except pantry and guard_hall, which keep ceiling_planks_1/_2/_3. Rubble is edge-matched and isotropic (no UV rotation). Plank boards run along tile x; pantry/guard primary beams run N–S so the boards already cross them (no 90° turn). Overlays sit on top: sunbeam crack at daylight (11,2), roots at (1,2), copper pipes along y=1 (1-3, 9-13) and y=6 (8-11).',
     },
     'squares': [
         {

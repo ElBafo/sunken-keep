@@ -89,19 +89,17 @@ describe('floor-1 floor and ceiling come from Levie’s map', () => {
     }
   });
 
-  it('turns plank boards 90° only in pantry and guard hall', () => {
+  it('keeps plank boards unrotated so they cross the N–S beams', () => {
     expect(shellUv(0, 0, 0)).toEqual([0, 0]);
     expect(shellUv(1, 0, 90)).toEqual([0, 0]);
     expect(shellUv(1, 1, 90)).toEqual([1, 0]);
     expect(mappedCeilingUvRot(2, 11)).toBe(0);
     expect(mappedCeilingUvRot(2, 6)).toBe(0);
-    expect(mappedCeilingUvRot(6, 6)).toBe(90);
-    expect(mappedCeilingUvRot(10, 2)).toBe(90);
+    expect(mappedCeilingUvRot(6, 6)).toBe(0);
+    expect(mappedCeilingUvRot(10, 2)).toBe(0);
     expect(mappedCeilingUvRot(6, 2)).toBe(0);
     for (const s of floor1FloorCeil.squares) {
-      const plank = s.ceiling.startsWith('ceiling_planks');
-      if (plank) expect(s.ceilingRot).toBe(90);
-      else expect(s.ceilingRot ?? 0).toBe(0);
+      expect(s.ceilingRot ?? 0).toBe(0);
     }
     const jobs = enumerateFaces(floor1Map);
     for (const j of jobs.filter((f) => f.kind === 'floor')) {

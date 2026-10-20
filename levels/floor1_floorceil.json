@@ -4,7 +4,7 @@
  "for": "PR #63 Artie ceiling r3 \u2014 rubble + planks in pantry/guard hall",
  "rules": {
   "floor": "floor_water locked on cistern and cellar pool squares; floor_stone locked on squares that touch water. Spread is floor_stone / _2 / _4. floor_stone_3 is a rare feature (at most 4, under a lamp or by a door, never adjacent). Tiles share edge bands so joints run through any mix; no per-cell flip or rotation.",
-  "ceiling": "ceiling_rubble_1/_2/_3 replace planks everywhere except pantry and guard_hall, which keep ceiling_planks_1/_2/_3. Rubble is edge-matched and isotropic (no UV rotation). Plank boards still run along tile x and take a zone-wide 90\u00b0 UV turn in pantry/guard_hall so they cross the E\u2013W beams. Overlays sit on top: sunbeam crack at daylight (11,2), roots at (1,2), copper pipes along y=1 (1-3, 9-13) and y=6 (8-11)."
+  "ceiling": "ceiling_rubble_1/_2/_3 replace planks everywhere except pantry and guard_hall, which keep ceiling_planks_1/_2/_3. Rubble is edge-matched and isotropic (no UV rotation). Plank boards run along tile x; pantry/guard primary beams run N\u2013S so the boards already cross them (no 90\u00b0 turn). Overlays sit on top: sunbeam crack at daylight (11,2), roots at (1,2), copper pipes along y=1 (1-3, 9-13) and y=6 (8-11)."
  },
  "squares": [
   {
@@ -54,35 +54,35 @@
    "y": 1,
    "floor": "floor_stone_3",
    "ceiling": "ceiling_planks_3",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 10,
    "y": 1,
    "floor": "floor_stone_2",
    "ceiling": "ceiling_planks_2",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 11,
    "y": 1,
    "floor": "floor_stone_4",
    "ceiling": "ceiling_planks_1",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 12,
    "y": 1,
    "floor": "floor_stone",
    "ceiling": "ceiling_planks_3",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 13,
    "y": 1,
    "floor": "floor_stone_2",
    "ceiling": "ceiling_planks_2",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 1,
@@ -138,49 +138,49 @@
    "y": 2,
    "floor": "floor_stone",
    "ceiling": "ceiling_planks_1",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 9,
    "y": 2,
    "floor": "floor_stone_2",
    "ceiling": "ceiling_planks_2",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 10,
    "y": 2,
    "floor": "floor_stone_4",
    "ceiling": "ceiling_planks_1",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 11,
    "y": 2,
    "floor": "floor_stone_2",
    "ceiling": "ceiling_planks_3",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 12,
    "y": 2,
    "floor": "floor_stone_2",
    "ceiling": "ceiling_planks_2",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 13,
    "y": 2,
    "floor": "floor_stone",
    "ceiling": "ceiling_planks_3",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 14,
    "y": 2,
    "floor": "floor_stone_2",
    "ceiling": "ceiling_planks_1",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 15,
@@ -264,35 +264,35 @@
    "y": 3,
    "floor": "floor_stone",
    "ceiling": "ceiling_planks_3",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 10,
    "y": 3,
    "floor": "floor_stone_2",
    "ceiling": "ceiling_planks_2",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 11,
    "y": 3,
    "floor": "floor_stone_2",
    "ceiling": "ceiling_planks_1",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 12,
    "y": 3,
    "floor": "floor_stone_4",
    "ceiling": "ceiling_planks_3",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 13,
    "y": 3,
    "floor": "floor_stone_3",
    "ceiling": "ceiling_planks_1",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 19,
@@ -327,35 +327,35 @@
    "y": 4,
    "floor": "floor_stone_2",
    "ceiling": "ceiling_planks_2",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 10,
    "y": 4,
    "floor": "floor_stone_4",
    "ceiling": "ceiling_planks_1",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 11,
    "y": 4,
    "floor": "floor_stone",
    "ceiling": "ceiling_planks_2",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 12,
    "y": 4,
    "floor": "floor_stone_2",
    "ceiling": "ceiling_planks_1",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 13,
    "y": 4,
    "floor": "floor_stone_4",
    "ceiling": "ceiling_planks_3",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 19,
@@ -397,21 +397,21 @@
    "y": 5,
    "floor": "floor_stone_2",
    "ceiling": "ceiling_planks_3",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 6,
    "y": 5,
    "floor": "floor_stone_3",
    "ceiling": "ceiling_planks_2",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 7,
    "y": 5,
    "floor": "floor_stone_2",
    "ceiling": "ceiling_planks_3",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 19,
@@ -446,21 +446,21 @@
    "y": 6,
    "floor": "floor_stone_4",
    "ceiling": "ceiling_planks_2",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 6,
    "y": 6,
    "floor": "floor_stone",
    "ceiling": "ceiling_planks_1",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 7,
    "y": 6,
    "floor": "floor_stone_4",
    "ceiling": "ceiling_planks_2",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 8,
@@ -523,21 +523,21 @@
    "y": 7,
    "floor": "floor_stone",
    "ceiling": "ceiling_planks_1",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 6,
    "y": 7,
    "floor": "floor_stone_2",
    "ceiling": "ceiling_planks_3",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 7,
    "y": 7,
    "floor": "floor_stone_2",
    "ceiling": "ceiling_planks_1",
-   "ceilingRot": 90
+   "ceilingRot": 0
   },
   {
    "x": 11,

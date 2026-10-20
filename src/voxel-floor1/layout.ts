@@ -29,7 +29,7 @@ export function mappedCeilingFile(x: number, y: number): string | undefined {
   return FLOOR_CEIL.get(`${x},${y}`)?.ceiling;
 }
 
-/** Zone-wide 90° turn so pantry/guard plank boards (tile-x) cross east–west beams. */
+/** Zone-wide 90° turn when plank boards must cross east–west beams. */
 export function mappedCeilingUvRot(x: number, y: number): 0 | 90 {
   return FLOOR_CEIL.get(`${x},${y}`)?.ceilingRot ?? 0;
 }
@@ -126,7 +126,7 @@ export type FaceJob = {
   look?: WallLook;
   /** World-tile U run so neighbouring wall faces continue. */
   uOffset: number;
-  /** Ceiling only: 90 turns plank boards onto Z in pantry/guard hall. */
+  /** Ceiling only: 90 would turn plank boards onto Z. Unused while beams run N–S. */
   uvRot: 0 | 90;
 };
 
