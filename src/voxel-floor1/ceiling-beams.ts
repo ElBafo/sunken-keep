@@ -2,15 +2,24 @@ import * as THREE from 'three';
 import floor1DecorJson from '../../levels/floor1_decor.json';
 import { CELL } from './constants';
 import { floor1Sunbeams } from './fixtures';
-import { isShellTile, tileAt, type FloorMap } from './layout';
+import { isShellTile, isTrueWall, tileAt, type FloorMap, type FloorTile } from './layout';
 
-/** Squared timber: ~0.25 m across, 0.3 m tall, just under the ceiling. */
-export const BEAM_WIDTH = 0.25;
-export const BEAM_DEPTH = 0.3;
+/**
+ * Shallow ceiling rib: 0.14 m across, 0.09 m down, flush just under the slab.
+ * Placement is grid-only — it does not read ceiling tile files (a plank ceiling
+ * can replace the stone later without touching this module).
+ */
+export const BEAM_WIDTH = 0.14;
+export const BEAM_DEPTH = 0.09;
 export const BEAM_CEIL_GAP = 0.04;
 export const BEAM_Y = CELL - BEAM_CEIL_GAP - BEAM_DEPTH / 2;
-const WALL_PAD = 0.08;
+/** Cell centre or cell-boundary / slab-joint line. */
+export const BEAM_GRID = CELL / 2;
 const MIN_SPAN = 0.45;
+const MIN_PAIR_SEP = CELL * 0.9;
+const JOIN_EPS = 0.002;
+const WALL_TOUCH = 0.02;
+const OVERLAP_EPS = 0.0005;
 
 const CORRIDOR_ZONES = new Set(['entry_gate', 'hook_corridor', 'slime_trail', 'lair']);
 const ROOM_ZONES = new Set([
@@ -59,11 +68,29 @@ function isSunbeamCell(x: number, y: number): boolean {
   return floor1Sunbeams.some((b) => b.x === x && b.y === y);
 }
 
-/** No timber over water, the cistern hall, or a crack sunbeam square. */
+function isOpeningTile(tile: FloorTile | undefined): boolean {
+  return !!(tile && (tile.door || tile.secret));
+}
+
+/** No timber over water, the cistern, a crack sunbeam, or a door/secret opening. */
 export function skipCeilingBeamCell(map: FloorMap, x: number, y: number): boolean {
   if (isCisternCell(x, y) || isSunbeamCell(x, y) || isWaterTile(map, x, y)) return true;
   const tile = tileAt(map, x, y);
-  return !isShellTile(tile);
+  if (!isShellTile(tile) || isOpeningTile(tile)) return true;
+  return false;
+}
+
+export function isBeamGridLine(world: number): boolean {
+  const q = world / BEAM_GRID;
+  return Math.abs(q - Math.round(q)) < 1e-6;
+}
+
+function snapGrid(world: number): number {
+  return Math.round(world / BEAM_GRID) * BEAM_GRID;
+}
+
+function isJointLine(world: number): boolean {
+  return ((Math.round(world / BEAM_GRID) % 2) + 2) % 2 === 1;
 }
 
 function eligible(map: FloorMap, x: number, y: number): boolean {
@@ -80,6 +107,32 @@ function zoneCells(map: FloorMap, zone: DecorZone): Array<{ x: number; y: number
     }
   }
   return out;
+}
+
+/** 1-cell doorway / secret-wall nook sticking out of a room into another zone. */
+function isDoorwayNook(map: FloorMap, zone: DecorZone, x: number, y: number): boolean {
+  const dirs: Array<[number, number]> = [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1]
+  ];
+  let n = 0;
+  let opensOut = false;
+  for (const [dx, dy] of dirs) {
+    const nx = x + dx;
+    const ny = y + dy;
+    if (inRects(nx, ny, zone.viewerSquares) && eligible(map, nx, ny)) n += 1;
+    const tile = tileAt(map, nx, ny);
+    if (isOpeningTile(tile)) opensOut = true;
+    const other = zoneAt(nx, ny);
+    if (other && other.id !== zone.id && eligible(map, nx, ny)) opensOut = true;
+  }
+  return n < 2 && opensOut;
+}
+
+function roomCells(map: FloorMap, zone: DecorZone): Array<{ x: number; y: number }> {
+  return zoneCells(map, zone).filter((c) => !isDoorwayNook(map, zone, c.x, c.y));
 }
 
 function runsOf(values: number[]): Array<[number, number]> {
@@ -101,22 +154,7 @@ function runsOf(values: number[]): Array<[number, number]> {
   return runs;
 }
 
-function mode(values: number[]): number {
-  const counts = new Map<number, number>();
-  let best = values[0];
-  let bestN = 0;
-  for (const v of values) {
-    const n = (counts.get(v) ?? 0) + 1;
-    counts.set(v, n);
-    if (n > bestN) {
-      best = v;
-      bestN = n;
-    }
-  }
-  return best;
-}
-
-function cellOverlapsBeam(cx: number, cy: number, box: Omit<CeilingBeamBox, 'kind' | 'y'>): boolean {
+export function cellOverlapsBeam(cx: number, cy: number, box: Pick<CeilingBeamBox, 'x' | 'z' | 'sx' | 'sz'>): boolean {
   const half = CELL / 2;
   const x0 = cx * CELL - half;
   const x1 = cx * CELL + half;
@@ -129,7 +167,7 @@ function cellOverlapsBeam(cx: number, cy: number, box: Omit<CeilingBeamBox, 'kin
   return bx0 < x1 && bx1 > x0 && bz0 < z1 && bz1 > z0;
 }
 
-function blockedByKeepout(map: FloorMap, box: Omit<CeilingBeamBox, 'kind' | 'y'>): boolean {
+function blockedByKeepout(map: FloorMap, box: Pick<CeilingBeamBox, 'x' | 'z' | 'sx' | 'sz'>): boolean {
   const half = CELL / 2;
   const x0 = Math.floor((box.x - box.sx / 2 + half) / CELL);
   const x1 = Math.floor((box.x + box.sx / 2 - 1e-6 + half) / CELL);
@@ -143,72 +181,159 @@ function blockedByKeepout(map: FloorMap, box: Omit<CeilingBeamBox, 'kind' | 'y'>
   return false;
 }
 
-function pushBox(
-  out: CeilingBeamBox[],
+function boxesOverlap(a: Pick<CeilingBeamBox, 'x' | 'z' | 'sx' | 'sz'>, b: Pick<CeilingBeamBox, 'x' | 'z' | 'sx' | 'sz'>): boolean {
+  return (
+    a.x - a.sx / 2 < b.x + b.sx / 2 - OVERLAP_EPS &&
+    a.x + a.sx / 2 > b.x - b.sx / 2 + OVERLAP_EPS &&
+    a.z - a.sz / 2 < b.z + b.sz / 2 - OVERLAP_EPS &&
+    a.z + a.sz / 2 > b.z - b.sz / 2 + OVERLAP_EPS
+  );
+}
+
+function overlapsAny(box: Pick<CeilingBeamBox, 'x' | 'z' | 'sx' | 'sz'>, list: CeilingBeamBox[]): boolean {
+  return list.some((other) => boxesOverlap(box, other));
+}
+
+/** Cell rows/cols the beam's thin axis overlaps (centre line = 1, slab joint = 2). */
+function lineCells(world: number): number[] {
+  const half = BEAM_WIDTH / 2;
+  const a = Math.floor((world - half + CELL / 2) / CELL);
+  const b = Math.floor((world + half - 1e-7 + CELL / 2) / CELL);
+  const out: number[] = [];
+  for (let i = a; i <= b; i++) out.push(i);
+  return out;
+}
+
+function runCellOk(map: FloorMap, alongX: boolean, run: number, cross: number): boolean {
+  for (const other of lineCells(cross)) {
+    const x = alongX ? run : other;
+    const y = alongX ? other : run;
+    if (!eligible(map, x, y)) return false;
+  }
+  return true;
+}
+
+function runHasWalls(map: FloorMap, alongX: boolean, a: number, b: number, cross: number): boolean {
+  for (const other of lineCells(cross)) {
+    if (alongX) {
+      if (!isTrueWall(tileAt(map, a - 1, other)) || !isTrueWall(tileAt(map, b + 1, other))) return false;
+    } else if (!isTrueWall(tileAt(map, other, a - 1)) || !isTrueWall(tileAt(map, other, b + 1))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function makeRunBox(
+  kind: CeilingBeamBox['kind'],
+  alongX: boolean,
+  cross: number,
+  a: number,
+  b: number
+): CeilingBeamBox {
+  const u0 = a * CELL - CELL / 2;
+  const u1 = b * CELL + CELL / 2;
+  if (alongX) {
+    return { x: (u0 + u1) / 2, y: BEAM_Y, z: cross, sx: u1 - u0, sy: BEAM_DEPTH, sz: BEAM_WIDTH, kind };
+  }
+  return { x: cross, y: BEAM_Y, z: (u0 + u1) / 2, sx: BEAM_WIDTH, sy: BEAM_DEPTH, sz: u1 - u0, kind };
+}
+
+/** Longest wall-to-wall span on a grid line. Dropped when either end is an opening. */
+function tryWallSpan(
   map: FloorMap,
   kind: CeilingBeamBox['kind'],
-  x: number,
-  z: number,
-  sx: number,
-  sz: number
-): void {
-  if (sx < MIN_SPAN && sz < MIN_SPAN) return;
-  const box = { x, y: BEAM_Y, z, sx, sy: BEAM_DEPTH, sz, kind };
-  if (blockedByKeepout(map, box)) return;
+  alongX: boolean,
+  cross: number,
+  run0: number,
+  run1: number
+): CeilingBeamBox | null {
+  if (!isBeamGridLine(cross)) return null;
+  const cells: number[] = [];
+  for (let r = run0; r <= run1; r++) {
+    if (runCellOk(map, alongX, r, cross)) cells.push(r);
+  }
+  let best: CeilingBeamBox | null = null;
+  for (const [a, b] of runsOf(cells)) {
+    if (!runHasWalls(map, alongX, a, b, cross)) continue;
+    const box = makeRunBox(kind, alongX, cross, a, b);
+    if (Math.max(box.sx, box.sz) < MIN_SPAN) continue;
+    if (blockedByKeepout(map, box)) continue;
+    if (!best || Math.max(box.sx, box.sz) > Math.max(best.sx, best.sz)) best = box;
+  }
+  return best;
+}
+
+type LineHit = { cross: number; box: CeilingBeamBox };
+
+function nearestLine(valid: LineHit[], target: number, exclude: LineHit | null, minSep: number): LineHit | null {
+  let best: LineHit | null = null;
+  let bestD = Infinity;
+  for (const v of valid) {
+    if (exclude && Math.abs(v.cross - exclude.cross) < minSep) continue;
+    const d = Math.abs(v.cross - target);
+    const tieJoint = best && d === bestD && isJointLine(v.cross) && !isJointLine(best.cross);
+    if (d < bestD || tieJoint) {
+      bestD = d;
+      best = v;
+    }
+  }
+  return best;
+}
+
+function pickPair(valid: LineHit[], crossMin: number, crossMax: number): LineHit[] {
+  if (valid.length <= 1) return valid;
+  const z0 = (crossMin - 0.5) * CELL;
+  const z1 = (crossMax + 0.5) * CELL;
+  const targetA = snapGrid(z0 + (z1 - z0) * 0.28);
+  const targetB = snapGrid(z0 + (z1 - z0) * 0.72);
+  const a = nearestLine(valid, targetA, null, 0);
+  const b = a ? nearestLine(valid, targetB, a, MIN_PAIR_SEP) : null;
+  if (a && b) return a.cross <= b.cross ? [a, b] : [b, a];
+  return a ? [a] : [valid[0]];
+}
+
+function pickJoistLines(runMin: number, runMax: number): number[] {
+  const joints: number[] = [];
+  for (let i = runMin; i < runMax; i++) joints.push((i + 0.5) * CELL);
+  if (joints.length <= 3) return joints;
+  const out: number[] = [];
+  for (let i = 0; i < joints.length; i += 2) out.push(joints[i]);
+  return out;
+}
+
+function tryJoist(map: FloorMap, alongX: boolean, cross: number, pair0: number, pair1: number): CeilingBeamBox | null {
+  if (!isBeamGridLine(cross)) return null;
+  const lo = Math.min(pair0, pair1) + BEAM_WIDTH / 2 + JOIN_EPS;
+  const hi = Math.max(pair0, pair1) - BEAM_WIDTH / 2 - JOIN_EPS;
+  if (hi - lo < MIN_SPAN) return null;
+  const box: CeilingBeamBox = alongX
+    ? { x: (lo + hi) / 2, y: BEAM_Y, z: cross, sx: hi - lo, sy: BEAM_DEPTH, sz: BEAM_WIDTH, kind: 'joist' }
+    : { x: cross, y: BEAM_Y, z: (lo + hi) / 2, sx: BEAM_WIDTH, sy: BEAM_DEPTH, sz: hi - lo, kind: 'joist' };
+  if (blockedByKeepout(map, box)) return null;
+  return box;
+}
+
+function accept(out: CeilingBeamBox[], box: CeilingBeamBox | null): void {
+  if (!box || overlapsAny(box, out)) return;
   out.push(box);
 }
 
-/** Split an X-axis run around keep-out cells, then emit one box per segment. */
-function emitSpanX(
-  out: CeilingBeamBox[],
-  map: FloorMap,
-  kind: CeilingBeamBox['kind'],
-  z: number,
-  xStart: number,
-  xEnd: number
-): void {
-  const xs: number[] = [];
-  for (let x = xStart; x <= xEnd; x++) {
-    const trial = {
-      x: x * CELL,
-      z,
-      sx: CELL - WALL_PAD * 2,
-      sy: BEAM_DEPTH,
-      sz: BEAM_WIDTH
-    };
-    if (!blockedByKeepout(map, trial) && eligible(map, x, Math.round(z / CELL))) xs.push(x);
+function firstCellOpensOut(map: FloorMap, zone: DecorZone, longX: boolean, first: number, crosses: number[]): boolean {
+  for (const c of crosses) {
+    const x = longX ? first - 1 : c;
+    const y = longX ? c : first - 1;
+    if (isOpeningTile(tileAt(map, x, y))) return true;
+    const other = zoneAt(x, y);
+    if (other && other.id !== zone.id && eligible(map, x, y)) return true;
   }
-  for (const [a, b] of runsOf(xs)) {
-    const x0 = a * CELL - CELL / 2 + WALL_PAD;
-    const x1 = b * CELL + CELL / 2 - WALL_PAD;
-    pushBox(out, map, kind, (x0 + x1) / 2, z, x1 - x0, BEAM_WIDTH);
-  }
+  return false;
 }
 
-function emitSpanZ(
-  out: CeilingBeamBox[],
-  map: FloorMap,
-  kind: CeilingBeamBox['kind'],
-  x: number,
-  zStart: number,
-  zEnd: number
-): void {
-  const zs: number[] = [];
-  for (let z = zStart; z <= zEnd; z++) {
-    const trial = {
-      x,
-      z: z * CELL,
-      sx: BEAM_WIDTH,
-      sy: BEAM_DEPTH,
-      sz: CELL - WALL_PAD * 2
-    };
-    if (!blockedByKeepout(map, trial) && eligible(map, Math.round(x / CELL), z)) zs.push(z);
-  }
-  for (const [a, b] of runsOf(zs)) {
-    const z0 = a * CELL - CELL / 2 + WALL_PAD;
-    const z1 = b * CELL + CELL / 2 - WALL_PAD;
-    pushBox(out, map, kind, x, (z0 + z1) / 2, BEAM_WIDTH, z1 - z0);
-  }
+function corridorPhase(map: FloorMap, zone: DecorZone, longX: boolean, a: number, b: number, crosses: number[]): number {
+  const skipFirst = b - a >= 2 || firstCellOpensOut(map, zone, longX, a, crosses);
+  const phase = skipFirst ? 1 : 0;
+  return a + phase <= b ? phase : 0;
 }
 
 function placeCorridor(map: FloorMap, zone: DecorZone, out: CeilingBeamBox[]): void {
@@ -216,66 +341,197 @@ function placeCorridor(map: FloorMap, zone: DecorZone, out: CeilingBeamBox[]): v
   if (!cells.length) return;
   const xs = cells.map((c) => c.x);
   const zs = cells.map((c) => c.y);
-  const alongX = new Set(xs).size >= new Set(zs).size;
-  if (alongX) {
-    const spineZ = mode(zs);
-    const spine = cells.filter((c) => c.y === spineZ).map((c) => c.x);
-    for (const [a, b] of runsOf(spine)) {
-      const phase = b - a >= 2 ? 1 : 0;
+  const longX = new Set(xs).size >= new Set(zs).size;
+  if (longX) {
+    const xsU = [...new Set(xs)].sort((a, b) => a - b);
+    for (const [a, b] of runsOf(xsU)) {
+      const crosses = cells.filter((c) => c.x >= a && c.x <= b).map((c) => c.y);
+      const phase = corridorPhase(map, zone, true, a, b, crosses);
       for (let x = a + phase; x <= b; x += 2) {
-        emitSpanZ(out, map, 'corridor', x * CELL, spineZ, spineZ);
+        const ys = cells.filter((c) => c.x === x).map((c) => c.y);
+        for (const [y0, y1] of runsOf(ys)) {
+          accept(out, tryWallSpan(map, 'corridor', false, x * CELL, y0, y1));
+        }
       }
     }
     return;
   }
-  const spineX = mode(xs);
-  const spine = cells.filter((c) => c.x === spineX).map((c) => c.y);
-  for (const [a, b] of runsOf(spine)) {
-    const phase = b - a >= 2 ? 1 : 0;
+  const zsU = [...new Set(zs)].sort((a, b) => a - b);
+  for (const [a, b] of runsOf(zsU)) {
+    const crosses = cells.filter((c) => c.y >= a && c.y <= b).map((c) => c.x);
+    const phase = corridorPhase(map, zone, false, a, b, crosses);
     for (let y = a + phase; y <= b; y += 2) {
-      emitSpanX(out, map, 'corridor', y * CELL, spineX, spineX);
+      const xsAt = cells.filter((c) => c.y === y).map((c) => c.x);
+      for (const [x0, x1] of runsOf(xsAt)) {
+        accept(out, tryWallSpan(map, 'corridor', true, y * CELL, x0, x1));
+      }
     }
   }
 }
 
+function tryOrientation(
+  map: FloorMap,
+  alongX: boolean,
+  minX: number,
+  maxX: number,
+  minZ: number,
+  maxZ: number
+): CeilingBeamBox[] {
+  const crossMin = alongX ? minZ : minX;
+  const crossMax = alongX ? maxZ : maxX;
+  const runMin = alongX ? minX : minZ;
+  const runMax = alongX ? maxX : maxZ;
+  const candidates: number[] = [];
+  for (let c = crossMin; c <= crossMax; c++) candidates.push(c * CELL);
+  for (let c = crossMin; c < crossMax; c++) candidates.push((c + 0.5) * CELL);
+  const valid: LineHit[] = [];
+  for (const cross of candidates) {
+    const box = tryWallSpan(map, 'room', alongX, cross, runMin, runMax);
+    if (box) valid.push({ cross, box });
+  }
+  const picked = pickPair(valid, crossMin, crossMax);
+  const boxes = picked.map((p) => p.box);
+  if (picked.length >= 2) {
+    const a = picked[0].cross;
+    const b = picked[1].cross;
+    for (const cross of pickJoistLines(runMin, runMax)) {
+      const joist = tryJoist(map, !alongX, cross, a, b);
+      if (joist && !overlapsAny(joist, boxes)) boxes.push(joist);
+    }
+  }
+  return boxes;
+}
+
 function placeRoom(map: FloorMap, zone: DecorZone, out: CeilingBeamBox[]): void {
-  const cells = zoneCells(map, zone);
+  const cells = roomCells(map, zone);
   if (cells.length < 2) return;
   const minX = Math.min(...cells.map((c) => c.x));
   const maxX = Math.max(...cells.map((c) => c.x));
   const minZ = Math.min(...cells.map((c) => c.y));
   const maxZ = Math.max(...cells.map((c) => c.y));
-  const wide = maxX - minX + 1;
-  const deep = maxZ - minZ + 1;
-  const alongX = wide >= deep;
-  const joists = Math.min(3, Math.max(2, Math.floor((Math.max(wide, deep) + 1) / 2)));
+  const preferAlongX = maxX - minX >= maxZ - minZ;
+  const primary = tryOrientation(map, preferAlongX, minX, maxX, minZ, maxZ);
+  const alt = tryOrientation(map, !preferAlongX, minX, maxX, minZ, maxZ);
+  const score = (boxes: CeilingBeamBox[]): number => {
+    const rooms = boxes.filter((b) => b.kind === 'room').length;
+    const joists = boxes.filter((b) => b.kind === 'joist').length;
+    const span = boxes.reduce((n, b) => n + Math.max(b.sx, b.sz), 0);
+    const coverage = boxes.reduce((n, b) => n + b.sx * b.sz, 0);
+    return (rooms >= 2 ? 50 : 0) + rooms * 10 + joists * 4 + span + coverage;
+  };
+  const chosen = score(alt) > score(primary) ? alt : primary;
+  for (const box of chosen) accept(out, box);
+}
 
-  if (alongX) {
-    const z0 = minZ - 0.5;
-    const z1 = maxZ + 0.5;
-    const zA = (z0 + (z1 - z0) * 0.28) * CELL;
-    const zB = (z0 + (z1 - z0) * 0.72) * CELL;
-    emitSpanX(out, map, 'room', zA, minX, maxX);
-    emitSpanX(out, map, 'room', zB, minX, maxX);
-    for (let i = 1; i <= joists; i++) {
-      const t = i / (joists + 1);
-      const x = (minX - 0.5 + (maxX + 1 - minX) * t) * CELL;
-      emitSpanZ(out, map, 'joist', x, minZ, maxZ);
+export type CeilingBeamIssue = {
+  code: 'grid' | 'wall' | 'opening' | 'overlap' | 'keepout' | 'joist';
+  message: string;
+};
+
+function alongAxis(b: Pick<CeilingBeamBox, 'sx' | 'sz'>): 'x' | 'z' {
+  return b.sx >= b.sz ? 'x' : 'z';
+}
+
+function endWorld(b: CeilingBeamBox, which: 'min' | 'max'): number {
+  return alongAxis(b) === 'x'
+    ? which === 'min'
+      ? b.x - b.sx / 2
+      : b.x + b.sx / 2
+    : which === 'min'
+      ? b.z - b.sz / 2
+      : b.z + b.sz / 2;
+}
+
+function endTouchesWall(map: FloorMap, box: CeilingBeamBox, which: 'min' | 'max'): boolean {
+  const axis = alongAxis(box);
+  const end = endWorld(box, which);
+  const inner = which === 'min' ? end + 0.01 : end - 0.01;
+  const cell = Math.round(inner / CELL);
+  const others = lineCells(axis === 'x' ? box.z : box.x);
+  for (const other of others) {
+    const cx = axis === 'x' ? cell : other;
+    const cy = axis === 'x' ? other : cell;
+    const nx = axis === 'x' ? (which === 'min' ? cx - 1 : cx + 1) : cx;
+    const ny = axis === 'x' ? cy : which === 'min' ? cy - 1 : cy + 1;
+    if (!isTrueWall(tileAt(map, nx, ny))) return false;
+    const face = (axis === 'x' ? cx : cy) * CELL + (which === 'min' ? -CELL / 2 : CELL / 2);
+    if (Math.abs(end - face) > WALL_TOUCH) return false;
+  }
+  return others.length > 0;
+}
+
+function endTouchesBeam(box: CeilingBeamBox, which: 'min' | 'max', supports: CeilingBeamBox[]): boolean {
+  const axis = alongAxis(box);
+  const end = endWorld(box, which);
+  const mid = axis === 'x' ? box.z : box.x;
+  for (const other of supports) {
+    if (other === box) continue;
+    if (axis === 'x') {
+      const left = other.x - other.sx / 2;
+      const right = other.x + other.sx / 2;
+      if (Math.abs(end - left) > WALL_TOUCH && Math.abs(end - right) > WALL_TOUCH) continue;
+      if (mid >= other.z - other.sz / 2 - WALL_TOUCH && mid <= other.z + other.sz / 2 + WALL_TOUCH) return true;
+    } else {
+      const south = other.z - other.sz / 2;
+      const north = other.z + other.sz / 2;
+      if (Math.abs(end - south) > WALL_TOUCH && Math.abs(end - north) > WALL_TOUCH) continue;
+      if (mid >= other.x - other.sx / 2 - WALL_TOUCH && mid <= other.x + other.sx / 2 + WALL_TOUCH) return true;
     }
-    return;
   }
+  return false;
+}
 
-  const x0 = minX - 0.5;
-  const x1 = maxX + 0.5;
-  const xA = (x0 + (x1 - x0) * 0.28) * CELL;
-  const xB = (x0 + (x1 - x0) * 0.72) * CELL;
-  emitSpanZ(out, map, 'room', xA, minZ, maxZ);
-  emitSpanZ(out, map, 'room', xB, minZ, maxZ);
-  for (let i = 1; i <= joists; i++) {
-    const t = i / (joists + 1);
-    const z = (minZ - 0.5 + (maxZ + 1 - minZ) * t) * CELL;
-    emitSpanX(out, map, 'joist', z, minX, maxX);
+function listOpenings(map: FloorMap): Array<{ x: number; y: number }> {
+  const out: Array<{ x: number; y: number }> = [];
+  for (let y = 0; y < map.height; y++) {
+    for (let x = 0; x < map.width; x++) {
+      if (isOpeningTile(map.tiles[y][x])) out.push({ x, y });
+    }
   }
+  return out;
+}
+
+/** Dev/test: every run sits on the grid, ends on a wall or the pair, and misses openings. */
+export function auditCeilingBeamBoxes(map: FloorMap, beams: CeilingBeamBox[]): CeilingBeamIssue[] {
+  const issues: CeilingBeamIssue[] = [];
+  const openings = listOpenings(map);
+  const supports = beams.filter((b) => b.kind !== 'joist');
+  for (const [i, b] of beams.entries()) {
+    const label = `${b.kind}#${i} (${(b.x / CELL).toFixed(2)},${(b.z / CELL).toFixed(2)})`;
+    const axis = alongAxis(b);
+    const cross = axis === 'x' ? b.z : b.x;
+    if (!isBeamGridLine(cross)) issues.push({ code: 'grid', message: `${label} is off the cell grid` });
+    if (b.kind === 'joist') {
+      if (!endTouchesBeam(b, 'min', supports) || !endTouchesBeam(b, 'max', supports)) {
+        issues.push({ code: 'joist', message: `${label} does not meet the pair at both ends` });
+      }
+    } else if (!endTouchesWall(map, b, 'min') || !endTouchesWall(map, b, 'max')) {
+      issues.push({ code: 'wall', message: `${label} end does not sit on a wall face` });
+    }
+    for (const o of openings) {
+      if (cellOverlapsBeam(o.x, o.y, b)) {
+        issues.push({ code: 'opening', message: `${label} intersects opening ${o.x},${o.y}` });
+      }
+    }
+    if (blockedByKeepout(map, b)) issues.push({ code: 'keepout', message: `${label} overlaps water, cistern, or sunbeam` });
+    for (let j = i + 1; j < beams.length; j++) {
+      if (boxesOverlap(b, beams[j])) {
+        issues.push({ code: 'overlap', message: `${label} overlaps ${beams[j].kind}#${j}` });
+      }
+    }
+  }
+  return issues;
+}
+
+export function auditCeilingBeams(map: FloorMap, beams?: CeilingBeamBox[]): CeilingBeamIssue[] {
+  return auditCeilingBeamBoxes(map, beams ?? listCeilingBeams(map));
+}
+
+function maybeDevAudit(map: FloorMap, beams: CeilingBeamBox[]): void {
+  const dev = typeof import.meta !== 'undefined' && !!import.meta.env?.DEV;
+  if (!dev) return;
+  const issues = auditCeilingBeamBoxes(map, beams);
+  if (issues.length) console.warn('[voxel-floor1] ceiling beam audit', issues);
 }
 
 export function listCeilingBeams(map: FloorMap): CeilingBeamBox[] {
@@ -285,13 +541,16 @@ export function listCeilingBeams(map: FloorMap): CeilingBeamBox[] {
     if (CORRIDOR_ZONES.has(zone.id)) placeCorridor(map, zone, out);
     else if (ROOM_ZONES.has(zone.id)) placeRoom(map, zone, out);
   }
+  maybeDevAudit(map, out);
   return out;
 }
 
 /** 64² wood_beam.png: one texel is one centimetre. */
 export const TEXEL_M = 0.01;
 export const WOOD_TILE_M = 64 * TEXEL_M;
-const STRAP_M = 0.05;
+/** Iron strap width, scaled with the slimmer 0.14 m rib. */
+export const STRAP_M = 0.028;
+const STRAP_PROUD = 0.008;
 const STRAP_U0 = 0.17;
 const STRAP_U1 = 0.3;
 
@@ -322,16 +581,16 @@ export function listBeamStraps(boxes: CeilingBeamBox[]): CeilingBeamBox[] {
           ...b,
           x: at,
           sx: STRAP_M,
-          sy: b.sy + 0.014,
-          sz: b.sz + 0.014,
+          sy: b.sy + STRAP_PROUD,
+          sz: b.sz + STRAP_PROUD,
           kind: b.kind
         });
       } else {
         out.push({
           ...b,
           z: at,
-          sx: b.sx + 0.014,
-          sy: b.sy + 0.014,
+          sx: b.sx + STRAP_PROUD,
+          sy: b.sy + STRAP_PROUD,
           sz: STRAP_M,
           kind: b.kind
         });
