@@ -329,6 +329,7 @@ export async function buildFloor1(
           tz: f.tz,
           segs: f.segs,
           uOffset: f.uOffset,
+          uvRot: f.uvRot,
           size:
             f.kind === 'floor' || f.kind === 'ceiling' ? CELL + 2 * (CAMERA_NEAR + 0.12) : CELL
         })),

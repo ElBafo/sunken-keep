@@ -262,6 +262,11 @@ function geometryFromMerged(merged: ReturnType<typeof mergeFar>): THREE.BufferGe
   return g;
 }
 
+/** Identity or a proper 90° turn — never a per-cell flip, so edge bands stay joined. */
+export function shellUv(u: number, v: number, rot: 0 | 90 = 0): [number, number] {
+  return rot === 90 ? [v, 1 - u] : [u, v];
+}
+
 function packFlatQuad(
   pose: { x: number; y: number; z: number; rotX: number; rotY: number },
   tx: number,
@@ -270,7 +275,8 @@ function packFlatQuad(
   segs: number,
   torches: FarTorch[],
   beams: FarBeam[],
-  uOffset = 0
+  uOffset = 0,
+  uvRot: 0 | 90 = 0
 ): {
   positions: number[];
   normals: number[];
@@ -295,7 +301,8 @@ function packFlatQuad(
       const p = rotateOffset(px, py, 0, pose.rotX, pose.rotY);
       positions.push(p[0] + pose.x, p[1] + pose.y, p[2] + pose.z);
       normals.push(n[0], n[1], n[2]);
-      uvs.push(u + uOffset, v);
+      const [su, sv] = shellUv(u, v, uvRot);
+      uvs.push(su + uOffset, sv);
     }
   }
   for (let j = 0; j < segs; j++) {
@@ -320,6 +327,7 @@ export function flatGeometryWithBake(
     segs?: number;
     size?: number;
     uOffset?: number;
+    uvRot?: 0 | 90;
   }>,
   torches: FarTorch[],
   cell: number,
@@ -334,7 +342,8 @@ export function flatGeometryWithBake(
       item.segs ?? 1,
       torches,
       beams,
-      item.uOffset ?? 0
+      item.uOffset ?? 0,
+      item.uvRot ?? 0
     )
   );
   return geometryFromMerged(mergeFar(packed));

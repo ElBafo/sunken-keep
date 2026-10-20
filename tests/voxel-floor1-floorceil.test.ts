@@ -5,11 +5,13 @@ import floor1FloorCeil from '../levels/floor1_floorceil.json';
 import { CEILING_VARIANTS, FLOOR_VARIANTS } from '../src/voxel-floor1/constants';
 import { compositeCrackedCeiling, crackedCeilingHasGap, scaleNearest } from '../src/voxel-floor1/crack';
 import { isPaintedShellFile, normalFromAlbedo } from '../src/voxel-floor1/painted';
+import { shellUv } from '../src/voxel-floor1/bake';
 import {
   enumerateFaces,
   floor1Map,
   isShellTile,
   mappedCeilingFile,
+  mappedCeilingUvRot,
   mappedFloorFile
 } from '../src/voxel-floor1/layout';
 import { pickVariant } from '../src/voxel-floor1/variants';
@@ -23,12 +25,18 @@ function pngSize(name: string): { w: number; h: number } {
 
 describe('floor-1 floor and ceiling come from Levie’s map', () => {
   it('drops ceiling.png and ships 256² tiles that cover one cell', () => {
-    expect(CEILING_VARIANTS).toEqual(['ceiling_2.png', 'ceiling_3.png', 'ceiling_4.png']);
+    expect(CEILING_VARIANTS).toEqual([
+      'ceiling_planks_1.png',
+      'ceiling_planks_2.png',
+      'ceiling_planks_3.png'
+    ]);
     expect(CEILING_VARIANTS).not.toContain('ceiling.png');
+    expect(CEILING_VARIANTS.join()).not.toContain('ceiling_2');
     for (const name of [...FLOOR_VARIANTS, ...CEILING_VARIANTS, 'floor_water.png']) {
       expect(pngSize(name), name).toEqual({ w: 256, h: 256 });
     }
     expect(pngSize('wood_beam.png')).toEqual({ w: 64, h: 64 });
+    expect(pngSize('ceiling_2.png')).toEqual({ w: 256, h: 256 });
   });
 
   it('assigns each shell square from the JSON and falls back to pickVariant', () => {
@@ -41,18 +49,68 @@ describe('floor-1 floor and ceiling come from Levie’s map', () => {
         expect(floor?.file).toBe(mappedFloorFile(x, y) ?? pickVariant(FLOOR_VARIANTS, x, y, 'F'));
         expect(ceil?.file).toBe(mappedCeilingFile(x, y) ?? pickVariant(CEILING_VARIANTS, x, y, 'C'));
         expect(ceil?.file).not.toBe('ceiling.png');
+        expect(ceil?.file.startsWith('ceiling_planks_') || ceil?.file === 'ceiling_cracked.png').toBe(true);
       }
     }
     expect(mappedFloorFile(2, 2)).toBe('floor_water.png');
     expect(mappedFloorFile(2, 5)).toBe('floor_stone.png');
-    expect(mappedFloorFile(3, 14)).toBe('floor_stone_3.png');
-    expect(mappedCeilingFile(3, 14)).toBe('ceiling_4.png');
+    expect(mappedFloorFile(3, 14)).toBe('floor_stone_2.png');
+    expect(mappedCeilingFile(3, 14)).toBe('ceiling_planks_1.png');
     expect(mappedFloorFile(99, 99)).toBeUndefined();
     expect(floor1FloorCeil.squares).toHaveLength(jobs.filter((j) => j.kind === 'floor').length);
   });
 
+  it('keeps floor_stone_3 rare, under a lamp or door, and never adjacent', () => {
+    const feats = floor1FloorCeil.squares.filter((s) => s.floor === 'floor_stone_3');
+    expect(feats.length).toBeGreaterThan(0);
+    expect(feats.length).toBeLessThanOrEqual(4);
+    const keys = new Set(feats.map((s) => `${s.x},${s.y}`));
+    expect(keys.has('9,1') || keys.has('7,1') || keys.has('6,5') || keys.has('13,3')).toBe(true);
+    for (const a of feats) {
+      for (const b of feats) {
+        if (a === b) continue;
+        expect(Math.abs(a.x - b.x) + Math.abs(a.y - b.y)).toBeGreaterThan(1);
+      }
+    }
+    for (const s of floor1FloorCeil.squares) {
+      if (s.floor === 'floor_water') continue;
+      const n = floor1FloorCeil.squares.find((o) => Math.abs(o.x - s.x) + Math.abs(o.y - s.y) === 1 && o.floor === 'floor_water');
+      if (n) expect(s.floor).toBe('floor_stone');
+    }
+  });
+
+  it('turns plank boards 90° only where primary beams run east–west', () => {
+    expect(shellUv(0, 0, 0)).toEqual([0, 0]);
+    expect(shellUv(1, 0, 90)).toEqual([0, 0]);
+    expect(shellUv(1, 1, 90)).toEqual([1, 0]);
+    expect(mappedCeilingUvRot(2, 11)).toBe(90);
+    expect(mappedCeilingUvRot(2, 6)).toBe(90);
+    expect(mappedCeilingUvRot(10, 2)).toBe(0);
+    expect(mappedCeilingUvRot(6, 2)).toBe(0);
+    const jobs = enumerateFaces(floor1Map);
+    for (const j of jobs.filter((f) => f.kind === 'floor')) {
+      expect(j.uvRot).toBe(0);
+      expect(j.uOffset).toBe(0);
+    }
+    const byZone = new Map<string, Set<number>>();
+    for (const j of jobs.filter((f) => f.kind === 'ceiling')) {
+      expect(j.uvRot === 0 || j.uvRot === 90).toBe(true);
+      const key = `${Math.round(j.tx / 3)},${Math.round(j.tz / 3)}`;
+      const set = byZone.get(key) ?? new Set();
+      set.add(j.uvRot);
+      byZone.set(key, set);
+    }
+    const src = readFileSync(resolve(__dirname, '../src/voxel-floor1/bake.ts'), 'utf8');
+    expect(src).toContain('shellUv');
+    expect(src).not.toContain('Math.random');
+    const layout = readFileSync(resolve(__dirname, '../src/voxel-floor1/layout.ts'), 'utf8');
+    expect(layout).toContain('mappedCeilingUvRot');
+    expect(layout).not.toMatch(/uvRot:\s*90 \? 0 : 90/);
+  });
+
   it('paints floor and ceiling as mipmapped flats, not relief voxels', () => {
     expect(isPaintedShellFile('floor_stone_3.png')).toBe(true);
+    expect(isPaintedShellFile('ceiling_planks_1.png')).toBe(true);
     expect(isPaintedShellFile('ceiling_2.png')).toBe(true);
     expect(isPaintedShellFile('floor_water.png')).toBe(true);
     expect(isPaintedShellFile('ceiling_cracked.png')).toBe(true);
