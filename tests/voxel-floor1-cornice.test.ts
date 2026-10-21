@@ -6,7 +6,8 @@ import {
   CELL,
   CORNICE_DEPTH,
   CORNICE_HEIGHT,
-  CORNICE_SHADOW_ROWS
+  CORNICE_SHADOW_ROWS,
+  CORNICE_WALL_INSET
 } from '../src/voxel-floor1/constants';
 import {
   CORNICE_U_SCALE,
@@ -27,9 +28,10 @@ describe('floor-1 cornice', () => {
   const src = readFileSync(resolve(__dirname, '../src/voxel-floor1/cornice.ts'), 'utf8');
   const props = readFileSync(resolve(__dirname, '../src/voxel-floor1/props.ts'), 'utf8');
 
-  it('is a 0.32 × 0.12 band batched into brick and slab meshes', () => {
-    expect(CORNICE_HEIGHT).toBeCloseTo(0.32, 5);
-    expect(CORNICE_DEPTH).toBeCloseTo(0.12, 5);
+  it('is a heavy worn band batched into brick and slab meshes', () => {
+    expect(CORNICE_HEIGHT).toBeCloseTo(0.38, 5);
+    expect(CORNICE_DEPTH).toBeCloseTo(0.15, 5);
+    expect(CORNICE_WALL_INSET).toBeGreaterThan(0.02);
     expect(segs.length).toBeGreaterThan(40);
     for (const s of segs) {
       expect(s.sy).toBeCloseTo(CORNICE_HEIGHT, 5);
@@ -58,6 +60,7 @@ describe('floor-1 cornice', () => {
     expect(src).toContain('mergeGeometries');
     expect(src).toContain('wearCornicePixels');
     expect(src).toContain('cornicePieces');
+    expect(src).toContain('CORNICE_WALL_INSET');
     expect(src).not.toContain('ShaderMaterial');
     expect(brick.material).toMatchObject({ roughness: 1, specularIntensity: 0 });
   });
@@ -114,11 +117,18 @@ describe('floor-1 cornice', () => {
     for (let i = 3; i < data.length; i += 4) data[i] = 255;
     wearCornicePixels({ width: 16, height: 8, data }, 'slab');
     const luma = data[0] * 0.2126 + data[1] * 0.7152 + data[2] * 0.0722;
-    expect(luma).toBeLessThan(180);
+    expect(luma).toBeLessThan(155);
     const sample = segs.find((s) => s.face === 'N' && s.family === 'brick');
     expect(sample).toBeTruthy();
     const pieces = cornicePieces(sample!);
-    expect(pieces.length).toBeGreaterThan(3);
+    expect(pieces.length).toBeGreaterThan(5);
+    const lens = pieces.map((p) => (sample!.face === 'N' || sample!.face === 'S' ? p.sx : p.sz));
+    expect(Math.max(...lens) - Math.min(...lens)).toBeGreaterThan(0.2);
+    expect(pieces.some((p) => p.sy > CORNICE_HEIGHT + 0.02)).toBe(true);
     expect(pieces.some((p) => p.sy < CORNICE_HEIGHT - 0.01 || Math.min(p.sx, p.sz) < CORNICE_DEPTH - 0.01)).toBe(true);
+    for (const p of pieces) {
+      expect(p.y + p.sy / 2).toBeLessThanOrEqual(CELL + 1e-6);
+      expect(p.y - p.sy / 2).toBeLessThan(CELL - 0.2);
+    }
   });
 });

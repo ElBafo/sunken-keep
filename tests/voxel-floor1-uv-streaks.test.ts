@@ -26,10 +26,13 @@ describe('floor-1 streaked wall faces', () => {
   it('clears the running U on unique knot panels so ClampToEdge cannot smear a column', () => {
     expect(isUniqueWallPanel(KNOT_WALL_FILE)).toBe(true);
     expect(isUniqueWallPanel('walls_floor1/ashlar_clean.png')).toBe(false);
-    const jobs = enumerateFaces(floor1Map).filter((j) => j.file === KNOT_WALL_FILE);
-    expect(jobs.length).toBeGreaterThan(0);
+    const jobs = enumerateFaces(floor1Map).filter((j) => j.knot);
+    expect(jobs).toHaveLength(2);
     for (const job of jobs) {
       expect(job.uOffset).toBe(0);
+      expect(job.file).not.toBe(KNOT_WALL_FILE);
+      expect(job.file.startsWith('walls_floor1/')).toBe(true);
+      expect(job.batch.startsWith('knot:')).toBe(true);
     }
     expect(listStreakedWallCells(floor1Map)).toEqual([]);
     const layout = readFileSync(resolve(__dirname, '../src/voxel-floor1/layout.ts'), 'utf8');

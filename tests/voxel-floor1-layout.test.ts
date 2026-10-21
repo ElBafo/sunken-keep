@@ -141,10 +141,11 @@ describe('knot carving is a placed wall variant, not a secret', () => {
     }
   });
 
-  it('emits secret_closed.png only on those placed faces', () => {
+  it('stamps the knot on those placed faces over the room wall look', () => {
     const faces = enumerateFaces(floor1Map);
-    const knots = faces.filter((f) => f.file === KNOT_WALL_FILE);
+    const knots = faces.filter((f) => f.knot);
     expect(knots.length).toBe(floor1KnotWalls.length);
+    expect(faces.filter((f) => f.file === KNOT_WALL_FILE)).toHaveLength(0);
     for (const spec of floor1KnotWalls) {
       expect(
         knots.some((f) => f.kind === 'wall' && f.wallX === spec.x && f.wallY === spec.y && f.wallFace === spec.face)

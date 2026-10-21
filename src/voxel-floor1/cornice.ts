@@ -6,6 +6,7 @@ import {
   CORNICE_SHADOW_ROWS,
   CORNICE_TEXELS_U,
   CORNICE_TEXELS_V,
+  CORNICE_WALL_INSET,
   WALL_TEXELS
 } from './constants';
 import {
@@ -62,7 +63,7 @@ function boxForFace(tx: number, tz: number, face: 'N' | 'E' | 'S' | 'W', bulge: 
 > {
   const ox = (tx - 0.5) * CELL;
   const oz = (tz - 0.5) * CELL;
-  const inset = bulge * CELL;
+  const inset = bulge * CELL - CORNICE_WALL_INSET;
   const y = CELL - CORNICE_HEIGHT / 2;
   if (face === 'N') {
     return {
@@ -206,27 +207,27 @@ export function wearCornicePixels(
       n ^= n >>> 13;
       const rnd = ((n >>> 0) % 10000) / 10000;
       const edge = Math.min(x, w - 1 - x, y, h - 1 - y);
-      const grime = (1 - Math.min(1, edge / 10)) * 0.2 + rnd * 0.1;
-      const chip = ((x < 7 || x > w - 8 || fromBottom > h - 8) && rnd > 0.68 ? 0.28 + rnd * 0.22 : 0);
+      const grime = (1 - Math.min(1, edge / 7)) * 0.34 + rnd * 0.16;
+      const chip = ((x < 10 || x > w - 11 || fromBottom > h - 10) && rnd > 0.55 ? 0.36 + rnd * 0.28 : 0);
       let k = 1 - grime - chip;
-      if (underside) k *= 0.38;
-      else k *= family === 'slab' ? 0.72 + rnd * 0.08 : 0.82 + rnd * 0.08;
+      if (underside) k *= 0.2;
+      else k *= family === 'slab' ? 0.58 + rnd * 0.1 : 0.68 + rnd * 0.1;
       data[i] = Math.max(0, Math.min(255, Math.round(data[i] * k)));
       data[i + 1] = Math.max(0, Math.min(255, Math.round(data[i + 1] * k * 0.97)));
       data[i + 2] = Math.max(0, Math.min(255, Math.round(data[i + 2] * k * 0.93)));
     }
   }
-  for (let c = 0; c < 8; c++) {
-    const cx = Math.floor(((c + 0.35) * w) / 8) % w;
-    const cy = shadow + 1 + (c % 3);
-    const rw = 2 + (c % 5);
-    const rh = 2 + (c % 3);
+  for (let c = 0; c < 14; c++) {
+    const cx = Math.floor(((c + 0.2) * w) / 11) % w;
+    const cy = shadow + 1 + (c % 4);
+    const rw = 2 + (c % 6);
+    const rh = 2 + (c % 4);
     for (let yy = cy; yy < Math.min(h - 1, cy + rh); yy++) {
       for (let xx = cx; xx < Math.min(w, cx + rw); xx++) {
         const i = ((h - 1 - yy) * w + xx) * 4;
-        data[i] = Math.max(0, data[i] - 48);
-        data[i + 1] = Math.max(0, data[i + 1] - 50);
-        data[i + 2] = Math.max(0, data[i + 2] - 44);
+        data[i] = Math.max(0, data[i] - 62);
+        data[i + 1] = Math.max(0, data[i + 1] - 66);
+        data[i + 2] = Math.max(0, data[i + 2] - 58);
       }
     }
   }
@@ -263,14 +264,14 @@ export type CornicePiece = CorniceSeg;
 export function cornicePieces(seg: CorniceSeg): CornicePiece[] {
   const alongX = seg.face === 'N' || seg.face === 'S';
   const len = alongX ? seg.sx : seg.sz;
-  const parts = 4;
+  const parts = 5;
   const out: CornicePiece[] = [];
   let cursor = 0;
   for (let i = 0; i < parts; i++) {
-    const share = i === parts - 1 ? 1 - cursor / len : 0.18 + hash01(seg.tx, seg.tz, seg.face, 4 + i) * 0.16;
+    const share = i === parts - 1 ? 1 - cursor / len : 0.1 + hash01(seg.tx, seg.tz, seg.face, 4 + i) * 0.22;
     const slen = i === parts - 1 ? len - cursor : share * len;
-    const hMul = 0.7 + hash01(seg.tx, seg.tz, seg.face, 11 + i) * 0.34;
-    const dMul = 0.58 + hash01(seg.tx, seg.tz, seg.face, 19 + i) * 0.55;
+    const hMul = 0.95 + hash01(seg.tx, seg.tz, seg.face, 11 + i) * 0.55;
+    const dMul = 0.5 + hash01(seg.tx, seg.tz, seg.face, 19 + i) * 0.72;
     const sy = CORNICE_HEIGHT * hMul;
     const sd = CORNICE_DEPTH * dMul;
     const mid = cursor + slen / 2 - len / 2;
@@ -290,7 +291,7 @@ export function cornicePieces(seg: CorniceSeg): CornicePiece[] {
   }
   const chipAt = Math.floor(hash01(seg.tx, seg.tz, seg.face, 41) * parts);
   const host = out[chipAt];
-  const chip = 0.18 + hash01(seg.tx, seg.tz, seg.face, 43) * 0.14;
+  const chip = 0.24 + hash01(seg.tx, seg.tz, seg.face, 43) * 0.18;
   if (alongX) {
     out.push({
       ...host,
@@ -311,7 +312,7 @@ export function cornicePieces(seg: CorniceSeg): CornicePiece[] {
     });
   }
   const host2 = out[(chipAt + 2) % parts];
-  const chip2 = 0.1 + hash01(seg.tx, seg.tz, seg.face, 53) * 0.1;
+  const chip2 = 0.16 + hash01(seg.tx, seg.tz, seg.face, 53) * 0.14;
   if (alongX) {
     out.push({
       ...host2,

@@ -89,8 +89,10 @@ export const ARCH_FRONT = 0.03;
 export const ARCH_LAYERS = Math.round((ARCH_DEPTH + ARCH_FRONT) / LAYER_SIZE);
 
 /** Heavy stone band at the wall–ceiling join. 256×64 tile spans one CELL. */
-export const CORNICE_HEIGHT = 0.32;
-export const CORNICE_DEPTH = 0.12;
+export const CORNICE_HEIGHT = 0.38;
+export const CORNICE_DEPTH = 0.15;
+/** Bite into the wall so the underside covers the wall top (no light leak). */
+export const CORNICE_WALL_INSET = 0.03;
 export const CORNICE_TEXELS_U = 256;
 export const CORNICE_TEXELS_V = 64;
 /** Painted shadow line on the strip — mapped to the underside, not the front. */
