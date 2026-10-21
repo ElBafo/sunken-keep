@@ -154,36 +154,48 @@ function hash01(tx: number, tz: number, face: string, salt: number): number {
   return ((n >>> 0) % 10000) / 10000;
 }
 
+/**
+ * Project UVs from the box in metres so every face (front, underside, ends,
+ * top) has a real U and V span at wall texel density. The old path remapped
+ * BoxGeometry 0–1 UVs with an integer running U and ClampToEdge on V — a
+ * collapsed axis smeared one texel row/column into vertical streaks.
+ */
 export function setCorniceUvs(geo: THREE.BufferGeometry, seg: CorniceSeg): void {
+  const pos = geo.getAttribute('position');
+  const nrm = geo.getAttribute('normal');
   const uv = geo.getAttribute('uv');
+  if (!pos || !nrm || !uv) return;
   const shadowV = corniceShadowV(seg.family);
-  const texel = CELL / WALL_TEXELS;
-  const frontV0 = 1 - CORNICE_HEIGHT / texel / CORNICE_TEXELS_V;
-  const topV0 = 1 - CORNICE_DEPTH / texel / CORNICE_TEXELS_V;
   const alongX = seg.face === 'N' || seg.face === 'S';
-  const front = seg.face === 'N' ? 4 : seg.face === 'S' ? 5 : seg.face === 'E' ? 0 : 1;
-  const back = seg.face === 'N' ? 5 : seg.face === 'S' ? 4 : seg.face === 'E' ? 1 : 0;
-  const endU = CORNICE_DEPTH / CELL;
+  const texel = CELL / WALL_TEXELS;
+  const uPerM = CORNICE_U_SCALE / CELL;
+  const vPerM = 1 / (CORNICE_TEXELS_V * texel);
+  const cellMin = alongX ? (seg.tx - 0.5) * CELL : (seg.tz - 0.5) * CELL;
+  const centerAlong = alongX ? seg.x : seg.z;
+  const depthSize = Math.max(1e-6, alongX ? seg.sz : seg.sx);
+  const heightSize = Math.max(1e-6, seg.sy);
   const uOff = (seg.uOffset ?? 0) * CORNICE_U_SCALE;
 
-  const write = (f: number, u: number, v: number, i: number): void => {
-    uv.setXY(f * 4 + i, u, v);
-  };
-
-  for (let f = 0; f < 6; f++) {
-    for (let k = 0; k < 4; k++) {
-      const i = f * 4 + k;
-      const u0 = uv.getX(i);
-      const v0 = uv.getY(i);
-      if (f === 2) {
-        write(f, (alongX ? u0 : v0) * CORNICE_U_SCALE + uOff, topV0 + (alongX ? v0 : u0) * (1 - topV0), k);
-      } else if (f === 3) {
-        write(f, (alongX ? u0 : v0) * CORNICE_U_SCALE + uOff, (alongX ? v0 : u0) * shadowV, k);
-      } else if (f === front || f === back) {
-        write(f, u0 * CORNICE_U_SCALE + uOff, frontV0 + v0 * (1 - frontV0), k);
-      } else {
-        write(f, u0 * endU * CORNICE_U_SCALE + uOff, frontV0 + v0 * (1 - frontV0), k);
-      }
+  for (let i = 0; i < pos.count; i++) {
+    const lx = pos.getX(i);
+    const ly = pos.getY(i);
+    const lz = pos.getZ(i);
+    const nx = nrm.getX(i);
+    const ny = nrm.getY(i);
+    const nz = nrm.getZ(i);
+    const along = centerAlong + (alongX ? lx : lz);
+    const u = (along - cellMin) * uPerM + uOff;
+    const h01 = ly / heightSize + 0.5;
+    const d01 = (alongX ? lz : lx) / depthSize + 0.5;
+    const stoneV = shadowV + h01 * heightSize * vPerM;
+    if (ny < -0.5) {
+      uv.setXY(i, u, Math.min(shadowV, Math.max(0, d01 * shadowV)));
+    } else if (ny > 0.5) {
+      uv.setXY(i, u, shadowV + d01 * depthSize * vPerM);
+    } else {
+      const wallNormal = alongX ? Math.abs(nz) >= Math.abs(nx) : Math.abs(nx) >= Math.abs(nz);
+      if (wallNormal) uv.setXY(i, u, stoneV);
+      else uv.setXY(i, uOff + d01 * depthSize * uPerM, stoneV);
     }
   }
   uv.needsUpdate = true;
@@ -250,7 +262,7 @@ export function wearCorniceMap(src: THREE.Texture, family: CorniceFamily): THREE
   const tex = new THREE.Texture(canvas);
   tex.colorSpace = THREE.SRGBColorSpace;
   tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.ClampToEdgeWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
   tex.magFilter = THREE.NearestFilter;
   tex.minFilter = THREE.NearestFilter;
   tex.generateMipmaps = false;
@@ -260,76 +272,55 @@ export function wearCorniceMap(src: THREE.Texture, family: CorniceFamily): THREE
 
 export type CornicePiece = CorniceSeg;
 
-/** Split the band and chew corners so the profile is not a clean LEGO brick. */
+/** Three blocks, same height/depth. Age is in the joints and a tiny bottom nick. */
 export function cornicePieces(seg: CorniceSeg): CornicePiece[] {
   const alongX = seg.face === 'N' || seg.face === 'S';
   const len = alongX ? seg.sx : seg.sz;
-  const parts = 5;
+  const parts = 3;
   const out: CornicePiece[] = [];
   let cursor = 0;
   for (let i = 0; i < parts; i++) {
-    const share = i === parts - 1 ? 1 - cursor / len : 0.1 + hash01(seg.tx, seg.tz, seg.face, 4 + i) * 0.22;
+    const share = i === parts - 1 ? 1 - cursor / len : 0.28 + hash01(seg.tx, seg.tz, seg.face, 4 + i) * 0.14;
     const slen = i === parts - 1 ? len - cursor : share * len;
-    const hMul = 0.95 + hash01(seg.tx, seg.tz, seg.face, 11 + i) * 0.55;
-    const dMul = 0.5 + hash01(seg.tx, seg.tz, seg.face, 19 + i) * 0.72;
-    const sy = CORNICE_HEIGHT * hMul;
-    const sd = CORNICE_DEPTH * dMul;
     const mid = cursor + slen / 2 - len / 2;
     const piece: CornicePiece = {
       ...seg,
-      sy,
-      y: CELL - sy / 2,
-      sx: alongX ? slen : sd,
-      sz: alongX ? sd : slen,
-      x: alongX ? seg.x + mid : seg.x + (seg.face === 'E' ? (CORNICE_DEPTH - sd) / 2 : (sd - CORNICE_DEPTH) / 2),
-      z: alongX
-        ? seg.z + (seg.face === 'S' ? (CORNICE_DEPTH - sd) / 2 : (sd - CORNICE_DEPTH) / 2)
-        : seg.z + mid
+      sy: CORNICE_HEIGHT,
+      y: CELL - CORNICE_HEIGHT / 2,
+      sx: alongX ? slen : CORNICE_DEPTH,
+      sz: alongX ? CORNICE_DEPTH : slen,
+      x: alongX ? seg.x + mid : seg.x,
+      z: alongX ? seg.z : seg.z + mid
     };
     out.push(piece);
     cursor += slen;
   }
   const chipAt = Math.floor(hash01(seg.tx, seg.tz, seg.face, 41) * parts);
   const host = out[chipAt];
-  const chip = 0.24 + hash01(seg.tx, seg.tz, seg.face, 43) * 0.18;
+  const chipW = 0.035 + hash01(seg.tx, seg.tz, seg.face, 43) * 0.02;
+  const chipH = 0.022;
+  const chipD = CORNICE_DEPTH * 0.45;
+  const sign = hash01(seg.tx, seg.tz, seg.face, 47) > 0.5 ? 1 : -1;
+  const y = host.y - host.sy / 2 + chipH / 2;
   if (alongX) {
     out.push({
       ...host,
-      sx: chip,
-      sy: host.sy * 0.45,
-      sz: host.sz * 0.55,
-      x: host.x + (hash01(seg.tx, seg.tz, seg.face, 47) > 0.5 ? 1 : -1) * (host.sx / 2 - chip / 2),
-      y: host.y - host.sy * 0.22
+      sx: chipW,
+      sy: chipH,
+      sz: chipD,
+      x: host.x + sign * (host.sx / 2 - chipW / 2),
+      y,
+      z: host.z + (seg.face === 'S' ? (CORNICE_DEPTH - chipD) / 2 : (chipD - CORNICE_DEPTH) / 2)
     });
   } else {
     out.push({
       ...host,
-      sx: host.sx * 0.55,
-      sy: host.sy * 0.45,
-      sz: chip,
-      z: host.z + (hash01(seg.tx, seg.tz, seg.face, 47) > 0.5 ? 1 : -1) * (host.sz / 2 - chip / 2),
-      y: host.y - host.sy * 0.22
-    });
-  }
-  const host2 = out[(chipAt + 2) % parts];
-  const chip2 = 0.16 + hash01(seg.tx, seg.tz, seg.face, 53) * 0.14;
-  if (alongX) {
-    out.push({
-      ...host2,
-      sx: chip2,
-      sy: host2.sy * 0.38,
-      sz: host2.sz * 0.48,
-      x: host2.x + (hash01(seg.tx, seg.tz, seg.face, 59) > 0.5 ? 1 : -1) * (host2.sx / 2 - chip2 / 2),
-      y: host2.y - host2.sy * 0.18
-    });
-  } else {
-    out.push({
-      ...host2,
-      sx: host2.sx * 0.48,
-      sy: host2.sy * 0.38,
-      sz: chip2,
-      z: host2.z + (hash01(seg.tx, seg.tz, seg.face, 59) > 0.5 ? 1 : -1) * (host2.sz / 2 - chip2 / 2),
-      y: host2.y - host2.sy * 0.18
+      sx: chipD,
+      sy: chipH,
+      sz: chipW,
+      x: host.x + (seg.face === 'E' ? (CORNICE_DEPTH - chipD) / 2 : (chipD - CORNICE_DEPTH) / 2),
+      y,
+      z: host.z + sign * (host.sz / 2 - chipW / 2)
     });
   }
   return out;
@@ -389,7 +380,7 @@ function mergeGeometries(geos: THREE.BufferGeometry[]): THREE.BufferGeometry | n
 function corniceMaterial(map: THREE.Texture): THREE.MeshPhysicalMaterial {
   enablePaintedSampling(map);
   map.wrapS = THREE.RepeatWrapping;
-  map.wrapT = THREE.ClampToEdgeWrapping;
+  map.wrapT = THREE.RepeatWrapping;
   map.generateMipmaps = false;
   map.minFilter = THREE.NearestFilter;
   map.magFilter = THREE.NearestFilter;

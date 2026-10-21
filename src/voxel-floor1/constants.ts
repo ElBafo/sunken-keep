@@ -88,9 +88,9 @@ export const ARCH_DEPTH = CELL * 0.48;
 export const ARCH_FRONT = 0.03;
 export const ARCH_LAYERS = Math.round((ARCH_DEPTH + ARCH_FRONT) / LAYER_SIZE);
 
-/** Heavy stone band at the wall–ceiling join. 256×64 tile spans one CELL. */
-export const CORNICE_HEIGHT = 0.38;
-export const CORNICE_DEPTH = 0.15;
+/** One brick-course band, flush on the wall. 256×64 tile spans two cells. */
+export const CORNICE_HEIGHT = 0.18;
+export const CORNICE_DEPTH = 0.09;
 /** Bite into the wall so the underside covers the wall top (no light leak). */
 export const CORNICE_WALL_INSET = 0.03;
 export const CORNICE_TEXELS_U = 256;

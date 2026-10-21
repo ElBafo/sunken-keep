@@ -28,9 +28,9 @@ describe('floor-1 cornice', () => {
   const src = readFileSync(resolve(__dirname, '../src/voxel-floor1/cornice.ts'), 'utf8');
   const props = readFileSync(resolve(__dirname, '../src/voxel-floor1/props.ts'), 'utf8');
 
-  it('is a heavy worn band batched into brick and slab meshes', () => {
-    expect(CORNICE_HEIGHT).toBeCloseTo(0.38, 5);
-    expect(CORNICE_DEPTH).toBeCloseTo(0.15, 5);
+  it('is a flush one-course band batched into brick and slab meshes', () => {
+    expect(CORNICE_HEIGHT).toBeCloseTo(0.18, 5);
+    expect(CORNICE_DEPTH).toBeCloseTo(0.09, 5);
     expect(CORNICE_WALL_INSET).toBeGreaterThan(0.02);
     expect(segs.length).toBeGreaterThan(40);
     for (const s of segs) {
@@ -61,6 +61,7 @@ describe('floor-1 cornice', () => {
     expect(src).toContain('wearCornicePixels');
     expect(src).toContain('cornicePieces');
     expect(src).toContain('CORNICE_WALL_INSET');
+    expect(src).toContain('uPerM');
     expect(src).not.toContain('ShaderMaterial');
     expect(brick.material).toMatchObject({ roughness: 1, specularIntensity: 0 });
   });
@@ -90,7 +91,7 @@ describe('floor-1 cornice', () => {
     }
   });
 
-  it('maps the painted shadow line onto the underside only', () => {
+  it('maps real stone UVs on front/ends and the shadow line on the underside', () => {
     expect(CORNICE_SHADOW_ROWS.brick).toBe(10);
     expect(CORNICE_SHADOW_ROWS.slab).toBe(12);
     expect(corniceShadowV('brick')).toBeCloseTo(10 / 64, 5);
@@ -100,13 +101,25 @@ describe('floor-1 cornice', () => {
     const geo = new THREE.BoxGeometry(sample!.sx, sample!.sy, sample!.sz);
     setCorniceUvs(geo, sample!);
     const uv = geo.getAttribute('uv');
-    const underside = [12, 13, 14, 15].map((i) => uv.getY(i));
-    const front = [16, 17, 18, 19].map((i) => uv.getY(i));
-    expect(Math.max(...underside)).toBeLessThanOrEqual(corniceShadowV('slab') + 1e-6);
-    expect(Math.min(...underside)).toBeGreaterThanOrEqual(0);
-    expect(Math.min(...front)).toBeGreaterThan(corniceShadowV('slab') + 0.05);
+    const nrm = geo.getAttribute('normal');
+    const frontU: number[] = [];
+    const frontV: number[] = [];
+    const underV: number[] = [];
+    for (let i = 0; i < nrm.count; i++) {
+      if (nrm.getZ(i) > 0.5) {
+        frontU.push(uv.getX(i));
+        frontV.push(uv.getY(i));
+      }
+      if (nrm.getY(i) < -0.5) underV.push(uv.getY(i));
+    }
+    expect(Math.max(...frontU) - Math.min(...frontU)).toBeGreaterThan(0.2);
+    expect(Math.max(...frontV) - Math.min(...frontV)).toBeGreaterThan(0.08);
+    expect(Math.max(...underV)).toBeLessThanOrEqual(corniceShadowV('slab') + 1e-6);
+    expect(Math.min(...underV)).toBeGreaterThanOrEqual(0);
+    expect(Math.min(...frontV)).toBeGreaterThan(corniceShadowV('slab') - 1e-6);
     expect(src).toContain('shadowV');
-    expect(src).toContain('frontV0');
+    expect(src).toContain('RepeatWrapping');
+    expect(src).not.toContain('ClampToEdgeWrapping');
     expect(CORNICE_U_SCALE).toBeCloseTo(0.5, 5);
     expect(sample!.uOffset).toBe(sample!.tx);
   });
@@ -121,14 +134,18 @@ describe('floor-1 cornice', () => {
     const sample = segs.find((s) => s.face === 'N' && s.family === 'brick');
     expect(sample).toBeTruthy();
     const pieces = cornicePieces(sample!);
-    expect(pieces.length).toBeGreaterThan(5);
-    const lens = pieces.map((p) => (sample!.face === 'N' || sample!.face === 'S' ? p.sx : p.sz));
-    expect(Math.max(...lens) - Math.min(...lens)).toBeGreaterThan(0.2);
-    expect(pieces.some((p) => p.sy > CORNICE_HEIGHT + 0.02)).toBe(true);
-    expect(pieces.some((p) => p.sy < CORNICE_HEIGHT - 0.01 || Math.min(p.sx, p.sz) < CORNICE_DEPTH - 0.01)).toBe(true);
+    expect(pieces.length).toBe(4);
+    const course = pieces.filter((p) => Math.abs(p.sy - CORNICE_HEIGHT) < 1e-6);
+    expect(course).toHaveLength(3);
+    const lens = course.map((p) => p.sx);
+    expect(Math.max(...lens) - Math.min(...lens)).toBeGreaterThan(0.05);
+    const chip = pieces.find((p) => p.sy < CORNICE_HEIGHT - 0.05);
+    expect(chip).toBeTruthy();
+    expect(chip!.sy).toBeLessThan(0.04);
     for (const p of pieces) {
       expect(p.y + p.sy / 2).toBeLessThanOrEqual(CELL + 1e-6);
-      expect(p.y - p.sy / 2).toBeLessThan(CELL - 0.2);
+      expect(p.y - p.sy / 2).toBeGreaterThanOrEqual(CELL - CORNICE_HEIGHT - 1e-6);
+      expect(p.sz).toBeLessThanOrEqual(CORNICE_DEPTH + 1e-6);
     }
   });
 });
