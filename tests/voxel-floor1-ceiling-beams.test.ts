@@ -12,7 +12,6 @@ import {
   STRAP_TINT,
   TEXEL_M,
   WOOD_TILE_M,
-  WOOD_TINT,
   auditCeilingBeams,
   cellOverlapsBeam,
   isBeamGridLine,
@@ -21,8 +20,7 @@ import {
   listCeilingBeams,
   makeIronStrapMap,
   meshCeilingBeams,
-  skipCeilingBeamCell,
-  sootyPixel
+  skipCeilingBeamCell
 } from '../src/voxel-floor1/ceiling-beams';
 import { CELL } from '../src/voxel-floor1/constants';
 import { floor1Sunbeams } from '../src/voxel-floor1/fixtures';
@@ -156,21 +154,11 @@ describe('floor-1 ceiling timber', () => {
     expect(iron.image.data[2]).toBeLessThan(24);
   });
 
-  it('tints ribs darker brown-grey oak, close to the plank hue', () => {
-    const crate = sootyPixel(79 / 255, 60 / 255, 44 / 255);
-    const tinted = [crate[0] * WOOD_TINT.r, crate[1] * WOOD_TINT.g, crate[2] * WOOD_TINT.b];
-    const plank = [50 / 255, 37 / 255, 28 / 255];
-    const tintedLuma = 0.2126 * tinted[0] + 0.7152 * tinted[1] + 0.0722 * tinted[2];
-    const plankLuma = 0.2126 * plank[0] + 0.7152 * plank[1] + 0.0722 * plank[2];
-    const tintedRB = tinted[0] / Math.max(1e-6, tinted[2]);
-    const plankRB = plank[0] / plank[2];
-    expect(tintedLuma).toBeLessThan(plankLuma);
-    expect(tintedRB).toBeGreaterThan(plankRB * 0.75);
-    expect(tintedRB).toBeLessThan(plankRB * 1.45);
-    expect(WOOD_TINT.r).toBeGreaterThan(WOOD_TINT.g);
-    expect(WOOD_TINT.g).toBeGreaterThan(WOOD_TINT.b);
-    expect(WOOD_TINT.r - WOOD_TINT.b).toBeLessThan(0.28);
-    expect(WOOD_TINT.r).toBeLessThan(0.8);
+  it('uses Artie old-wood albedo on the ribs with no extra tint', () => {
+    expect(src).toContain('sootyOakMap');
+    expect(src).not.toContain('WOOD_TINT');
+    expect(src).not.toContain('sootyPixel');
+    expect(src).not.toContain('new THREE.Color(0.74, 0.64, 0.54)');
     expect(src).not.toContain('new THREE.Color(0.7, 0.48, 0.28)');
     expect(src).not.toContain('new THREE.Color(0.84, 0.82, 0.78)');
     expect(Math.max(STRAP_TINT.r, STRAP_TINT.g, STRAP_TINT.b)).toBeLessThan(0.22);
@@ -183,7 +171,6 @@ describe('floor-1 ceiling timber', () => {
     expect(src).toContain('castShadow = false');
     expect(src).toContain('receiveShadow = true');
     expect(src).toContain('sootyOakMap');
-    expect(src).toContain('sootyPixel');
     expect(src).toContain('ironStrapMap');
     expect(src).toContain('makeIronStrapMap');
     expect(src).toContain('ironStrapPixel');
@@ -216,8 +203,9 @@ describe('floor-1 ceiling timber', () => {
     const strapMat = straps.material as THREE.MeshPhysicalMaterial;
     expect(strapMat.color.r).toBeLessThan(woodMat.color.r * 0.5);
     expect(Math.max(strapMat.color.r, strapMat.color.g, strapMat.color.b)).toBeLessThan(0.22);
-    expect(woodMat.color.r).toBeGreaterThan(woodMat.color.b);
-    expect(woodMat.color.r).toBeLessThan(0.8);
+    expect(woodMat.color.r).toBe(1);
+    expect(woodMat.color.g).toBe(1);
+    expect(woodMat.color.b).toBe(1);
     expect(woodMat.roughness).toBe(1);
     expect(woodMat.metalness).toBe(0);
     expect(woodMat.clearcoat).toBe(0);

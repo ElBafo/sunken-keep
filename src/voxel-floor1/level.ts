@@ -7,13 +7,7 @@ import { CAMERA_NEAR, CELL, CRACKED_CEILING_FILE, CULL_CHEB, LAYER_SIZE, VOXEL_C
 import { floor1Sconces, floor1Sunbeams } from './fixtures';
 import { canStep, chebyshev, enumerateFaces, type FaceJob, type FloorMap } from './layout';
 import { isBeamCeiling, loadCrackedCeiling } from './crack';
-import {
-  isPaintedShellFile,
-  isPlankCeilingFile,
-  normalFromAlbedo,
-  paintedShellMaterial,
-  weatherPlankPixels
-} from './painted';
+import { isPaintedShellFile, normalFromAlbedo, paintedShellMaterial } from './painted';
 import { lookPixels } from './wall-once';
 import {
   bulgePose,
@@ -119,14 +113,7 @@ export async function buildFloor1(
 
   for (const file of neededFiles) {
     const png = pngs.get(file)!;
-    if (isPlankCeilingFile(file)) {
-      weatherPlankPixels(png.data.data);
-      const map = textureFromPixels(png.data);
-      map.userData.plankWeathered = true;
-      texByBatch.set(file, map);
-    } else {
-      texByBatch.set(file, png.texture);
-    }
+    texByBatch.set(file, png.texture);
     if (isPaintedShellFile(file)) {
       normalByBatch.set(file, normalFromAlbedo(png.data));
       continue;

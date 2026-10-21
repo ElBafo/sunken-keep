@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { loadPng, type PngPixels } from '../voxel-lab/materials';
 import { CEILING_VARIANTS, CRACKED_CEILING_FILE } from './constants';
-import { enablePaintedSampling, isPlankCeilingFile, weatherPlankPixels } from './painted';
+import { enablePaintedSampling } from './painted';
 import { mappedCeilingFile } from './layout';
 import { pickVariant } from './variants';
 
@@ -126,7 +126,6 @@ export async function loadCrackedCeiling(): Promise<PngPixels> {
     crack.data.width < ceil.data.width || crack.data.height < ceil.data.height
       ? scaleNearest(crack.data, ceil.data.width, ceil.data.height)
       : crack.data;
-  if (isPlankCeilingFile(variant)) weatherPlankPixels(ceil.data.data);
   const image = compositeCrackedCeiling(ceil.data, overlay);
   const canvas = document.createElement('canvas');
   canvas.width = image.width;

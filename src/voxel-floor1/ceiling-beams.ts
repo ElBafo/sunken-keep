@@ -547,8 +547,6 @@ const STRAP_PROUD = 0.008;
 /** Centre iron column in wood_beam.png (texels 29–34: mid-grey band + rivet). */
 const STRAP_U0 = 0.45;
 const STRAP_U1 = 0.53;
-/** Darker than Artie's plank flats; hue stays a desaturated brown-grey oak. */
-export const WOOD_TINT = new THREE.Color(0.74, 0.64, 0.54);
 /** Near-black iron. The generated map carries at most a faint rivet glint. */
 export const STRAP_TINT = new THREE.Color(0.16, 0.14, 0.12);
 
@@ -648,18 +646,6 @@ export function ironStrapPixel(r: number, g: number, b: number): [number, number
   return [0.055 + lift * 0.3, 0.052 + lift * 0.24, 0.048 + lift * 0.2];
 }
 
-/** Crate wood is lighter than Artie's oak planks (mean luma ~0.155). Dim it; keep plank hue. */
-export function sootyPixel(r: number, g: number, b: number): [number, number, number] {
-  const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  const sat = 0.55;
-  const dim = 0.6;
-  return [
-    (luma + (r - luma) * sat) * dim,
-    (luma + (g - luma) * sat) * dim,
-    (luma + (b - luma) * sat) * dim
-  ];
-}
-
 function inpaintWood(pix: ImageData): void {
   const w = pix.width;
   const h = pix.height;
@@ -707,7 +693,7 @@ function inpaintWood(pix: ImageData): void {
   }
 }
 
-/** Pull the crate-bright plank toward sooty oak. `woodOnly` fills strap columns with grain. */
+/** Fill strap columns with grain. Artie's old-wood albedo is already the play colour. */
 export function sootyOakMap(src: THREE.Texture, woodOnly = false): THREE.Texture {
   const img = src.image as { width?: number; height?: number; naturalWidth?: number; naturalHeight?: number } | undefined;
   const w = img?.naturalWidth || img?.width || 0;
@@ -721,12 +707,6 @@ export function sootyOakMap(src: THREE.Texture, woodOnly = false): THREE.Texture
   ctx.drawImage(img as CanvasImageSource, 0, 0);
   const pix = ctx.getImageData(0, 0, w, h);
   if (woodOnly) inpaintWood(pix);
-  for (let i = 0; i < pix.data.length; i += 4) {
-    const [r, g, b] = sootyPixel(pix.data[i] / 255, pix.data[i + 1] / 255, pix.data[i + 2] / 255);
-    pix.data[i] = Math.round(r * 255);
-    pix.data[i + 1] = Math.round(g * 255);
-    pix.data[i + 2] = Math.round(b * 255);
-  }
   ctx.putImageData(pix, 0, 0);
   return nearestMap(canvas);
 }
@@ -892,7 +872,6 @@ export function meshCeilingBeams(map: THREE.Texture, boxes: CeilingBeamBox[]): T
         woodGeo,
         new THREE.MeshPhysicalMaterial({
           map: woodMap,
-          color: WOOD_TINT,
           roughness: 1,
           metalness: 0,
           clearcoat: 0,

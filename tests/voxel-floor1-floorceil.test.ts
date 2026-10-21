@@ -15,9 +15,7 @@ import {
   isPaintedShellFile,
   normalFromAlbedo,
   paintedShellMaterial,
-  PLANK_TINT,
-  RUBBLE_TINT,
-  weatherPlankPixel
+  RUBBLE_TINT
 } from '../src/voxel-floor1/painted';
 import { shellUv, shellUvScaled } from '../src/voxel-floor1/bake';
 import {
@@ -193,43 +191,31 @@ describe('floor-1 floor and ceiling come from Levie’s map', () => {
     expect(RUBBLE_TINT.r).toBeCloseTo(0.66, 2);
     const level = readFileSync(resolve(__dirname, '../src/voxel-floor1/level.ts'), 'utf8');
     expect(level).toContain('farMat.color.copy(painted.color)');
-    expect(level).toContain('weatherPlankPixels');
+    expect(level).not.toContain('weatherPlankPixels');
     const bake = readFileSync(resolve(__dirname, '../src/voxel-floor1/bake.ts'), 'utf8');
     expect(bake).toContain('shellUvScaled');
     expect(bake).not.toMatch(/customProgramCacheKey = \(\) => 'floor1-far-bake-v9'/);
   });
 
-  it('weathers pantry and guard planks toward grey-brown oak', () => {
-    const src = [50 / 255, 37 / 255, 28 / 255] as const;
-    const out = weatherPlankPixel(src[0], src[1], src[2]);
-    const srcLuma = 0.2126 * src[0] + 0.7152 * src[1] + 0.0722 * src[2];
-    const outLuma = 0.2126 * out[0] + 0.7152 * out[1] + 0.0722 * out[2];
-    const srcRB = src[0] / src[2];
-    const outRB = out[0] / Math.max(1e-6, out[2]);
-    expect(outLuma).toBeLessThan(srcLuma);
-    expect(outLuma).toBeGreaterThan(srcLuma * 0.7);
-    expect(outRB).toBeLessThan(srcRB * 0.75);
-    expect(outRB).toBeGreaterThan(1);
-    expect(outRB).toBeLessThan(1.35);
+  it('uses Artie old-wood planks as-is, with no tint or darken', () => {
     const map = new THREE.Texture();
     const mat = paintedShellMaterial(map, undefined, 'ceiling_planks_1.png');
-    expect(mat.color.r).toBeCloseTo(PLANK_TINT.r, 5);
-    expect(mat.color.b).toBeGreaterThan(mat.color.r);
-    const weathered = new THREE.Texture();
-    weathered.userData.plankWeathered = true;
-    const done = paintedShellMaterial(weathered, undefined, 'ceiling_planks_2.png');
-    expect(done.color.r).toBe(1);
-    expect(done.color.g).toBe(1);
-    expect(done.color.b).toBe(1);
-    const crack = readFileSync(resolve(__dirname, '../src/voxel-floor1/crack.ts'), 'utf8');
-    expect(crack).toContain('weatherPlankPixels');
+    expect(mat.color.r).toBe(1);
+    expect(mat.color.g).toBe(1);
+    expect(mat.color.b).toBe(1);
+    expect(mat.roughness).toBe(1);
     const painted = readFileSync(resolve(__dirname, '../src/voxel-floor1/painted.ts'), 'utf8');
     expect(painted).not.toContain('onBeforeCompile');
+    expect(painted).not.toContain('PLANK_TINT');
+    expect(painted).not.toContain('weatherPlank');
+    const crack = readFileSync(resolve(__dirname, '../src/voxel-floor1/crack.ts'), 'utf8');
+    expect(crack).not.toContain('weatherPlankPixels');
+    const level = readFileSync(resolve(__dirname, '../src/voxel-floor1/level.ts'), 'utf8');
+    expect(level).not.toContain('weatherPlankPixels');
   });
 
   it('keeps plank and cracked-ceiling wood fully matte', () => {
     const map = new THREE.Texture();
-    map.userData.plankWeathered = true;
     const nrm = new THREE.DataTexture(new Uint8Array(16), 2, 2);
     const plank = paintedShellMaterial(map, nrm, 'ceiling_planks_1.png');
     const cracked = paintedShellMaterial(map, nrm, 'ceiling_cracked.png');

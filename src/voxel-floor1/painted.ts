@@ -1,16 +1,10 @@
 import * as THREE from 'three';
-import { textureFromPixels } from '../voxel-lab/materials';
 import { CUTOUT_ALPHA_TEST } from './constants';
 
 type Pixels = { width: number; height: number; data: ArrayLike<number> };
 
 /** Darken rubble so it stays below the wall albedo even under a torch. */
 export const RUBBLE_TINT = new THREE.Color(0.66, 0.66, 0.66);
-/**
- * Fallback multiply when plank pixels cannot be rewritten (node tests).
- * Cooler and a little darker than the reddish source oak.
- */
-export const PLANK_TINT = new THREE.Color(0.7, 0.82, 0.96);
 
 export function isPaintedShellFile(file: string): boolean {
   return file.startsWith('floor_') || file.startsWith('ceiling');
@@ -86,41 +80,6 @@ export function normalFromAlbedo(image: Pixels, strength = 0.55): THREE.DataText
   return tex;
 }
 
-/**
- * Grey-brown weathered oak: drop ~45% saturation, pull hue toward neutral
- * brown, dim a little. Original planks sit near RGB(50, 37, 28).
- */
-export function weatherPlankPixel(r: number, g: number, b: number): [number, number, number] {
-  const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-  const sat = 0.52;
-  const dim = 0.88;
-  return [
-    (luma + (r - luma) * sat) * dim * 0.94,
-    (luma + (g - luma) * sat) * dim * 0.98,
-    (luma + (b - luma) * sat) * dim * 1.08
-  ];
-}
-
-export function weatherPlankPixels(data: Uint8Array | Uint8ClampedArray): void {
-  for (let i = 0; i < data.length; i += 4) {
-    if (data[i + 3] < 8) continue;
-    const [r, g, b] = weatherPlankPixel(data[i] / 255, data[i + 1] / 255, data[i + 2] / 255);
-    data[i] = Math.round(Math.min(255, Math.max(0, r * 255)));
-    data[i + 1] = Math.round(Math.min(255, Math.max(0, g * 255)));
-    data[i + 2] = Math.round(Math.min(255, Math.max(0, b * 255)));
-  }
-}
-
-/** Rewrite plank albedo into a new map. Leaves the source texture untouched. */
-export function weatheredPlankMap(map: THREE.Texture, pixels?: Pixels): THREE.Texture {
-  if (!pixels || !pixels.width || !pixels.height) return map;
-  const data = new Uint8ClampedArray(pixels.data);
-  weatherPlankPixels(data);
-  const tex = textureFromPixels({ width: pixels.width, height: pixels.height, data });
-  tex.userData.plankWeathered = true;
-  return tex;
-}
-
 export function paintedShellMaterial(
   map: THREE.Texture,
   normal: THREE.Texture | undefined,
@@ -129,7 +88,6 @@ export function paintedShellMaterial(
   const water = file === 'floor_water.png';
   const cutout = file.startsWith('ceiling_cracked');
   const rubble = isRubbleCeilingFile(file);
-  const plank = isPlankCeilingFile(file);
   const wood = isWoodCeilingFile(file);
   enablePaintedSampling(map);
   if (rubble) {
@@ -156,6 +114,5 @@ export function paintedShellMaterial(
     mat.envMapIntensity = 0;
   }
   if (rubble) mat.color.copy(RUBBLE_TINT);
-  else if (plank && !map.userData.plankWeathered) mat.color.copy(PLANK_TINT);
   return mat;
 }
