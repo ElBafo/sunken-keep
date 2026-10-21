@@ -2,7 +2,7 @@ import { floor1 as rawFloor1 } from '../../public/levels/floor1';
 import floor1FloorCeilJson from '../../levels/floor1_floorceil.json';
 import type { FaceId } from '../voxel-lab/faces';
 import { CEILING_VARIANTS, FLOOR_VARIANTS, RUBBLE_UV_SCALE } from './constants';
-import { KNOT_FACE_NEIGHBORS, knotWallFile } from './knot-walls';
+import { KNOT_FACE_NEIGHBORS, knotBatchKey, knotWallFile } from './knot-walls';
 import { pickVariant } from './variants';
 import { faceUOffset, familyBaseLook, lookForWall, lookForZoneBase, type WallLook } from './wall-look';
 
@@ -124,6 +124,8 @@ export type FaceJob = {
   wallFace: string;
   bulge: number;
   look?: WallLook;
+  /** Carved knot stamped on this face; surround is the room look. */
+  knot?: boolean;
   /** World-tile U run so neighbouring wall faces continue. */
   uOffset: number;
   /** Ceiling only: 90 would turn plank boards onto Z. Unused while beams run N–S. */
@@ -254,26 +256,29 @@ export function enumerateFaces(map: FloorMap): FaceJob[] {
         const wx = x + spec.dx;
         const wz = z + spec.dz;
         if (!isTrueWall(tileAt(map, wx, wz))) continue;
-        const knot = knotWallFile(wx, wz, spec.wallFace);
+        const knot = !!knotWallFile(wx, wz, spec.wallFace);
         const tile = map.tiles[z][x];
-        let look = knot ? undefined : lookForWall(wx, wz, spec.wallFace) ?? lookForZoneBase(x, z);
+        let look = lookForWall(wx, wz, spec.wallFace) ?? lookForZoneBase(x, z);
         if (!knot && tile.door && look) {
           look = familyBaseLook(look.kind, look.zone, look.seepage);
         }
-        const file = knot ?? look?.file ?? lookForZoneBase(x, z).file;
+        const file = look?.file ?? lookForZoneBase(x, z).file;
         jobs.push({
           face: spec.face,
           tx: x,
           tz: z,
           file,
-          batch: knot ?? look?.key ?? file,
+          batch: knot ? knotBatchKey(look, wx, wz, spec.wallFace) : look?.key ?? file,
           kind: 'wall',
           wallX: wx,
           wallY: wz,
           wallFace: spec.wallFace,
           bulge: look?.bulge ?? 0,
           look,
-          uOffset: faceUOffset(spec.face, x, z),
+          knot,
+          // Unique knot composites are a full 0–1 face. A running U plus
+          // ClampToEdge smears one texel column into horizontal streaks.
+          uOffset: knot ? 0 : faceUOffset(spec.face, x, z),
           uvRot: 0,
           uvScale: 1
         });

@@ -160,8 +160,8 @@ describe('floor-1 floor and ceiling come from Levie’s map', () => {
     expect(painted).toContain('generateMipmaps = true');
   });
 
-  it('tiles rubble 2×2 per cell and darkens it below the walls', () => {
-    expect(RUBBLE_UV_SCALE).toBe(2);
+  it('tiles rubble 1:1 per cell and darkens it below the walls', () => {
+    expect(RUBBLE_UV_SCALE).toBe(1);
     expect(shellUvScaled(0, 0, 0, CELL, CELL, 2)).toEqual([0, 0]);
     expect(shellUvScaled(1, 1, 0, CELL, CELL, 2)).toEqual([2, 2]);
     expect(shellUvScaled(0.5, 0.5, 0, CELL, CELL, 2)).toEqual([1, 1]);
@@ -169,13 +169,9 @@ describe('floor-1 floor and ceiling come from Levie’s map', () => {
     expect(shellUvScaled(1, 1, 90, CELL, CELL, 1)).toEqual([1, 0]);
     const jobs = enumerateFaces(floor1Map);
     for (const j of jobs) {
-      if (j.kind === 'ceiling' && j.file.startsWith('ceiling_rubble_')) {
-        expect(j.uvScale).toBe(2);
-      } else {
-        expect(j.uvScale).toBe(1);
-      }
+      expect(j.uvScale).toBe(1);
     }
-    expect(jobs.find((j) => j.kind === 'ceiling' && j.tx === 2 && j.tz === 11)?.uvScale).toBe(2);
+    expect(jobs.find((j) => j.kind === 'ceiling' && j.tx === 2 && j.tz === 11)?.uvScale).toBe(1);
     expect(jobs.find((j) => j.kind === 'ceiling' && j.tx === 10 && j.tz === 4)?.uvScale).toBe(1);
     expect(jobs.find((j) => j.kind === 'floor' && j.tx === 2 && j.tz === 11)?.uvScale).toBe(1);
     const map = new THREE.Texture();
@@ -186,7 +182,8 @@ describe('floor-1 floor and ceiling come from Levie’s map', () => {
     expect(map.wrapS).toBe(THREE.RepeatWrapping);
     expect(map.wrapT).toBe(THREE.RepeatWrapping);
     expect(nrm.wrapS).toBe(THREE.RepeatWrapping);
-    expect(map.minFilter).toBe(THREE.NearestMipmapNearestFilter);
+    expect(map.minFilter).toBe(THREE.NearestFilter);
+    expect(map.generateMipmaps).toBe(false);
     expect(map.magFilter).toBe(THREE.NearestFilter);
     expect(RUBBLE_TINT.r).toBeCloseTo(0.66, 2);
     const level = readFileSync(resolve(__dirname, '../src/voxel-floor1/level.ts'), 'utf8');
@@ -234,9 +231,9 @@ describe('floor-1 floor and ceiling come from Levie’s map', () => {
       expect(mat.map?.minFilter).toBe(THREE.NearestFilter);
     }
     expect(rubble.roughness).toBe(0.92);
-    expect(rubble.specularIntensity).toBe(1);
-    expect(rubble.map?.generateMipmaps).toBe(true);
-    expect(rubble.map?.minFilter).toBe(THREE.NearestMipmapNearestFilter);
+    expect(rubble.specularIntensity).toBe(0);
+    expect(rubble.map?.generateMipmaps).toBe(false);
+    expect(rubble.map?.minFilter).toBe(THREE.NearestFilter);
     expect(rubble.normalScale.x).toBeCloseTo(0.14, 5);
     expect(floor.roughness).toBe(0.92);
     expect(floor.normalScale.x).toBeCloseTo(0.14, 5);

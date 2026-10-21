@@ -9,6 +9,7 @@ import { canStep, chebyshev, enumerateFaces, type FaceJob, type FloorMap } from 
 import { isBeamCeiling, loadCrackedCeiling } from './crack';
 import { isPaintedShellFile, normalFromAlbedo, paintedShellMaterial } from './painted';
 import { lookPixels } from './wall-once';
+import { KNOT_WALL_FILE, compositeKnotOnRoom } from './knot-walls';
 import {
   bulgePose,
   bulgeWorld,
@@ -84,6 +85,7 @@ export async function buildFloor1(
   for (const job of jobs) {
     neededFiles.add(job.file);
     if (job.look?.baseFile) neededFiles.add(job.look.baseFile);
+    if (job.knot) neededFiles.add(KNOT_WALL_FILE);
   }
   const pngs = new Map<string, PngPixels>();
   await Promise.all(
@@ -135,6 +137,21 @@ export async function buildFloor1(
     texByBatch.set(look.key, look.once ? textureFromPixels(pixels) : feat.texture);
     voxels += vol.voxelCount;
     roughByBatch.set(look.key, pbrMap(vol.roughness, vol.dims[0], vol.dims[1]));
+  }
+
+  for (const job of jobs) {
+    if (!job.knot || !job.look || volumes.has(job.batch)) continue;
+    const knotPng = pngs.get(KNOT_WALL_FILE);
+    const roomPng = pngs.get(job.look.file);
+    if (!knotPng || !roomPng) continue;
+    const room = lookPixels(job.look.file, pngs, job.look.once, job.look.baseFile);
+    const pixels = compositeKnotOnRoom(room, knotPng.data);
+    const vol = volumeFromImageData(pixels);
+    finishVolume(vol, job.look);
+    volumes.set(job.batch, vol);
+    texByBatch.set(job.batch, textureFromPixels(pixels));
+    voxels += vol.voxelCount;
+    roughByBatch.set(job.batch, pbrMap(vol.roughness, vol.dims[0], vol.dims[1]));
   }
 
   const prepared: PreparedFace[] = [];
@@ -190,10 +207,8 @@ export async function buildFloor1(
     }
     const rough = roughByBatch.get(batch);
     if (!tex || !rough) continue;
-    if (batch.startsWith('walls_floor1/')) {
-      tex.wrapS = THREE.RepeatWrapping;
-      rough.wrapS = THREE.RepeatWrapping;
-    }
+    tex.wrapS = THREE.RepeatWrapping;
+    rough.wrapS = THREE.RepeatWrapping;
     const mat = voxelMaterial(tex, rough);
     mat.name = batch;
     if (!realLights) patchBakeMaterial(mat);

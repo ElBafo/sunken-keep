@@ -3,6 +3,10 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import { readFileSync, readdirSync } from 'fs';
 import { resolve } from 'path';
 import {
+  ARCH_DEPTH,
+  ARCH_FRONT,
+  ARCH_LAYERS,
+  CELL,
   DOOR_CLOSE_MS,
   DOOR_OPEN_MS,
   DOOR_SLIDE,
@@ -11,9 +15,11 @@ import {
 import { greedyMesh } from '../src/voxel-lab/mesher';
 import {
   OpeningSystem,
+  makeArchToWorld,
   maskVolumeWithOpening,
   pickSecretTellTexels,
   recessSecretTell,
+  solidifyArchVolume,
   type OpeningVisual
 } from '../src/voxel-floor1/openings';
 import { floor1Map, openingViews, resetFloor1Doors, tileAt } from '../src/voxel-floor1/layout';
@@ -125,6 +131,9 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     expect(openings).toContain('lookForZoneBase');
     expect(openings).toContain('maskVolumeWithOpening');
     expect(openings).toContain('openingHoleMask');
+    expect(openings).toContain('solidifyArchVolume');
+    expect(openings).toContain('makeArchToWorld');
+    expect(openings).toContain('remapDegenerateUvs');
     expect(openings).toContain('warnMissingWallTexture');
     expect(openings).toContain('familyBaseFile');
     expect(openings).not.toContain('using door_open');
@@ -212,5 +221,24 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     }
     expect(pulled).toBe(texels.length);
     expect(recessed[0 + 0 * W + 2 * W * H]).toBe(1);
+  });
+
+  it('gives door arches a real reveal into the opening', () => {
+    expect(ARCH_DEPTH).toBeCloseTo(CELL * 0.48, 5);
+    expect(ARCH_FRONT).toBeCloseTo(0.03, 5);
+    expect(ARCH_LAYERS).toBeGreaterThan(20);
+    const wall = new Uint8Array(8).fill(1);
+    wall[2] = 0;
+    wall[6] = 0;
+    const arch = solidifyArchVolume(wall, [2, 2, 2], 6);
+    expect(arch.dims[2]).toBe(6);
+    expect(arch.volume[0]).toBe(1);
+    expect(arch.volume[2]).toBe(0);
+    const toWorld = makeArchToWorld('W', 5, 2, [2, 2, 6]);
+    const back = toWorld(0, 0, 0);
+    const front = toWorld(0, 0, 6);
+    expect(front[0] - back[0]).toBeCloseTo(ARCH_DEPTH + ARCH_FRONT, 5);
+    expect(front[0]).toBeGreaterThan((5 - 0.5) * CELL - 0.001);
+    expect(back[0]).toBeLessThan((5 - 0.5) * CELL);
   });
 });

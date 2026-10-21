@@ -102,7 +102,7 @@ export function paintedShellMaterial(
   const cutout = file.startsWith('ceiling_cracked');
   const rubble = isRubbleCeilingFile(file);
   const wood = isWoodCeilingFile(file);
-  if (wood) enableWoodSampling(map);
+  if (wood || rubble) enableWoodSampling(map);
   else enablePaintedSampling(map);
   if (rubble) {
     enableRubbleRepeat(map);
@@ -122,7 +122,7 @@ export function paintedShellMaterial(
     polygonOffsetFactor: 1,
     polygonOffsetUnits: 1
   });
-  if (wood) {
+  if (wood || rubble) {
     mat.sheen = 0;
     mat.clearcoat = 0;
     mat.envMapIntensity = 0;

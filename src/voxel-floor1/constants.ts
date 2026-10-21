@@ -78,12 +78,21 @@ export const PLANK_CEILING_VARIANTS = [
   'ceiling_planks_3.png'
 ] as const;
 export const CRACKED_CEILING_FILE = 'ceiling_cracked.png';
-/** Rubble stones tile 2×2 in each CELL so they read half-size. */
-export const RUBBLE_UV_SCALE = 2;
+/** One 256² rubble tile per 2 m cell — same density as the floor, readable on a phone. */
+export const RUBBLE_UV_SCALE = 1;
+/**
+ * Reveal into the door cell. Half a CELL so both sides meet in the middle
+ * (wall-thick soffit) while the room-side face stays a 3 cm relief.
+ */
+export const ARCH_DEPTH = CELL * 0.48;
+export const ARCH_FRONT = 0.03;
+export const ARCH_LAYERS = Math.round((ARCH_DEPTH + ARCH_FRONT) / LAYER_SIZE);
 
-/** Heavy stone band at the wall–ceiling join. 256×64 tile spans one CELL. */
-export const CORNICE_HEIGHT = 0.32;
-export const CORNICE_DEPTH = 0.12;
+/** One brick-course band, flush on the wall. 256×64 tile spans two cells. */
+export const CORNICE_HEIGHT = 0.18;
+export const CORNICE_DEPTH = 0.09;
+/** Bite into the wall so the underside covers the wall top (no light leak). */
+export const CORNICE_WALL_INSET = 0.03;
 export const CORNICE_TEXELS_U = 256;
 export const CORNICE_TEXELS_V = 64;
 /** Painted shadow line on the strip — mapped to the underside, not the front. */
