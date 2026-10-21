@@ -24,6 +24,13 @@ export function isPlankCeilingFile(file: string): boolean {
   return file.startsWith('ceiling_planks_');
 }
 
+export function isWoodCeilingFile(file: string): boolean {
+  return isPlankCeilingFile(file) || file.startsWith('ceiling_cracked');
+}
+
+/** Grain bump on wood — kept tiny so torch light does not streak like varnish. */
+export const WOOD_NORMAL_SCALE = 0.05;
+
 /** Painted 256 tiles: crisp texels up close, nearest mips in the distance. */
 export function enablePaintedSampling(tex: THREE.Texture): void {
   tex.magFilter = THREE.NearestFilter;
@@ -123,6 +130,7 @@ export function paintedShellMaterial(
   const cutout = file.startsWith('ceiling_cracked');
   const rubble = isRubbleCeilingFile(file);
   const plank = isPlankCeilingFile(file);
+  const wood = isWoodCeilingFile(file);
   enablePaintedSampling(map);
   if (rubble) {
     enableRubbleRepeat(map);
@@ -131,8 +139,8 @@ export function paintedShellMaterial(
   const mat = new THREE.MeshPhysicalMaterial({
     map,
     normalMap: normal,
-    normalScale: new THREE.Vector2(0.14, 0.14),
-    roughness: water ? 0.62 : 0.92,
+    normalScale: new THREE.Vector2(wood ? WOOD_NORMAL_SCALE : 0.14, wood ? WOOD_NORMAL_SCALE : 0.14),
+    roughness: water ? 0.62 : wood ? 1 : 0.92,
     metalness: 0,
     clearcoat: water ? 0.12 : 0,
     clearcoatRoughness: water ? 0.45 : 1,
@@ -142,6 +150,11 @@ export function paintedShellMaterial(
     polygonOffsetFactor: 1,
     polygonOffsetUnits: 1
   });
+  if (wood) {
+    mat.sheen = 0;
+    mat.clearcoat = 0;
+    mat.envMapIntensity = 0;
+  }
   if (rubble) mat.color.copy(RUBBLE_TINT);
   else if (plank && !map.userData.plankWeathered) mat.color.copy(PLANK_TINT);
   return mat;

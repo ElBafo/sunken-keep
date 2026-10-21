@@ -893,8 +893,10 @@ export function meshCeilingBeams(map: THREE.Texture, boxes: CeilingBeamBox[]): T
         new THREE.MeshPhysicalMaterial({
           map: woodMap,
           color: WOOD_TINT,
-          roughness: 0.94,
+          roughness: 1,
           metalness: 0,
+          clearcoat: 0,
+          sheen: 0,
           envMapIntensity: 0
         })
       )

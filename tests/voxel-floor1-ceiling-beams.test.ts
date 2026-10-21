@@ -218,6 +218,13 @@ describe('floor-1 ceiling timber', () => {
     expect(Math.max(strapMat.color.r, strapMat.color.g, strapMat.color.b)).toBeLessThan(0.22);
     expect(woodMat.color.r).toBeGreaterThan(woodMat.color.b);
     expect(woodMat.color.r).toBeLessThan(0.8);
+    expect(woodMat.roughness).toBe(1);
+    expect(woodMat.metalness).toBe(0);
+    expect(woodMat.clearcoat).toBe(0);
+    expect(woodMat.sheen).toBe(0);
+    expect(woodMat.envMapIntensity).toBe(0);
+    expect(strapMat.roughness).toBeCloseTo(0.82, 5);
+    expect(strapMat.metalness).toBeCloseTo(0.08, 5);
     expect(strapMat.map).toBeInstanceOf(THREE.DataTexture);
     expect(strapMat.map).not.toBe(tex);
     for (const mesh of [wood, straps]) {

@@ -227,6 +227,28 @@ describe('floor-1 floor and ceiling come from Levie’s map', () => {
     expect(painted).not.toContain('onBeforeCompile');
   });
 
+  it('keeps plank and cracked-ceiling wood fully matte', () => {
+    const map = new THREE.Texture();
+    map.userData.plankWeathered = true;
+    const nrm = new THREE.DataTexture(new Uint8Array(16), 2, 2);
+    const plank = paintedShellMaterial(map, nrm, 'ceiling_planks_1.png');
+    const cracked = paintedShellMaterial(map, nrm, 'ceiling_cracked.png');
+    const rubble = paintedShellMaterial(new THREE.Texture(), nrm, 'ceiling_rubble_1.png');
+    const floor = paintedShellMaterial(new THREE.Texture(), nrm, 'floor_stone.png');
+    for (const mat of [plank, cracked]) {
+      expect(mat.roughness).toBe(1);
+      expect(mat.metalness).toBe(0);
+      expect(mat.clearcoat).toBe(0);
+      expect(mat.sheen).toBe(0);
+      expect(mat.envMapIntensity).toBe(0);
+      expect(mat.normalScale.x).toBeLessThan(0.08);
+    }
+    expect(rubble.roughness).toBe(0.92);
+    expect(rubble.normalScale.x).toBeCloseTo(0.14, 5);
+    expect(floor.roughness).toBe(0.92);
+    expect(floor.normalScale.x).toBeCloseTo(0.14, 5);
+  });
+
   it('does not put floor or ceiling tiles on the wall mip/atlas path', () => {
     const mips = JSON.parse(readFileSync(resolve(TEX, 'wall_mips.json'), 'utf8')) as {
       textures: Record<string, Record<string, string>>;
