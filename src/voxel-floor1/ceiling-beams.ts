@@ -876,6 +876,7 @@ export function meshCeilingBeams(map: THREE.Texture, boxes: CeilingBeamBox[]): T
           metalness: 0,
           clearcoat: 0,
           sheen: 0,
+          specularIntensity: 0,
           envMapIntensity: 0
         })
       )

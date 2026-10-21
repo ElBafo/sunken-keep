@@ -27,9 +27,22 @@ export const WOOD_NORMAL_SCALE = 0.05;
 
 /** Painted 256 tiles: crisp texels up close, nearest mips in the distance. */
 export function enablePaintedSampling(tex: THREE.Texture): void {
+  tex.colorSpace = THREE.SRGBColorSpace;
   tex.magFilter = THREE.NearestFilter;
   tex.minFilter = THREE.NearestMipmapNearestFilter;
   tex.generateMipmaps = true;
+  tex.needsUpdate = true;
+}
+
+/**
+ * Wood maps match the wall path: sRGB, nearest, no mips.
+ * Box-filtered mips turn 1-texel near-black gaps grey at distance.
+ */
+export function enableWoodSampling(tex: THREE.Texture): void {
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.generateMipmaps = false;
   tex.needsUpdate = true;
 }
 
@@ -89,7 +102,8 @@ export function paintedShellMaterial(
   const cutout = file.startsWith('ceiling_cracked');
   const rubble = isRubbleCeilingFile(file);
   const wood = isWoodCeilingFile(file);
-  enablePaintedSampling(map);
+  if (wood) enableWoodSampling(map);
+  else enablePaintedSampling(map);
   if (rubble) {
     enableRubbleRepeat(map);
     if (normal) enableRubbleRepeat(normal);
@@ -112,6 +126,10 @@ export function paintedShellMaterial(
     mat.sheen = 0;
     mat.clearcoat = 0;
     mat.envMapIntensity = 0;
+    // Default dielectric spec (F0 ~0.04) adds a lantern floor on the flat
+    // ceiling and lifts (17,15,13) gaps to mid-grey. Walls keep true-black
+    // mortar because those texels are 0. This is a construction uniform.
+    mat.specularIntensity = 0;
   }
   if (rubble) mat.color.copy(RUBBLE_TINT);
   return mat;

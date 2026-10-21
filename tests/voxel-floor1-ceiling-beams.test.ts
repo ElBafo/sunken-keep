@@ -210,6 +210,7 @@ describe('floor-1 ceiling timber', () => {
     expect(woodMat.metalness).toBe(0);
     expect(woodMat.clearcoat).toBe(0);
     expect(woodMat.sheen).toBe(0);
+    expect(woodMat.specularIntensity).toBe(0);
     expect(woodMat.envMapIntensity).toBe(0);
     expect(strapMat.roughness).toBeCloseTo(0.82, 5);
     expect(strapMat.metalness).toBeCloseTo(0.08, 5);
