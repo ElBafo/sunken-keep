@@ -22,6 +22,10 @@ import {
   inOpeningVoid,
   JAMB_TOP_FACETED,
   JAMB_TOP_LINTEL,
+  KEYSTONE_H,
+  LINTEL_BEAR,
+  LINTEL_H,
+  LINTEL_PROUD,
   LEAF_BACK,
   LEAF_FRONT,
   LEAF_PAD,
@@ -35,6 +39,7 @@ import {
   OPEN_U0,
   OPEN_U1,
   OPEN_WIDTH,
+  openingPlateRect,
   openingPunchRect,
   openingQuadWorldNormal,
   openingWallCovered,
@@ -113,11 +118,21 @@ describe('floor-1 door opening styles', () => {
     for (const q of quads) {
       expect(q.corners).toHaveLength(4);
     }
-    expect(CHAMFER).toBeCloseTo(0.1, 5);
+    expect(CHAMFER).toBeCloseTo(0.12, 5);
+    expect(KEYSTONE_H).toBeCloseTo(0.08, 5);
     expect(FRONT_PROUD).toBeLessThanOrEqual(0.03);
+    expect(LINTEL_PROUD).toBeGreaterThan(FRONT_PROUD);
+    expect(LINTEL_PROUD).toBeGreaterThanOrEqual(0.08);
+    expect(LINTEL_H).toBeGreaterThanOrEqual(0.25);
+    expect(LINTEL_H).toBeLessThanOrEqual(0.3);
+    expect(LINTEL_BEAR).toBeGreaterThanOrEqual(0.15);
+    expect(LINTEL_BEAR).toBeLessThanOrEqual(0.2);
     expect(OPEN_WIDTH).toBeGreaterThanOrEqual(1.1);
     expect(OPEN_WIDTH).toBeLessThanOrEqual(1.2);
     expect(JAMB_TOP_FACETED).toBeGreaterThan(OPEN_WIDTH);
+    expect(openingPlateRect('faceted').v1).toBeCloseTo(facetedTop(), 5);
+    expect(openingPlateRect('lintel').v1).toBeCloseTo(lintelTop(), 5);
+    expect(openingPlateRect('faceted').v1).toBeGreaterThan(openingPunchRect('faceted').v1);
     expect(wallAboveOpening('faceted')).toBeGreaterThanOrEqual(-1e-6);
     expect(facetedTop()).toBeLessThanOrEqual(CELL - CORNICE_HEIGHT + 1e-6);
     expect(inOpeningVoid('faceted', (OPEN_U0 + OPEN_U1) / 2, 0.6)).toBe(true);
@@ -245,6 +260,8 @@ describe('floor-1 door opening styles', () => {
   it('keeps the faceted wall watertight from both sides of both main doors', () => {
     expect(openingWallIsWatertight('faceted', 'front')).toBe(true);
     expect(openingWallIsWatertight('faceted', 'back')).toBe(true);
+    expect(openingWallIsWatertight('lintel', 'front')).toBe(true);
+    expect(openingWallIsWatertight('lintel', 'back')).toBe(true);
     const leftU = OPEN_U0 + CHAMFER * 0.25;
     const rightU = OPEN_U1 - CHAMFER * 0.25;
     const midV = JAMB_TOP_FACETED + CHAMFER * 0.55;

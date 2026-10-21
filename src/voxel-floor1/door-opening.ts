@@ -27,28 +27,33 @@ export const OPEN_U1 = OPEN_U0 + OPEN_WIDTH;
 /** Visible thickness of each head slab on the wall face. */
 export const SLAB_THICK = 0.28;
 export const JOINT = 0.024;
-/** 3 cm proud of the wall plate so the lintel and arch read. */
+/** 3 cm proud of the wall plate — jambs. */
 export const FRONT_PROUD = 0.03;
+/** Lintel and relieving-arch slabs step past the cornice so they read from a cell back. */
+export const LINTEL_PROUD = 0.1;
 export const BRICK_COURSE = 0.18;
 /** 45° run = rise on the relieving arch above the main-door lintel. */
-export const CHAMFER = 0.1;
-export const KEYSTONE_H = 0.04;
-/** Heavy single lintel block, 26 cm. */
-export const LINTEL_H = 0.26;
+export const CHAMFER = 0.12;
+export const KEYSTONE_H = 0.08;
+/** Heavy single lintel block, 28 cm. */
+export const LINTEL_H = 0.28;
 /** How far the lintel bears into the wall past each jamb. */
 export const LINTEL_BEAR = 0.18;
-export const JAMB_TOP_H = 0.1;
+export const JAMB_TOP_H = 0.14;
 /**
  * Tall rectangular opening — floor to lintel. Same size on main and side
  * doors so it reads as a full-height door in the 2 m cell, not a garage cut.
+ * ~1.34 m is as tall as the 25–30 cm lintel plus a readable five-slab arch
+ * can go under the 1.82 m cornice.
  */
-export const JAMB_TOP_FACETED = 1.42;
-export const JAMB_TOP_LINTEL = 1.42;
+export const JAMB_TOP_FACETED = 1.34;
+export const JAMB_TOP_LINTEL = 1.34;
 /** Field-brick V on banded walls — below the carved knot course. */
 export const FIELD_STONE_V0 = 0.14;
 /** One room's half of the 30 cm doorway wall. */
 export const ROOM_DEPTH = DOOR_WALL_HALF;
 export const FRONT = ROOM_DEPTH + FRONT_PROUD;
+export const LINTEL_FRONT = ROOM_DEPTH + LINTEL_PROUD;
 /** Slight overlap past the shared edge so the two room plates seal. */
 export const BACK = -0.004;
 /** Door leaf sits in the combined wall thickness, centred on the edge. */
@@ -108,6 +113,19 @@ export function openingPunchRect(style: DoorOpeningStyle): OpeningHole {
   };
 }
 
+/**
+ * Hole cut in the wall plate: walkable opening plus the lintel / arch band
+ * so wall courses do not run through the head. Slabs fill that band.
+ */
+export function openingPlateRect(style: DoorOpeningStyle): OpeningHole {
+  return {
+    u0: OPEN_U0,
+    u1: OPEN_U1,
+    v0: 0,
+    v1: style === 'faceted' ? facetedTop() : lintelTop()
+  };
+}
+
 /** True inside the walkable opening. Both styles are a rectangle under the lintel. */
 export function inOpeningVoid(style: DoorOpeningStyle, u: number, v: number): boolean {
   if (v < 0) return false;
@@ -120,19 +138,7 @@ export function punchOpening(
   style: DoorOpeningStyle,
   cell = CELL
 ): Uint8Array {
-  const [W, H, D] = dims;
-  const out = new Uint8Array(volume);
-  const slice = W * H;
-  for (let iv = 0; iv < H; iv++) {
-    const y = ((iv + 0.5) / H) * cell;
-    for (let iu = 0; iu < W; iu++) {
-      const x = ((iu + 0.5) / W) * cell;
-      if (!inOpeningVoid(style, x, y)) continue;
-      const idx = iu + iv * W;
-      for (let d = 0; d < D; d++) out[idx + d * slice] = 0;
-    }
-  }
-  return out;
+  return punchOpeningRect(volume, dims, openingPlateRect(style), cell);
 }
 
 export function punchOpeningRect(
@@ -177,8 +183,13 @@ export function wallAboveOpening(style: DoorOpeningStyle): number {
   return corniceBottom() - (style === 'faceted' ? facetedTop() : lintelTop());
 }
 
-function frontRect(a0: number, a1: number, u0: number, u1: number): OpeningQuad['corners'] {
-  const d = FRONT;
+function frontRect(
+  a0: number,
+  a1: number,
+  u0: number,
+  u1: number,
+  d = FRONT
+): OpeningQuad['corners'] {
   return [
     [a0, u0, d],
     [a1, u0, d],
@@ -187,12 +198,18 @@ function frontRect(a0: number, a1: number, u0: number, u1: number): OpeningQuad[
   ];
 }
 
-function soffitRect(a0: number, a1: number, u0: number, u1: number): OpeningQuad['corners'] {
+function soffitRect(
+  a0: number,
+  a1: number,
+  u0: number,
+  u1: number,
+  d = FRONT
+): OpeningQuad['corners'] {
   return [
-    [a0, u0, FRONT],
+    [a0, u0, d],
     [a0, u0, BACK],
     [a1, u1, BACK],
-    [a1, u1, FRONT]
+    [a1, u1, d]
   ];
 }
 
@@ -288,7 +305,7 @@ export function openingWallCovered(
   side: 'front' | 'back'
 ): boolean {
   if (inOpeningVoid(style, u, v)) return true;
-  const rect = openingPunchRect(style);
+  const rect = openingPlateRect(style);
   if (u < rect.u0 || u >= rect.u1 || v < rect.v0 || v >= rect.v1) return true;
   return listOpeningQuads(style).some((q) => q.kind === side && pointInQuadUV(u, v, q.corners));
 }
@@ -360,12 +377,12 @@ export function listFacetedHeadQuads(): OpeningQuad[] {
   out.push({
     role: 'lintel',
     kind: 'front',
-    corners: frontRect(u0 - LINTEL_BEAR, u1 + LINTEL_BEAR, jt, spring)
+    corners: frontRect(u0 - LINTEL_BEAR, u1 + LINTEL_BEAR, jt, spring, LINTEL_FRONT)
   });
   out.push({
     role: 'lintel',
     kind: 'soffit',
-    corners: soffitRect(u0, u1, jt, jt)
+    corners: soffitRect(u0, u1, jt, jt, LINTEL_FRONT)
   });
   out.push({
     role: 'jamb-soffit',
@@ -382,7 +399,7 @@ export function listFacetedHeadQuads(): OpeningQuad[] {
   out.push({
     role: 'jamb-top',
     kind: 'front',
-    corners: frontRect(u0 - th, u0 - j, leftTop0 - 0.02, leftTop0 + JAMB_TOP_H)
+    corners: frontRect(u0 - th, u0 - j, leftTop0 - 0.02, leftTop0 + JAMB_TOP_H, LINTEL_FRONT)
   });
   out.push({
     role: 'jamb-top',
@@ -392,25 +409,25 @@ export function listFacetedHeadQuads(): OpeningQuad[] {
 
   const la0: [number, number] = [u0 + j, spring + j];
   const la1: [number, number] = [u0 + ch - j, spring + ch - j];
-  const lp: [number, number] = [-inv * 0.12, inv * 0.12];
+  const lp: [number, number] = [-inv * 0.16, inv * 0.16];
   out.push({
     role: 'chamfer',
     kind: 'front',
     corners: [
-      [la0[0], la0[1], FRONT],
-      [la1[0], la1[1], FRONT],
-      [la1[0] + lp[0], la1[1] + lp[1], FRONT],
-      [la0[0] + lp[0], la0[1] + lp[1], FRONT]
+      [la0[0], la0[1], LINTEL_FRONT],
+      [la1[0], la1[1], LINTEL_FRONT],
+      [la1[0] + lp[0], la1[1] + lp[1], LINTEL_FRONT],
+      [la0[0] + lp[0], la0[1] + lp[1], LINTEL_FRONT]
     ]
   });
   out.push({
     role: 'chamfer',
     kind: 'soffit',
     corners: [
-      [la0[0], la0[1], FRONT],
+      [la0[0], la0[1], LINTEL_FRONT],
       [la0[0], la0[1], BACK],
       [la1[0], la1[1], BACK],
-      [la1[0], la1[1], FRONT]
+      [la1[0], la1[1], LINTEL_FRONT]
     ]
   });
 
@@ -420,42 +437,42 @@ export function listFacetedHeadQuads(): OpeningQuad[] {
   out.push({
     role: 'keystone',
     kind: 'front',
-    corners: frontRect(k0, k1, kb, kb + kh)
+    corners: frontRect(k0, k1, kb, kb + kh, LINTEL_FRONT)
   });
   out.push({
     role: 'keystone',
     kind: 'soffit',
-    corners: soffitRect(k0, k1, kb, kb)
+    corners: soffitRect(k0, k1, kb, kb, LINTEL_FRONT)
   });
 
   const ra0: [number, number] = [u1 - ch + j, spring + ch - j];
   const ra1: [number, number] = [u1 - j, spring + j];
-  const rp: [number, number] = [inv * 0.12, inv * 0.12];
+  const rp: [number, number] = [inv * 0.16, inv * 0.16];
   out.push({
     role: 'chamfer',
     kind: 'front',
     corners: [
-      [ra0[0], ra0[1], FRONT],
-      [ra1[0], ra1[1], FRONT],
-      [ra1[0] + rp[0], ra1[1] + rp[1], FRONT],
-      [ra0[0] + rp[0], ra0[1] + rp[1], FRONT]
+      [ra0[0], ra0[1], LINTEL_FRONT],
+      [ra1[0], ra1[1], LINTEL_FRONT],
+      [ra1[0] + rp[0], ra1[1] + rp[1], LINTEL_FRONT],
+      [ra0[0] + rp[0], ra0[1] + rp[1], LINTEL_FRONT]
     ]
   });
   out.push({
     role: 'chamfer',
     kind: 'soffit',
     corners: [
-      [ra0[0], ra0[1], FRONT],
+      [ra0[0], ra0[1], LINTEL_FRONT],
       [ra0[0], ra0[1], BACK],
       [ra1[0], ra1[1], BACK],
-      [ra1[0], ra1[1], FRONT]
+      [ra1[0], ra1[1], LINTEL_FRONT]
     ]
   });
 
   out.push({
     role: 'jamb-top',
     kind: 'front',
-    corners: frontRect(u1 + j, u1 + th, leftTop0 - 0.02, leftTop0 + JAMB_TOP_H)
+    corners: frontRect(u1 + j, u1 + th, leftTop0 - 0.02, leftTop0 + JAMB_TOP_H, LINTEL_FRONT)
   });
   out.push({
     role: 'jamb-top',
@@ -510,8 +527,8 @@ export function listFacetedHeadQuads(): OpeningQuad[] {
     role: 'corner',
     kind: 'front',
     corners: [
-      [u0 + ch, spring, tymp],
-      [u1 - ch, spring, tymp],
+      [u0, spring, tymp],
+      [u1, spring, tymp],
       [u1 - ch, kb, tymp],
       [u0 + ch, kb, tymp]
     ]
@@ -520,8 +537,8 @@ export function listFacetedHeadQuads(): OpeningQuad[] {
     role: 'chamfer-end',
     kind: 'soffit',
     corners: [
-      [la0[0], la0[1], FRONT],
-      [la0[0] + lp[0], la0[1] + lp[1], FRONT],
+      [la0[0], la0[1], LINTEL_FRONT],
+      [la0[0] + lp[0], la0[1] + lp[1], LINTEL_FRONT],
       [la0[0] + lp[0], la0[1] + lp[1], BACK],
       [la0[0], la0[1], BACK]
     ]
@@ -530,18 +547,18 @@ export function listFacetedHeadQuads(): OpeningQuad[] {
     role: 'chamfer-end',
     kind: 'soffit',
     corners: [
-      [la1[0], la1[1], FRONT],
+      [la1[0], la1[1], LINTEL_FRONT],
       [la1[0], la1[1], BACK],
       [la1[0] + lp[0], la1[1] + lp[1], BACK],
-      [la1[0] + lp[0], la1[1] + lp[1], FRONT]
+      [la1[0] + lp[0], la1[1] + lp[1], LINTEL_FRONT]
     ]
   });
   out.push({
     role: 'chamfer-end',
     kind: 'soffit',
     corners: [
-      [ra0[0], ra0[1], FRONT],
-      [ra0[0] + rp[0], ra0[1] + rp[1], FRONT],
+      [ra0[0], ra0[1], LINTEL_FRONT],
+      [ra0[0] + rp[0], ra0[1] + rp[1], LINTEL_FRONT],
       [ra0[0] + rp[0], ra0[1] + rp[1], BACK],
       [ra0[0], ra0[1], BACK]
     ]
@@ -550,32 +567,40 @@ export function listFacetedHeadQuads(): OpeningQuad[] {
     role: 'chamfer-end',
     kind: 'soffit',
     corners: [
-      [ra1[0], ra1[1], FRONT],
+      [ra1[0], ra1[1], LINTEL_FRONT],
       [ra1[0], ra1[1], BACK],
       [ra1[0] + rp[0], ra1[1] + rp[1], BACK],
-      [ra1[0] + rp[0], ra1[1] + rp[1], FRONT]
+      [ra1[0] + rp[0], ra1[1] + rp[1], LINTEL_FRONT]
     ]
   });
   out.push({
     role: 'chamfer-end',
     kind: 'soffit',
     corners: [
-      [la0[0] + lp[0], la0[1] + lp[1], FRONT],
+      [la0[0] + lp[0], la0[1] + lp[1], LINTEL_FRONT],
       [la0[0] + lp[0], la0[1] + lp[1], BACK],
       [la1[0] + lp[0], la1[1] + lp[1], BACK],
-      [la1[0] + lp[0], la1[1] + lp[1], FRONT]
+      [la1[0] + lp[0], la1[1] + lp[1], LINTEL_FRONT]
     ]
   });
   out.push({
     role: 'chamfer-end',
     kind: 'soffit',
     corners: [
-      [ra0[0] + rp[0], ra0[1] + rp[1], FRONT],
-      [ra1[0] + rp[0], ra1[1] + rp[1], FRONT],
+      [ra0[0] + rp[0], ra0[1] + rp[1], LINTEL_FRONT],
+      [ra1[0] + rp[0], ra1[1] + rp[1], LINTEL_FRONT],
       [ra1[0] + rp[0], ra1[1] + rp[1], BACK],
       [ra0[0] + rp[0], ra0[1] + rp[1], BACK]
     ]
   });
+  const structuralFronts = out.filter((q) => q.kind === 'front');
+  out.push(
+    ...structuralFronts.map((q) => ({
+      role: q.role,
+      kind: 'back' as const,
+      corners: flipQuadCorners(q.corners)
+    }))
+  );
   out.push(...listFacetedCornerFills());
   return out;
 }
@@ -588,25 +613,31 @@ export function listLintelQuads(): OpeningQuad[] {
   const j = JOINT / 2;
   const chip = 0.07;
   const out: OpeningQuad[] = [];
+  const lintelFront = frontRect(u0 - LINTEL_BEAR, u1 + LINTEL_BEAR, jt, jt + lh, LINTEL_FRONT);
   out.push({
     role: 'lintel',
     kind: 'front',
-    corners: frontRect(u0 - LINTEL_BEAR, u1 + LINTEL_BEAR, jt, jt + lh)
+    corners: lintelFront
+  });
+  out.push({
+    role: 'lintel',
+    kind: 'back',
+    corners: flipQuadCorners(lintelFront)
   });
   out.push({
     role: 'lintel',
     kind: 'soffit',
-    corners: soffitRect(u0 + chip, u1 - chip, jt, jt)
+    corners: soffitRect(u0 + chip, u1 - chip, jt, jt, LINTEL_FRONT)
   });
   out.push({
     role: 'chip',
     kind: 'soffit',
-    corners: soffitRect(u0, u0 + chip, jt + 0.05, jt + 0.05)
+    corners: soffitRect(u0, u0 + chip, jt + 0.05, jt + 0.05, LINTEL_FRONT)
   });
   out.push({
     role: 'chip',
     kind: 'soffit',
-    corners: soffitRect(u1 - chip, u1, jt + 0.05, jt + 0.05)
+    corners: soffitRect(u1 - chip, u1, jt + 0.05, jt + 0.05, LINTEL_FRONT)
   });
   out.push({
     role: 'jamb-soffit',

@@ -777,7 +777,7 @@ export async function buildFloor1Openings(
           const lintelGeo = geometryWithBake([{ mesh: slabs.lintel, tx: view.tx, tz: view.tz }], torches, beams);
           if (lintelGeo) {
             const lintelMat = mat.clone();
-            lintelMat.color.setRGB(0.72, 0.7, 0.66);
+            lintelMat.color.setRGB(0.9, 0.88, 0.84);
             if (!realLights) patchBakeMaterial(lintelMat);
             lintelMats.push(lintelMat);
             const lintel = new THREE.Mesh(lintelGeo, lintelMat);
