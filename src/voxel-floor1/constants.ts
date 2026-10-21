@@ -48,7 +48,7 @@ export const DOOR_PANEL_INSET = 0.05;
 export const DOOR_UNLOCK_LEAD_MS = 350;
 /**
  * Door leaf rides up into the wall above the opening (portcullis).
- * Far enough that the faceted / lintel void is clear; the mesh is clipped
+ * Far enough that the lintel void is clear; the mesh is clipped
  * at the cornice and hidden when fully open so it never pokes through.
  */
 export const DOOR_LEAF_SLIDE = 1.84;

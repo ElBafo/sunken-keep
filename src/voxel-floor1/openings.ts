@@ -399,7 +399,7 @@ export function meshDoorOpening(
   const positions = plate.mesh.positions.slice();
   const normals = plate.mesh.normals.slice();
   const slabs = openingSlabMeshes(style, face, tx, tz);
-  for (const slab of [slabs.stone, slabs.lintel, slabs.arch]) {
+  for (const slab of [slabs.stone, slabs.lintel]) {
     positions.push(...slab.positions);
     normals.push(...slab.normals);
     uvs.push(...slab.uvs);
@@ -786,21 +786,6 @@ export async function buildFloor1Openings(
             lintel.receiveShadow = true;
             lintel.frustumCulled = false;
             group.add(lintel);
-          }
-        }
-        if (slabs.arch.positions.length) {
-          const archGeo = geometryWithBake([{ mesh: slabs.arch, tx: view.tx, tz: view.tz }], torches, beams);
-          if (archGeo) {
-            const archMat = mat.clone();
-            archMat.color.setRGB(0.76, 0.74, 0.7);
-            if (!realLights) patchBakeMaterial(archMat);
-            lintelMats.push(archMat);
-            const arch = new THREE.Mesh(archGeo, archMat);
-            arch.name = `door-arch:${visual.x},${visual.y}:${face}`;
-            arch.castShadow = true;
-            arch.receiveShadow = true;
-            arch.frustumCulled = false;
-            group.add(arch);
           }
         }
       }

@@ -13,16 +13,13 @@ import {
 } from '../src/voxel-floor1/openings';
 import {
   BRICK_COURSE,
-  CHAMFER,
   doorHasLeaf,
   doorOpeningStyle,
-  facetedTop,
   FLOOR1_DOOR_STYLES,
   FRONT_PROUD,
   inOpeningVoid,
-  JAMB_TOP_FACETED,
+  JAMB_TOP,
   JAMB_TOP_LINTEL,
-  KEYSTONE_H,
   LINTEL_BEAR,
   LINTEL_H,
   LINTEL_PROUD,
@@ -30,7 +27,6 @@ import {
   LEAF_FRONT,
   LEAF_PAD,
   LEAF_REVEAL,
-  listFacetedCornerFills,
   listHeadRoles,
   listIronQuads,
   listLeafQuads,
@@ -41,10 +37,8 @@ import {
   OPEN_WIDTH,
   openingPlateRect,
   openingPunchRect,
-  openingQuadWorldNormal,
   openingWallCovered,
   openingWallIsWatertight,
-  roomInward,
   ROOM_DEPTH,
   wallAboveOpening
 } from '../src/voxel-floor1/door-opening';
@@ -87,39 +81,24 @@ describe('floor-1 door opening styles', () => {
     }))
   );
 
-  it('gives every floor-1 door a faceted or lintel style', () => {
+  it('gives every floor-1 door the same lintel style', () => {
     expect(doors.map((d) => `${d.x},${d.y}`).sort()).toEqual(['14,2', '19,5', '4,2', '6,8']);
-    expect(doorOpeningStyle(4, 2)).toBe('faceted');
-    expect(doorOpeningStyle(14, 2)).toBe('faceted');
+    expect(doorOpeningStyle(4, 2)).toBe('lintel');
+    expect(doorOpeningStyle(14, 2)).toBe('lintel');
     expect(doorOpeningStyle(6, 8)).toBe('lintel');
     expect(doorOpeningStyle(19, 5)).toBe('lintel');
     expect(Object.keys(FLOOR1_DOOR_STYLES)).toHaveLength(4);
+    expect(Object.values(FLOOR1_DOOR_STYLES).every((s) => s === 'lintel')).toBe(true);
   });
 
-  it('uses exactly five planar head slabs on a faceted door', () => {
-    expect(listHeadRoles('faceted')).toEqual(['jamb-top', 'chamfer', 'keystone', 'chamfer', 'jamb-top']);
-    const quads = listOpeningQuads('faceted');
-    const headFronts = quads.filter(
-      (q) => q.kind === 'front' && (q.role === 'jamb-top' || q.role === 'chamfer' || q.role === 'keystone')
-    );
-    expect(headFronts).toHaveLength(5);
-    expect(headFronts.map((q) => q.role)).toEqual(['jamb-top', 'chamfer', 'keystone', 'chamfer', 'jamb-top']);
-    expect(quads.filter((q) => q.role === 'corner' && q.kind === 'front').length).toBeGreaterThanOrEqual(4);
-    expect(quads.filter((q) => q.role === 'corner' && q.kind === 'back').length).toBeGreaterThanOrEqual(2);
-    expect(
-      quads.some(
-        (q) =>
-          q.role === 'corner' &&
-          q.corners.some((c) => c[0] < OPEN_U0 + CHAMFER && c[1] >= facetedTop() - 1e-6)
-      )
-    ).toBe(true);
-    expect(quads.filter((q) => q.role === 'chamfer' && q.kind === 'soffit')).toHaveLength(2);
-    expect(quads.filter((q) => q.role === 'keystone' && q.kind === 'soffit')).toHaveLength(1);
+  it('cuts a tall rectangle under a heavy lintel and no arch', () => {
+    expect(listHeadRoles('lintel')).toEqual(['lintel']);
+    const quads = listOpeningQuads('lintel');
+    expect(quads.filter((q) => q.role === 'lintel' && q.kind === 'front')).toHaveLength(1);
+    expect(quads.every((q) => q.role === 'lintel' || q.role === 'chip' || q.role === 'jamb-soffit')).toBe(true);
     for (const q of quads) {
       expect(q.corners).toHaveLength(4);
     }
-    expect(CHAMFER).toBeCloseTo(0.12, 5);
-    expect(KEYSTONE_H).toBeCloseTo(0.08, 5);
     expect(FRONT_PROUD).toBeLessThanOrEqual(0.03);
     expect(LINTEL_PROUD).toBeGreaterThan(FRONT_PROUD);
     expect(LINTEL_PROUD).toBeGreaterThanOrEqual(0.08);
@@ -129,28 +108,24 @@ describe('floor-1 door opening styles', () => {
     expect(LINTEL_BEAR).toBeLessThanOrEqual(0.2);
     expect(OPEN_WIDTH).toBeGreaterThanOrEqual(1.1);
     expect(OPEN_WIDTH).toBeLessThanOrEqual(1.2);
-    expect(JAMB_TOP_FACETED).toBeGreaterThan(OPEN_WIDTH);
-    expect(openingPlateRect('faceted').v1).toBeCloseTo(facetedTop(), 5);
+    expect(JAMB_TOP).toBeCloseTo(1.54, 5);
+    expect(JAMB_TOP).toBeGreaterThan(OPEN_WIDTH);
+    expect(JAMB_TOP + LINTEL_H).toBeCloseTo(lintelTop(), 5);
+    expect(lintelTop()).toBeLessThanOrEqual(CELL - CORNICE_HEIGHT + 1e-6);
     expect(openingPlateRect('lintel').v1).toBeCloseTo(lintelTop(), 5);
-    expect(openingPlateRect('faceted').v1).toBeGreaterThan(openingPunchRect('faceted').v1);
-    expect(wallAboveOpening('faceted')).toBeGreaterThanOrEqual(-1e-6);
-    expect(facetedTop()).toBeLessThanOrEqual(CELL - CORNICE_HEIGHT + 1e-6);
-    expect(inOpeningVoid('faceted', (OPEN_U0 + OPEN_U1) / 2, 0.6)).toBe(true);
-    expect(inOpeningVoid('faceted', (OPEN_U0 + OPEN_U1) / 2, JAMB_TOP_FACETED - 0.02)).toBe(true);
-    expect(inOpeningVoid('faceted', (OPEN_U0 + OPEN_U1) / 2, JAMB_TOP_FACETED + 0.02)).toBe(false);
-    expect(inOpeningVoid('faceted', (OPEN_U0 + OPEN_U1) / 2, facetedTop() - 0.02)).toBe(false);
-    expect(inOpeningVoid('faceted', OPEN_U0 + 0.02, facetedTop() - 0.02)).toBe(false);
-    expect(inOpeningVoid('faceted', OPEN_U1 - 0.02, facetedTop() - 0.02)).toBe(false);
-    expect(inOpeningVoid('faceted', OPEN_U0 + 0.02, JAMB_TOP_FACETED - 0.02)).toBe(true);
-    expect(inOpeningVoid('faceted', (OPEN_U0 + OPEN_U1) / 2, CELL - CORNICE_HEIGHT - 0.01)).toBe(
-      false
-    );
+    expect(openingPlateRect('lintel').v1).toBeGreaterThan(openingPunchRect('lintel').v1);
+    expect(wallAboveOpening('lintel')).toBeGreaterThanOrEqual(-1e-6);
+    expect(inOpeningVoid('lintel', (OPEN_U0 + OPEN_U1) / 2, 0.6)).toBe(true);
+    expect(inOpeningVoid('lintel', (OPEN_U0 + OPEN_U1) / 2, JAMB_TOP - 0.02)).toBe(true);
+    expect(inOpeningVoid('lintel', (OPEN_U0 + OPEN_U1) / 2, JAMB_TOP + 0.02)).toBe(false);
+    expect(inOpeningVoid('lintel', (OPEN_U0 + OPEN_U1) / 2, lintelTop() - 0.02)).toBe(false);
+    expect(inOpeningVoid('lintel', OPEN_U0 + 0.02, JAMB_TOP - 0.02)).toBe(true);
+    expect(inOpeningVoid('lintel', (OPEN_U0 + OPEN_U1) / 2, CELL - CORNICE_HEIGHT - 0.01)).toBe(false);
   });
 
   it('cuts a lintel into the wall under the cornice', () => {
     const quads = listOpeningQuads('lintel');
     expect(quads.filter((q) => q.role === 'lintel' && q.kind === 'front')).toHaveLength(1);
-    expect(quads.filter((q) => q.role === 'chamfer')).toHaveLength(0);
     expect(quads.some((q) => q.role === 'jamb-soffit')).toBe(true);
     expect(wallAboveOpening('lintel')).toBeGreaterThanOrEqual(0);
     expect(lintelTop()).toBeLessThan(CELL - CORNICE_HEIGHT + 1e-6);
@@ -165,10 +140,11 @@ describe('floor-1 door opening styles', () => {
     expect(src).not.toMatch(/dx \* dx \+ dy \* dy/);
     expect(src).not.toContain('inArch');
     expect(door).not.toMatch(/Math\.sin|Math\.cos|BoxGeometry/);
-    expect(door).toContain('listFacetedHeadQuads');
-    const faceted = openingPunchRect('faceted');
-    expect(faceted.v1).toBeLessThan(CELL - CORNICE_HEIGHT);
-    expect(CELL - CORNICE_HEIGHT - faceted.v1).toBeGreaterThanOrEqual(BRICK_COURSE - 1e-6);
+    expect(door).toContain('listLintelQuads');
+    expect(door).not.toContain('listFacetedHeadQuads');
+    const punch = openingPunchRect('lintel');
+    expect(punch.v1).toBeLessThan(CELL - CORNICE_HEIGHT);
+    expect(CELL - CORNICE_HEIGHT - punch.v1).toBeGreaterThanOrEqual(BRICK_COURSE - 1e-6);
   });
 
   it('fails the density audit on raw mesher UVs (one texel row along the reveal)', () => {
@@ -209,27 +185,23 @@ describe('floor-1 door opening styles', () => {
   it('gives every floor-1 door a leaf that matches its opening, and no plain archways', () => {
     expect(doors.every((d) => doorHasLeaf(d.x, d.y))).toBe(true);
     expect(doors).toHaveLength(4);
-    const faceted = listLeafQuads('faceted');
     const lintel = listLeafQuads('lintel');
-    expect(faceted.filter((q) => q.kind === 'front')).toHaveLength(1);
     expect(lintel.filter((q) => q.kind === 'front')).toHaveLength(1);
-    const fTop = Math.max(...faceted.flatMap((q) => q.corners.map((c) => c[1])));
     const lTop = Math.max(...lintel.flatMap((q) => q.corners.map((c) => c[1])));
-    expect(fTop).toBeCloseTo(JAMB_TOP_FACETED - LEAF_PAD, 5);
-    expect(fTop).toBeLessThan(facetedTop());
     expect(lTop).toBeLessThanOrEqual(JAMB_TOP_LINTEL);
     expect(lTop).toBeCloseTo(JAMB_TOP_LINTEL - LEAF_PAD, 5);
+    expect(lTop).toBeLessThan(lintelTop());
     expect(LEAF_REVEAL).toBeCloseTo(DOOR_WALL_DEPTH * 0.25, 5);
     expect(ROOM_DEPTH).toBeCloseTo(0.15, 5);
     expect(DOOR_WALL_DEPTH).toBeCloseTo(0.3, 5);
     expect(Math.abs(LEAF_FRONT - LEAF_BACK)).toBeLessThanOrEqual(ROOM_DEPTH + 1e-6);
-    expect(listIronQuads('faceted').length).toBeGreaterThan(8);
     expect(listIronQuads('lintel').length).toBeGreaterThan(8);
     expect(readFileSync(resolve(__dirname, '../src/voxel-floor1/door-opening.ts'), 'utf8')).toContain(
       'door_panel'
     );
     const art = readFileSync(resolve(__dirname, '../docs/ART_DIRECTION.md'), 'utf8');
-    expect(art).toContain('relieving arch');
+    expect(art).toContain('No arches');
+    expect(art).toContain('slides up');
     expect(art).toContain('rectangular under the lintel');
     expect(art).toContain('padlock');
     expect(art).toContain('door_panel.png');
@@ -243,7 +215,7 @@ describe('floor-1 door opening styles', () => {
     const doorFloors = floors.filter((j) => doorKeys.has(`${j.tx},${j.tz}`));
     expect(doorFloors.length).toBe(doors.length);
     const art = readFileSync(resolve(__dirname, '../docs/ART_DIRECTION.md'), 'utf8');
-    expect(art).toContain('exactly five big flat slabs');
+    expect(art).toContain('no relieving arch');
     expect(art).toContain('30 cm');
     expect(art).toContain('carved knot');
     expect(art).toContain('flush');
@@ -257,36 +229,24 @@ describe('floor-1 door opening styles', () => {
     expect(src).toContain('door_panel.png');
   });
 
-  it('keeps the faceted wall watertight from both sides of both main doors', () => {
-    expect(openingWallIsWatertight('faceted', 'front')).toBe(true);
-    expect(openingWallIsWatertight('faceted', 'back')).toBe(true);
+  it('keeps every lintel doorway watertight from both sides', () => {
     expect(openingWallIsWatertight('lintel', 'front')).toBe(true);
     expect(openingWallIsWatertight('lintel', 'back')).toBe(true);
-    const leftU = OPEN_U0 + CHAMFER * 0.25;
-    const rightU = OPEN_U1 - CHAMFER * 0.25;
-    const midV = JAMB_TOP_FACETED + CHAMFER * 0.55;
-    expect(inOpeningVoid('faceted', leftU, midV)).toBe(false);
-    expect(inOpeningVoid('faceted', rightU, midV)).toBe(false);
-    expect(openingWallCovered('faceted', leftU, midV, 'front')).toBe(true);
-    expect(openingWallCovered('faceted', leftU, midV, 'back')).toBe(true);
-    expect(openingWallCovered('faceted', rightU, midV, 'front')).toBe(true);
-    expect(openingWallCovered('faceted', rightU, midV, 'back')).toBe(true);
-    const fills = listFacetedCornerFills();
-    expect(fills.filter((q) => q.kind === 'front')).toHaveLength(2);
-    expect(fills.filter((q) => q.kind === 'back')).toHaveLength(2);
+    const leftU = OPEN_U0 + 0.03;
+    const rightU = OPEN_U1 - 0.03;
+    const midV = JAMB_TOP + LINTEL_H * 0.5;
+    expect(inOpeningVoid('lintel', leftU, midV)).toBe(false);
+    expect(inOpeningVoid('lintel', rightU, midV)).toBe(false);
+    expect(openingWallCovered('lintel', leftU, midV, 'front')).toBe(true);
+    expect(openingWallCovered('lintel', leftU, midV, 'back')).toBe(true);
+    expect(openingWallCovered('lintel', rightU, midV, 'front')).toBe(true);
+    expect(openingWallCovered('lintel', rightU, midV, 'back')).toBe(true);
 
-    const facetedDoors = views.filter((v) => v.style === 'faceted');
-    expect(facetedDoors.length).toBeGreaterThanOrEqual(4);
-    for (const view of facetedDoors) {
+    expect(views.length).toBeGreaterThanOrEqual(4);
+    for (const view of views) {
       const face = view.face as 'N' | 'E' | 'S' | 'W';
-      const inward = roomInward(face);
-      for (const q of listOpeningQuads('faceted').filter((row) => row.role === 'corner')) {
-        const n = openingQuadWorldNormal(q, face, view.tx, view.tz);
-        const facing = n[0] * inward[0] + n[1] * inward[1] + n[2] * inward[2];
-        if (q.kind === 'front') expect(facing).toBeGreaterThan(0.5);
-        else expect(facing).toBeLessThan(-0.5);
-      }
-      const mesh = meshDoorOpening(solidWall().volume, solidWall().dims, face, view.tx, view.tz, 'faceted');
+      expect(view.style).toBe('lintel');
+      const mesh = meshDoorOpening(solidWall().volume, solidWall().dims, face, view.tx, view.tz, 'lintel');
       expect(mesh.quads).toBeGreaterThan(4);
     }
   });

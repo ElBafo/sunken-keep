@@ -12,7 +12,7 @@ import {
   DOOR_LEAF_SLIDE,
   DOOR_UNLOCK_LEAD_MS
 } from '../src/voxel-floor1/constants';
-import { ageDoorPanelPixels, facetedTop, LEAF_MAX_LUMA, lintelTop } from '../src/voxel-floor1/door-opening';
+import { ageDoorPanelPixels, LEAF_MAX_LUMA, lintelTop } from '../src/voxel-floor1/door-opening';
 import { greedyMesh } from '../src/voxel-lab/mesher';
 import {
   OpeningSystem,
@@ -63,7 +63,6 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
 
   it('slides the leaf up like a portcullis in 0.6s and keeps the secret Y-slide', () => {
     expect(DOOR_LEAF_MS).toBe(600);
-    expect(DOOR_LEAF_SLIDE).toBeGreaterThan(facetedTop() - 1e-6);
     expect(DOOR_LEAF_SLIDE).toBeGreaterThan(lintelTop() - 1e-6);
     expect(DOOR_SLIDE).toBeCloseTo(1.42, 8);
     expect(DOOR_OPEN_MS).toBe(1450);
