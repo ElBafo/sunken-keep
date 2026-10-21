@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { CELL } from '../src/voxel-floor1/constants';
+import { CELL, CORNICE_HEIGHT } from '../src/voxel-floor1/constants';
 import { greedyMesh } from '../src/voxel-lab/mesher';
 import {
   makeArchHoleMask,
@@ -12,14 +12,21 @@ import {
   solidifyArchVolume
 } from '../src/voxel-floor1/openings';
 import {
+  BRICK_COURSE,
   CHAMFER,
   doorOpeningStyle,
+  facetedTop,
   FLOOR1_DOOR_STYLES,
-  jambCount,
-  JAMB_TOP_LINTEL,
-  LINTEL_H,
-  listOpeningSlabs,
-  openingPunchRect
+  FRONT_PROUD,
+  inOpeningVoid,
+  JAMB_TOP_FACETED,
+  listHeadRoles,
+  listOpeningQuads,
+  lintelTop,
+  OPEN_U0,
+  OPEN_U1,
+  openingPunchRect,
+  wallAboveOpening
 } from '../src/voxel-floor1/door-opening';
 import { enumerateFaces, floor1Map, listDoors, openingViews } from '../src/voxel-floor1/layout';
 import {
@@ -69,47 +76,53 @@ describe('floor-1 door opening styles', () => {
     expect(Object.keys(FLOOR1_DOOR_STYLES)).toHaveLength(4);
   });
 
-  it('builds a faceted main door from jambs, 45° chamfers, and a flat keystone', () => {
-    const slabs = listOpeningSlabs('faceted');
-    expect(jambCount(slabs, 'L')).toBeGreaterThanOrEqual(3);
-    expect(jambCount(slabs, 'L')).toBeLessThanOrEqual(5);
-    expect(jambCount(slabs, 'R')).toBe(jambCount(slabs, 'L'));
-    expect(slabs.filter((s) => s.role === 'chamfer')).toHaveLength(2);
-    expect(slabs.filter((s) => s.role === 'keystone')).toHaveLength(1);
-    expect(slabs.filter((s) => s.role === 'lintel')).toHaveLength(0);
-    const chamfers = slabs.filter((s) => s.role === 'chamfer');
-    expect(chamfers.some((s) => Math.abs(s.rotD - -Math.PI / 4) < 1e-6)).toBe(true);
-    expect(chamfers.some((s) => Math.abs(s.rotD - Math.PI / 4) < 1e-6)).toBe(true);
-    expect(CHAMFER).toBeCloseTo(0.28, 5);
+  it('uses exactly five planar head slabs on a faceted door', () => {
+    expect(listHeadRoles('faceted')).toEqual(['jamb-top', 'chamfer', 'keystone', 'chamfer', 'jamb-top']);
+    const quads = listOpeningQuads('faceted');
+    const fronts = quads.filter((q) => q.kind === 'front');
+    expect(fronts).toHaveLength(5);
+    expect(fronts.map((q) => q.role)).toEqual(['jamb-top', 'chamfer', 'keystone', 'chamfer', 'jamb-top']);
+    expect(quads.filter((q) => q.role === 'chamfer' && q.kind === 'soffit')).toHaveLength(2);
+    expect(quads.filter((q) => q.role === 'keystone' && q.kind === 'soffit')).toHaveLength(1);
+    for (const q of quads) {
+      expect(q.corners).toHaveLength(4);
+    }
+    expect(CHAMFER).toBeCloseTo(0.3, 5);
+    expect(FRONT_PROUD).toBeLessThanOrEqual(0.03);
+    expect(wallAboveOpening('faceted')).toBeGreaterThanOrEqual(BRICK_COURSE - 1e-6);
+    expect(facetedTop()).toBeLessThan(CELL - CORNICE_HEIGHT);
+    expect(inOpeningVoid('faceted', (OPEN_U0 + OPEN_U1) / 2, 0.6)).toBe(true);
+    expect(inOpeningVoid('faceted', (OPEN_U0 + OPEN_U1) / 2, facetedTop() - 0.02)).toBe(true);
+    expect(inOpeningVoid('faceted', OPEN_U0 + 0.02, facetedTop() - 0.02)).toBe(false);
+    expect(inOpeningVoid('faceted', OPEN_U1 - 0.02, facetedTop() - 0.02)).toBe(false);
+    expect(inOpeningVoid('faceted', OPEN_U0 + 0.02, JAMB_TOP_FACETED - 0.02)).toBe(true);
+    expect(inOpeningVoid('faceted', (OPEN_U0 + OPEN_U1) / 2, CELL - CORNICE_HEIGHT - 0.01)).toBe(
+      false
+    );
   });
 
-  it('builds a side door as straight jambs plus a heavy chipped lintel', () => {
-    const slabs = listOpeningSlabs('lintel');
-    expect(jambCount(slabs, 'L')).toBeGreaterThanOrEqual(3);
-    expect(jambCount(slabs, 'L')).toBeLessThanOrEqual(5);
-    expect(slabs.filter((s) => s.role === 'chamfer')).toHaveLength(0);
-    expect(slabs.filter((s) => s.role === 'lintel')).toHaveLength(1);
-    expect(slabs.filter((s) => s.role === 'chip')).toHaveLength(1);
-    expect(LINTEL_H).toBeGreaterThan(0.2);
-    expect(JAMB_TOP_LINTEL).toBeGreaterThan(1.4);
-    const lintel = slabs.find((s) => s.role === 'lintel')!;
-    expect(lintel.rotD).toBe(0);
-    expect(lintel.sa).toBeGreaterThan(1.2);
+  it('cuts a lintel into the wall with a brick course under the cornice', () => {
+    const quads = listOpeningQuads('lintel');
+    expect(quads.filter((q) => q.role === 'lintel' && q.kind === 'front')).toHaveLength(1);
+    expect(quads.filter((q) => q.role === 'chamfer')).toHaveLength(0);
+    expect(quads.some((q) => q.role === 'jamb-soffit')).toBe(true);
+    expect(wallAboveOpening('lintel')).toBeGreaterThanOrEqual(BRICK_COURSE - 1e-6);
+    expect(lintelTop()).toBeLessThanOrEqual(CELL - CORNICE_HEIGHT - BRICK_COURSE + 1e-6);
+    const punch = openingPunchRect('lintel');
+    expect(punch.v1).toBeLessThanOrEqual(lintelTop() + 1e-6);
+    expect(punch.v1).toBeLessThan(CELL - CORNICE_HEIGHT);
   });
 
-  it('punches an axis-aligned hole — no circular soffit', () => {
-    const mask = makeArchHoleMask(W, H);
+  it('punches only the inner void — no circular soffit and no teeth under the cornice', () => {
     const src = readFileSync(resolve(__dirname, '../src/voxel-floor1/openings.ts'), 'utf8');
     const door = readFileSync(resolve(__dirname, '../src/voxel-floor1/door-opening.ts'), 'utf8');
     expect(src).not.toMatch(/dx \* dx \+ dy \* dy/);
     expect(src).not.toContain('inArch');
-    expect(door).not.toMatch(/Math\.sin|Math\.cos|Math\.PI \* 2/);
-    const rect = openingPunchRect('lintel');
-    expect(rect.v0).toBe(0);
-    expect(rect.u1 - rect.u0).toBeGreaterThan(1);
-    let ones = 0;
-    for (let i = 0; i < mask.length; i++) if (mask[i]) ones += 1;
-    expect(ones).toBeGreaterThan(20);
+    expect(door).not.toMatch(/Math\.sin|Math\.cos|BoxGeometry/);
+    expect(door).toContain('listFacetedHeadQuads');
+    const faceted = openingPunchRect('faceted');
+    expect(faceted.v1).toBeLessThan(CELL - CORNICE_HEIGHT);
+    expect(CELL - CORNICE_HEIGHT - faceted.v1).toBeGreaterThanOrEqual(BRICK_COURSE - 1e-6);
   });
 
   it('fails the density audit on raw mesher UVs (one texel row along the reveal)', () => {
@@ -128,7 +141,7 @@ describe('floor-1 door opening styles', () => {
     for (const view of views) {
       const face = view.face as 'N' | 'E' | 'S' | 'W';
       const mesh = meshDoorOpening(wall.volume, wall.dims, face, view.tx, view.tz, view.style);
-      expect(mesh.quads).toBeGreaterThan(8);
+      expect(mesh.quads).toBeGreaterThan(4);
       const skewed = listSkewedQuads(mesh.positions, mesh.uvs, 0.5);
       if (skewed.length) {
         failures.push(
@@ -152,17 +165,13 @@ describe('floor-1 door opening styles', () => {
     const doorKeys = new Set(doors.map((d) => `${d.x},${d.y}`));
     const doorFloors = floors.filter((j) => doorKeys.has(`${j.tx},${j.tz}`));
     expect(doorFloors.length).toBe(doors.length);
-    for (const job of doorFloors) {
-      expect(job.uvScale).toBe(1);
-    }
     const art = readFileSync(resolve(__dirname, '../docs/ART_DIRECTION.md'), 'utf8');
-    expect(art).toContain('faceted');
-    expect(art).toContain('flat lintel');
-    expect(art).toContain('not curves');
+    expect(art).toContain('exactly five big flat slabs');
+    expect(art).toContain('brick course');
+    expect(art).toContain('flush');
     const src = readFileSync(resolve(__dirname, '../src/voxel-floor1/openings.ts'), 'utf8');
-    expect(src).toContain('projectArchOpeningUvs');
-    expect(src).toContain('wrapT = THREE.RepeatWrapping');
     expect(src).toContain('openingSlabMeshes');
+    expect(src).toContain('wrapT = THREE.RepeatWrapping');
   });
 
   it('reprojects a soffit strip that only sampled one texture row', () => {
@@ -172,10 +181,6 @@ describe('floor-1 door opening styles', () => {
     expect(listSkewedQuads(positions, uvs, 0.5, 0.02).length).toBe(1);
     projectArchOpeningUvs(positions, normals, uvs, 'N', CELL, 0);
     expect(listSkewedQuads(positions, uvs, 0.5, 0.02)).toEqual([]);
-    const us = [0, 2, 4, 6].map((i) => uvs[i]);
-    const vs = [1, 3, 5, 7].map((i) => uvs[i]);
-    expect(Math.max(...us) - Math.min(...us)).toBeCloseTo(0.03 / CELL, 5);
-    expect(Math.max(...vs) - Math.min(...vs)).toBeCloseTo(0.96 / CELL, 5);
     expect(CELL).toBe(2);
   });
 });

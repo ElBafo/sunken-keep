@@ -1,9 +1,7 @@
-import * as THREE from 'three';
 import { tileCorner } from '../voxel-lab/faces';
 import type { MeshArrays } from '../voxel-lab/mesher';
-import { ARCH_DEPTH, ARCH_FRONT, CELL, WALL_TEXELS } from './constants';
+import { ARCH_DEPTH, ARCH_FRONT, CELL, CORNICE_HEIGHT, WALL_TEXELS } from './constants';
 import { faceUOffset } from './wall-look';
-import { projectArchOpeningUvs } from './uv-audit';
 
 export type DoorOpeningStyle = 'faceted' | 'lintel';
 
@@ -22,54 +20,86 @@ export function doorOpeningStyle(x: number, y: number): DoorOpeningStyle {
   return FLOOR1_DOOR_STYLES[`${x},${y}`] ?? 'lintel';
 }
 
-export const OPEN_WIDTH = 1.14;
+export const OPEN_WIDTH = 1.16;
 export const OPEN_U0 = (CELL - OPEN_WIDTH) / 2;
 export const OPEN_U1 = OPEN_U0 + OPEN_WIDTH;
-export const JAMB_THICK = 0.2;
-export const JAMB_JOINT = 0.022;
-export const WALL_BITE = 0.05;
-export const CHAMFER = 0.28;
-export const KEYSTONE_H = 0.24;
-export const LINTEL_H = 0.28;
-export const LINTEL_BEAR = 0.1;
-export const JAMB_TOP_FACETED = 1.28;
-export const JAMB_TOP_LINTEL = 1.5;
-export const SLAB_DEPTH = ARCH_DEPTH + ARCH_FRONT + WALL_BITE;
-const DEPTH_CENTER = SLAB_DEPTH / 2 - WALL_BITE;
+/** Visible thickness of each head slab on the wall face. */
+export const SLAB_THICK = 0.26;
+export const JOINT = 0.02;
+/** 2.5 cm proud of the wall plate — cut-in, not a pillar. */
+export const FRONT_PROUD = 0.025;
+export const BRICK_COURSE = 0.18;
+/** 45° run = rise. Keeps a full brick course of wall under the cornice. */
+export const CHAMFER = 0.3;
+export const KEYSTONE_H = 0.2;
+export const LINTEL_H = 0.22;
+export const JAMB_TOP_H = 0.4;
+export const JAMB_TOP_FACETED = 1.14;
+export const JAMB_TOP_LINTEL = 1.4;
+export const ROOM_DEPTH = ARCH_DEPTH + ARCH_FRONT;
+export const FRONT = ROOM_DEPTH + FRONT_PROUD;
+export const BACK = 0;
 
-export type LocalSlab = {
-  across: number;
-  up: number;
-  depth: number;
-  sa: number;
-  su: number;
-  sd: number;
-  rotD: number;
-  role: 'jamb' | 'back' | 'chamfer' | 'keystone' | 'lintel' | 'chip';
+export type QuadRole = 'jamb-top' | 'chamfer' | 'keystone' | 'lintel' | 'jamb-soffit' | 'chip';
+export type QuadKind = 'front' | 'soffit';
+
+export type OpeningQuad = {
+  role: QuadRole;
+  kind: QuadKind;
+  /** Local (across, up, depth) corners, CCW. */
+  corners: Array<[number, number, number]>;
 };
 
 export type OpeningHole = { u0: number; u1: number; v0: number; v1: number };
 
-/** Rectangle punched from the room-side plate — covers every slab so rotated chamfers cannot poke through. */
+/** Bounding box of the inner void. Faceted is not this rectangle — see inOpeningVoid. */
 export function openingPunchRect(style: DoorOpeningStyle): OpeningHole {
-  let u0 = OPEN_U0 - JAMB_THICK - 0.08;
-  let u1 = OPEN_U1 + JAMB_THICK + 0.08;
-  let v1 =
-    style === 'faceted'
-      ? JAMB_TOP_FACETED + CHAMFER + KEYSTONE_H + 0.16
-      : JAMB_TOP_LINTEL + LINTEL_H + 0.08;
-  for (const slab of listOpeningSlabs(style)) {
-    const reach = 0.5 * Math.hypot(slab.sa, slab.su) + 0.04;
-    u0 = Math.min(u0, slab.across - reach);
-    u1 = Math.max(u1, slab.across + reach);
-    v1 = Math.max(v1, slab.up + reach);
-  }
+  const v1 =
+    style === 'faceted' ? JAMB_TOP_FACETED + CHAMFER + KEYSTONE_H : JAMB_TOP_LINTEL + LINTEL_H;
   return {
-    u0: Math.max(0.02, u0),
-    u1: Math.min(CELL - 0.02, u1),
+    u0: OPEN_U0,
+    u1: OPEN_U1,
     v0: 0,
-    v1: Math.min(CELL - 0.08, v1)
+    v1
   };
+}
+
+/** True inside the walkable opening. Faceted head is five straight segments, not a box. */
+export function inOpeningVoid(style: DoorOpeningStyle, u: number, v: number): boolean {
+  if (v < 0) return false;
+  if (style === 'lintel') {
+    return u >= OPEN_U0 && u < OPEN_U1 && v < lintelTop();
+  }
+  if (v >= facetedTop()) return false;
+  if (v <= JAMB_TOP_FACETED) {
+    return u >= OPEN_U0 && u < OPEN_U1;
+  }
+  const rise = v - JAMB_TOP_FACETED;
+  if (rise < CHAMFER) {
+    return u >= OPEN_U0 + rise && u < OPEN_U1 - rise;
+  }
+  return u >= OPEN_U0 + CHAMFER && u < OPEN_U1 - CHAMFER;
+}
+
+export function punchOpening(
+  volume: Uint8Array,
+  dims: [number, number, number],
+  style: DoorOpeningStyle,
+  cell = CELL
+): Uint8Array {
+  const [W, H, D] = dims;
+  const out = new Uint8Array(volume);
+  const slice = W * H;
+  for (let iv = 0; iv < H; iv++) {
+    const y = ((iv + 0.5) / H) * cell;
+    for (let iu = 0; iu < W; iu++) {
+      const x = ((iu + 0.5) / W) * cell;
+      if (!inOpeningVoid(style, x, y)) continue;
+      const idx = iu + iv * W;
+      for (let d = 0; d < D; d++) out[idx + d * slice] = 0;
+    }
+  }
+  return out;
 }
 
 export function punchOpeningRect(
@@ -93,119 +123,204 @@ export function punchOpeningRect(
   return out;
 }
 
-function stackJambs(side: 'L' | 'R', top: number, count: number): LocalSlab[] {
-  const out: LocalSlab[] = [];
-  const inner = side === 'L' ? OPEN_U0 : OPEN_U1;
-  const sign = side === 'L' ? -1 : 1;
-  const across = inner + sign * (JAMB_THICK / 2);
-  const usable = top - JAMB_JOINT * (count - 1);
-  const raw = Array.from({ length: count }, (_, i) => 0.26 + (i % 3) * 0.05);
-  const rawSum = raw.reduce((a, b) => a + b, 0);
-  let cursor = 0;
-  for (let i = 0; i < count; i++) {
-    const h = (raw[i] / rawSum) * usable;
-    out.push({
-      across,
-      up: cursor + h / 2,
-      depth: DEPTH_CENTER,
-      sa: JAMB_THICK,
-      su: h,
-      sd: SLAB_DEPTH,
-      rotD: 0,
-      role: 'jamb'
-    });
-    cursor += h + JAMB_JOINT;
-  }
+export function lintelTop(): number {
+  return JAMB_TOP_LINTEL + LINTEL_H;
+}
+
+export function facetedTop(): number {
+  return JAMB_TOP_FACETED + CHAMFER + KEYSTONE_H;
+}
+
+export function corniceBottom(): number {
+  return CELL - CORNICE_HEIGHT;
+}
+
+export function wallAboveOpening(style: DoorOpeningStyle): number {
+  return corniceBottom() - (style === 'faceted' ? facetedTop() : lintelTop());
+}
+
+function frontRect(a0: number, a1: number, u0: number, u1: number): OpeningQuad['corners'] {
+  const d = FRONT;
+  return [
+    [a0, u0, d],
+    [a1, u0, d],
+    [a1, u1, d],
+    [a0, u1, d]
+  ];
+}
+
+function soffitRect(a0: number, a1: number, u0: number, u1: number): OpeningQuad['corners'] {
+  return [
+    [a0, u0, FRONT],
+    [a0, u0, BACK],
+    [a1, u1, BACK],
+    [a1, u1, FRONT]
+  ];
+}
+
+/** Five head slabs, left to right, each with one front and one soffit. */
+export function listFacetedHeadQuads(): OpeningQuad[] {
+  const u0 = OPEN_U0;
+  const u1 = OPEN_U1;
+  const jt = JAMB_TOP_FACETED;
+  const ch = CHAMFER;
+  const kh = KEYSTONE_H;
+  const th = SLAB_THICK;
+  const j = JOINT / 2;
+  const inv = 1 / Math.SQRT2;
+  const out: OpeningQuad[] = [];
+
+  const leftTop0 = jt - JAMB_TOP_H;
   out.push({
-    across: inner + sign * (JAMB_THICK * 0.72),
-    up: top / 2,
-    depth: DEPTH_CENTER,
-    sa: JAMB_THICK * 0.7,
-    su: top + 0.04,
-    sd: SLAB_DEPTH,
-    rotD: 0,
-    role: 'back'
+    role: 'jamb-top',
+    kind: 'front',
+    corners: frontRect(u0 - th, u0 - j, leftTop0, jt)
+  });
+  out.push({
+    role: 'jamb-top',
+    kind: 'soffit',
+    corners: soffitRect(u0, u0, leftTop0 + j, jt - j)
+  });
+
+  const la0: [number, number] = [u0 + j, jt + j];
+  const la1: [number, number] = [u0 + ch - j, jt + ch - j];
+  const lp: [number, number] = [-inv * th, inv * th];
+  out.push({
+    role: 'chamfer',
+    kind: 'front',
+    corners: [
+      [la0[0], la0[1], FRONT],
+      [la1[0], la1[1], FRONT],
+      [la1[0] + lp[0], la1[1] + lp[1], FRONT],
+      [la0[0] + lp[0], la0[1] + lp[1], FRONT]
+    ]
+  });
+  out.push({
+    role: 'chamfer',
+    kind: 'soffit',
+    corners: [
+      [la0[0], la0[1], FRONT],
+      [la0[0], la0[1], BACK],
+      [la1[0], la1[1], BACK],
+      [la1[0], la1[1], FRONT]
+    ]
+  });
+
+  const k0 = u0 + ch + j;
+  const k1 = u1 - ch - j;
+  const kb = jt + ch;
+  out.push({
+    role: 'keystone',
+    kind: 'front',
+    corners: frontRect(k0, k1, kb, kb + kh)
+  });
+  out.push({
+    role: 'keystone',
+    kind: 'soffit',
+    corners: soffitRect(k0, k1, kb, kb)
+  });
+
+  const ra0: [number, number] = [u1 - ch + j, jt + ch - j];
+  const ra1: [number, number] = [u1 - j, jt + j];
+  const rp: [number, number] = [inv * th, inv * th];
+  out.push({
+    role: 'chamfer',
+    kind: 'front',
+    corners: [
+      [ra0[0], ra0[1], FRONT],
+      [ra1[0], ra1[1], FRONT],
+      [ra1[0] + rp[0], ra1[1] + rp[1], FRONT],
+      [ra0[0] + rp[0], ra0[1] + rp[1], FRONT]
+    ]
+  });
+  out.push({
+    role: 'chamfer',
+    kind: 'soffit',
+    corners: [
+      [ra0[0], ra0[1], FRONT],
+      [ra0[0], ra0[1], BACK],
+      [ra1[0], ra1[1], BACK],
+      [ra1[0], ra1[1], FRONT]
+    ]
+  });
+
+  out.push({
+    role: 'jamb-top',
+    kind: 'front',
+    corners: frontRect(u1 + j, u1 + th, leftTop0, jt)
+  });
+  out.push({
+    role: 'jamb-top',
+    kind: 'soffit',
+    corners: soffitRect(u1, u1, leftTop0 + j, jt - j)
+  });
+
+  out.push({
+    role: 'jamb-soffit',
+    kind: 'soffit',
+    corners: soffitRect(u0, u0, 0, leftTop0)
+  });
+  out.push({
+    role: 'jamb-soffit',
+    kind: 'soffit',
+    corners: soffitRect(u1, u1, 0, leftTop0)
   });
   return out;
 }
 
-function chamferSlab(side: 'L' | 'R'): LocalSlab {
-  const v0 = JAMB_TOP_FACETED;
-  const ch = CHAMFER;
-  const sa = JAMB_THICK;
-  const su = ch * Math.SQRT2;
-  const rotD = side === 'L' ? -Math.PI / 4 : Math.PI / 4;
-  const midA = side === 'L' ? OPEN_U0 + ch / 2 : OPEN_U1 - ch / 2;
-  const midU = v0 + ch / 2;
-  const face = sa / (2 * Math.SQRT2);
-  const across = side === 'L' ? midA - face : midA + face;
-  const up = midU + face;
-  return {
-    across,
-    up,
-    depth: DEPTH_CENTER,
-    sa,
-    su,
-    sd: SLAB_DEPTH,
-    rotD,
-    role: 'chamfer'
-  };
+export function listLintelQuads(): OpeningQuad[] {
+  const u0 = OPEN_U0;
+  const u1 = OPEN_U1;
+  const jt = JAMB_TOP_LINTEL;
+  const lh = LINTEL_H;
+  const j = JOINT / 2;
+  const chip = 0.07;
+  const out: OpeningQuad[] = [];
+  out.push({
+    role: 'lintel',
+    kind: 'front',
+    corners: frontRect(u0 - 0.06, u1 + 0.06, jt, jt + lh)
+  });
+  out.push({
+    role: 'lintel',
+    kind: 'soffit',
+    corners: soffitRect(u0 + chip, u1 - chip, jt, jt)
+  });
+  out.push({
+    role: 'chip',
+    kind: 'soffit',
+    corners: soffitRect(u0, u0 + chip, jt + 0.05, jt + 0.05)
+  });
+  out.push({
+    role: 'chip',
+    kind: 'soffit',
+    corners: soffitRect(u1 - chip, u1, jt + 0.05, jt + 0.05)
+  });
+  out.push({
+    role: 'jamb-soffit',
+    kind: 'soffit',
+    corners: soffitRect(u0, u0, 0, jt - j)
+  });
+  out.push({
+    role: 'jamb-soffit',
+    kind: 'soffit',
+    corners: soffitRect(u1, u1, 0, jt - j)
+  });
+  return out;
 }
 
-export function listOpeningSlabs(style: DoorOpeningStyle): LocalSlab[] {
-  const slabs: LocalSlab[] = [];
-  if (style === 'faceted') {
-    slabs.push(...stackJambs('L', JAMB_TOP_FACETED, 3));
-    slabs.push(...stackJambs('R', JAMB_TOP_FACETED, 3));
-    slabs.push(chamferSlab('L'), chamferSlab('R'));
-    const keyU0 = OPEN_U0 + CHAMFER;
-    const keyU1 = OPEN_U1 - CHAMFER;
-    slabs.push({
-      across: (keyU0 + keyU1) / 2,
-      up: JAMB_TOP_FACETED + CHAMFER + KEYSTONE_H / 2,
-      depth: DEPTH_CENTER,
-      sa: keyU1 - keyU0 + 0.06,
-      su: KEYSTONE_H,
-      sd: SLAB_DEPTH,
-      rotD: 0,
-      role: 'keystone'
-    });
-    return slabs;
-  }
-  slabs.push(...stackJambs('L', JAMB_TOP_LINTEL, 4));
-  slabs.push(...stackJambs('R', JAMB_TOP_LINTEL, 4));
-  const lintelA0 = OPEN_U0 - LINTEL_BEAR;
-  const lintelA1 = OPEN_U1 + LINTEL_BEAR;
-  const lintelV0 = JAMB_TOP_LINTEL;
-  const chipW = 0.08;
-  const notch = 0.09;
-  const proud = 0.035;
-  slabs.push({
-    across: (lintelA0 + lintelA1) / 2,
-    up: lintelV0 + notch + (LINTEL_H - notch) / 2,
-    depth: DEPTH_CENTER + proud / 2,
-    sa: lintelA1 - lintelA0,
-    su: LINTEL_H - notch,
-    sd: SLAB_DEPTH + proud,
-    rotD: 0,
-    role: 'lintel'
-  });
-  slabs.push({
-    across: (lintelA0 + lintelA1) / 2,
-    up: lintelV0 + notch / 2,
-    depth: DEPTH_CENTER + proud / 2,
-    sa: lintelA1 - lintelA0 - chipW * 2,
-    su: notch,
-    sd: SLAB_DEPTH + proud,
-    rotD: 0,
-    role: 'chip'
-  });
-  return slabs;
+export function listOpeningQuads(style: DoorOpeningStyle): OpeningQuad[] {
+  return style === 'faceted' ? listFacetedHeadQuads() : listLintelQuads();
 }
 
-export function jambCount(slabs: LocalSlab[], side: 'L' | 'R'): number {
-  const inner = side === 'L' ? OPEN_U0 : OPEN_U1;
-  return slabs.filter((s) => s.role === 'jamb' && Math.abs(s.across - inner) < JAMB_THICK).length;
+/** Left-to-right head roles on the opening. Faceted is exactly these five. */
+export function listHeadRoles(style: DoorOpeningStyle): QuadRole[] {
+  if (style === 'faceted') return ['jamb-top', 'chamfer', 'keystone', 'chamfer', 'jamb-top'];
+  return ['lintel'];
+}
+
+export function listOpeningSlabs(style: DoorOpeningStyle): Array<{ role: QuadRole; kind: QuadKind }> {
+  return listOpeningQuads(style).map((q) => ({ role: q.role, kind: q.kind }));
 }
 
 type FaceNESW = 'N' | 'E' | 'S' | 'W';
@@ -224,64 +339,63 @@ function mapLocal(face: FaceNESW, tx: number, tz: number, a: number, u: number, 
   }
 }
 
-function mapLocalN(face: FaceNESW, na: number, nu: number, nd: number): [number, number, number] {
-  switch (face) {
-    case 'N':
-      return [na, nu, nd];
-    case 'S':
-      return [-na, nu, -nd];
-    case 'W':
-      return [nd, nu, -na];
-    case 'E':
-      return [-nd, nu, na];
-  }
-}
-
-export function slabToMesh(slab: LocalSlab, face: FaceNESW, tx: number, tz: number): MeshArrays {
-  const geo = new THREE.BoxGeometry(slab.sa, slab.su, slab.sd);
-  if (slab.rotD) geo.rotateZ(slab.rotD);
-  geo.translate(slab.across, slab.up, slab.depth);
-  const pos = geo.getAttribute('position');
-  const nrm = geo.getAttribute('normal');
-  const uv = geo.getAttribute('uv');
-  const idx = geo.getIndex();
-  const positions: number[] = [];
-  const normals: number[] = [];
-  const uvs: number[] = [];
-  const indices: number[] = [];
-  for (let i = 0; i < pos.count; i++) {
-    const [x, y, z] = mapLocal(face, tx, tz, pos.getX(i), pos.getY(i), pos.getZ(i));
-    const [nx, ny, nz] = mapLocalN(face, nrm.getX(i), nrm.getY(i), nrm.getZ(i));
-    positions.push(x, y, z);
-    normals.push(nx, ny, nz);
-    uvs.push(uv.getX(i), uv.getY(i));
-  }
-  if (idx) {
-    for (let i = 0; i < idx.count; i++) indices.push(idx.getX(i));
+function pushQuad(
+  mesh: MeshArrays,
+  corners: Array<[number, number, number]>,
+  kind: QuadKind,
+  face: FaceNESW,
+  tx: number,
+  tz: number
+): void {
+  const world = corners.map((c) => mapLocal(face, tx, tz, c[0], c[1], c[2]));
+  const ax = world[1][0] - world[0][0];
+  const ay = world[1][1] - world[0][1];
+  const az = world[1][2] - world[0][2];
+  const bx = world[3][0] - world[0][0];
+  const by = world[3][1] - world[0][1];
+  const bz = world[3][2] - world[0][2];
+  let nx = ay * bz - az * by;
+  let ny = az * bx - ax * bz;
+  let nz = ax * by - ay * bx;
+  const len = Math.hypot(nx, ny, nz) || 1;
+  nx /= len;
+  ny /= len;
+  nz /= len;
+  const uOff = faceUOffset(face, tx, tz);
+  const uv: Array<[number, number]> = [];
+  if (kind === 'front') {
+    for (const c of corners) uv.push([c[0] / CELL + uOff, c[1] / CELL]);
   } else {
-    for (let i = 0; i < pos.count; i++) indices.push(i);
+    const along = (c: [number, number, number]): number =>
+      Math.hypot(c[0] - corners[0][0], c[1] - corners[0][1]) / CELL + uOff;
+    for (const c of corners) uv.push([along(c), c[2] / CELL]);
   }
-  projectArchOpeningUvs(positions, normals, uvs, face, CELL, faceUOffset(face, tx, tz));
-  geo.dispose();
-  return { positions, normals, uvs, indices };
+  const base = mesh.positions.length / 3;
+  for (let i = 0; i < 4; i++) {
+    mesh.positions.push(world[i][0], world[i][1], world[i][2]);
+    mesh.normals.push(nx, ny, nz);
+    mesh.uvs.push(uv[i][0], uv[i][1]);
+  }
+  mesh.indices.push(base, base + 1, base + 2, base, base + 2, base + 3);
 }
 
-export function openingSlabMeshes(style: DoorOpeningStyle, face: FaceNESW, tx: number, tz: number): MeshArrays[] {
-  return listOpeningSlabs(style).map((slab) => slabToMesh(slab, face, tx, tz));
+function emptyMesh(): MeshArrays {
+  return { positions: [], normals: [], uvs: [], indices: [] };
 }
 
-export function metresToTexelRect(
-  hole: OpeningHole,
-  W: number,
-  H: number,
-  cell = CELL
-): { u0: number; u1: number; v0: number; v1: number } {
-  return {
-    u0: Math.floor((hole.u0 / cell) * W),
-    u1: Math.ceil((hole.u1 / cell) * W),
-    v0: Math.floor((hole.v0 / cell) * H),
-    v1: Math.ceil((hole.v1 / cell) * H)
-  };
+export function openingSlabMeshes(
+  style: DoorOpeningStyle,
+  face: FaceNESW,
+  tx: number,
+  tz: number
+): { stone: MeshArrays; lintel: MeshArrays } {
+  const stone = emptyMesh();
+  const lintel = emptyMesh();
+  for (const q of listOpeningQuads(style)) {
+    const dest = q.role === 'lintel' || q.role === 'chip' ? lintel : stone;
+    pushQuad(dest, q.corners, q.kind, face, tx, tz);
+  }
+  return { stone, lintel };
 }
 
 export function openingUsesWallTexels(): number {

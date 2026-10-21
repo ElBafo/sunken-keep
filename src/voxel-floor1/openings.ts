@@ -29,7 +29,7 @@ import {
   doorOpeningStyle,
   openingPunchRect,
   openingSlabMeshes,
-  punchOpeningRect,
+  punchOpening,
   type DoorOpeningStyle
 } from './door-opening';
 import { floor1Sconces, floor1Sunbeams } from './fixtures';
@@ -398,7 +398,7 @@ export function meshDoorOpening(
   tz: number,
   style: DoorOpeningStyle
 ): { positions: number[]; normals: number[]; uvs: number[]; quads: number } {
-  const punched = punchOpeningRect(wall, wallDims, openingPunchRect(style));
+  const punched = punchOpening(wall, wallDims, style);
   const plateWorld = makeToWorld(face, tx, tz, wallDims, LAYER_SIZE, CELL, 'center');
   const plate = greedyMesh(punched, wallDims, plateWorld, { cullNeg: [false, false, false] });
   const uvs = plate.mesh.uvs.slice();
@@ -412,7 +412,8 @@ export function meshDoorOpening(
   );
   const positions = plate.mesh.positions.slice();
   const normals = plate.mesh.normals.slice();
-  for (const slab of openingSlabMeshes(style, face, tx, tz)) {
+  const slabs = openingSlabMeshes(style, face, tx, tz);
+  for (const slab of [slabs.stone, slabs.lintel]) {
     positions.push(...slab.positions);
     normals.push(...slab.normals);
     uvs.push(...slab.uvs);
@@ -654,6 +655,7 @@ export async function buildFloor1Openings(
   const panelMat = makeMat(panelPng, panelVol);
   const secretMats = new Map<string, THREE.MeshPhysicalMaterial>();
   const surroundMats = new Map<string, THREE.MeshPhysicalMaterial>();
+  const lintelMats: THREE.MeshPhysicalMaterial[] = [];
   const secretMat = (
     look: WallLook,
     png: { texture: THREE.Texture },
@@ -713,7 +715,7 @@ export async function buildFloor1Openings(
         const wallSrc = volumeFromImageData(wallPng.data);
         finishVolume(wallSrc, surround);
         const style = doorOpeningStyle(visual.x, visual.y);
-        const punched = punchOpeningRect(wallSrc.volume, wallSrc.dims, openingPunchRect(style));
+        const punched = punchOpening(wallSrc.volume, wallSrc.dims, style);
         const plateWorld = makeToWorld(view.face, view.tx, view.tz, wallSrc.dims, LAYER_SIZE, CELL, 'center');
         const plate = greedyMesh(punched, wallSrc.dims, plateWorld, { cullNeg: [false, false, false] });
         projectArchOpeningUvs(
@@ -724,14 +726,9 @@ export async function buildFloor1Openings(
           CELL,
           faceUOffset(face, view.tx, view.tz)
         );
-        const items = [
-          { mesh: plate.mesh, tx: view.tx, tz: view.tz },
-          ...openingSlabMeshes(style, face, view.tx, view.tz).map((mesh) => ({
-            mesh,
-            tx: view.tx,
-            tz: view.tz
-          }))
-        ];
+        const slabs = openingSlabMeshes(style, face, view.tx, view.tz);
+        const items = [{ mesh: plate.mesh, tx: view.tx, tz: view.tz }];
+        if (slabs.stone.positions.length) items.push({ mesh: slabs.stone, tx: view.tx, tz: view.tz });
         const frameGeo = geometryWithBake(items, torches, beams);
         if (frameGeo) {
           const frame = new THREE.Mesh(frameGeo, mat);
@@ -743,6 +740,21 @@ export async function buildFloor1Openings(
           frame.receiveShadow = true;
           frame.frustumCulled = false;
           group.add(frame);
+        }
+        if (slabs.lintel.positions.length) {
+          const lintelGeo = geometryWithBake([{ mesh: slabs.lintel, tx: view.tx, tz: view.tz }], torches, beams);
+          if (lintelGeo) {
+            const lintelMat = mat.clone();
+            lintelMat.color.setRGB(0.72, 0.7, 0.66);
+            if (!realLights) patchBakeMaterial(lintelMat);
+            lintelMats.push(lintelMat);
+            const lintel = new THREE.Mesh(lintelGeo, lintelMat);
+            lintel.name = `door-lintel:${visual.x},${visual.y}:${face}`;
+            lintel.castShadow = true;
+            lintel.receiveShadow = true;
+            lintel.frustumCulled = false;
+            group.add(lintel);
+          }
         }
       }
       const panelWorld = offsetToWorld(toWorld, inx, inz, DOOR_PANEL_INSET);
@@ -828,7 +840,12 @@ export async function buildFloor1Openings(
     system.register(visual);
   }
 
-  system.bindLights(torches, beams, realLights, [panelMat, ...secretMats.values(), ...surroundMats.values()]);
+  system.bindLights(torches, beams, realLights, [
+    panelMat,
+    ...secretMats.values(),
+    ...surroundMats.values(),
+    ...lintelMats
+  ]);
 
   return { group, system };
 }
