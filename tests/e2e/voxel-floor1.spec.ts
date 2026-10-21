@@ -20,6 +20,12 @@ type Floor1 = {
   stepForward: () => boolean;
   turnLeft: () => boolean;
   meanLuma: () => number;
+  giveKey: () => void;
+  handleDoor: (x?: number, y?: number) => string;
+  snapDoor: (x: number, y: number, open: boolean) => boolean;
+  doorOpen: (x: number, y: number) => boolean;
+  doorBusy: (x: number, y: number) => boolean;
+  doorLocked: (x: number, y: number) => boolean;
 };
 
 test.use(devices['iPhone 15']);
@@ -87,4 +93,78 @@ test('voxel-floor1 boots at New Game start with a lit lantern', async ({ page })
   });
   await page.waitForTimeout(200);
   await page.screenshot({ path: `${OUT}/voxel_floor1_corridor.png`, fullPage: false });
+});
+
+test('floor-1 door (4,2) starts closed and swings open', async ({ page }) => {
+  test.setTimeout(90000);
+  mkdirSync(OUT, { recursive: true });
+
+  await page.goto(BASE);
+  await page.waitForFunction(
+    () => (window as unknown as { __voxelFloor1?: { ready?: boolean } }).__voxelFloor1?.ready === true,
+    null,
+    { timeout: 60000 }
+  );
+
+  await page.evaluate(() => {
+    (window as unknown as { __voxelFloor1: Floor1 }).__voxelFloor1.setPosition(5, 2, 3);
+  });
+  await page.waitForTimeout(400);
+
+  const closed = await page.evaluate(() => {
+    const api = (window as unknown as { __voxelFloor1: Floor1 }).__voxelFloor1;
+    const btn = document.getElementById('btn-door');
+    return {
+      open: api.doorOpen(4, 2),
+      locked: api.doorLocked(4, 2),
+      button: btn?.textContent ?? '',
+      visible: btn?.classList.contains('visible') ?? false,
+      blocked: api.stepForward()
+    };
+  });
+  expect(closed.open).toBe(false);
+  expect(closed.locked).toBe(true);
+  expect(closed.button).toBe('Unlock');
+  expect(closed.visible).toBe(true);
+  expect(closed.blocked).toBe(false);
+  await page.screenshot({ path: `${OUT}/voxel_floor1_door_42_closed.png`, fullPage: false });
+
+  await page.evaluate(() => {
+    const api = (window as unknown as { __voxelFloor1: Floor1 }).__voxelFloor1;
+    api.giveKey();
+    api.handleDoor(4, 2);
+  });
+  await page.waitForTimeout(1200);
+
+  const opened = await page.evaluate(() => {
+    const api = (window as unknown as { __voxelFloor1: Floor1 }).__voxelFloor1;
+    const btn = document.getElementById('btn-door');
+    return {
+      open: api.doorOpen(4, 2),
+      busy: api.doorBusy(4, 2),
+      locked: api.doorLocked(4, 2),
+      button: btn?.textContent ?? '',
+      x: api.gridX,
+      y: api.gridY
+    };
+  });
+  expect(opened.open).toBe(true);
+  expect(opened.busy).toBe(false);
+  expect(opened.locked).toBe(false);
+  expect(opened.button).toBe('Close');
+  expect(opened.x).toBe(5);
+  expect(opened.y).toBe(2);
+  await page.screenshot({ path: `${OUT}/voxel_floor1_door_42_open.png`, fullPage: false });
+
+  const stepped = await page.evaluate(() =>
+    (window as unknown as { __voxelFloor1: Floor1 }).__voxelFloor1.stepForward()
+  );
+  expect(stepped).toBe(true);
+  await page.waitForTimeout(250);
+  const walked = await page.evaluate(() => {
+    const api = (window as unknown as { __voxelFloor1: Floor1 }).__voxelFloor1;
+    return { x: api.gridX, y: api.gridY };
+  });
+  expect(walked.x).toBe(4);
+  expect(walked.y).toBe(2);
 });

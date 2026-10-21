@@ -20,12 +20,15 @@ import {
   DOOR_CLOSE_MS,
   DOOR_OPEN_MS,
   DOOR_SLIDE,
+  DOOR_SWING,
+  DOOR_SWING_MS,
   DOOR_UNLOCK_LEAD_MS,
   LAYER_SIZE
 } from './constants';
 import { projectArchOpeningUvs } from './uv-audit';
 import {
   doorOpeningStyle,
+  leafHingeWorld,
   leafMeshes,
   openingPunchRect,
   openingSlabMeshes,
@@ -524,12 +527,24 @@ export class OpeningSystem {
     visual.animStart = now;
     visual.animDur = opening ? DOOR_OPEN_MS : DOOR_CLOSE_MS;
     visual.busy = true;
-    if (visual.kind === 'door') {
-      visual.tile.doorOpen = opening;
-      if (opening) visual.tile.doorLocked = false;
-    } else {
-      visual.tile.secretOpen = opening;
-    }
+    visual.tile.secretOpen = opening;
+  }
+
+  startSwing(visual: OpeningVisual, opening: boolean, now: number): void {
+    const from = visual.panels[0]?.rotation.y ?? 0;
+    const to = opening ? DOOR_SWING : 0;
+    visual.animFrom = from;
+    visual.animTo = to;
+    visual.animStart = now;
+    visual.animDur = DOOR_SWING_MS;
+    visual.busy = true;
+    visual.tile.doorOpen = opening;
+    if (opening) visual.tile.doorLocked = false;
+  }
+
+  startOpen(visual: OpeningVisual, opening: boolean, now: number): void {
+    if (visual.kind === 'door') this.startSwing(visual, opening, now);
+    else this.startSlide(visual, opening, now);
   }
 
   poseSlide(visual: OpeningVisual, t: number): void {
@@ -538,12 +553,30 @@ export class OpeningSystem {
     visual.busy = false;
     visual.animFrom = y;
     visual.animTo = y;
-    if (visual.kind === 'door') visual.tile.doorOpen = k > 0;
-    else visual.tile.secretOpen = k > 0;
+    visual.tile.secretOpen = k > 0;
     for (const panel of visual.panels) {
       panel.position.y = y;
       panel.visible = k < 0.99;
     }
+  }
+
+  poseSwing(visual: OpeningVisual, t: number): void {
+    const k = Math.min(1, Math.max(0, t));
+    const angle = DOOR_SWING * k;
+    visual.busy = false;
+    visual.animFrom = angle;
+    visual.animTo = angle;
+    visual.tile.doorOpen = k > 0;
+    if (k > 0) visual.tile.doorLocked = false;
+    for (const panel of visual.panels) {
+      panel.rotation.y = angle;
+      panel.visible = true;
+    }
+  }
+
+  poseOpen(visual: OpeningVisual, t: number): void {
+    if (visual.kind === 'door') this.poseSwing(visual, t);
+    else this.poseSlide(visual, t);
   }
 
   snapOpen(visual: OpeningVisual, open: boolean): void {
@@ -551,10 +584,19 @@ export class OpeningSystem {
     if (visual.kind === 'door') {
       visual.tile.doorOpen = open;
       if (open) visual.tile.doorLocked = false;
-    } else {
-      visual.tile.secretOpen = open;
+      const angle = open ? DOOR_SWING : 0;
+      visual.animFrom = angle;
+      visual.animTo = angle;
+      for (const panel of visual.panels) {
+        panel.rotation.y = angle;
+        panel.visible = true;
+      }
+      return;
     }
+    visual.tile.secretOpen = open;
     const y = open ? DOOR_SLIDE : 0;
+    visual.animFrom = y;
+    visual.animTo = y;
     for (const panel of visual.panels) {
       panel.position.y = y;
       panel.visible = !open;
@@ -572,14 +614,14 @@ export class OpeningSystem {
       this.unlockAt = now + DOOR_UNLOCK_LEAD_MS;
       return 'unlocking';
     }
-    this.startSlide(visual, !visual.tile.doorOpen, now);
+    this.startOpen(visual, !visual.tile.doorOpen, now);
     return 'toggled';
   }
 
   openSecret(x: number, y: number, now: number): boolean {
     const visual = this.get(x, y);
     if (!visual || visual.kind !== 'secret' || visual.tile.secretOpen || visual.busy) return false;
-    this.startSlide(visual, true, now);
+    this.startOpen(visual, true, now);
     return true;
   }
 
@@ -588,7 +630,7 @@ export class OpeningSystem {
     const { x, y } = this.pendingUnlock;
     this.pendingUnlock = null;
     const visual = this.get(x, y);
-    if (visual) this.startSlide(visual, true, now);
+    if (visual) this.startOpen(visual, true, now);
     return true;
   }
 
@@ -599,17 +641,31 @@ export class OpeningSystem {
       const t = Math.min(1, (now - visual.animStart) / visual.animDur);
       const opening = visual.animTo > visual.animFrom;
       const eased = opening ? 1 - (1 - t) * (1 - t) * (1 - t) : t * t * t;
-      const y = visual.animFrom + (visual.animTo - visual.animFrom) * eased;
-      for (const panel of visual.panels) {
-        panel.position.y = y;
-        panel.visible = y < CELL - 0.02;
+      const value = visual.animFrom + (visual.animTo - visual.animFrom) * eased;
+      if (visual.kind === 'door') {
+        for (const panel of visual.panels) {
+          panel.rotation.y = value;
+          panel.visible = true;
+        }
+      } else {
+        for (const panel of visual.panels) {
+          panel.position.y = value;
+          panel.visible = value < CELL - 0.02;
+        }
       }
       if (t >= 1) {
         visual.busy = false;
-        const open = visual.animTo > 0;
-        for (const panel of visual.panels) {
-          panel.position.y = visual.animTo;
-          panel.visible = !open;
+        if (visual.kind === 'door') {
+          for (const panel of visual.panels) {
+            panel.rotation.y = visual.animTo;
+            panel.visible = true;
+          }
+        } else {
+          const open = visual.animTo > 0;
+          for (const panel of visual.panels) {
+            panel.position.y = visual.animTo;
+            panel.visible = !open;
+          }
         }
       }
     }
@@ -784,28 +840,46 @@ export async function buildFloor1Openings(
       const leaf = leafMeshes(style, face, view.tx, view.tz);
       if (leaf.wood.positions.length) {
         const woodGeo = geometryWithBake([{ mesh: leaf.wood, tx: view.tx, tz: view.tz }], torches, beams);
+        const hinge = leafHingeWorld(face, view.tx, view.tz);
+        const pivot = new THREE.Group();
+        pivot.name = `door-hinge:${visual.x},${visual.y}:${face}`;
+        pivot.position.set(hinge[0], 0, hinge[2]);
+        pivot.userData.door = { x: visual.x, y: visual.y };
+        pivot.userData.doorLeaf = true;
         const slider = new THREE.Group();
         slider.name = `door-panel:${visual.x},${visual.y}:${face}`;
+        slider.position.set(-hinge[0], 0, -hinge[2]);
+        const tagLeaf = (obj: THREE.Object3D): void => {
+          obj.userData.door = { x: visual.x, y: visual.y };
+          obj.userData.doorLeaf = true;
+        };
         if (woodGeo) {
           const panel = new THREE.Mesh(woodGeo, woodMat);
+          panel.name = `door-wood:${visual.x},${visual.y}:${face}`;
           panel.castShadow = true;
           panel.receiveShadow = true;
           panel.frustumCulled = false;
+          tagLeaf(panel);
           slider.add(panel);
         }
         if (leaf.iron.positions.length) {
           const ironGeo = geometryWithBake([{ mesh: leaf.iron, tx: view.tx, tz: view.tz }], torches, beams);
           if (ironGeo) {
             const iron = new THREE.Mesh(ironGeo, ironMat);
+            iron.name = `door-iron:${visual.x},${visual.y}:${face}`;
             iron.castShadow = true;
             iron.receiveShadow = true;
             iron.frustumCulled = false;
+            tagLeaf(iron);
             slider.add(iron);
           }
         }
         slider.frustumCulled = false;
-        group.add(slider);
-        visual.panels.push(slider);
+        tagLeaf(slider);
+        pivot.add(slider);
+        pivot.frustumCulled = false;
+        group.add(pivot);
+        visual.panels.push(pivot);
       }
       return;
     }

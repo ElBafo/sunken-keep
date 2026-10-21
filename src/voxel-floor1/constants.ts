@@ -40,12 +40,15 @@ export const MOVE_MS = 180;
 export const TURN_MS = 180;
 export const SWIPE_THRESHOLD = 50;
 
-/** Same slide as proto3d: panel rides up into the lintel. */
+/** Same slide as proto3d: secret walls still ride up into the lintel. */
 export const DOOR_SLIDE = 1.42;
 export const DOOR_OPEN_MS = 1450;
 export const DOOR_CLOSE_MS = 600;
 export const DOOR_PANEL_INSET = 0.05;
 export const DOOR_UNLOCK_LEAD_MS = 350;
+/** Floor-1 door leaves swing on a hinge; secrets keep the Y-slide. */
+export const DOOR_SWING = Math.PI / 2;
+export const DOOR_SWING_MS = 400;
 
 /** Real cubes within this Chebyshev distance; flat-but-lit beyond. */
 export const VOXEL_CHEB = 3;

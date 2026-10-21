@@ -10,8 +10,11 @@ import {
   DOOR_CLOSE_MS,
   DOOR_OPEN_MS,
   DOOR_SLIDE,
+  DOOR_SWING,
+  DOOR_SWING_MS,
   DOOR_UNLOCK_LEAD_MS
 } from '../src/voxel-floor1/constants';
+import { leafHingeLocal, leafHingeWorld, LEAF_BACK, LEAF_PAD, OPEN_U0 } from '../src/voxel-floor1/door-opening';
 import { greedyMesh } from '../src/voxel-lab/mesher';
 import {
   OpeningSystem,
@@ -47,11 +50,32 @@ function fakeDoor(locked: boolean): OpeningVisual {
 describe('voxel-floor1 doors match Classic timing and lock rules', () => {
   beforeEach(() => resetFloor1Doors());
 
-  it('uses proto3d slide distance and open/close windows', () => {
+  it('starts all four door tiles closed with a leaf style', () => {
+    const doors = [
+      [4, 2],
+      [14, 2],
+      [6, 8],
+      [19, 5]
+    ] as const;
+    for (const [x, y] of doors) {
+      const tile = tileAt(floor1Map, x, y);
+      expect(tile?.door, `${x},${y}`).toBe(true);
+      expect(tile?.doorOpen, `${x},${y}`).toBeFalsy();
+    }
+  });
+
+  it('uses a 90° hinge swing for doors and the proto3d Y-slide for secrets', () => {
+    expect(DOOR_SWING).toBeCloseTo(Math.PI / 2, 8);
+    expect(DOOR_SWING_MS).toBe(400);
     expect(DOOR_SLIDE).toBeCloseTo(1.42, 8);
     expect(DOOR_OPEN_MS).toBe(1450);
     expect(DOOR_CLOSE_MS).toBe(600);
     expect(DOOR_UNLOCK_LEAD_MS).toBe(350);
+    const hinge = leafHingeLocal();
+    expect(hinge[0]).toBeCloseTo(OPEN_U0 + LEAF_PAD, 8);
+    expect(hinge[1]).toBe(0);
+    expect(hinge[2]).toBeCloseTo(LEAF_BACK, 8);
+    expect(leafHingeWorld('W', 5, 2)[1]).toBe(0);
   });
 
   it('refuses a locked door without a key and does not start the slide', () => {
@@ -76,22 +100,31 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     system.update(1000 + DOOR_UNLOCK_LEAD_MS);
     expect(visual.tile.doorOpen).toBe(true);
     expect(visual.busy).toBe(true);
+    system.update(1000 + DOOR_UNLOCK_LEAD_MS + DOOR_SWING_MS);
+    expect(visual.busy).toBe(false);
+    expect(visual.panels[0].visible).toBe(true);
+    expect(visual.panels[0].rotation.y).toBeCloseTo(DOOR_SWING, 5);
   });
 
-  it('sets doorOpen at slide start so the cell is walkable while the panel moves', () => {
+  it('sets doorOpen at swing start so the cell is walkable while the leaf moves', () => {
     const system = new OpeningSystem();
     const visual = fakeDoor(false);
     system.register(visual);
     expect(system.tryDoor(4, 2, false, 50)).toBe('toggled');
     expect(visual.tile.doorOpen).toBe(true);
     expect(visual.busy).toBe(true);
-    system.update(50 + DOOR_OPEN_MS);
+    system.update(50 + DOOR_SWING_MS);
     expect(visual.busy).toBe(false);
-    expect(visual.panels[0].position.y).toBeCloseTo(DOOR_SLIDE, 5);
-    expect(visual.panels[0].visible).toBe(false);
-    system.poseSlide(visual, 0.45);
-    expect(visual.panels[0].position.y).toBeCloseTo(DOOR_SLIDE * 0.45, 5);
+    expect(visual.panels[0].rotation.y).toBeCloseTo(DOOR_SWING, 5);
+    expect(visual.panels[0].visible).toBe(true);
+    system.poseOpen(visual, 0.45);
+    expect(visual.panels[0].rotation.y).toBeCloseTo(DOOR_SWING * 0.45, 5);
+    expect(visual.panels[0].visible).toBe(true);
     expect(visual.busy).toBe(false);
+    system.snapOpen(visual, false);
+    expect(visual.tile.doorOpen).toBe(false);
+    expect(visual.panels[0].rotation.y).toBeCloseTo(0, 5);
+    expect(visual.panels[0].visible).toBe(true);
   });
 
   it('opens a secret wall on bump and keeps overlay files off proto3d', () => {
@@ -139,9 +172,15 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     expect(openings).toContain('familyBaseFile');
     expect(openings).not.toContain('using door_open');
     expect(openings).toContain('surroundFile');
-    expect(main).toContain('listDoors(floor1Map)');
-    expect(main).toContain('snapOpen(visual, true)');
-    expect(main).toContain('Demo only');
+    expect(main).not.toContain('listDoors(floor1Map)');
+    expect(main).not.toContain('snapOpen(visual, true)');
+    expect(main).not.toContain('Demo only');
+    expect(main).toContain('hitFacingDoorLeaf');
+    expect(main).toContain("'Close'");
+    expect(openings).toContain('leafHingeWorld');
+    expect(openings).toContain('DOOR_SWING');
+    expect(openings).toContain('door-hinge');
+    expect(openings).toContain('doorLeaf');
     expect(openings).not.toContain('applyWallLook');
     expect(openings).toContain('recessSecretTell');
     expect(openings).not.toContain('secret_closed.png');

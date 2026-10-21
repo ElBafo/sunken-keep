@@ -750,6 +750,16 @@ function mapLocal(face: FaceNESW, tx: number, tz: number, a: number, u: number, 
   }
 }
 
+/** Left jamb, door-cell side of the leaf — +Y rotation swings into the opening. */
+export function leafHingeLocal(): [number, number, number] {
+  return [OPEN_U0 + LEAF_PAD, 0, LEAF_BACK];
+}
+
+export function leafHingeWorld(face: FaceNESW, tx: number, tz: number): [number, number, number] {
+  const [a, u, d] = leafHingeLocal();
+  return mapLocal(face, tx, tz, a, u, d);
+}
+
 /** Vertical boards at ceiling-plank density (256 px / 2 m). */
 function woodUv(a: number, u: number): [number, number] {
   return [u / CELL, (a - OPEN_U0) / CELL];

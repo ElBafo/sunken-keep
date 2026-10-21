@@ -35,7 +35,7 @@ import {
   type LightMode,
   type QualityLevel
 } from './lights';
-import { floor1Map, listDoors, tileAt } from './layout';
+import { floor1Map, tileAt } from './layout';
 import { buildFloor1 } from './level';
 import { buildFloor1Markers } from './markers';
 import { buildFloor1Openings } from './openings';
@@ -250,11 +250,6 @@ async function boot(): Promise<void> {
   scene.add(props.group);
   const openings = await buildFloor1Openings(floor1Map, lightMode === 'all');
   scene.add(openings.group);
-  // Demo only: start with both locked doors open so every room is reachable. Classic is unchanged.
-  for (const spec of listDoors(floor1Map)) {
-    const visual = openings.system.get(spec.x, spec.y);
-    if (visual) openings.system.snapOpen(visual, true);
-  }
   const markers = await buildFloor1Markers(floor1Map);
   scene.add(markers.group);
 
@@ -434,7 +429,39 @@ async function boot(): Promise<void> {
     const tile = tileAt(floor1Map, pos.x, pos.y);
     const show = !!(tile?.door || (tile?.secret && !tile.secretOpen));
     btnDoor.classList.toggle('visible', show);
-    btnDoor.textContent = tile?.secret ? 'Push' : tile?.doorLocked && !tile.doorOpen ? 'Unlock' : 'Open';
+    btnDoor.textContent = tile?.secret
+      ? 'Push'
+      : tile?.doorLocked && !tile.doorOpen
+        ? 'Unlock'
+        : tile?.doorOpen
+          ? 'Close'
+          : 'Open';
+  };
+
+  const raycaster = new THREE.Raycaster();
+  const pointerNdc = new THREE.Vector2();
+  const pointerToNdc = (e: PointerEvent): THREE.Vector2 => {
+    const rect = canvas.getBoundingClientRect();
+    const w = Math.max(1, rect.width);
+    const h = Math.max(1, rect.height);
+    pointerNdc.set(((e.clientX - rect.left) / w) * 2 - 1, -((e.clientY - rect.top) / h) * 2 + 1);
+    return pointerNdc;
+  };
+  const hitFacingDoorLeaf = (e: PointerEvent): boolean => {
+    const ahead = doorAhead();
+    if (!ahead) return false;
+    const visual = openings.system.get(ahead.x, ahead.y);
+    if (!visual) return false;
+    const targets: THREE.Object3D[] = [];
+    for (const panel of visual.panels) {
+      panel.traverse((obj) => {
+        if ((obj as THREE.Mesh).isMesh && obj.userData.doorLeaf) targets.push(obj);
+      });
+    }
+    if (!targets.length) return false;
+    camera.updateMatrixWorld();
+    raycaster.setFromCamera(pointerToNdc(e), camera);
+    return raycaster.intersectObjects(targets, false).length > 0;
   };
 
   const beginStep = (dirSign: 1 | -1): boolean => {
@@ -502,6 +529,10 @@ async function boot(): Promise<void> {
     const dx = e.clientX - swipeX;
     const dy = e.clientY - swipeY;
     if (Math.abs(dx) < 18 && Math.abs(dy) < 18) {
+      if (doorAhead()) {
+        if (hitFacingDoorLeaf(e)) handleDoor();
+        return;
+      }
       interact();
       return;
     }
@@ -604,7 +635,7 @@ async function boot(): Promise<void> {
     poseDoor: (x, y, t) => {
       const visual = openings.system.get(x, y);
       if (!visual) return false;
-      openings.system.poseSlide(visual, t);
+      openings.system.poseOpen(visual, t);
       return true;
     },
     doorOpen: (x, y) => openings.system.isOpen(x, y),
