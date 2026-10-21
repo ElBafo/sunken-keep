@@ -3,9 +3,7 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import { readFileSync, readdirSync } from 'fs';
 import { resolve } from 'path';
 import {
-  ARCH_DEPTH,
   ARCH_FRONT,
-  ARCH_LAYERS,
   CELL,
   DOOR_CLOSE_MS,
   DOOR_OPEN_MS,
@@ -30,7 +28,6 @@ import { lookForSecret } from '../src/voxel-floor1/wall-look';
 
 function fakeDoor(locked: boolean): OpeningVisual {
   const tile = tileAt(floor1Map, 4, 2)!;
-  tile.door = true;
   tile.doorLocked = locked;
   tile.doorOpen = false;
   return {
@@ -50,7 +47,7 @@ function fakeDoor(locked: boolean): OpeningVisual {
 describe('voxel-floor1 doors match Classic timing and lock rules', () => {
   beforeEach(() => resetFloor1Doors());
 
-  it('starts all four door tiles closed with a leaf style', () => {
+  it('starts all four door edges closed with a leaf style', () => {
     const doors = [
       [4, 2],
       [14, 2],
@@ -59,7 +56,7 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     ] as const;
     for (const [x, y] of doors) {
       const tile = tileAt(floor1Map, x, y);
-      expect(tile?.door, `${x},${y}`).toBe(true);
+      expect(tile?.door, `${x},${y}`).toBeFalsy();
       expect(tile?.doorOpen, `${x},${y}`).toBeFalsy();
     }
   });
@@ -283,10 +280,8 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     expect(recessed[0 + 0 * W + 2 * W * H]).toBe(1);
   });
 
-  it('gives door arches a real reveal into the opening', () => {
-    expect(ARCH_DEPTH).toBeCloseTo(CELL * 0.48, 5);
+  it('cuts the door opening through normal wall thickness', () => {
     expect(ARCH_FRONT).toBeCloseTo(0.03, 5);
-    expect(ARCH_LAYERS).toBeGreaterThan(20);
     const wall = new Uint8Array(8).fill(1);
     wall[2] = 0;
     wall[6] = 0;
@@ -294,11 +289,11 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     expect(arch.dims[2]).toBe(6);
     expect(arch.volume[0]).toBe(1);
     expect(arch.volume[2]).toBe(0);
-    const toWorld = makeArchToWorld('W', 5, 2, [2, 2, 6]);
+    const toWorld = makeArchToWorld('W', 4, 2, [2, 2, 6]);
     const back = toWorld(0, 0, 0);
     const front = toWorld(0, 0, 6);
-    expect(front[0] - back[0]).toBeCloseTo(ARCH_DEPTH + ARCH_FRONT, 5);
-    expect(front[0]).toBeGreaterThan((5 - 0.5) * CELL - 0.001);
-    expect(back[0]).toBeLessThan((5 - 0.5) * CELL);
+    expect(front[0] - back[0]).toBeCloseTo(ARCH_FRONT, 5);
+    expect(back[0]).toBeCloseTo((4 - 0.5) * CELL, 5);
+    expect(front[0] - back[0]).toBeLessThan(0.1);
   });
 });

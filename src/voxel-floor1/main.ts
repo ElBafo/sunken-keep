@@ -35,7 +35,7 @@ import {
   type LightMode,
   type QualityLevel
 } from './lights';
-import { floor1Map, tileAt } from './layout';
+import { doorBetween, doorEdgeAt, floor1Map, tileAt } from './layout';
 import { buildFloor1 } from './level';
 import { buildFloor1Markers } from './markers';
 import { buildFloor1Openings } from './openings';
@@ -383,8 +383,8 @@ async function boot(): Promise<void> {
   const facing = (): { x: number; y: number } => facingCell(mover.x, mover.y, mover.dir);
   const doorAhead = (): { x: number; y: number } | null => {
     const pos = facing();
-    const tile = tileAt(floor1Map, pos.x, pos.y);
-    return tile?.door ? pos : null;
+    const edge = doorBetween(mover.x, mover.y, pos.x, pos.y);
+    return edge ? { x: edge.x, y: edge.y } : null;
   };
   const handleDoor = (x?: number, y?: number): string => {
     const ahead = doorAhead();
@@ -411,7 +411,8 @@ async function boot(): Promise<void> {
       }
       return ok ? 'secret' : 'none';
     }
-    if (tile?.door) return handleDoor(pos.x, pos.y);
+    const ahead = doorAhead();
+    if (ahead) return handleDoor(ahead.x, ahead.y);
     const sconce = facingSconce(floor1Sconces, mover.x, mover.y, mover.dir);
     if (sconce?.capped) {
       showPrompt(TORCH_CAPPED_PROMPT);
@@ -428,13 +429,15 @@ async function boot(): Promise<void> {
     if (!btnDoor) return;
     const pos = facing();
     const tile = tileAt(floor1Map, pos.x, pos.y);
-    const show = !!(tile?.door || (tile?.secret && !tile.secretOpen));
+    const ahead = doorAhead();
+    const doorTile = ahead ? tileAt(floor1Map, ahead.x, ahead.y) : undefined;
+    const show = !!(ahead || (tile?.secret && !tile.secretOpen));
     btnDoor.classList.toggle('visible', show);
-    btnDoor.textContent = tile?.secret
+    btnDoor.textContent = tile?.secret && !tile.secretOpen
       ? 'Push'
-      : tile?.doorLocked && !tile.doorOpen
+      : doorTile?.doorLocked && !doorTile.doorOpen
         ? 'Unlock'
-        : tile?.doorOpen
+        : doorTile?.doorOpen
           ? 'Close'
           : 'Open';
   };
@@ -736,7 +739,14 @@ async function boot(): Promise<void> {
         `<div>${frame.draws} draws · ${level.stats.triangles.toLocaleString()} tri · ${api.programs} prog</div>` +
         `<div>${api.voxelFaces} vx faces · ${api.flatFaces} flat</div>` +
         `<div>gfx=${api.quality} · lights=${api.lights.mode} · ${api.lights.total} · ${api.lights.torchesActive}/${api.lights.torchesLit} torch · ${api.lights.sunbeamsActive}/${api.lights.sunbeams} beam</div>` +
-        `<div>step worst ${lastStepWorstMs.toFixed(1)} · arrive ${lastStepArrivalMs.toFixed(1)} · cache ${level.cacheSize}</div>`;
+        `<div>step worst ${lastStepWorstMs.toFixed(1)} · arrive ${lastStepArrivalMs.toFixed(1)} · cache ${level.cacheSize}</div>` +
+        (() => {
+          const ahead = doorAhead();
+          const edge = ahead ? doorEdgeAt(ahead.x, ahead.y) : undefined;
+          if (!edge) return '';
+          const open = openings.system.isOpen(edge.x, edge.y);
+          return `<div>door ${edge.x},${edge.y} ${edge.face} ${open ? 'open' : 'closed'}</div>`;
+        })();
     }
   };
   requestAnimationFrame(loop);

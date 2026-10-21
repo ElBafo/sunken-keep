@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import floor1DecorJson from '../../levels/floor1_decor.json';
 import { CELL, CORNICE_DEPTH } from './constants';
 import { floor1Sunbeams } from './fixtures';
-import { isShellTile, isTrueWall, tileAt, type FloorMap, type FloorTile } from './layout';
+import { cellHasDoorEdge, isShellTile, isTrueWall, tileAt, type FloorMap, type FloorTile } from './layout';
 import { dungeonWoodMaterial } from './painted';
 
 /**
@@ -62,14 +62,14 @@ function isSunbeamCell(x: number, y: number): boolean {
 }
 
 function isOpeningTile(tile: FloorTile | undefined): boolean {
-  return !!(tile && (tile.door || tile.secret));
+  return !!tile?.secret;
 }
 
 /** No timber over water, the cistern, a crack sunbeam, or a door/secret opening. */
 export function skipCeilingBeamCell(map: FloorMap, x: number, y: number): boolean {
   if (isCisternCell(x, y) || isSunbeamCell(x, y) || isWaterTile(map, x, y)) return true;
   const tile = tileAt(map, x, y);
-  if (!isShellTile(tile) || isOpeningTile(tile)) return true;
+  if (!isShellTile(tile) || isOpeningTile(tile) || cellHasDoorEdge(x, y)) return true;
   return false;
 }
 
@@ -316,7 +316,7 @@ function firstCellOpensOut(map: FloorMap, zone: DecorZone, longX: boolean, first
   for (const c of crosses) {
     const x = longX ? first - 1 : c;
     const y = longX ? c : first - 1;
-    if (isOpeningTile(tileAt(map, x, y))) return true;
+    if (isOpeningTile(tileAt(map, x, y)) || cellHasDoorEdge(x, y)) return true;
     const other = zoneAt(x, y);
     if (other && other.id !== zone.id && eligible(map, x, y)) return true;
   }
@@ -479,7 +479,7 @@ function listOpenings(map: FloorMap): Array<{ x: number; y: number }> {
   const out: Array<{ x: number; y: number }> = [];
   for (let y = 0; y < map.height; y++) {
     for (let x = 0; x < map.width; x++) {
-      if (isOpeningTile(map.tiles[y][x])) out.push({ x, y });
+      if (isOpeningTile(map.tiles[y][x]) || cellHasDoorEdge(x, y)) out.push({ x, y });
     }
   }
   return out;

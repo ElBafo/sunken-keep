@@ -1,6 +1,6 @@
 import { tileCorner } from '../voxel-lab/faces';
 import type { MeshArrays } from '../voxel-lab/mesher';
-import { ARCH_DEPTH, ARCH_FRONT, CELL, CORNICE_HEIGHT, WALL_TEXELS } from './constants';
+import { ARCH_FRONT, CELL, CORNICE_HEIGHT, DOOR_WALL_DEPTH, WALL_TEXELS } from './constants';
 import { faceUOffset } from './wall-look';
 
 export type DoorOpeningStyle = 'faceted' | 'lintel';
@@ -8,7 +8,7 @@ export type FaceNESW = 'N' | 'E' | 'S' | 'W';
 
 /**
  * Main doors sit between halls. Side doors are cellar / lair / pantry-type.
- * Floor 1 has four door tiles — two of each style.
+ * Floor 1 has four door *edges* — two of each style — keyed by the host cell.
  */
 export const FLOOR1_DOOR_STYLES: Record<string, DoorOpeningStyle> = {
   '4,2': 'faceted',
@@ -37,17 +37,19 @@ export const LINTEL_H = 0.22;
 export const JAMB_TOP_H = 0.4;
 export const JAMB_TOP_FACETED = 1.14;
 export const JAMB_TOP_LINTEL = 1.4;
-export const ROOM_DEPTH = ARCH_DEPTH + ARCH_FRONT;
+/** One room's wall plate — same 3 cm relief as every other wall. */
+export const ROOM_DEPTH = ARCH_FRONT;
 export const FRONT = ROOM_DEPTH + FRONT_PROUD;
-export const BACK = 0;
-/** Door leaf sits just inside the room-side plate. */
+/** Slight overlap past the shared edge so the two room plates seal. */
+export const BACK = -0.004;
+/** Door leaf sits in the combined wall thickness, centred on the edge. */
 export const LEAF_PAD = 0.03;
-export const LEAF_THICK = 0.055;
-/** Quarter of the 0.96 m reveal — frame depth reads from the room. */
-export const LEAF_REVEAL = ARCH_DEPTH * 0.25;
-export const LEAF_FRONT = ROOM_DEPTH - LEAF_REVEAL;
-export const LEAF_BACK = LEAF_FRONT - LEAF_THICK;
-export const IRON_PROUD = 0.01;
+export const LEAF_THICK = 0.018;
+/** Quarter of the two-sided wall so the frame still reads from each room. */
+export const LEAF_REVEAL = DOOR_WALL_DEPTH * 0.25;
+export const LEAF_FRONT = LEAF_THICK / 2;
+export const LEAF_BACK = -LEAF_THICK / 2;
+export const IRON_PROUD = 0.004;
 
 export type QuadRole =
   | 'jamb-top'
@@ -491,6 +493,7 @@ export function listFacetedHeadQuads(): OpeningQuad[] {
       [ra0[0] + rp[0], ra0[1] + rp[1], BACK]
     ]
   });
+  out.push(...listFacetedCornerFills());
   return out;
 }
 
@@ -740,13 +743,13 @@ function mapLocal(face: FaceNESW, tx: number, tz: number, a: number, u: number, 
   const { ox, oz } = tileCorner(tx, tz, CELL, 'center');
   switch (face) {
     case 'N':
-      return [ox + a, u, oz - ARCH_DEPTH + d];
+      return [ox + a, u, oz + d];
     case 'S':
-      return [ox + CELL - a, u, oz + CELL + ARCH_DEPTH - d];
+      return [ox + CELL - a, u, oz + CELL - d];
     case 'W':
-      return [ox - ARCH_DEPTH + d, u, oz + CELL - a];
+      return [ox + d, u, oz + CELL - a];
     case 'E':
-      return [ox + CELL + ARCH_DEPTH - d, u, oz + a];
+      return [ox + CELL - d, u, oz + a];
   }
 }
 

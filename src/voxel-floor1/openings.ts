@@ -13,7 +13,6 @@ import {
   type FarTorch
 } from './bake';
 import {
-  ARCH_DEPTH,
   ARCH_FRONT,
   ARCH_LAYERS,
   CELL,
@@ -38,6 +37,7 @@ import {
 } from './door-opening';
 import { floor1Sconces, floor1Sunbeams } from './fixtures';
 import {
+  doorEdgeAt,
   listDoors,
   listSecrets,
   openingViews,
@@ -332,8 +332,8 @@ export function solidifyArchVolume(
 }
 
 /**
- * d=0 is the back of the reveal (into the opening). d=D is the room-side
- * face, 3 cm proud like the neighbouring walls.
+ * d=0 is the shared cell edge. d=D is the room-side face, the same 3 cm
+ * relief as neighbouring walls.
  */
 export function makeArchToWorld(
   face: FaceId,
@@ -345,17 +345,17 @@ export function makeArchToWorld(
   const [W, H, D] = dims;
   const sx = cell / W;
   const sy = cell / H;
-  const layer = (ARCH_DEPTH + ARCH_FRONT) / Math.max(1, D);
+  const layer = ARCH_FRONT / Math.max(1, D);
   const { ox, oz } = tileCorner(tileX, tileZ, cell, 'center');
   switch (face) {
     case 'N':
-      return (u, v, d) => [ox + u * sx, v * sy, oz - ARCH_DEPTH + d * layer];
+      return (u, v, d) => [ox + u * sx, v * sy, oz + d * layer];
     case 'S':
-      return (u, v, d) => [ox + cell - u * sx, v * sy, oz + cell + ARCH_DEPTH - d * layer];
+      return (u, v, d) => [ox + cell - u * sx, v * sy, oz + cell - d * layer];
     case 'W':
-      return (u, v, d) => [ox - ARCH_DEPTH + d * layer, v * sy, oz + cell - u * sx];
+      return (u, v, d) => [ox + d * layer, v * sy, oz + cell - u * sx];
     case 'E':
-      return (u, v, d) => [ox + cell + ARCH_DEPTH - d * layer, v * sy, oz + u * sx];
+      return (u, v, d) => [ox + cell - d * layer, v * sy, oz + u * sx];
     default:
       return makeToWorld(face, tileX, tileZ, dims, LAYER_SIZE, cell, 'center');
   }
@@ -787,6 +787,9 @@ export async function buildFloor1Openings(
           }
         }
       }
+      const host = doorEdgeAt(visual.x, visual.y);
+      const hostView = !!host && view.tx === host.x && view.tz === host.y && view.face === host.face;
+      if (!hostView) return;
       const leaf = leafMeshes(style, face, view.tx, view.tz);
       if (leaf.wood.positions.length) {
         const woodGeo = geometryWithBake([{ mesh: leaf.wood, tx: view.tx, tz: view.tz }], torches, beams);

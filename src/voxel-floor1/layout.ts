@@ -4,7 +4,7 @@ import type { FaceId } from '../voxel-lab/faces';
 import { CEILING_VARIANTS, FLOOR_VARIANTS, RUBBLE_UV_SCALE } from './constants';
 import { KNOT_FACE_NEIGHBORS, knotBatchKey, knotWallFile } from './knot-walls';
 import { pickVariant } from './variants';
-import { faceUOffset, familyBaseLook, lookForWall, lookForZoneBase, type WallLook } from './wall-look';
+import { faceUOffset, lookForWall, lookForZoneBase, type WallLook } from './wall-look';
 
 type FloorCeilSquare = { x: number; y: number; floor: string; ceiling: string; ceilingRot?: number };
 
@@ -54,8 +54,48 @@ export type FloorMap = {
   tiles: FloorTile[][];
 };
 
+/**
+ * Voxel-only: Classic still stores a door *cell*. Floor 1 has no door cell —
+ * each door is one wall edge between two adjacent room cells. The former door
+ * tile becomes a floor cell of the host room; the opening sits on that edge.
+ *
+ * Host picks keep both rooms' shapes:
+ * - (4,2) antechamber, W edge toward water_hall (3,2)
+ * - (14,2) guard_hall, E edge toward slime_trail (15,2)
+ * - (6,8) cellar, N edge toward pantry (6,7)
+ * - (19,5) lair, N edge toward the lair neck (19,4)
+ */
+export type DoorEdge = {
+  x: number;
+  y: number;
+  face: 'N' | 'E' | 'S' | 'W';
+  otherX: number;
+  otherY: number;
+  otherFace: 'N' | 'E' | 'S' | 'W';
+  locked: boolean;
+  hostZone: string;
+  otherZone: string;
+};
+
+export const FLOOR1_DOOR_EDGES: readonly DoorEdge[] = [
+  { x: 4, y: 2, face: 'W', otherX: 3, otherY: 2, otherFace: 'E', locked: true, hostZone: 'antechamber', otherZone: 'water_hall' },
+  { x: 14, y: 2, face: 'E', otherX: 15, otherY: 2, otherFace: 'W', locked: false, hostZone: 'guard_hall', otherZone: 'slime_trail' },
+  { x: 6, y: 8, face: 'N', otherX: 6, otherY: 7, otherFace: 'S', locked: false, hostZone: 'cellar', otherZone: 'pantry' },
+  { x: 19, y: 5, face: 'N', otherX: 19, otherY: 4, otherFace: 'S', locked: false, hostZone: 'lair', otherZone: 'lair' }
+];
+
+const DOOR_EDGE_BY_HOST = new Map(FLOOR1_DOOR_EDGES.map((e) => [`${e.x},${e.y}`, e]));
+
 function copyTiles(): FloorTile[][] {
-  return rawFloor1.tiles.map((row) => row.map((tile) => ({ ...(tile as FloorTile) })));
+  const tiles = rawFloor1.tiles.map((row) => row.map((tile) => ({ ...(tile as FloorTile) })));
+  for (const edge of FLOOR1_DOOR_EDGES) {
+    const tile = tiles[edge.y][edge.x];
+    const locked = !!tile.doorLocked || edge.locked;
+    delete tile.door;
+    tile.doorOpen = false;
+    tile.doorLocked = locked;
+  }
+  return tiles;
 }
 
 /** Game New Game map. Closed doors and secret walls block stepping. */
@@ -93,7 +133,6 @@ export function isTrueWall(tile: FloorTile | undefined): boolean {
 export function isSolidTile(tile: FloorTile | undefined): boolean {
   if (!tile) return true;
   if (tile.wall) return true;
-  if (tile.door && !tile.doorOpen) return true;
   if (tile.secret && !tile.secretOpen) return true;
   return false;
 }
@@ -109,6 +148,36 @@ export function isShellTile(tile: FloorTile | undefined): boolean {
 
 export function canStep(map: FloorMap, x: number, y: number): boolean {
   return isWalkableTile(tileAt(map, x, y));
+}
+
+export function doorEdgeAt(x: number, y: number): DoorEdge | undefined {
+  return DOOR_EDGE_BY_HOST.get(`${x},${y}`);
+}
+
+export function doorBetween(x0: number, y0: number, x1: number, y1: number): DoorEdge | undefined {
+  for (const edge of FLOOR1_DOOR_EDGES) {
+    const hostToOther = edge.x === x0 && edge.y === y0 && edge.otherX === x1 && edge.otherY === y1;
+    const otherToHost = edge.x === x1 && edge.y === y1 && edge.otherX === x0 && edge.otherY === y0;
+    if (hostToOther || otherToHost) return edge;
+  }
+  return undefined;
+}
+
+export function cellHasDoorEdge(x: number, y: number): boolean {
+  return FLOOR1_DOOR_EDGES.some(
+    (edge) => (edge.x === x && edge.y === y) || (edge.otherX === x && edge.otherY === y)
+  );
+}
+
+export function doorIsOpen(map: FloorMap, edge: DoorEdge): boolean {
+  return !!tileAt(map, edge.x, edge.y)?.doorOpen;
+}
+
+/** Closed door on the shared edge blocks crossing. Cells themselves stay walkable. */
+export function canCross(map: FloorMap, x0: number, y0: number, x1: number, y1: number): boolean {
+  const edge = doorBetween(x0, y0, x1, y1);
+  if (edge && !doorIsOpen(map, edge)) return false;
+  return canStep(map, x1, y1);
 }
 
 export type FaceJob = {
@@ -134,18 +203,14 @@ export type FaceJob = {
   uvScale: number;
 };
 
-export type DoorSpec = { x: number; y: number; locked: boolean };
+export type DoorSpec = DoorEdge;
 export type SecretSpec = { x: number; y: number };
 
 export function listDoors(map: FloorMap = floor1Map): DoorSpec[] {
-  const out: DoorSpec[] = [];
-  for (let y = 0; y < map.height; y++) {
-    for (let x = 0; x < map.width; x++) {
-      const tile = map.tiles[y][x];
-      if (tile.door) out.push({ x, y, locked: !!tile.doorLocked });
-    }
-  }
-  return out;
+  return FLOOR1_DOOR_EDGES.map((edge) => ({
+    ...edge,
+    locked: !!tileAt(map, edge.x, edge.y)?.doorLocked
+  }));
 }
 
 export function listSecrets(map: FloorMap = floor1Map): SecretSpec[] {
@@ -158,27 +223,42 @@ export function listSecrets(map: FloorMap = floor1Map): SecretSpec[] {
   return out;
 }
 
-/** Neighbours that look into a door/secret cell (the overlay faces). */
-export function openingViews(
-  map: FloorMap,
-  x: number,
-  y: number
-): Array<{
+export type OpeningView = {
   tx: number;
   tz: number;
   face: FaceId;
   wallX: number;
   wallY: number;
   wallFace: 'N' | 'E' | 'S' | 'W';
-}> {
-  const views: Array<{
-    tx: number;
-    tz: number;
-    face: FaceId;
-    wallX: number;
-    wallY: number;
-    wallFace: 'N' | 'E' | 'S' | 'W';
-  }> = [];
+};
+
+/** Both room faces of a door edge. Each side uses its own room stone. */
+export function doorOpeningViews(edge: DoorEdge): OpeningView[] {
+  return [
+    {
+      tx: edge.x,
+      tz: edge.y,
+      face: edge.face,
+      wallX: edge.otherX,
+      wallY: edge.otherY,
+      wallFace: edge.otherFace
+    },
+    {
+      tx: edge.otherX,
+      tz: edge.otherY,
+      face: edge.otherFace,
+      wallX: edge.x,
+      wallY: edge.y,
+      wallFace: edge.face
+    }
+  ];
+}
+
+/** Neighbours that look into a secret cell, or both sides of a door edge. */
+export function openingViews(map: FloorMap, x: number, y: number): OpeningView[] {
+  const edge = doorEdgeAt(x, y);
+  if (edge) return doorOpeningViews(edge);
+  const views: OpeningView[] = [];
   for (const spec of OPEN_TO_WALL) {
     const tx = x + spec.dx;
     const tz = y + spec.dz;
@@ -197,15 +277,15 @@ export function openingViews(
 }
 
 export function resetFloor1Doors(map: FloorMap = floor1Map): void {
+  for (const edge of FLOOR1_DOOR_EDGES) {
+    const tile = tileAt(map, edge.x, edge.y);
+    if (!tile) continue;
+    tile.doorOpen = false;
+    tile.doorLocked = edge.locked;
+  }
   for (let y = 0; y < map.height; y++) {
     for (let x = 0; x < map.width; x++) {
-      const tile = map.tiles[y][x];
-      const src = rawFloor1.tiles[y][x] as FloorTile;
-      if (tile.door) {
-        tile.doorOpen = false;
-        tile.doorLocked = !!src.doorLocked;
-      }
-      if (tile.secret) tile.secretOpen = false;
+      if (map.tiles[y][x].secret) map.tiles[y][x].secretOpen = false;
     }
   }
 }
@@ -257,11 +337,7 @@ export function enumerateFaces(map: FloorMap): FaceJob[] {
         const wz = z + spec.dz;
         if (!isTrueWall(tileAt(map, wx, wz))) continue;
         const knot = !!knotWallFile(wx, wz, spec.wallFace);
-        const tile = map.tiles[z][x];
-        let look = lookForWall(wx, wz, spec.wallFace) ?? lookForZoneBase(x, z);
-        if (!knot && tile.door && look) {
-          look = familyBaseLook(look.kind, look.zone, look.seepage);
-        }
+        const look = lookForWall(wx, wz, spec.wallFace) ?? lookForZoneBase(x, z);
         const file = look?.file ?? lookForZoneBase(x, z).file;
         jobs.push({
           face: spec.face,

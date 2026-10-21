@@ -22,7 +22,7 @@ Beams are slim ribs ~8–10 cm, on the grid, one direction per room, flush with 
 
 ## Openings
 
-Doors, arches, and secret-wall nooks use the same stone as the surrounding room. Arches and openings have real depth (reveal / soffit). Secret walls look normal except one slightly odd brick.
+Doors, arches, and secret-wall nooks use the same stone as the surrounding room. A door is one wall between two directly adjacent room cells — not its own passage cell. The opening is cut through that wall's normal thickness; soffit and reveal faces are sealed with each room's own stone. Secret walls look normal except one slightly odd brick.
 
 Doorways are big flat slabs, not curves — a curved soffit reads as a strip of thin stones at phone resolution.
 

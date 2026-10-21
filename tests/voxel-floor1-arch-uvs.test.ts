@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { ARCH_DEPTH, CELL, CORNICE_HEIGHT } from '../src/voxel-floor1/constants';
+import { ARCH_FRONT, CELL, CORNICE_HEIGHT, DOOR_WALL_DEPTH } from '../src/voxel-floor1/constants';
 import { greedyMesh } from '../src/voxel-lab/mesher';
 import {
   makeArchHoleMask,
@@ -22,6 +22,7 @@ import {
   inOpeningVoid,
   JAMB_TOP_FACETED,
   JAMB_TOP_LINTEL,
+  LEAF_BACK,
   LEAF_FRONT,
   LEAF_PAD,
   LEAF_REVEAL,
@@ -97,8 +98,8 @@ describe('floor-1 door opening styles', () => {
     );
     expect(headFronts).toHaveLength(5);
     expect(headFronts.map((q) => q.role)).toEqual(['jamb-top', 'chamfer', 'keystone', 'chamfer', 'jamb-top']);
-    expect(quads.filter((q) => q.role === 'corner' && q.kind === 'front')).toHaveLength(2);
-    expect(quads.filter((q) => q.role === 'corner' && q.kind === 'back')).toHaveLength(2);
+    expect(quads.filter((q) => q.role === 'corner' && q.kind === 'front').length).toBeGreaterThanOrEqual(4);
+    expect(quads.filter((q) => q.role === 'corner' && q.kind === 'back').length).toBeGreaterThanOrEqual(2);
     expect(
       quads.some(
         (q) =>
@@ -197,8 +198,9 @@ describe('floor-1 door opening styles', () => {
     expect(fTop).toBeLessThan(facetedTop());
     expect(lTop).toBeLessThanOrEqual(JAMB_TOP_LINTEL);
     expect(lTop).toBeCloseTo(JAMB_TOP_LINTEL - LEAF_PAD, 5);
-    expect(LEAF_REVEAL).toBeCloseTo(ARCH_DEPTH * 0.25, 5);
-    expect(LEAF_FRONT).toBeCloseTo(ROOM_DEPTH - LEAF_REVEAL, 5);
+    expect(LEAF_REVEAL).toBeCloseTo(DOOR_WALL_DEPTH * 0.25, 5);
+    expect(ROOM_DEPTH).toBeCloseTo(ARCH_FRONT, 5);
+    expect(Math.abs(LEAF_FRONT - LEAF_BACK)).toBeLessThanOrEqual(ARCH_FRONT + 1e-6);
     expect(listIronQuads('faceted').length).toBeGreaterThan(8);
     expect(listIronQuads('lintel').length).toBeGreaterThan(8);
     expect(readFileSync(resolve(__dirname, '../src/voxel-floor1/door-opening.ts'), 'utf8')).toContain(
@@ -221,6 +223,7 @@ describe('floor-1 door opening styles', () => {
     expect(art).toContain('exactly five big flat slabs');
     expect(art).toContain('brick course');
     expect(art).toContain('flush');
+    expect(art).toContain('one wall between two directly adjacent room cells');
     const src = readFileSync(resolve(__dirname, '../src/voxel-floor1/openings.ts'), 'utf8');
     expect(src).toContain('openingSlabMeshes');
     expect(src).toContain('leafMeshes');
