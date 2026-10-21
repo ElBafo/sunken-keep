@@ -35,7 +35,7 @@ import {
   type LightMode,
   type QualityLevel
 } from './lights';
-import { floor1Map, listDoors, tileAt } from './layout';
+import { doorBetween, doorEdgeAt, floor1Map, tileAt } from './layout';
 import { buildFloor1 } from './level';
 import { buildFloor1Markers } from './markers';
 import { buildFloor1Openings } from './openings';
@@ -77,8 +77,13 @@ type Floor1Api = {
   stepBack: () => boolean;
   turnLeft: () => boolean;
   turnRight: () => boolean;
-  meanLuma: (band?: { y0?: number; y1?: number }) => number;
-  meanRgb: (band?: { y0?: number; y1?: number }) => { r: number; g: number; b: number; rb: number };
+  meanLuma: (band?: { x0?: number; x1?: number; y0?: number; y1?: number }) => number;
+  meanRgb: (band?: { x0?: number; x1?: number; y0?: number; y1?: number }) => {
+    r: number;
+    g: number;
+    b: number;
+    rb: number;
+  };
   sconceVisible: (x: number, y: number, face: string) => boolean;
   hasKey: boolean;
   giveKey: () => void;
@@ -174,6 +179,7 @@ async function boot(): Promise<void> {
   renderer.toneMappingExposure = 1;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.localClippingEnabled = true;
 
   const look = lookColors(1, false);
   const fog = look.fog;
@@ -245,11 +251,6 @@ async function boot(): Promise<void> {
   scene.add(props.group);
   const openings = await buildFloor1Openings(floor1Map, lightMode === 'all');
   scene.add(openings.group);
-  // Demo only: start with both locked doors open so every room is reachable. Classic is unchanged.
-  for (const spec of listDoors(floor1Map)) {
-    const visual = openings.system.get(spec.x, spec.y);
-    if (visual) openings.system.snapOpen(visual, true);
-  }
   const markers = await buildFloor1Markers(floor1Map);
   scene.add(markers.group);
 
@@ -310,12 +311,14 @@ async function boot(): Promise<void> {
   };
 
   const samplePixels = (
-    band?: { y0?: number; y1?: number }
+    band?: { x0?: number; x1?: number; y0?: number; y1?: number }
   ): { r: number; g: number; b: number; luma: number; rb: number; n: number } => {
     renderFrame();
     const gl = renderer.getContext();
     const w = gl.drawingBufferWidth;
     const h = gl.drawingBufferHeight;
+    const x0 = Math.max(0, Math.floor((band?.x0 ?? 0) * w));
+    const x1 = Math.min(w, Math.ceil((band?.x1 ?? 1) * w));
     const y0 = Math.max(0, Math.floor((band?.y0 ?? 0) * h));
     const y1 = Math.min(h, Math.ceil((band?.y1 ?? 1) * h));
     const rows = Math.max(1, y1 - y0);
@@ -324,12 +327,15 @@ async function boot(): Promise<void> {
     let r = 0;
     let g = 0;
     let b = 0;
-    const n = pixels.length / 4;
-    for (let i = 0; i < n; i++) {
-      const o = i * 4;
-      r += pixels[o];
-      g += pixels[o + 1];
-      b += pixels[o + 2];
+    let n = 0;
+    for (let row = 0; row < rows; row++) {
+      for (let col = x0; col < x1; col++) {
+        const o = (row * w + col) * 4;
+        r += pixels[o];
+        g += pixels[o + 1];
+        b += pixels[o + 2];
+        n += 1;
+      }
     }
     const rr = n > 0 ? r / n / 255 : 0;
     const gg = n > 0 ? g / n / 255 : 0;
@@ -377,8 +383,8 @@ async function boot(): Promise<void> {
   const facing = (): { x: number; y: number } => facingCell(mover.x, mover.y, mover.dir);
   const doorAhead = (): { x: number; y: number } | null => {
     const pos = facing();
-    const tile = tileAt(floor1Map, pos.x, pos.y);
-    return tile?.door ? pos : null;
+    const edge = doorBetween(mover.x, mover.y, pos.x, pos.y);
+    return edge ? { x: edge.x, y: edge.y } : null;
   };
   const handleDoor = (x?: number, y?: number): string => {
     const ahead = doorAhead();
@@ -405,7 +411,8 @@ async function boot(): Promise<void> {
       }
       return ok ? 'secret' : 'none';
     }
-    if (tile?.door) return handleDoor(pos.x, pos.y);
+    const ahead = doorAhead();
+    if (ahead) return handleDoor(ahead.x, ahead.y);
     const sconce = facingSconce(floor1Sconces, mover.x, mover.y, mover.dir);
     if (sconce?.capped) {
       showPrompt(TORCH_CAPPED_PROMPT);
@@ -422,9 +429,43 @@ async function boot(): Promise<void> {
     if (!btnDoor) return;
     const pos = facing();
     const tile = tileAt(floor1Map, pos.x, pos.y);
-    const show = !!(tile?.door || (tile?.secret && !tile.secretOpen));
+    const ahead = doorAhead();
+    const doorTile = ahead ? tileAt(floor1Map, ahead.x, ahead.y) : undefined;
+    const show = !!(ahead || (tile?.secret && !tile.secretOpen));
     btnDoor.classList.toggle('visible', show);
-    btnDoor.textContent = tile?.secret ? 'Push' : tile?.doorLocked && !tile.doorOpen ? 'Unlock' : 'Open';
+    btnDoor.textContent = tile?.secret && !tile.secretOpen
+      ? 'Push'
+      : doorTile?.doorLocked && !doorTile.doorOpen
+        ? 'Unlock'
+        : doorTile?.doorOpen
+          ? 'Close'
+          : 'Open';
+  };
+
+  const raycaster = new THREE.Raycaster();
+  const pointerNdc = new THREE.Vector2();
+  const pointerToNdc = (e: PointerEvent): THREE.Vector2 => {
+    const rect = canvas.getBoundingClientRect();
+    const w = Math.max(1, rect.width);
+    const h = Math.max(1, rect.height);
+    pointerNdc.set(((e.clientX - rect.left) / w) * 2 - 1, -((e.clientY - rect.top) / h) * 2 + 1);
+    return pointerNdc;
+  };
+  const hitFacingDoorLeaf = (e: PointerEvent): boolean => {
+    const ahead = doorAhead();
+    if (!ahead) return false;
+    const visual = openings.system.get(ahead.x, ahead.y);
+    if (!visual) return false;
+    const targets: THREE.Object3D[] = [];
+    for (const panel of visual.panels) {
+      panel.traverse((obj) => {
+        if ((obj as THREE.Mesh).isMesh && obj.userData.doorLeaf) targets.push(obj);
+      });
+    }
+    if (!targets.length) return false;
+    camera.updateMatrixWorld();
+    raycaster.setFromCamera(pointerToNdc(e), camera);
+    return raycaster.intersectObjects(targets, false).length > 0;
   };
 
   const beginStep = (dirSign: 1 | -1): boolean => {
@@ -492,6 +533,10 @@ async function boot(): Promise<void> {
     const dx = e.clientX - swipeX;
     const dy = e.clientY - swipeY;
     if (Math.abs(dx) < 18 && Math.abs(dy) < 18) {
+      if (doorAhead()) {
+        if (hitFacingDoorLeaf(e)) handleDoor();
+        return;
+      }
       interact();
       return;
     }
@@ -594,7 +639,7 @@ async function boot(): Promise<void> {
     poseDoor: (x, y, t) => {
       const visual = openings.system.get(x, y);
       if (!visual) return false;
-      openings.system.poseSlide(visual, t);
+      openings.system.poseOpen(visual, t);
       return true;
     },
     doorOpen: (x, y) => openings.system.isOpen(x, y),
@@ -694,7 +739,14 @@ async function boot(): Promise<void> {
         `<div>${frame.draws} draws · ${level.stats.triangles.toLocaleString()} tri · ${api.programs} prog</div>` +
         `<div>${api.voxelFaces} vx faces · ${api.flatFaces} flat</div>` +
         `<div>gfx=${api.quality} · lights=${api.lights.mode} · ${api.lights.total} · ${api.lights.torchesActive}/${api.lights.torchesLit} torch · ${api.lights.sunbeamsActive}/${api.lights.sunbeams} beam</div>` +
-        `<div>step worst ${lastStepWorstMs.toFixed(1)} · arrive ${lastStepArrivalMs.toFixed(1)} · cache ${level.cacheSize}</div>`;
+        `<div>step worst ${lastStepWorstMs.toFixed(1)} · arrive ${lastStepArrivalMs.toFixed(1)} · cache ${level.cacheSize}</div>` +
+        (() => {
+          const ahead = doorAhead();
+          const edge = ahead ? doorEdgeAt(ahead.x, ahead.y) : undefined;
+          if (!edge) return '';
+          const open = openings.system.isOpen(edge.x, edge.y);
+          return `<div>door ${edge.x},${edge.y} ${edge.face} ${open ? 'open' : 'closed'}</div>`;
+        })();
     }
   };
   requestAnimationFrame(loop);

@@ -24,7 +24,7 @@ import { cupWorldPos, flameOnBracket, meshBracket } from './bracket';
 import { listCeilingBeams, meshCeilingBeams } from './ceiling-beams';
 import { listCorniceSegments, meshCornice } from './cornice';
 import { floor1Map } from './layout';
-import { enablePaintedSampling } from './painted';
+import { dungeonWoodMaterial, enablePaintedSampling } from './painted';
 
 type TorchVisual = {
   spec: SconceSpec;
@@ -122,12 +122,7 @@ export async function buildFloor1Props(
   if (cornice) group.add(cornice);
   const ceiling = meshCeilingBeams(woodBeam.texture, listCeilingBeams(floor1Map));
   if (ceiling) group.add(ceiling);
-  const woodMat = new THREE.MeshBasicMaterial({
-    map: woodBeam.texture,
-    color: 0xffffff,
-    fog: true,
-    toneMapped: false
-  });
+  const woodMat = dungeonWoodMaterial(woodBeam.texture, { name: 'fallen-planks-wood' });
   for (const pile of floor1FallenBeams) {
     const wx = pile.x * CELL;
     const wz = pile.y * CELL;
