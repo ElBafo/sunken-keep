@@ -80,7 +80,7 @@ describe('floor-1 door opening styles', () => {
     const chamfers = slabs.filter((s) => s.role === 'chamfer');
     expect(chamfers.some((s) => Math.abs(s.rotD - -Math.PI / 4) < 1e-6)).toBe(true);
     expect(chamfers.some((s) => Math.abs(s.rotD - Math.PI / 4) < 1e-6)).toBe(true);
-    expect(CHAMFER).toBeCloseTo(0.3, 5);
+    expect(CHAMFER).toBeCloseTo(0.28, 5);
   });
 
   it('builds a side door as straight jambs plus a heavy chipped lintel', () => {

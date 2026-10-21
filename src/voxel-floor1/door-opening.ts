@@ -26,11 +26,11 @@ export const OPEN_WIDTH = 1.14;
 export const OPEN_U0 = (CELL - OPEN_WIDTH) / 2;
 export const OPEN_U1 = OPEN_U0 + OPEN_WIDTH;
 export const JAMB_THICK = 0.2;
-export const JAMB_JOINT = 0.016;
+export const JAMB_JOINT = 0.022;
 export const WALL_BITE = 0.05;
-export const CHAMFER = 0.3;
-export const KEYSTONE_H = 0.22;
-export const LINTEL_H = 0.26;
+export const CHAMFER = 0.28;
+export const KEYSTONE_H = 0.24;
+export const LINTEL_H = 0.28;
 export const LINTEL_BEAR = 0.1;
 export const JAMB_TOP_FACETED = 1.28;
 export const JAMB_TOP_LINTEL = 1.5;
@@ -50,17 +50,25 @@ export type LocalSlab = {
 
 export type OpeningHole = { u0: number; u1: number; v0: number; v1: number };
 
-/** Rectangle punched from the room-side plate — larger than the inner opening so slabs seal the rim. */
+/** Rectangle punched from the room-side plate — covers every slab so rotated chamfers cannot poke through. */
 export function openingPunchRect(style: DoorOpeningStyle): OpeningHole {
-  const top =
+  let u0 = OPEN_U0 - JAMB_THICK - 0.08;
+  let u1 = OPEN_U1 + JAMB_THICK + 0.08;
+  let v1 =
     style === 'faceted'
-      ? JAMB_TOP_FACETED + CHAMFER + KEYSTONE_H + 0.04
-      : JAMB_TOP_LINTEL + LINTEL_H + 0.04;
+      ? JAMB_TOP_FACETED + CHAMFER + KEYSTONE_H + 0.16
+      : JAMB_TOP_LINTEL + LINTEL_H + 0.08;
+  for (const slab of listOpeningSlabs(style)) {
+    const reach = 0.5 * Math.hypot(slab.sa, slab.su) + 0.04;
+    u0 = Math.min(u0, slab.across - reach);
+    u1 = Math.max(u1, slab.across + reach);
+    v1 = Math.max(v1, slab.up + reach);
+  }
   return {
-    u0: OPEN_U0 - 0.04,
-    u1: OPEN_U1 + 0.04,
+    u0: Math.max(0.02, u0),
+    u1: Math.min(CELL - 0.02, u1),
     v0: 0,
-    v1: top
+    v1: Math.min(CELL - 0.08, v1)
   };
 }
 
@@ -171,23 +179,24 @@ export function listOpeningSlabs(style: DoorOpeningStyle): LocalSlab[] {
   const lintelV0 = JAMB_TOP_LINTEL;
   const chipW = 0.08;
   const notch = 0.09;
+  const proud = 0.035;
   slabs.push({
     across: (lintelA0 + lintelA1) / 2,
     up: lintelV0 + notch + (LINTEL_H - notch) / 2,
-    depth: DEPTH_CENTER,
+    depth: DEPTH_CENTER + proud / 2,
     sa: lintelA1 - lintelA0,
     su: LINTEL_H - notch,
-    sd: SLAB_DEPTH,
+    sd: SLAB_DEPTH + proud,
     rotD: 0,
     role: 'lintel'
   });
   slabs.push({
     across: (lintelA0 + lintelA1) / 2,
     up: lintelV0 + notch / 2,
-    depth: DEPTH_CENTER,
+    depth: DEPTH_CENTER + proud / 2,
     sa: lintelA1 - lintelA0 - chipW * 2,
     su: notch,
-    sd: SLAB_DEPTH,
+    sd: SLAB_DEPTH + proud,
     rotD: 0,
     role: 'chip'
   });
