@@ -25,6 +25,13 @@ import {
   LAYER_SIZE
 } from './constants';
 import { projectArchOpeningUvs } from './uv-audit';
+import {
+  doorOpeningStyle,
+  openingPunchRect,
+  openingSlabMeshes,
+  punchOpeningRect,
+  type DoorOpeningStyle
+} from './door-opening';
 import { floor1Sconces, floor1Sunbeams } from './fixtures';
 import {
   listDoors,
@@ -369,76 +376,65 @@ export function makeArchToWorld(
   }
 }
 
-function projectArchUvs(
-  geo: THREE.BufferGeometry,
-  face: 'N' | 'E' | 'S' | 'W',
-  tx: number,
-  tz: number
-): void {
-  const pos = geo.getAttribute('position');
-  const nrm = geo.getAttribute('normal');
-  const uv = geo.getAttribute('uv');
-  if (!pos || !nrm || !uv) return;
-  projectArchOpeningUvs(
-    pos.array as unknown as number[],
-    nrm.array as unknown as number[],
-    uv.array as unknown as number[],
-    face,
-    CELL,
-    faceUOffset(face, tx, tz)
-  );
-  uv.needsUpdate = true;
-}
-
-/**
- * Punch, extrude, mesh, and project one door surround so tests can audit
- * every floor-1 arch without the browser texture loader.
- */
+/** Punch a rectangular plate, add style slabs, project UVs. Used by the density audit. */
 export function meshArchOpening(
   wall: Uint8Array,
   wallDims: [number, number, number],
-  opening: Uint8Array,
-  openingDims: [number, number, number],
+  _opening: Uint8Array,
+  _openingDims: [number, number, number],
   face: 'N' | 'E' | 'S' | 'W',
   tx: number,
-  tz: number
+  tz: number,
+  style: DoorOpeningStyle = 'lintel'
 ): { positions: number[]; normals: number[]; uvs: number[]; quads: number } {
-  const punched = maskVolumeWithOpening(wall, wallDims, opening, openingDims);
-  const arch = solidifyArchVolume(punched, wallDims);
-  const toWorld = makeArchToWorld(face, tx, tz, arch.dims);
-  const meshed = greedyMesh(arch.volume, arch.dims, toWorld, { cullNeg: [false, false, false] });
-  const uvs = meshed.mesh.uvs.slice();
+  return meshDoorOpening(wall, wallDims, face, tx, tz, style);
+}
+
+export function meshDoorOpening(
+  wall: Uint8Array,
+  wallDims: [number, number, number],
+  face: 'N' | 'E' | 'S' | 'W',
+  tx: number,
+  tz: number,
+  style: DoorOpeningStyle
+): { positions: number[]; normals: number[]; uvs: number[]; quads: number } {
+  const punched = punchOpeningRect(wall, wallDims, openingPunchRect(style));
+  const plateWorld = makeToWorld(face, tx, tz, wallDims, LAYER_SIZE, CELL, 'center');
+  const plate = greedyMesh(punched, wallDims, plateWorld, { cullNeg: [false, false, false] });
+  const uvs = plate.mesh.uvs.slice();
   projectArchOpeningUvs(
-    meshed.mesh.positions,
-    meshed.mesh.normals,
+    plate.mesh.positions,
+    plate.mesh.normals,
     uvs,
     face,
     CELL,
     faceUOffset(face, tx, tz)
   );
+  const positions = plate.mesh.positions.slice();
+  const normals = plate.mesh.normals.slice();
+  for (const slab of openingSlabMeshes(style, face, tx, tz)) {
+    positions.push(...slab.positions);
+    normals.push(...slab.normals);
+    uvs.push(...slab.uvs);
+  }
   return {
-    positions: meshed.mesh.positions,
-    normals: meshed.mesh.normals,
+    positions,
+    normals,
     uvs,
-    quads: meshed.quads
+    quads: (positions.length / 3 / 4) | 0
   };
 }
 
-/** Door-shaped hole (jambs + semicircle soffit) in voxel U,V. v=0 is the floor. */
+/** Axis-aligned doorway void. No circular soffit — curves read as thin stones at phone res. */
 export function makeArchHoleMask(W: number, H: number): Uint8Array {
   const hole = new Uint8Array(W * H);
-  const x0 = Math.floor(W * 0.2);
-  const x1 = Math.ceil(W * 0.8);
-  const spring = Math.floor(H * 0.62);
-  const cx = (x0 + x1 - 1) * 0.5;
-  const r = (x1 - x0) * 0.5;
-  for (let v = 0; v < H; v++) {
-    for (let u = 0; u < W; u++) {
-      const inJambs = u >= x0 && u < x1 && v <= spring;
-      const dy = v - spring;
-      const dx = u - cx;
-      const inArch = v > spring && dx * dx + dy * dy <= r * r;
-      if (inJambs || inArch) hole[u + v * W] = 1;
+  const rect = openingPunchRect('lintel');
+  const u0 = Math.floor((rect.u0 / CELL) * W);
+  const u1 = Math.ceil((rect.u1 / CELL) * W);
+  const v1 = Math.ceil((rect.v1 / CELL) * H);
+  for (let v = 0; v < v1; v++) {
+    for (let u = u0; u < u1; u++) {
+      hole[u + v * W] = 1;
     }
   }
   return hole;
@@ -642,15 +638,12 @@ export async function buildFloor1Openings(
   const wallFiles = [...FLOOR1_WALL_FILES];
   const pngs = await Promise.all([
     loadPng('door_panel.png'),
-    loadPng('door_open.png'),
     ...wallFiles.map((file) => loadPng(file))
   ]);
   const panelPng = pngs[0];
-  const framePng = pngs[1];
   const wallPngs = new Map<string, (typeof panelPng)>();
-  wallFiles.forEach((file, i) => wallPngs.set(file, pngs[i + 2]));
+  wallFiles.forEach((file, i) => wallPngs.set(file, pngs[i + 1]));
   const panelVol = volumeFromImageData(panelPng.data);
-  const frameVol = volumeFromImageData(framePng.data);
 
   const makeMat = (png: { texture: THREE.Texture }, vol: { roughness: Uint8Array; dims: [number, number, number] }) => {
     const mat = voxelMaterial(png.texture, pbrMap(vol.roughness, vol.dims[0], vol.dims[1]));
@@ -719,25 +712,33 @@ export async function buildFloor1Openings(
       if (wallPng && mat) {
         const wallSrc = volumeFromImageData(wallPng.data);
         finishVolume(wallSrc, surround);
-        const punched = maskVolumeWithOpening(wallSrc.volume, wallSrc.dims, frameVol.volume, frameVol.dims);
-        const arch = solidifyArchVolume(punched, wallSrc.dims);
-        const surroundWorld = makeArchToWorld(view.face, view.tx, view.tz, arch.dims);
-        const frameGeo = meshVolume(
-          arch.volume,
-          arch.dims,
-          surroundWorld,
-          view.tx,
-          view.tz,
-          torches,
-          beams,
-          true
+        const style = doorOpeningStyle(visual.x, visual.y);
+        const punched = punchOpeningRect(wallSrc.volume, wallSrc.dims, openingPunchRect(style));
+        const plateWorld = makeToWorld(view.face, view.tx, view.tz, wallSrc.dims, LAYER_SIZE, CELL, 'center');
+        const plate = greedyMesh(punched, wallSrc.dims, plateWorld, { cullNeg: [false, false, false] });
+        projectArchOpeningUvs(
+          plate.mesh.positions,
+          plate.mesh.normals,
+          plate.mesh.uvs,
+          face,
+          CELL,
+          faceUOffset(face, view.tx, view.tz)
         );
+        const items = [
+          { mesh: plate.mesh, tx: view.tx, tz: view.tz },
+          ...openingSlabMeshes(style, face, view.tx, view.tz).map((mesh) => ({
+            mesh,
+            tx: view.tx,
+            tz: view.tz
+          }))
+        ];
+        const frameGeo = geometryWithBake(items, torches, beams);
         if (frameGeo) {
-          projectArchUvs(frameGeo, face, view.tx, view.tz);
           const frame = new THREE.Mesh(frameGeo, mat);
           frame.name = `door-frame:${visual.x},${visual.y}:${face}`;
           frame.userData.surroundFile = surround.file;
           frame.userData.surroundLook = surround.key;
+          frame.userData.doorStyle = style;
           frame.castShadow = true;
           frame.receiveShadow = true;
           frame.frustumCulled = false;

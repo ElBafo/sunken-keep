@@ -24,6 +24,11 @@ Beams are slim ribs ~8–10 cm, on the grid, one direction per room, flush with 
 
 Doors, arches, and secret-wall nooks use the same stone as the surrounding room. Arches and openings have real depth (reveal / soffit). Secret walls look normal except one slightly odd brick.
 
+Doorways are big flat slabs, not curves — a curved soffit reads as a strip of thin stones at phone resolution.
+
+- **Main doors** (between halls): faceted opening. Straight vertical jambs, two 45° chamfer slabs, and one flat keystone/lintel on top. 3–5 large stones per side, visible joints, each face UV’d at wall density.
+- **Side doors** (small rooms, corridors, pantry / cellar / lair): flat lintel. Straight jambs plus one heavy stone beam across the top, slightly taller than a brick course, with chipped worn ends.
+
 ## Tiles and density
 
 Tiles share edges so joints run straight across (walls, slabs, floor). Texel density matches between walls, floor, and ceiling. Floor and ceiling are 256 px per 2 m cell.
