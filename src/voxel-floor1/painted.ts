@@ -102,7 +102,7 @@ export function paintedShellMaterial(
   const cutout = file.startsWith('ceiling_cracked');
   const rubble = isRubbleCeilingFile(file);
   const wood = isWoodCeilingFile(file);
-  if (wood) enableWoodSampling(map);
+  if (wood || rubble) enableWoodSampling(map);
   else enablePaintedSampling(map);
   if (rubble) {
     enableRubbleRepeat(map);

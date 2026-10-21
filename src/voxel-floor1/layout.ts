@@ -273,7 +273,9 @@ export function enumerateFaces(map: FloorMap): FaceJob[] {
           wallFace: spec.wallFace,
           bulge: look?.bulge ?? 0,
           look,
-          uOffset: faceUOffset(spec.face, x, z),
+          // Unique knot panels are a full 0–1 composition. A running U plus
+          // ClampToEdge smears one texel column into horizontal streaks.
+          uOffset: knot ? 0 : faceUOffset(spec.face, x, z),
           uvRot: 0,
           uvScale: 1
         });

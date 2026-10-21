@@ -190,10 +190,8 @@ export async function buildFloor1(
     }
     const rough = roughByBatch.get(batch);
     if (!tex || !rough) continue;
-    if (batch.startsWith('walls_floor1/')) {
-      tex.wrapS = THREE.RepeatWrapping;
-      rough.wrapS = THREE.RepeatWrapping;
-    }
+    tex.wrapS = THREE.RepeatWrapping;
+    rough.wrapS = THREE.RepeatWrapping;
     const mat = voxelMaterial(tex, rough);
     mat.name = batch;
     if (!realLights) patchBakeMaterial(mat);

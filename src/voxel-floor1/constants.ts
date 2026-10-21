@@ -78,8 +78,12 @@ export const PLANK_CEILING_VARIANTS = [
   'ceiling_planks_3.png'
 ] as const;
 export const CRACKED_CEILING_FILE = 'ceiling_cracked.png';
-/** Rubble stones tile 2×2 in each CELL so they read half-size. */
-export const RUBBLE_UV_SCALE = 2;
+/** One 256² rubble tile per 2 m cell — same density as the floor, readable on a phone. */
+export const RUBBLE_UV_SCALE = 1;
+/** Door / arch reveal into the opening. Front stays a 3 cm room-side relief. */
+export const ARCH_DEPTH = 0.32;
+export const ARCH_FRONT = 0.03;
+export const ARCH_LAYERS = Math.round((ARCH_DEPTH + ARCH_FRONT) / LAYER_SIZE);
 
 /** Heavy stone band at the wall–ceiling join. 256×64 tile spans one CELL. */
 export const CORNICE_HEIGHT = 0.32;

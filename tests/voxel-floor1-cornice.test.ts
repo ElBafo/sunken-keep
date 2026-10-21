@@ -9,12 +9,15 @@ import {
   CORNICE_SHADOW_ROWS
 } from '../src/voxel-floor1/constants';
 import {
+  CORNICE_U_SCALE,
   corniceFamilyForKind,
   corniceFileForFamily,
+  cornicePieces,
   corniceShadowV,
   listCorniceSegments,
   meshCornice,
-  setCorniceUvs
+  setCorniceUvs,
+  wearCornicePixels
 } from '../src/voxel-floor1/cornice';
 import { floor1Map, listDoors, listSecrets, openingViews } from '../src/voxel-floor1/layout';
 import { lookForZoneBase, zoneAt } from '../src/voxel-floor1/wall-look';
@@ -53,7 +56,10 @@ describe('floor-1 cornice', () => {
     expect(props).toContain('meshCornice');
     expect(props).toContain('listCorniceSegments');
     expect(src).toContain('mergeGeometries');
+    expect(src).toContain('wearCornicePixels');
+    expect(src).toContain('cornicePieces');
     expect(src).not.toContain('ShaderMaterial');
+    expect(brick.material).toMatchObject({ roughness: 1, specularIntensity: 0 });
   });
 
   it('follows the zone wall family and covers secret and door faces', () => {
@@ -98,5 +104,21 @@ describe('floor-1 cornice', () => {
     expect(Math.min(...front)).toBeGreaterThan(corniceShadowV('slab') + 0.05);
     expect(src).toContain('shadowV');
     expect(src).toContain('frontV0');
+    expect(CORNICE_U_SCALE).toBeCloseTo(0.5, 5);
+    expect(sample!.uOffset).toBe(sample!.tx);
+  });
+
+  it('wears the strip and splits each band so corners chip', () => {
+    const data = new Uint8ClampedArray(16 * 8 * 4);
+    data.fill(200);
+    for (let i = 3; i < data.length; i += 4) data[i] = 255;
+    wearCornicePixels({ width: 16, height: 8, data }, 'slab');
+    const luma = data[0] * 0.2126 + data[1] * 0.7152 + data[2] * 0.0722;
+    expect(luma).toBeLessThan(180);
+    const sample = segs.find((s) => s.face === 'N' && s.family === 'brick');
+    expect(sample).toBeTruthy();
+    const pieces = cornicePieces(sample!);
+    expect(pieces.length).toBeGreaterThan(3);
+    expect(pieces.some((p) => p.sy < CORNICE_HEIGHT - 0.01 || Math.min(p.sx, p.sz) < CORNICE_DEPTH - 0.01)).toBe(true);
   });
 });

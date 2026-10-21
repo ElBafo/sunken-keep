@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { volumeFromImageData } from '../voxel-lab/classify';
-import { makeToWorld, type FaceId } from '../voxel-lab/faces';
+import { makeToWorld, tileCorner, type FaceId } from '../voxel-lab/faces';
 import { loadPng, pbrMap, textureFromPixels, voxelMaterial } from '../voxel-lab/materials';
 import { greedyMesh } from '../voxel-lab/mesher';
 import {
@@ -13,6 +13,9 @@ import {
   type FarTorch
 } from './bake';
 import {
+  ARCH_DEPTH,
+  ARCH_FRONT,
+  ARCH_LAYERS,
   CELL,
   DOOR_CLOSE_MS,
   DOOR_OPEN_MS,
@@ -21,6 +24,7 @@ import {
   DOOR_UNLOCK_LEAD_MS,
   LAYER_SIZE
 } from './constants';
+import { remapDegenerateUvs } from './uv-audit';
 import { floor1Sconces, floor1Sunbeams } from './fixtures';
 import {
   listDoors,
@@ -306,6 +310,76 @@ function shiftFaceU(geo: THREE.BufferGeometry, face: string, tx: number, tz: num
   uv.needsUpdate = true;
 }
 
+/** Solid stone through the reveal; keep the painted relief on the room-side layers. */
+export function solidifyArchVolume(
+  wall: Uint8Array,
+  dims: [number, number, number],
+  newD = ARCH_LAYERS
+): { volume: Uint8Array; dims: [number, number, number] } {
+  const [W, H, D] = dims;
+  const slice = W * H;
+  const out = new Uint8Array(W * H * newD);
+  const back = Math.max(0, newD - D);
+  for (let v = 0; v < H; v++) {
+    for (let u = 0; u < W; u++) {
+      let solid = false;
+      for (let d = 0; d < D; d++) {
+        if (wall[u + v * W + d * slice]) {
+          solid = true;
+          break;
+        }
+      }
+      if (!solid) continue;
+      for (let d = 0; d < back; d++) out[u + v * W + d * slice] = 1;
+      for (let d = 0; d < D && back + d < newD; d++) {
+        if (wall[u + v * W + d * slice]) out[u + v * W + (back + d) * slice] = 1;
+      }
+    }
+  }
+  return { volume: out, dims: [W, H, newD] };
+}
+
+/**
+ * d=0 is the back of the reveal (into the opening). d=D is the room-side
+ * face, 3 cm proud like the neighbouring walls.
+ */
+export function makeArchToWorld(
+  face: FaceId,
+  tileX: number,
+  tileZ: number,
+  dims: [number, number, number],
+  cell = CELL
+): (u: number, v: number, d: number) => [number, number, number] {
+  const [W, H, D] = dims;
+  const sx = cell / W;
+  const sy = cell / H;
+  const layer = (ARCH_DEPTH + ARCH_FRONT) / Math.max(1, D);
+  const { ox, oz } = tileCorner(tileX, tileZ, cell, 'center');
+  switch (face) {
+    case 'N':
+      return (u, v, d) => [ox + u * sx, v * sy, oz - ARCH_DEPTH + d * layer];
+    case 'S':
+      return (u, v, d) => [ox + cell - u * sx, v * sy, oz + cell + ARCH_DEPTH - d * layer];
+    case 'W':
+      return (u, v, d) => [ox - ARCH_DEPTH + d * layer, v * sy, oz + cell - u * sx];
+    case 'E':
+      return (u, v, d) => [ox + cell + ARCH_DEPTH - d * layer, v * sy, oz + u * sx];
+    default:
+      return makeToWorld(face, tileX, tileZ, dims, LAYER_SIZE, cell, 'center');
+  }
+}
+
+function projectArchUvs(geo: THREE.BufferGeometry): void {
+  const pos = geo.getAttribute('position');
+  const uv = geo.getAttribute('uv');
+  if (!pos || !uv) return;
+  const positions = pos.array as unknown as number[];
+  const uvs = uv.array as unknown as number[];
+  remapDegenerateUvs(positions, uvs, CELL);
+  pos.needsUpdate = true;
+  uv.needsUpdate = true;
+}
+
 function meshVolume(
   volume: Uint8Array,
   dims: [number, number, number],
@@ -567,11 +641,12 @@ export async function buildFloor1Openings(
       if (wallPng && mat) {
         const wallSrc = volumeFromImageData(wallPng.data);
         finishVolume(wallSrc, surround);
-        const surroundVol = maskVolumeWithOpening(wallSrc.volume, wallSrc.dims, frameVol.volume, frameVol.dims);
-        const surroundWorld = makeToWorld(view.face, view.tx, view.tz, wallSrc.dims, LAYER_SIZE, CELL, 'center');
+        const punched = maskVolumeWithOpening(wallSrc.volume, wallSrc.dims, frameVol.volume, frameVol.dims);
+        const arch = solidifyArchVolume(punched, wallSrc.dims);
+        const surroundWorld = makeArchToWorld(view.face, view.tx, view.tz, arch.dims);
         const frameGeo = meshVolume(
-          surroundVol,
-          wallSrc.dims,
+          arch.volume,
+          arch.dims,
           surroundWorld,
           view.tx,
           view.tz,
@@ -580,6 +655,7 @@ export async function buildFloor1Openings(
           true
         );
         if (frameGeo) {
+          projectArchUvs(frameGeo);
           shiftFaceU(frameGeo, face, view.tx, view.tz);
           const frame = new THREE.Mesh(frameGeo, mat);
           frame.name = `door-frame:${visual.x},${visual.y}:${face}`;
