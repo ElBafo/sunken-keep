@@ -697,7 +697,12 @@ function detectOversizedPadlock(
   return seed;
 }
 
+/**
+ * Tight lock + shackle + keyhole mask. Band rows stay iron. A 1 px dilate
+ * clears the outline without eating neighbouring planks.
+ */
 function padlockMask(
+  src: ArrayLike<number>,
   width: number,
   leaf: LeafRect,
   lock: LockBlob,
@@ -705,20 +710,135 @@ function padlockMask(
 ): Set<number> {
   const key = (x: number, y: number) => y * width + x;
   const mask = new Set<number>();
-  // Cover the shackle above the body. Replacing the whole box from
-  // same-column donors continues planks; leftover lock pixels cannot hide.
-  const x0 = Math.max(leaf.x0 + 2, lock.x0 - 3);
-  const x1 = Math.min(leaf.x1 - 3, lock.x1 + 3);
+  for (const [x, y] of lock.cells) {
+    if (!bandRows.has(y)) mask.add(key(x, y));
+  }
+  const x0 = Math.max(leaf.x0, lock.x0 - 4);
+  const x1 = Math.min(leaf.x1 - 1, lock.x1 + 4);
   const y0 = Math.max(leaf.y0, lock.y0 - 16);
-  const y1 = Math.min(leaf.y1 - 1, lock.y1 + 8);
+  const y1 = Math.min(leaf.y1 - 1, lock.y1 + 4);
   for (let y = y0; y <= y1; y++) {
     if (bandRows.has(y)) continue;
-    for (let x = x0; x <= x1; x++) mask.add(key(x, y));
+    for (let x = x0; x <= x1; x++) {
+      const [r, g, b] = srcRgb(src, width, x, y);
+      if (isMetalTone(r, g, b)) {
+        mask.add(key(x, y));
+        continue;
+      }
+      if (
+        x >= lock.x0 - 2 &&
+        x <= lock.x1 + 2 &&
+        !isWoodTone(r, g, b) &&
+        pixelLuma(r, g, b) < 0.18
+      ) {
+        mask.add(key(x, y));
+      }
+    }
   }
+  const extra: number[] = [];
+  const nbrs = [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1]
+  ];
+  for (const k of mask) {
+    const x = k % width;
+    const y = (k - x) / width;
+    for (const [dx, dy] of nbrs) {
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < leaf.x0 || nx >= leaf.x1 || ny < leaf.y0 || ny >= leaf.y1) continue;
+      if (bandRows.has(ny)) continue;
+      extra.push(key(nx, ny));
+    }
+  }
+  for (const k of extra) mask.add(k);
   return mask;
 }
 
+/** Board gaps from clean rows above the first iron band — never from lock shadow. */
+function detectCleanGapColumns(
+  src: ArrayLike<number>,
+  width: number,
+  leaf: LeafRect,
+  bandRows: Set<number>
+): Set<number> {
+  const firstBand = bandRows.size ? Math.min(...bandRows) : leaf.y0 + 10;
+  const gaps = new Set<number>();
+  for (let x = leaf.x0; x < leaf.x1; x++) {
+    let dark = 0;
+    let n = 0;
+    for (let y = leaf.y0; y < firstBand; y++) {
+      const [r, g, b] = srcRgb(src, width, x, y);
+      n += 1;
+      if (r + g + b < 0.28) dark += 1;
+    }
+    if (n > 0 && dark / n >= 0.4) gaps.add(x);
+  }
+  return gaps;
+}
+
+function plankRuns(leaf: LeafRect, gapCols: Set<number>): Array<{ x0: number; x1: number }> {
+  const runs: Array<{ x0: number; x1: number }> = [];
+  let start: number | null = null;
+  for (let x = leaf.x0; x <= leaf.x1; x++) {
+    const gap = x >= leaf.x1 || gapCols.has(x);
+    if (!gap && start === null) start = x;
+    if (gap && start !== null) {
+      runs.push({ x0: start, x1: x - 1 });
+      start = null;
+    }
+  }
+  return runs;
+}
+
+function nearGap(x: number, gapCols: Set<number>, reach = 2): boolean {
+  for (let d = 1; d <= reach; d++) {
+    if (gapCols.has(x - d) || gapCols.has(x + d)) return true;
+  }
+  return false;
+}
+
+function bestRunOffset(
+  run: { x0: number; x1: number },
+  damagedCols: Set<number>,
+  gapCols: Set<number>,
+  destIsEdge: boolean
+): number {
+  const xs: number[] = [];
+  for (let x = run.x0; x <= run.x1; x++) {
+    if (damagedCols.has(x) && nearGap(x, gapCols) === destIsEdge) xs.push(x);
+  }
+  if (!xs.length) return 0;
+  let best = 0;
+  let bestScore = -1;
+  const maxd = run.x1 - run.x0;
+  for (let off = 1; off <= maxd; off++) {
+    for (const sign of [1, -1]) {
+      const d = off * sign;
+      let score = 0;
+      for (const x of xs) {
+        const sx = x + d;
+        if (sx < run.x0 || sx > run.x1 || damagedCols.has(sx)) continue;
+        if (nearGap(sx, gapCols) !== destIsEdge) continue;
+        score += 1;
+      }
+      if (score > bestScore) {
+        bestScore = score;
+        best = d;
+      }
+    }
+  }
+  return bestScore > 0 ? best : 0;
+}
+
+/**
+ * Rebuild the old lock from whole neighbouring plank regions at the same Y
+ * (grain, knots, nail holes, dark edges). Vertical column-stretch is the smear.
+ */
 function fillPadlockHole(
+  src: ArrayLike<number>,
   out: Uint8ClampedArray,
   width: number,
   leaf: LeafRect,
@@ -726,13 +846,6 @@ function fillPadlockHole(
   bandRows: Set<number>
 ): void {
   const key = (x: number, y: number) => y * width + x;
-  let minY = 1e9;
-  let maxY = 0;
-  for (const k of mask) {
-    const y = Math.floor(k / width);
-    if (y < minY) minY = y;
-    if (y > maxY) maxY = y;
-  }
   const copy = (dx: number, dy: number, sx: number, sy: number): void => {
     const di = (dy * width + dx) * 4;
     const si = (sy * width + sx) * 4;
@@ -741,78 +854,103 @@ function fillPadlockHole(
     out[di + 2] = out[si + 2];
     out[di + 3] = out[si + 3];
   };
-  const crackRows = new Set<number>();
-  const span = Math.max(1, leaf.x1 - leaf.x0);
-  for (let y = leaf.y0; y < leaf.y1; y++) {
-    let dark = 0;
-    for (let x = leaf.x0; x < leaf.x1; x++) {
-      const i = (y * width + x) * 4;
-      if (out[i] + out[i + 1] + out[i + 2] < 48) dark += 1;
-    }
-    if (dark >= span * 0.45) crackRows.add(y);
+  const gapCols = detectCleanGapColumns(src, width, leaf, bandRows);
+  const gapList = [...gapCols].sort((a, b) => a - b);
+  const runs = plankRuns(leaf, gapCols);
+  const damagedCols = new Set<number>();
+  for (const k of mask) damagedCols.add(k % width);
+  const runOffIn = new Map<number, number>();
+  const runOffEd = new Map<number, number>();
+  for (let i = 0; i < runs.length; i++) {
+    runOffIn.set(i, bestRunOffset(runs[i], damagedCols, gapCols, false));
+    runOffEd.set(i, bestRunOffset(runs[i], damagedCols, gapCols, true));
   }
-  const colWantsGap = new Map<number, boolean>();
-  for (let x = leaf.x0; x < leaf.x1; x++) {
-    let dark = 0;
-    let n = 0;
-    for (let y = leaf.y0; y < leaf.y1; y++) {
-      if (mask.has(key(x, y)) || bandRows.has(y) || crackRows.has(y)) continue;
-      if (y >= minY && y <= maxY) continue;
-      n += 1;
-      const i = (y * width + x) * 4;
-      if (out[i] + out[i + 1] + out[i + 2] < 70) dark += 1;
-    }
-    colWantsGap.set(x, n > 0 && dark / n >= 0.5);
-  }
-  const goodDonor = (x: number, y: number): boolean => {
-    if (x < leaf.x0 || x >= leaf.x1 || y < leaf.y0 || y >= leaf.y1) return false;
-    if (mask.has(key(x, y))) return false;
-    if (bandRows.has(y) || crackRows.has(y)) return false;
-    if (!(y < minY || y > maxY)) return false;
-    const i = (y * width + x) * 4;
-    const dark = out[i] + out[i + 1] + out[i + 2] < 70;
-    if (dark && !colWantsGap.get(x)) return false;
-    return true;
+  const runIndex = (x: number): number => runs.findIndex((r) => x >= r.x0 && x <= r.x1);
+  const okDonor = (sx: number, sy: number, wantGap: boolean): boolean => {
+    if (sx < leaf.x0 || sx >= leaf.x1 || sy < leaf.y0 || sy >= leaf.y1) return false;
+    if (mask.has(key(sx, sy))) return false;
+    if (bandRows.has(sy)) return false;
+    return wantGap ? gapCols.has(sx) : !gapCols.has(sx);
   };
-  const donorOf = new Map<number, [number, number]>();
-  for (const k of mask) {
-    const x = k % width;
-    if (donorOf.has(x)) continue;
-    let above: [number, number] | null = null;
-    for (let ny = minY - 1; ny >= leaf.y0; ny--) {
-      if (goodDonor(x, ny)) {
-        above = [x, ny];
-        break;
-      }
-    }
-    let below: [number, number] | null = null;
-    for (let ny = maxY + 1; ny < leaf.y1; ny++) {
-      if (goodDonor(x, ny)) {
-        below = [x, ny];
-        break;
-      }
-    }
-    const pick = above ?? below;
-    if (pick) donorOf.set(x, pick);
-  }
   for (const k of mask) {
     const x = k % width;
     const y = (k - x) / width;
-    const pick = donorOf.get(x);
-    if (pick) {
-      copy(x, y, pick[0], pick[1]);
+    if (bandRows.has(y)) {
+      for (const sign of [-1, 1]) {
+        for (let d = 4; d < leaf.x1 - leaf.x0; d++) {
+          const sx = x + d * sign;
+          if (sx >= leaf.x0 && sx < leaf.x1 && !mask.has(key(sx, y))) {
+            copy(x, y, sx, y);
+            break;
+          }
+        }
+      }
       continue;
     }
-    for (let d = 1; d < leaf.x1 - leaf.x0; d++) {
-      const left = donorOf.get(x - d);
-      const right = donorOf.get(x + d);
-      if (left) {
-        copy(x, y, left[0], left[1]);
-        break;
+    let done = false;
+    if (gapCols.has(x)) {
+      for (const gx of gapList) {
+        if (gx !== x && okDonor(gx, y, true)) {
+          copy(x, y, gx, y);
+          done = true;
+          break;
+        }
       }
-      if (right) {
-        copy(x, y, right[0], right[1]);
-        break;
+      if (!done) {
+        const i = (y * width + x) * 4;
+        out[i] = 10;
+        out[i + 1] = 8;
+        out[i + 2] = 7;
+        out[i + 3] = 255;
+        done = true;
+      }
+    } else {
+      const ri = runIndex(x);
+      if (ri >= 0) {
+        const run = runs[ri];
+        const edge = nearGap(x, gapCols);
+        const d = (edge ? runOffEd : runOffIn).get(ri) ?? 0;
+        if (d && okDonor(x + d, y, false) && nearGap(x + d, gapCols) === edge) {
+          copy(x, y, x + d, y);
+          done = true;
+        }
+        if (!done) {
+          const rel = x - run.x0;
+          const order: number[] = [];
+          if (ri > 0) order.push(ri - 1);
+          if (ri + 1 < runs.length) order.push(ri + 1);
+          for (let i = 0; i < runs.length; i++) {
+            if (i !== ri && !order.includes(i)) order.push(i);
+          }
+          for (const oi of order) {
+            const other = runs[oi];
+            const mid = other.x0 + Math.min(rel, other.x1 - other.x0);
+            for (let k = 0; k <= other.x1 - other.x0; k++) {
+              for (const sx of [mid + k, mid - k]) {
+                if (sx < other.x0 || sx > other.x1) continue;
+                if (!okDonor(sx, y, false)) continue;
+                if (nearGap(sx, gapCols) !== edge) continue;
+                copy(x, y, sx, y);
+                done = true;
+                break;
+              }
+              if (done) break;
+            }
+            if (done) break;
+          }
+        }
+      }
+    }
+    if (!done) {
+      for (let d = 1; d < leaf.x1 - leaf.x0; d++) {
+        if (okDonor(x - d, y, false)) {
+          copy(x, y, x - d, y);
+          break;
+        }
+        if (okDonor(x + d, y, false)) {
+          copy(x, y, x + d, y);
+          break;
+        }
       }
     }
   }
@@ -834,8 +972,9 @@ function putAged(
 }
 
 /**
- * Small rusty padlock hung from a staple on the upper (middle) band,
- * a little toward +U — the opening / latch edge.
+ * Dark grey-iron padlock hung from a staple on the upper (middle) band,
+ * a little toward +U — the opening / latch edge. Shackle is a U-arc
+ * through the hasp; body is a rounded shield with a keyhole.
  */
 function paintHaspAndPadlock(
   out: Uint8ClampedArray,
@@ -845,49 +984,43 @@ function paintHaspAndPadlock(
   midBand: number[]
 ): void {
   const lockW = padlockWidthTexels(width, height);
-  const lockH = lockW + 3;
   const leafCx = (leaf.x0 + leaf.x1) * 0.5;
   const lockCx = Math.round(leafCx + (leaf.x1 - leaf.x0) * 0.14);
   const x0 = lockCx - Math.floor(lockW / 2);
   const by = midBand[midBand.length - 1];
-  const y0 = by - 1;
-  const outline: [number, number, number] = [0.055, 0.04, 0.03];
-  const body: [number, number, number] = [0.3, 0.2, 0.14];
-  const hi: [number, number, number] = [0.38, 0.26, 0.18];
-  const hole: [number, number, number] = [0.035, 0.025, 0.02];
-  const hasp: [number, number, number] = rustIron(0.32);
-  const hx = lockCx;
-  for (const yy of [by - 2, by - 1, by]) {
-    if (yy >= leaf.y0) {
-      putAged(out, width, hx - 1, yy, outline);
-      putAged(out, width, hx + 1, yy, outline);
-    }
-  }
-  putAged(out, width, hx - 1, by, hasp);
-  putAged(out, width, hx, by, hasp);
-  putAged(out, width, hx + 1, by, hasp);
-
+  const outline: [number, number, number] = [0.05, 0.048, 0.046];
+  const shackle: [number, number, number] = [0.21, 0.2, 0.19];
+  const hasp: [number, number, number] = [0.1, 0.095, 0.09];
+  const body: [number, number, number] = [0.23, 0.215, 0.205];
+  const hi: [number, number, number] = [0.29, 0.275, 0.26];
+  const hole: [number, number, number] = [0.028, 0.026, 0.024];
+  // 0 empty (band/plank shows through the shackle hole), 1 outline,
+  // 2 shackle, 3 hasp staple, 4 body, 5 highlight, 6 keyhole.
   const sprite: number[][] = [
     [0, 1, 1, 1, 1, 0],
-    [1, 2, 1, 1, 2, 1],
-    [1, 2, 0, 0, 2, 1],
-    [1, 2, 0, 0, 2, 1],
-    [1, 3, 2, 2, 2, 1],
-    [1, 2, 4, 4, 2, 1],
-    [1, 2, 4, 4, 2, 1],
     [1, 2, 2, 2, 2, 1],
-    [1, 1, 1, 1, 1, 1]
+    [1, 2, 0, 0, 2, 1],
+    [1, 2, 3, 3, 2, 1],
+    [1, 2, 3, 3, 2, 1],
+    [1, 5, 4, 4, 4, 1],
+    [1, 4, 6, 6, 4, 1],
+    [1, 4, 4, 4, 4, 1],
+    [0, 1, 1, 1, 1, 0]
   ];
   const cols: Record<number, [number, number, number]> = {
     1: outline,
-    2: body,
-    3: hi,
-    4: hole
+    2: shackle,
+    3: hasp,
+    4: body,
+    5: hi,
+    6: hole
   };
   const painted = new Set<number>();
   const key = (x: number, y: number) => y * width + x;
   const scaleX = lockW / 6;
+  const lockH = Math.max(sprite.length, Math.round(sprite.length * scaleX));
   const scaleY = lockH / sprite.length;
+  const y0 = by - Math.round(4 * scaleY);
   for (let j = 0; j < lockH; j++) {
     const sj = Math.min(sprite.length - 1, Math.floor(j / scaleY));
     for (let i = 0; i < lockW; i++) {
@@ -908,9 +1041,9 @@ function paintHaspAndPadlock(
     const sy = y + 1;
     if (sx >= width || sy >= height || painted.has(key(sx, sy))) continue;
     const i = (sy * width + sx) * 4;
-    out[i] = Math.round(out[i] * 0.45);
-    out[i + 1] = Math.round(out[i + 1] * 0.42);
-    out[i + 2] = Math.round(out[i + 2] * 0.4);
+    out[i] = Math.round(out[i] * 0.55);
+    out[i + 1] = Math.round(out[i + 1] * 0.52);
+    out[i + 2] = Math.round(out[i + 2] * 0.5);
   }
 }
 
@@ -926,8 +1059,8 @@ function shrinkOversizedPadlock(
   const bandRows = new Set(groups.flat());
   const lock = detectOversizedPadlock(src, width, height, leaf, bandRows);
   if (!lock) return;
-  const mask = padlockMask(width, leaf, lock, bandRows);
-  fillPadlockHole(out, width, leaf, mask, bandRows);
+  const mask = padlockMask(src, width, leaf, lock, bandRows);
+  fillPadlockHole(src, out, width, leaf, mask, bandRows);
   if (groups[0]?.length) paintHaspAndPadlock(out, width, height, leaf, groups[0]);
 }
 

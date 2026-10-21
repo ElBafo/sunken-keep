@@ -221,9 +221,9 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     for (const [dx, dy] of [
       [-5, 0],
       [-3, 2],
-      [4, -2],
-      [5, 1],
-      [0, -8]
+      [3, -2],
+      [-4, 4],
+      [0, -6]
     ] as const) {
       const i = ((oldCy + dy) * png.width + (oldCx + dx)) * 4;
       const r = aged[i] / 255;
@@ -235,22 +235,55 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     }
     expect(woodish, 'old lock area is continued plank, not leftover iron').toBeGreaterThanOrEqual(3);
 
+    const colVar = (x0: number, x1: number, y0: number, y1: number): number => {
+      let acc = 0;
+      let n = 0;
+      for (let x = x0; x <= x1; x++) {
+        const vals: number[] = [];
+        for (let y = y0; y <= y1; y++) {
+          const p = (y * png.width + x) * 4;
+          vals.push(0.2126 * aged[p] + 0.7152 * aged[p + 1] + 0.0722 * aged[p + 2]);
+        }
+        const mean = vals.reduce((s, v) => s + v, 0) / vals.length;
+        acc += vals.reduce((s, v) => s + (v - mean) ** 2, 0) / vals.length;
+        n += 1;
+      }
+      return acc / Math.max(1, n);
+    };
+    const oldVar = colVar(oldCx - 5, oldCx + 2, oldCy - 4, oldCy + 8);
+    const nbrVar = colVar(leaf.x0 + 4, leaf.x0 + 10, oldCy - 4, oldCy + 8);
+    expect(oldVar, 'old lock columns keep plank grain, not a column-smear').toBeGreaterThan(nbrVar * 0.35);
+
     const lockW = padlockWidthTexels(png.width, png.height);
     const leafCx = (leaf.x0 + leaf.x1) * 0.5;
     const lockCx = Math.round(leafCx + (leaf.x1 - leaf.x0) * 0.14);
     expect(lockCx).toBeGreaterThan(leafCx);
-    const lockY = leaf.y0 + 14;
+    const lockY = leaf.y0 + 10;
     let dark = 0;
-    let body = 0;
-    for (let y = lockY; y < lockY + lockW + 4; y++) {
-      for (let x = lockCx - 4; x <= lockCx + 4; x++) {
+    let iron = 0;
+    let brownLock = 0;
+    let lockPx = 0;
+    for (let y = lockY; y < lockY + lockW + 8; y++) {
+      for (let x = lockCx - 3; x <= lockCx + 2; x++) {
         const p = (y * png.width + x) * 4;
-        const L = (0.2126 * aged[p] + 0.7152 * aged[p + 1] + 0.0722 * aged[p + 2]) / 255;
-        if (L < 0.1) dark += 1;
-        else if (L < 0.28 && aged[p] > aged[p + 2]) body += 1;
+        const r = aged[p] / 255;
+        const g = aged[p + 1] / 255;
+        const b = aged[p + 2] / 255;
+        const L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        const sat = (Math.max(r, g, b) - Math.min(r, g, b)) / Math.max(r, g, b, 1e-6);
+        if (L < 0.12) {
+          dark += 1;
+          lockPx += 1;
+        } else if (L < 0.32 && sat < 0.28) {
+          iron += 1;
+          lockPx += 1;
+          if (r > b + 0.05) brownLock += 1;
+        }
       }
     }
-    expect(dark + body, 'small lock stays readable on the middle band').toBeGreaterThan(10);
+    expect(dark, 'outline and keyhole stay readable').toBeGreaterThan(6);
+    expect(dark + iron, 'small grey-iron lock stays readable on the middle band').toBeGreaterThan(12);
+    expect(brownLock / Math.max(1, lockPx), 'padlock is dark grey iron, not brown wood').toBeLessThan(0.25);
 
     let maxChan = 0;
     let maxLuma = 0;
