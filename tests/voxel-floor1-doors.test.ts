@@ -133,7 +133,8 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     expect(openings).toContain('openingHoleMask');
     expect(openings).toContain('solidifyArchVolume');
     expect(openings).toContain('makeArchToWorld');
-    expect(openings).toContain('remapDegenerateUvs');
+    expect(openings).toContain('projectArchOpeningUvs');
+    expect(openings).toContain('wrapT = THREE.RepeatWrapping');
     expect(openings).toContain('warnMissingWallTexture');
     expect(openings).toContain('familyBaseFile');
     expect(openings).not.toContain('using door_open');

@@ -24,7 +24,7 @@ import {
   DOOR_UNLOCK_LEAD_MS,
   LAYER_SIZE
 } from './constants';
-import { remapDegenerateUvs } from './uv-audit';
+import { projectArchOpeningUvs } from './uv-audit';
 import { floor1Sconces, floor1Sunbeams } from './fixtures';
 import {
   listDoors,
@@ -369,15 +369,91 @@ export function makeArchToWorld(
   }
 }
 
-function projectArchUvs(geo: THREE.BufferGeometry): void {
+function projectArchUvs(
+  geo: THREE.BufferGeometry,
+  face: 'N' | 'E' | 'S' | 'W',
+  tx: number,
+  tz: number
+): void {
   const pos = geo.getAttribute('position');
+  const nrm = geo.getAttribute('normal');
   const uv = geo.getAttribute('uv');
-  if (!pos || !uv) return;
-  const positions = pos.array as unknown as number[];
-  const uvs = uv.array as unknown as number[];
-  remapDegenerateUvs(positions, uvs, CELL);
-  pos.needsUpdate = true;
+  if (!pos || !nrm || !uv) return;
+  projectArchOpeningUvs(
+    pos.array as unknown as number[],
+    nrm.array as unknown as number[],
+    uv.array as unknown as number[],
+    face,
+    CELL,
+    faceUOffset(face, tx, tz)
+  );
   uv.needsUpdate = true;
+}
+
+/**
+ * Punch, extrude, mesh, and project one door surround so tests can audit
+ * every floor-1 arch without the browser texture loader.
+ */
+export function meshArchOpening(
+  wall: Uint8Array,
+  wallDims: [number, number, number],
+  opening: Uint8Array,
+  openingDims: [number, number, number],
+  face: 'N' | 'E' | 'S' | 'W',
+  tx: number,
+  tz: number
+): { positions: number[]; normals: number[]; uvs: number[]; quads: number } {
+  const punched = maskVolumeWithOpening(wall, wallDims, opening, openingDims);
+  const arch = solidifyArchVolume(punched, wallDims);
+  const toWorld = makeArchToWorld(face, tx, tz, arch.dims);
+  const meshed = greedyMesh(arch.volume, arch.dims, toWorld, { cullNeg: [false, false, false] });
+  const uvs = meshed.mesh.uvs.slice();
+  projectArchOpeningUvs(
+    meshed.mesh.positions,
+    meshed.mesh.normals,
+    uvs,
+    face,
+    CELL,
+    faceUOffset(face, tx, tz)
+  );
+  return {
+    positions: meshed.mesh.positions,
+    normals: meshed.mesh.normals,
+    uvs,
+    quads: meshed.quads
+  };
+}
+
+/** Door-shaped hole (jambs + semicircle soffit) in voxel U,V. v=0 is the floor. */
+export function makeArchHoleMask(W: number, H: number): Uint8Array {
+  const hole = new Uint8Array(W * H);
+  const x0 = Math.floor(W * 0.2);
+  const x1 = Math.ceil(W * 0.8);
+  const spring = Math.floor(H * 0.62);
+  const cx = (x0 + x1 - 1) * 0.5;
+  const r = (x1 - x0) * 0.5;
+  for (let v = 0; v < H; v++) {
+    for (let u = 0; u < W; u++) {
+      const inJambs = u >= x0 && u < x1 && v <= spring;
+      const dy = v - spring;
+      const dx = u - cx;
+      const inArch = v > spring && dx * dx + dy * dy <= r * r;
+      if (inJambs || inArch) hole[u + v * W] = 1;
+    }
+  }
+  return hole;
+}
+
+export function holeMaskToVolume(mask: Uint8Array, W: number, H: number, D: number): Uint8Array {
+  const volume = new Uint8Array(W * H * D);
+  const slice = W * H;
+  for (let v = 0; v < H; v++) {
+    for (let u = 0; u < W; u++) {
+      if (mask[u + v * W]) continue;
+      for (let d = 0; d < D; d++) volume[u + v * W + d * slice] = 1;
+    }
+  }
+  return volume;
 }
 
 function meshVolume(
@@ -593,6 +669,7 @@ export async function buildFloor1Openings(
     const hit = secretMats.get(look.key);
     if (hit) return hit;
     png.texture.wrapS = THREE.RepeatWrapping;
+    png.texture.wrapT = THREE.RepeatWrapping;
     const mat = makeMat(png, src);
     secretMats.set(look.key, mat);
     return mat;
@@ -611,6 +688,7 @@ export async function buildFloor1Openings(
     const png = wallPngOrFamilyBase(look, `door-surround:${look.file}`);
     if (!png) return null;
     png.texture.wrapS = THREE.RepeatWrapping;
+    png.texture.wrapT = THREE.RepeatWrapping;
     const src = volumeFromImageData(png.data);
     finishVolume(src, look);
     const mat = makeMat(png, src);
@@ -655,8 +733,7 @@ export async function buildFloor1Openings(
           true
         );
         if (frameGeo) {
-          projectArchUvs(frameGeo);
-          shiftFaceU(frameGeo, face, view.tx, view.tz);
+          projectArchUvs(frameGeo, face, view.tx, view.tz);
           const frame = new THREE.Mesh(frameGeo, mat);
           frame.name = `door-frame:${visual.x},${visual.y}:${face}`;
           frame.userData.surroundFile = surround.file;
