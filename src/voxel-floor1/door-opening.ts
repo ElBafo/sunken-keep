@@ -1,6 +1,6 @@
 import { tileCorner } from '../voxel-lab/faces';
 import type { MeshArrays } from '../voxel-lab/mesher';
-import { ARCH_DEPTH, ARCH_FRONT, CELL, CORNICE_HEIGHT, DOOR_PANEL_INSET, WALL_TEXELS } from './constants';
+import { ARCH_DEPTH, ARCH_FRONT, CELL, CORNICE_HEIGHT, WALL_TEXELS } from './constants';
 import { faceUOffset } from './wall-look';
 
 export type DoorOpeningStyle = 'faceted' | 'lintel';
@@ -42,10 +42,11 @@ export const BACK = 0;
 /** Door leaf sits just inside the room-side plate. */
 export const LEAF_PAD = 0.03;
 export const LEAF_THICK = 0.055;
-export const LEAF_FRONT = ROOM_DEPTH - DOOR_PANEL_INSET;
+/** Quarter of the 0.96 m reveal — frame depth reads from the room. */
+export const LEAF_REVEAL = ARCH_DEPTH * 0.25;
+export const LEAF_FRONT = ROOM_DEPTH - LEAF_REVEAL;
 export const LEAF_BACK = LEAF_FRONT - LEAF_THICK;
-/** Crop of door_panel.png wood, skipping the painted stone surround. */
-export const WOOD_UV = { u0: 0.23, u1: 0.77, v0: 0.1, v1: 0.68 } as const;
+export const IRON_PROUD = 0.01;
 
 export type QuadRole =
   | 'jamb-top'
@@ -56,7 +57,8 @@ export type QuadRole =
   | 'chip'
   | 'corner'
   | 'chamfer-end'
-  | 'leaf';
+  | 'leaf'
+  | 'iron';
 export type QuadKind = 'front' | 'soffit' | 'back';
 
 export type OpeningQuad = {
@@ -282,6 +284,7 @@ export function listFacetedHeadQuads(): OpeningQuad[] {
     corners: soffitRect(u1, u1, 0, leftTop0)
   });
 
+  const ft = kb + kh;
   out.push({
     role: 'corner',
     kind: 'front',
@@ -296,10 +299,30 @@ export function listFacetedHeadQuads(): OpeningQuad[] {
     role: 'corner',
     kind: 'front',
     corners: [
+      [u0 - th, kb, FRONT],
+      [u0 + ch, kb, FRONT],
+      [u0 + ch, ft, FRONT],
+      [u0 - th, ft, FRONT]
+    ]
+  });
+  out.push({
+    role: 'corner',
+    kind: 'front',
+    corners: [
       [u1, jt, FRONT],
       [u1 + th, jt, FRONT],
       [u1 + th, kb, FRONT],
       [u1 - ch, kb, FRONT]
+    ]
+  });
+  out.push({
+    role: 'corner',
+    kind: 'front',
+    corners: [
+      [u1 - ch, kb, FRONT],
+      [u1 + th, kb, FRONT],
+      [u1 + th, ft, FRONT],
+      [u1 - ch, ft, FRONT]
     ]
   });
   out.push({
@@ -538,6 +561,75 @@ export function listLeafHeadRoles(style: DoorOpeningStyle): QuadRole[] {
   return ['leaf', 'leaf', 'leaf'];
 }
 
+function ironRect(a0: number, a1: number, u0: number, u1: number): OpeningQuad['corners'] {
+  const d = LEAF_FRONT + IRON_PROUD;
+  return [
+    [a0, u0, d],
+    [a1, u0, d],
+    [a1, u1, d],
+    [a0, u1, d]
+  ];
+}
+
+/** Dark rusty bands, studs, and a ring handle. */
+export function listIronQuads(style: DoorOpeningStyle): OpeningQuad[] {
+  const pad = LEAF_PAD;
+  const a0 = OPEN_U0 + pad;
+  const a1 = OPEN_U1 - pad;
+  const top = style === 'lintel' ? JAMB_TOP_LINTEL - pad : JAMB_TOP_FACETED + CHAMFER - pad;
+  const out: OpeningQuad[] = [];
+  const push = (x0: number, x1: number, y0: number, y1: number): void => {
+    out.push({ role: 'iron', kind: 'front', corners: ironRect(x0, x1, y0, y1) });
+  };
+  const strap = 0.045;
+  push(a0, a0 + strap, 0.08, top - 0.05);
+  push(a1 - strap, a1, 0.08, top - 0.05);
+  const bh = 0.04;
+  const bands = [0.13, 0.44, Math.min(0.9, top - 0.14)];
+  const stud = 0.024;
+  for (const y of bands) {
+    push(a0, a1, y, y + bh);
+    for (let i = 0; i < 5; i++) {
+      const cx = a0 + ((a1 - a0) * (i + 0.5)) / 5;
+      const cy = y + bh * 0.5;
+      push(cx - stud * 0.5, cx + stud * 0.5, cy - stud * 0.5, cy + stud * 0.5);
+    }
+  }
+  const cx = (a0 + a1) * 0.5;
+  const cy = 0.7;
+  const s = 1 / Math.SQRT2;
+  const ring: Array<[number, number]> = [
+    [1, 0],
+    [s, s],
+    [0, 1],
+    [-s, s],
+    [-1, 0],
+    [-s, -s],
+    [0, -1],
+    [s, -s]
+  ];
+  const rOut = 0.07;
+  const rIn = 0.044;
+  const d = LEAF_FRONT + IRON_PROUD;
+  for (let i = 0; i < 8; i++) {
+    const j = (i + 1) & 7;
+    const a = ring[i];
+    const b = ring[j];
+    out.push({
+      role: 'iron',
+      kind: 'front',
+      corners: [
+        [cx + a[0] * rIn, cy + a[1] * rIn, d],
+        [cx + a[0] * rOut, cy + a[1] * rOut, d],
+        [cx + b[0] * rOut, cy + b[1] * rOut, d],
+        [cx + b[0] * rIn, cy + b[1] * rIn, d]
+      ]
+    });
+  }
+  push(cx - 0.012, cx + 0.012, cy + rOut - 0.008, cy + rOut + 0.048);
+  return out;
+}
+
 type FaceNESW = 'N' | 'E' | 'S' | 'W';
 
 function mapLocal(face: FaceNESW, tx: number, tz: number, a: number, u: number, d: number): [number, number, number] {
@@ -554,10 +646,9 @@ function mapLocal(face: FaceNESW, tx: number, tz: number, a: number, u: number, 
   }
 }
 
+/** Vertical boards at ceiling-plank density (256 px / 2 m). */
 function woodUv(a: number, u: number): [number, number] {
-  const tu = WOOD_UV.u0 + ((a - OPEN_U0) / OPEN_WIDTH) * (WOOD_UV.u1 - WOOD_UV.u0);
-  const tv = WOOD_UV.v0 + (u / facetedTop()) * (WOOD_UV.v1 - WOOD_UV.v0);
-  return [tu, tv];
+  return [u / CELL, (a - OPEN_U0) / CELL];
 }
 
 function pushQuad(
@@ -622,12 +713,21 @@ export function openingSlabMeshes(
   return { stone, lintel };
 }
 
-export function leafMeshes(style: DoorOpeningStyle, face: FaceNESW, tx: number, tz: number): MeshArrays {
-  const mesh = emptyMesh();
+export function leafMeshes(
+  style: DoorOpeningStyle,
+  face: FaceNESW,
+  tx: number,
+  tz: number
+): { wood: MeshArrays; iron: MeshArrays } {
+  const wood = emptyMesh();
+  const iron = emptyMesh();
   for (const q of listLeafQuads(style)) {
-    pushQuad(mesh, q.corners, q.kind, face, tx, tz, true);
+    pushQuad(wood, q.corners, q.kind, face, tx, tz, true);
   }
-  return mesh;
+  for (const q of listIronQuads(style)) {
+    pushQuad(iron, q.corners, q.kind, face, tx, tz);
+  }
+  return { wood, iron };
 }
 
 export function openingUsesWallTexels(): number {

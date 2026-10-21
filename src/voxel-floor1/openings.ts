@@ -619,15 +619,14 @@ export async function buildFloor1Openings(
 
   const wallFiles = [...FLOOR1_WALL_FILES];
   const pngs = await Promise.all([
-    loadPng('door_panel.png'),
+    loadPng('ceiling_planks_1.png'),
     ...wallFiles.map((file) => loadPng(file))
   ]);
-  const panelPng = pngs[0];
-  const wallPngs = new Map<string, (typeof panelPng)>();
+  const plankPng = pngs[0];
+  const wallPngs = new Map<string, (typeof plankPng)>();
   wallFiles.forEach((file, i) => wallPngs.set(file, pngs[i + 1]));
-  const panelVol = volumeFromImageData(panelPng.data);
-  panelPng.texture.wrapS = THREE.ClampToEdgeWrapping;
-  panelPng.texture.wrapT = THREE.ClampToEdgeWrapping;
+  plankPng.texture.wrapS = THREE.RepeatWrapping;
+  plankPng.texture.wrapT = THREE.RepeatWrapping;
 
   const makeMat = (png: { texture: THREE.Texture }, vol: { roughness: Uint8Array; dims: [number, number, number] }) => {
     const mat = voxelMaterial(png.texture, pbrMap(vol.roughness, vol.dims[0], vol.dims[1]));
@@ -635,7 +634,29 @@ export async function buildFloor1Openings(
     if (!realLights) patchBakeMaterial(mat);
     return mat;
   };
-  const panelMat = makeMat(panelPng, panelVol);
+  const woodMat = new THREE.MeshPhysicalMaterial({
+    map: plankPng.texture,
+    color: new THREE.Color(0.7, 0.68, 0.64),
+    roughness: 1,
+    metalness: 0,
+    clearcoat: 0,
+    sheen: 0,
+    specularIntensity: 0,
+    envMapIntensity: 0
+  });
+  woodMat.fog = true;
+  if (!realLights) patchBakeMaterial(woodMat);
+  const ironMat = new THREE.MeshPhysicalMaterial({
+    color: new THREE.Color(0.18, 0.14, 0.11),
+    roughness: 1,
+    metalness: 0,
+    clearcoat: 0,
+    sheen: 0,
+    specularIntensity: 0,
+    envMapIntensity: 0
+  });
+  ironMat.fog = true;
+  if (!realLights) patchBakeMaterial(ironMat);
   const secretMats = new Map<string, THREE.MeshPhysicalMaterial>();
   const surroundMats = new Map<string, THREE.MeshPhysicalMaterial>();
   const lintelMats: THREE.MeshPhysicalMaterial[] = [];
@@ -739,20 +760,30 @@ export async function buildFloor1Openings(
         }
       }
       const leaf = leafMeshes(style, face, view.tx, view.tz);
-      if (leaf.positions.length) {
-        const leafGeo = geometryWithBake([{ mesh: leaf, tx: view.tx, tz: view.tz }], torches, beams);
-        if (leafGeo) {
-          const slider = new THREE.Group();
-          slider.name = `door-panel:${visual.x},${visual.y}:${face}`;
-          const panel = new THREE.Mesh(leafGeo, panelMat);
+      if (leaf.wood.positions.length) {
+        const woodGeo = geometryWithBake([{ mesh: leaf.wood, tx: view.tx, tz: view.tz }], torches, beams);
+        const slider = new THREE.Group();
+        slider.name = `door-panel:${visual.x},${visual.y}:${face}`;
+        if (woodGeo) {
+          const panel = new THREE.Mesh(woodGeo, woodMat);
           panel.castShadow = true;
           panel.receiveShadow = true;
           panel.frustumCulled = false;
           slider.add(panel);
-          slider.frustumCulled = false;
-          group.add(slider);
-          visual.panels.push(slider);
         }
+        if (leaf.iron.positions.length) {
+          const ironGeo = geometryWithBake([{ mesh: leaf.iron, tx: view.tx, tz: view.tz }], torches, beams);
+          if (ironGeo) {
+            const iron = new THREE.Mesh(ironGeo, ironMat);
+            iron.castShadow = true;
+            iron.receiveShadow = true;
+            iron.frustumCulled = false;
+            slider.add(iron);
+          }
+        }
+        slider.frustumCulled = false;
+        group.add(slider);
+        visual.panels.push(slider);
       }
       return;
     }
@@ -824,7 +855,8 @@ export async function buildFloor1Openings(
   }
 
   system.bindLights(torches, beams, realLights, [
-    panelMat,
+    woodMat,
+    ironMat,
     ...secretMats.values(),
     ...surroundMats.values(),
     ...lintelMats

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { CELL, CORNICE_HEIGHT } from '../src/voxel-floor1/constants';
+import { ARCH_DEPTH, CELL, CORNICE_HEIGHT } from '../src/voxel-floor1/constants';
 import { greedyMesh } from '../src/voxel-lab/mesher';
 import {
   makeArchHoleMask,
@@ -22,14 +22,18 @@ import {
   inOpeningVoid,
   JAMB_TOP_FACETED,
   JAMB_TOP_LINTEL,
+  LEAF_FRONT,
   LEAF_PAD,
+  LEAF_REVEAL,
   listHeadRoles,
+  listIronQuads,
   listLeafQuads,
   listOpeningQuads,
   lintelTop,
   OPEN_U0,
   OPEN_U1,
   openingPunchRect,
+  ROOM_DEPTH,
   wallAboveOpening
 } from '../src/voxel-floor1/door-opening';
 import { enumerateFaces, floor1Map, listDoors, openingViews } from '../src/voxel-floor1/layout';
@@ -88,7 +92,14 @@ describe('floor-1 door opening styles', () => {
     );
     expect(headFronts).toHaveLength(5);
     expect(headFronts.map((q) => q.role)).toEqual(['jamb-top', 'chamfer', 'keystone', 'chamfer', 'jamb-top']);
-    expect(quads.filter((q) => q.role === 'corner' && q.kind === 'front')).toHaveLength(2);
+    expect(quads.filter((q) => q.role === 'corner' && q.kind === 'front')).toHaveLength(4);
+    expect(
+      quads.some(
+        (q) =>
+          q.role === 'corner' &&
+          q.corners.some((c) => c[0] < OPEN_U0 + CHAMFER && c[1] >= facetedTop() - 1e-6)
+      )
+    ).toBe(true);
     expect(quads.filter((q) => q.role === 'chamfer' && q.kind === 'soffit')).toHaveLength(2);
     expect(quads.filter((q) => q.role === 'keystone' && q.kind === 'soffit')).toHaveLength(1);
     for (const q of quads) {
@@ -180,9 +191,18 @@ describe('floor-1 door opening styles', () => {
     expect(fTop).toBeLessThan(facetedTop());
     expect(lTop).toBeLessThanOrEqual(JAMB_TOP_LINTEL);
     expect(lTop).toBeCloseTo(JAMB_TOP_LINTEL - LEAF_PAD, 5);
+    expect(LEAF_REVEAL).toBeCloseTo(ARCH_DEPTH * 0.25, 5);
+    expect(LEAF_FRONT).toBeCloseTo(ROOM_DEPTH - LEAF_REVEAL, 5);
+    expect(listIronQuads('faceted').length).toBeGreaterThan(8);
+    expect(listIronQuads('lintel').length).toBeGreaterThan(8);
+    expect(readFileSync(resolve(__dirname, '../src/voxel-floor1/door-opening.ts'), 'utf8')).toContain(
+      'ring handle'
+    );
     const art = readFileSync(resolve(__dirname, '../docs/ART_DIRECTION.md'), 'utf8');
     expect(art).toContain('leaf top follows those same five facets');
     expect(art).toContain('rectangular under the lintel');
+    expect(art).toContain('ring handle');
+    expect(art).toContain('antique oak');
   });
 
   it('keeps painted doorway floors at 1 UV per cell and documents the styles', () => {
@@ -197,7 +217,10 @@ describe('floor-1 door opening styles', () => {
     const src = readFileSync(resolve(__dirname, '../src/voxel-floor1/openings.ts'), 'utf8');
     expect(src).toContain('openingSlabMeshes');
     expect(src).toContain('leafMeshes');
+    expect(src).toContain('ceiling_planks_1.png');
+    expect(src).toContain('specularIntensity: 0');
     expect(src).toContain('wrapT = THREE.RepeatWrapping');
+    expect(src).not.toContain('door_panel.png');
   });
 
   it('reprojects a soffit strip that only sampled one texture row', () => {
