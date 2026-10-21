@@ -395,29 +395,31 @@ export function listFacetedHeadQuads(): OpeningQuad[] {
     corners: soffitRect(u1, u1, 0, jt - j)
   });
 
-  const leftTop0 = spring;
+  const sw = 0.26;
+  const kb = spring + ch;
+  const ft = kb + kh;
   out.push({
     role: 'jamb-top',
     kind: 'front',
-    corners: frontRect(u0 - th, u0 - j, leftTop0 - 0.02, leftTop0 + JAMB_TOP_H, LINTEL_FRONT)
+    corners: frontRect(u0 + j, u0 + sw - j, spring + j, ft, LINTEL_FRONT)
   });
   out.push({
     role: 'jamb-top',
     kind: 'soffit',
-    corners: soffitRect(u0, u0, leftTop0 + j, leftTop0 + JAMB_TOP_H)
+    corners: soffitRect(u0 + sw, u0 + sw, spring + j, ft, LINTEL_FRONT)
   });
 
-  const la0: [number, number] = [u0 + j, spring + j];
-  const la1: [number, number] = [u0 + ch - j, spring + ch - j];
-  const lp: [number, number] = [-inv * 0.16, inv * 0.16];
+  const la0: [number, number] = [u0 + sw + j, spring + j];
+  const la1: [number, number] = [u0 + sw + ch - j, kb - j];
+  const lp: [number, number] = [-inv * 0.1, inv * 0.1];
   out.push({
     role: 'chamfer',
     kind: 'front',
     corners: [
       [la0[0], la0[1], LINTEL_FRONT],
       [la1[0], la1[1], LINTEL_FRONT],
-      [la1[0] + lp[0], la1[1] + lp[1], LINTEL_FRONT],
-      [la0[0] + lp[0], la0[1] + lp[1], LINTEL_FRONT]
+      [la1[0], ft, LINTEL_FRONT],
+      [la0[0], ft, LINTEL_FRONT]
     ]
   });
   out.push({
@@ -431,13 +433,12 @@ export function listFacetedHeadQuads(): OpeningQuad[] {
     ]
   });
 
-  const k0 = u0 + ch + j;
-  const k1 = u1 - ch - j;
-  const kb = spring + ch;
+  const k0 = u0 + sw + ch + j;
+  const k1 = u1 - sw - ch - j;
   out.push({
     role: 'keystone',
     kind: 'front',
-    corners: frontRect(k0, k1, kb, kb + kh, LINTEL_FRONT)
+    corners: frontRect(k0, k1, kb, ft, LINTEL_FRONT)
   });
   out.push({
     role: 'keystone',
@@ -445,17 +446,17 @@ export function listFacetedHeadQuads(): OpeningQuad[] {
     corners: soffitRect(k0, k1, kb, kb, LINTEL_FRONT)
   });
 
-  const ra0: [number, number] = [u1 - ch + j, spring + ch - j];
-  const ra1: [number, number] = [u1 - j, spring + j];
-  const rp: [number, number] = [inv * 0.16, inv * 0.16];
+  const ra0: [number, number] = [u1 - sw - ch + j, kb - j];
+  const ra1: [number, number] = [u1 - sw - j, spring + j];
+  const rp: [number, number] = [inv * 0.1, inv * 0.1];
   out.push({
     role: 'chamfer',
     kind: 'front',
     corners: [
       [ra0[0], ra0[1], LINTEL_FRONT],
       [ra1[0], ra1[1], LINTEL_FRONT],
-      [ra1[0] + rp[0], ra1[1] + rp[1], LINTEL_FRONT],
-      [ra0[0] + rp[0], ra0[1] + rp[1], LINTEL_FRONT]
+      [ra1[0], ft, LINTEL_FRONT],
+      [ra0[0], ft, LINTEL_FRONT]
     ]
   });
   out.push({
@@ -472,15 +473,14 @@ export function listFacetedHeadQuads(): OpeningQuad[] {
   out.push({
     role: 'jamb-top',
     kind: 'front',
-    corners: frontRect(u1 + j, u1 + th, leftTop0 - 0.02, leftTop0 + JAMB_TOP_H, LINTEL_FRONT)
+    corners: frontRect(u1 - sw + j, u1 - j, spring + j, ft, LINTEL_FRONT)
   });
   out.push({
     role: 'jamb-top',
     kind: 'soffit',
-    corners: soffitRect(u1, u1, leftTop0 + j, leftTop0 + JAMB_TOP_H)
+    corners: soffitRect(u1 - sw, u1 - sw, spring + j, ft, LINTEL_FRONT)
   });
 
-  const ft = kb + kh;
   const cf = ROOM_DEPTH + FILL_PROUD;
   out.push({
     role: 'corner',
@@ -529,8 +529,8 @@ export function listFacetedHeadQuads(): OpeningQuad[] {
     corners: [
       [u0, spring, tymp],
       [u1, spring, tymp],
-      [u1 - ch, kb, tymp],
-      [u0 + ch, kb, tymp]
+      [u1, ft, tymp],
+      [u0, ft, tymp]
     ]
   });
   out.push({
@@ -958,21 +958,20 @@ export function openingSlabMeshes(
   face: FaceNESW,
   tx: number,
   tz: number
-): { stone: MeshArrays; lintel: MeshArrays } {
+): { stone: MeshArrays; lintel: MeshArrays; arch: MeshArrays } {
   const stone = emptyMesh();
   const lintel = emptyMesh();
+  const arch = emptyMesh();
   for (const q of listOpeningQuads(style)) {
     const dest =
-      q.role === 'lintel' ||
-      q.role === 'chip' ||
-      q.role === 'jamb-top' ||
-      q.role === 'chamfer' ||
-      q.role === 'keystone'
-        ? lintel
-        : stone;
+      q.role === 'jamb-top' || q.role === 'chamfer' || q.role === 'keystone'
+        ? arch
+        : q.role === 'lintel' || q.role === 'chip'
+          ? lintel
+          : stone;
     pushQuad(dest, q.corners, q.kind, face, tx, tz, false, 0, q.role);
   }
-  return { stone, lintel };
+  return { stone, lintel, arch };
 }
 
 export function leafMeshes(
