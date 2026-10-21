@@ -23,6 +23,7 @@ type Floor1 = {
   giveKey: () => void;
   handleDoor: (x?: number, y?: number) => string;
   snapDoor: (x: number, y: number, open: boolean) => boolean;
+  poseDoor: (x: number, y: number, t: number) => boolean;
   doorOpen: (x: number, y: number) => boolean;
   doorBusy: (x: number, y: number) => boolean;
   doorLocked: (x: number, y: number) => boolean;
@@ -95,7 +96,7 @@ test('voxel-floor1 boots at New Game start with a lit lantern', async ({ page })
   await page.screenshot({ path: `${OUT}/voxel_floor1_corridor.png`, fullPage: false });
 });
 
-test('floor-1 door (4,2) starts closed and swings open', async ({ page }) => {
+test('floor-1 door (4,2) starts closed and slides up', async ({ page }) => {
   test.setTimeout(90000);
   mkdirSync(OUT, { recursive: true });
 
@@ -130,11 +131,17 @@ test('floor-1 door (4,2) starts closed and swings open', async ({ page }) => {
   await page.screenshot({ path: `${OUT}/voxel_floor1_door_42_closed.png`, fullPage: false });
 
   await page.evaluate(() => {
+    (window as unknown as { __voxelFloor1: Floor1 }).__voxelFloor1.poseDoor(4, 2, 0.45);
+  });
+  await page.waitForTimeout(200);
+  await page.screenshot({ path: `${OUT}/voxel_floor1_door_42_midslide.png`, fullPage: false });
+
+  await page.evaluate(() => {
     const api = (window as unknown as { __voxelFloor1: Floor1 }).__voxelFloor1;
     api.giveKey();
-    api.handleDoor(4, 2);
+    api.snapDoor(4, 2, true);
   });
-  await page.waitForTimeout(1200);
+  await page.waitForTimeout(200);
 
   const opened = await page.evaluate(() => {
     const api = (window as unknown as { __voxelFloor1: Floor1 }).__voxelFloor1;
@@ -154,7 +161,6 @@ test('floor-1 door (4,2) starts closed and swings open', async ({ page }) => {
   expect(opened.button).toBe('Close');
   expect(opened.x).toBe(5);
   expect(opened.y).toBe(2);
-  await page.screenshot({ path: `${OUT}/voxel_floor1_door_42_open.png`, fullPage: false });
 
   const stepped = await page.evaluate(() =>
     (window as unknown as { __voxelFloor1: Floor1 }).__voxelFloor1.stepForward()

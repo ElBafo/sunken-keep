@@ -179,6 +179,7 @@ async function boot(): Promise<void> {
   renderer.toneMappingExposure = 1;
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
+  renderer.localClippingEnabled = true;
 
   const look = lookColors(1, false);
   const fog = look.fog;

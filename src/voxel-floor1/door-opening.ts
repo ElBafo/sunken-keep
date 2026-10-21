@@ -750,19 +750,69 @@ function mapLocal(face: FaceNESW, tx: number, tz: number, a: number, u: number, 
   }
 }
 
-/** Left jamb, door-cell side of the leaf — +Y rotation swings into the opening. */
-export function leafHingeLocal(): [number, number, number] {
-  return [OPEN_U0 + LEAF_PAD, 0, LEAF_BACK];
-}
-
-export function leafHingeWorld(face: FaceNESW, tx: number, tz: number): [number, number, number] {
-  const [a, u, d] = leafHingeLocal();
-  return mapLocal(face, tx, tz, a, u, d);
-}
-
-/** Vertical boards at ceiling-plank density (256 px / 2 m). */
+/** Sample the painted door in the centre of the 2 m `door_panel` tile. */
 function woodUv(a: number, u: number): [number, number] {
-  return [u / CELL, (a - OPEN_U0) / CELL];
+  return [a / CELL, u / CELL];
+}
+
+/**
+ * Recolour/age pass on `door_panel.png`. Keeps the plank layout, bands,
+ * studs, and padlock; shifts wood to dark grey-brown and iron to rusty matte.
+ */
+export function ageDoorPanelPixels(
+  src: ArrayLike<number>,
+  width: number,
+  height: number
+): Uint8ClampedArray {
+  const out = new Uint8ClampedArray(src.length);
+  const cx = (width - 1) * 0.5;
+  const cy = (height - 1) * 0.55;
+  const rx = width * 0.32;
+  const ry = height * 0.42;
+  for (let y = 0; y < height; y++) {
+    for (let x = 0; x < width; x++) {
+      const i = (y * width + x) * 4;
+      const r = src[i] / 255;
+      const g = src[i + 1] / 255;
+      const b = src[i + 2] / 255;
+      const a = src[i + 3];
+      const maxc = Math.max(r, g, b);
+      const minc = Math.min(r, g, b);
+      const sat = maxc > 1e-6 ? (maxc - minc) / maxc : 0;
+      const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      const dx = (x - cx) / rx;
+      const dy = (y - cy) / ry;
+      const inDoor = dx * dx + dy * dy <= 1.15;
+      const edge = Math.min(1, Math.sqrt(dx * dx + dy * dy));
+      const wood = sat > 0.12 && r > g + 0.02 && r > b + 0.04 && luma < 0.78;
+      const iron = inDoor && sat < 0.2 && luma > 0.28 && luma < 0.88 && !wood;
+      let nr = r;
+      let ng = g;
+      let nb = b;
+      if (wood) {
+        const grey = luma;
+        nr = grey * 0.42 + 0.1;
+        ng = grey * 0.36 + 0.08;
+        nb = grey * 0.3 + 0.06;
+        if (luma < 0.22) {
+          nr = ng = nb = luma * 0.35;
+        }
+        const grime = 1 - edge * 0.28;
+        nr *= grime;
+        ng *= grime * 0.98;
+        nb *= grime * 0.92;
+      } else if (iron) {
+        nr = luma * 0.28 + 0.06;
+        ng = luma * 0.18 + 0.04;
+        nb = luma * 0.12 + 0.03;
+      }
+      out[i] = Math.round(Math.min(1, nr) * 255);
+      out[i + 1] = Math.round(Math.min(1, ng) * 255);
+      out[i + 2] = Math.round(Math.min(1, nb) * 255);
+      out[i + 3] = a;
+    }
+  }
+  return out;
 }
 
 function pushQuad(

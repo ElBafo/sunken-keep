@@ -202,13 +202,14 @@ describe('floor-1 door opening styles', () => {
     expect(listIronQuads('faceted').length).toBeGreaterThan(8);
     expect(listIronQuads('lintel').length).toBeGreaterThan(8);
     expect(readFileSync(resolve(__dirname, '../src/voxel-floor1/door-opening.ts'), 'utf8')).toContain(
-      'ring handle'
+      'door_panel'
     );
     const art = readFileSync(resolve(__dirname, '../docs/ART_DIRECTION.md'), 'utf8');
     expect(art).toContain('leaf top follows those same five facets');
     expect(art).toContain('rectangular under the lintel');
-    expect(art).toContain('ring handle');
-    expect(art).toContain('antique oak');
+    expect(art).toContain('padlock');
+    expect(art).toContain('door_panel.png');
+    expect(art).toContain('exempt from the antique-oak');
   });
 
   it('keeps painted doorway floors at 1 UV per cell and documents the styles', () => {
@@ -226,7 +227,7 @@ describe('floor-1 door opening styles', () => {
     expect(src).toContain('ceiling_planks_1.png');
     expect(src).toContain('specularIntensity: 0');
     expect(src).toContain('wrapT = THREE.RepeatWrapping');
-    expect(src).not.toContain('door_panel.png');
+    expect(src).toContain('door_panel.png');
   });
 
   it('keeps the faceted wall watertight from both sides of both main doors', () => {

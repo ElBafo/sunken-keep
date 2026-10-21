@@ -46,9 +46,13 @@ export const DOOR_OPEN_MS = 1450;
 export const DOOR_CLOSE_MS = 600;
 export const DOOR_PANEL_INSET = 0.05;
 export const DOOR_UNLOCK_LEAD_MS = 350;
-/** Floor-1 door leaves swing on a hinge; secrets keep the Y-slide. */
-export const DOOR_SWING = Math.PI / 2;
-export const DOOR_SWING_MS = 400;
+/**
+ * Door leaf rides up into the wall above the opening (portcullis).
+ * Far enough that the faceted / lintel void is clear; the mesh is clipped
+ * at the cornice and hidden when fully open so it never pokes through.
+ */
+export const DOOR_LEAF_SLIDE = 1.66;
+export const DOOR_LEAF_MS = 600;
 
 /** Real cubes within this Chebyshev distance; flat-but-lit beyond. */
 export const VOXEL_CHEB = 3;

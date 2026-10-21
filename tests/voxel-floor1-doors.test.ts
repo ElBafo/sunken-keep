@@ -10,11 +10,11 @@ import {
   DOOR_CLOSE_MS,
   DOOR_OPEN_MS,
   DOOR_SLIDE,
-  DOOR_SWING,
-  DOOR_SWING_MS,
+  DOOR_LEAF_MS,
+  DOOR_LEAF_SLIDE,
   DOOR_UNLOCK_LEAD_MS
 } from '../src/voxel-floor1/constants';
-import { leafHingeLocal, leafHingeWorld, LEAF_BACK, LEAF_PAD, OPEN_U0 } from '../src/voxel-floor1/door-opening';
+import { ageDoorPanelPixels, facetedTop, lintelTop } from '../src/voxel-floor1/door-opening';
 import { greedyMesh } from '../src/voxel-lab/mesher';
 import {
   OpeningSystem,
@@ -64,18 +64,35 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     }
   });
 
-  it('uses a 90° hinge swing for doors and the proto3d Y-slide for secrets', () => {
-    expect(DOOR_SWING).toBeCloseTo(Math.PI / 2, 8);
-    expect(DOOR_SWING_MS).toBe(400);
+  it('slides the leaf up like a portcullis in 0.6s and keeps the secret Y-slide', () => {
+    expect(DOOR_LEAF_MS).toBe(600);
+    expect(DOOR_LEAF_SLIDE).toBeGreaterThan(facetedTop() - 1e-6);
+    expect(DOOR_LEAF_SLIDE).toBeGreaterThan(lintelTop() - 1e-6);
     expect(DOOR_SLIDE).toBeCloseTo(1.42, 8);
     expect(DOOR_OPEN_MS).toBe(1450);
     expect(DOOR_CLOSE_MS).toBe(600);
     expect(DOOR_UNLOCK_LEAD_MS).toBe(350);
-    const hinge = leafHingeLocal();
-    expect(hinge[0]).toBeCloseTo(OPEN_U0 + LEAF_PAD, 8);
-    expect(hinge[1]).toBe(0);
-    expect(hinge[2]).toBeCloseTo(LEAF_BACK, 8);
-    expect(leafHingeWorld('W', 5, 2)[1]).toBe(0);
+  });
+
+  it('ages door_panel wood to grey-brown and iron to rust without a new design', () => {
+    const w = 16;
+    const h = 16;
+    const src = new Uint8ClampedArray(w * h * 4);
+    for (let i = 0; i < w * h; i++) {
+      src[i * 4] = 200;
+      src[i * 4 + 1] = 110;
+      src[i * 4 + 2] = 48;
+      src[i * 4 + 3] = 255;
+    }
+    const mid = ((h >> 1) * w + (w >> 1)) * 4;
+    src[mid] = 170;
+    src[mid + 1] = 172;
+    src[mid + 2] = 176;
+    const aged = ageDoorPanelPixels(src, w, h);
+    expect(aged[0]).toBeLessThan(140);
+    expect(aged[0] - aged[2]).toBeLessThan(40);
+    expect(aged[mid]).toBeLessThan(90);
+    expect(aged[mid]).toBeGreaterThan(aged[mid + 2]);
   });
 
   it('refuses a locked door without a key and does not start the slide', () => {
@@ -100,30 +117,30 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     system.update(1000 + DOOR_UNLOCK_LEAD_MS);
     expect(visual.tile.doorOpen).toBe(true);
     expect(visual.busy).toBe(true);
-    system.update(1000 + DOOR_UNLOCK_LEAD_MS + DOOR_SWING_MS);
+    system.update(1000 + DOOR_UNLOCK_LEAD_MS + DOOR_LEAF_MS);
     expect(visual.busy).toBe(false);
-    expect(visual.panels[0].visible).toBe(true);
-    expect(visual.panels[0].rotation.y).toBeCloseTo(DOOR_SWING, 5);
+    expect(visual.panels[0].visible).toBe(false);
+    expect(visual.panels[0].position.y).toBeCloseTo(DOOR_LEAF_SLIDE, 5);
   });
 
-  it('sets doorOpen at swing start so the cell is walkable while the leaf moves', () => {
+  it('sets doorOpen at slide start so the cell is walkable while the leaf moves', () => {
     const system = new OpeningSystem();
     const visual = fakeDoor(false);
     system.register(visual);
     expect(system.tryDoor(4, 2, false, 50)).toBe('toggled');
     expect(visual.tile.doorOpen).toBe(true);
     expect(visual.busy).toBe(true);
-    system.update(50 + DOOR_SWING_MS);
+    system.update(50 + DOOR_LEAF_MS);
     expect(visual.busy).toBe(false);
-    expect(visual.panels[0].rotation.y).toBeCloseTo(DOOR_SWING, 5);
-    expect(visual.panels[0].visible).toBe(true);
+    expect(visual.panels[0].position.y).toBeCloseTo(DOOR_LEAF_SLIDE, 5);
+    expect(visual.panels[0].visible).toBe(false);
     system.poseOpen(visual, 0.45);
-    expect(visual.panels[0].rotation.y).toBeCloseTo(DOOR_SWING * 0.45, 5);
+    expect(visual.panels[0].position.y).toBeCloseTo(DOOR_LEAF_SLIDE * 0.45, 5);
     expect(visual.panels[0].visible).toBe(true);
     expect(visual.busy).toBe(false);
     system.snapOpen(visual, false);
     expect(visual.tile.doorOpen).toBe(false);
-    expect(visual.panels[0].rotation.y).toBeCloseTo(0, 5);
+    expect(visual.panels[0].position.y).toBeCloseTo(0, 5);
     expect(visual.panels[0].visible).toBe(true);
   });
 
@@ -177,10 +194,13 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     expect(main).not.toContain('Demo only');
     expect(main).toContain('hitFacingDoorLeaf');
     expect(main).toContain("'Close'");
-    expect(openings).toContain('leafHingeWorld');
-    expect(openings).toContain('DOOR_SWING');
-    expect(openings).toContain('door-hinge');
+    expect(main).toContain('localClippingEnabled');
+    expect(openings).toContain('door_panel.png');
+    expect(openings).toContain('ageDoorPanelPixels');
+    expect(openings).toContain('DOOR_LEAF_SLIDE');
     expect(openings).toContain('doorLeaf');
+    expect(openings).not.toContain('door-hinge');
+    expect(openings).not.toContain('MeshBasicMaterial');
     expect(openings).not.toContain('applyWallLook');
     expect(openings).toContain('recessSecretTell');
     expect(openings).not.toContain('secret_closed.png');
