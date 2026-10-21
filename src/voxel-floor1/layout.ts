@@ -1,20 +1,24 @@
 import { floor1 as rawFloor1 } from '../../public/levels/floor1';
 import floor1FloorCeilJson from '../../levels/floor1_floorceil.json';
 import type { FaceId } from '../voxel-lab/faces';
-import { CEILING_VARIANTS, FLOOR_VARIANTS } from './constants';
+import { CEILING_VARIANTS, FLOOR_VARIANTS, RUBBLE_UV_SCALE } from './constants';
 import { KNOT_FACE_NEIGHBORS, knotWallFile } from './knot-walls';
 import { pickVariant } from './variants';
 import { faceUOffset, familyBaseLook, lookForWall, lookForZoneBase, type WallLook } from './wall-look';
 
-type FloorCeilSquare = { x: number; y: number; floor: string; ceiling: string };
+type FloorCeilSquare = { x: number; y: number; floor: string; ceiling: string; ceilingRot?: number };
 
 function texName(stem: string): string {
   return stem.endsWith('.png') ? stem : `${stem}.png`;
 }
 
-const FLOOR_CEIL = new Map<string, { floor: string; ceiling: string }>();
+const FLOOR_CEIL = new Map<string, { floor: string; ceiling: string; ceilingRot: 0 | 90 }>();
 for (const sq of (floor1FloorCeilJson as { squares: FloorCeilSquare[] }).squares) {
-  FLOOR_CEIL.set(`${sq.x},${sq.y}`, { floor: texName(sq.floor), ceiling: texName(sq.ceiling) });
+  FLOOR_CEIL.set(`${sq.x},${sq.y}`, {
+    floor: texName(sq.floor),
+    ceiling: texName(sq.ceiling),
+    ceilingRot: sq.ceilingRot === 90 ? 90 : 0
+  });
 }
 
 export function mappedFloorFile(x: number, y: number): string | undefined {
@@ -23,6 +27,11 @@ export function mappedFloorFile(x: number, y: number): string | undefined {
 
 export function mappedCeilingFile(x: number, y: number): string | undefined {
   return FLOOR_CEIL.get(`${x},${y}`)?.ceiling;
+}
+
+/** Zone-wide 90° turn when plank boards must cross east–west beams. */
+export function mappedCeilingUvRot(x: number, y: number): 0 | 90 {
+  return FLOOR_CEIL.get(`${x},${y}`)?.ceilingRot ?? 0;
 }
 
 export type FloorTile = {
@@ -117,6 +126,10 @@ export type FaceJob = {
   look?: WallLook;
   /** World-tile U run so neighbouring wall faces continue. */
   uOffset: number;
+  /** Ceiling only: 90 would turn plank boards onto Z. Unused while beams run N–S. */
+  uvRot: 0 | 90;
+  /** Repeats per cell. Rubble is 2 so the cobbles read half-size. */
+  uvScale: number;
 };
 
 export type DoorSpec = { x: number; y: number; locked: boolean };
@@ -217,7 +230,9 @@ export function enumerateFaces(map: FloorMap): FaceJob[] {
         wallY: z,
         wallFace: 'F',
         bulge: 0,
-        uOffset: 0
+        uOffset: 0,
+        uvRot: 0,
+        uvScale: 1
       });
       const ceilFile = mappedCeilingFile(x, z) ?? pickVariant(CEILING_VARIANTS, x, z, 'C');
       jobs.push({
@@ -231,7 +246,9 @@ export function enumerateFaces(map: FloorMap): FaceJob[] {
         wallY: z,
         wallFace: 'C',
         bulge: 0,
-        uOffset: 0
+        uOffset: 0,
+        uvRot: mappedCeilingUvRot(x, z),
+        uvScale: ceilFile.startsWith('ceiling_rubble_') ? RUBBLE_UV_SCALE : 1
       });
       for (const spec of OPEN_TO_WALL) {
         const wx = x + spec.dx;
@@ -256,7 +273,9 @@ export function enumerateFaces(map: FloorMap): FaceJob[] {
           wallFace: spec.wallFace,
           bulge: look?.bulge ?? 0,
           look,
-          uOffset: faceUOffset(spec.face, x, z)
+          uOffset: faceUOffset(spec.face, x, z),
+          uvRot: 0,
+          uvScale: 1
         });
       }
     }

@@ -5,42 +5,38 @@ import * as THREE from 'three';
 import {
   BEAM_CEIL_GAP,
   BEAM_DEPTH,
+  BEAM_GRID,
   BEAM_WIDTH,
   BEAM_Y,
+  STRAP_M,
+  STRAP_TINT,
   TEXEL_M,
   WOOD_TILE_M,
+  auditCeilingBeams,
+  cellOverlapsBeam,
+  isBeamGridLine,
+  ironStrapPixel,
   listBeamStraps,
   listCeilingBeams,
+  makeIronStrapMap,
   meshCeilingBeams,
   skipCeilingBeamCell
 } from '../src/voxel-floor1/ceiling-beams';
 import { CELL } from '../src/voxel-floor1/constants';
 import { floor1Sunbeams } from '../src/voxel-floor1/fixtures';
-import { floor1Map } from '../src/voxel-floor1/layout';
-
-const CELL_HALF = CELL / 2;
-
-function overlapsCell(
-  box: { x: number; z: number; sx: number; sz: number },
-  cx: number,
-  cy: number
-): boolean {
-  const x0 = cx * CELL - CELL_HALF;
-  const x1 = cx * CELL + CELL_HALF;
-  const z0 = cy * CELL - CELL_HALF;
-  const z1 = cy * CELL + CELL_HALF;
-  return box.x - box.sx / 2 < x1 && box.x + box.sx / 2 > x0 && box.z - box.sz / 2 < z1 && box.z + box.sz / 2 > z0;
-}
+import { floor1Map, listDoors, listSecrets } from '../src/voxel-floor1/layout';
 
 describe('floor-1 ceiling timber', () => {
   const beams = listCeilingBeams(floor1Map);
+  const src = readFileSync(resolve(__dirname, '../src/voxel-floor1/ceiling-beams.ts'), 'utf8');
 
-  it('uses squared 0.25 × 0.3 timber just below the ceiling', () => {
-    expect(BEAM_WIDTH).toBeCloseTo(0.25, 5);
-    expect(BEAM_DEPTH).toBeCloseTo(0.3, 5);
+  it('uses a shallow 0.14 × 0.09 rib just below the ceiling', () => {
+    expect(BEAM_WIDTH).toBeCloseTo(0.14, 5);
+    expect(BEAM_DEPTH).toBeGreaterThanOrEqual(0.08);
+    expect(BEAM_DEPTH).toBeLessThanOrEqual(0.1);
     expect(BEAM_Y).toBeCloseTo(CELL - BEAM_CEIL_GAP - BEAM_DEPTH / 2, 5);
-    expect(BEAM_Y).toBeGreaterThan(CELL - 0.3);
-    expect(beams.length).toBeGreaterThan(12);
+    expect(BEAM_Y).toBeGreaterThan(CELL - 0.16);
+    expect(beams.length).toBeGreaterThan(6);
     for (const b of beams) {
       expect(b.y).toBeCloseTo(BEAM_Y, 5);
       expect(b.sy).toBeCloseTo(BEAM_DEPTH, 5);
@@ -49,14 +45,34 @@ describe('floor-1 ceiling timber', () => {
     }
   });
 
-  it('spans the start corridor short axis every 2 cells', () => {
-    const corridor = beams.filter((b) => b.kind === 'corridor' && Math.abs(b.x - 2 * CELL) < 0.2);
-    const rows = corridor.map((b) => Math.round(b.z / CELL)).sort((a, b) => a - b);
-    expect(rows).toEqual([9, 11, 13]);
-    for (const b of corridor) {
-      expect(b.sx).toBeGreaterThan(1.5);
-      expect(b.sz).toBeCloseTo(BEAM_WIDTH, 5);
-    }
+  it('does not depend on the ceiling tile map', () => {
+    expect(src).not.toContain('floor1_floorceil');
+    expect(src).not.toContain('mappedCeilingFile');
+    expect(src).not.toContain('ceiling_2');
+    expect(src).not.toContain('ceiling_cracked');
+  });
+
+  it('keeps timber only in pantry, guard hall, and muster hall', () => {
+    expect(beams.some((b) => b.kind === 'corridor')).toBe(false);
+    const corridor = beams.filter((b) => Math.abs(b.x - 2 * CELL) < 0.2 && b.z > 8 * CELL);
+    expect(corridor).toEqual([]);
+    const rooms = new Set(
+      beams.map((b) => {
+        const cx = Math.round(b.x / CELL);
+        const cz = Math.round(b.z / CELL);
+        if (cx >= 1 && cx <= 4 && cz >= 5 && cz <= 7) return 'muster';
+        if (cx >= 8 && cx <= 14 && cz >= 1 && cz <= 4) return 'guard';
+        if (cx >= 5 && cx <= 7 && cz >= 5 && cz <= 7) return 'pantry';
+        return `other:${cx},${cz}`;
+      })
+    );
+    expect(rooms.has('muster')).toBe(true);
+    expect(rooms.has('guard')).toBe(true);
+    expect(rooms.has('pantry')).toBe(true);
+    expect([...rooms].filter((r) => r.startsWith('other'))).toEqual([]);
+    const src = readFileSync(resolve(__dirname, '../src/voxel-floor1/ceiling-beams.ts'), 'utf8');
+    expect(src).toContain('CORNICE_DEPTH');
+    expect(src).toContain("'muster_hall', 'guard_hall', 'pantry'");
   });
 
   it('gives rooms a parallel pair plus crossing joists', () => {
@@ -81,18 +97,19 @@ describe('floor-1 ceiling timber', () => {
     for (const b of beams) {
       for (let y = 1; y <= 4; y++) {
         for (let x = 1; x <= 3; x++) {
-          expect(overlapsCell(b, x, y), `${b.kind} over cistern ${x},${y}`).toBe(false);
+          expect(cellOverlapsBeam(x, y, b), `${b.kind} over cistern ${x},${y}`).toBe(false);
         }
       }
       for (const sun of floor1Sunbeams) {
-        expect(overlapsCell(b, sun.x, sun.y), `${b.kind} over sunbeam ${sun.x},${sun.y}`).toBe(false);
+        expect(cellOverlapsBeam(sun.x, sun.y, b), `${b.kind} over sunbeam ${sun.x},${sun.y}`).toBe(false);
       }
     }
   });
 
-  it('places 2–3 uneven iron straps per beam', () => {
+  it('places 2–3 uneven iron straps per beam, scaled to the slim rib', () => {
     expect(TEXEL_M).toBeCloseTo(0.01, 8);
     expect(WOOD_TILE_M).toBeCloseTo(0.64, 5);
+    expect(STRAP_M).toBeCloseTo(0.028, 5);
     for (const b of beams) {
       const straps = listBeamStraps([b]);
       const len = Math.max(b.sx, b.sz);
@@ -103,7 +120,7 @@ describe('floor-1 ceiling timber', () => {
       expect(Math.min(...ts)).toBeGreaterThan(0.05);
       expect(Math.max(...ts)).toBeLessThan(0.95);
       for (const s of straps) {
-        expect(Math.min(s.sx, s.sz)).toBeCloseTo(0.05, 5);
+        expect(Math.min(s.sx, s.sz)).toBeCloseTo(STRAP_M, 5);
         expect(s.sy).toBeGreaterThan(b.sy);
       }
     }
@@ -116,18 +133,52 @@ describe('floor-1 ceiling timber', () => {
     expect(new Set(firsts.map((t) => t.toFixed(2))).size).toBeGreaterThan(4);
   });
 
+  it('remaps the pale crate strap to near-black iron with a faint rivet', () => {
+    const band = ironStrapPixel(82 / 255, 84 / 255, 76 / 255);
+    const rivet = ironStrapPixel(170 / 255, 176 / 255, 167 / 255);
+    const grain = ironStrapPixel(56 / 255, 39 / 255, 29 / 255);
+    const oak = [0.45 * 0.74, 0.32 * 0.74, 0.18 * 0.74];
+    expect(src).toContain('STRAP_U0 = 0.45');
+    expect(src).toContain('STRAP_U1 = 0.53');
+    expect(src).toContain('makeIronStrapMap');
+    expect(src).not.toContain('color: new THREE.Color(0.38, 0.35, 0.32)');
+    expect(Math.max(...band)).toBeLessThan(0.08);
+    expect(Math.max(...grain)).toBeLessThan(0.08);
+    expect(Math.max(...band)).toBeLessThan(Math.max(...oak));
+    expect(Math.max(...rivet)).toBeGreaterThan(Math.max(...band) + 0.08);
+    expect(Math.max(...rivet)).toBeLessThan(0.35);
+    const iron = makeIronStrapMap();
+    expect(iron).toBeInstanceOf(THREE.DataTexture);
+    expect(iron.image.data[0]).toBeLessThan(24);
+    expect(iron.image.data[1]).toBeLessThan(24);
+    expect(iron.image.data[2]).toBeLessThan(24);
+  });
+
+  it('uses Artie old-wood albedo on the ribs with no extra tint', () => {
+    expect(src).toContain('sootyOakMap');
+    expect(src).not.toContain('WOOD_TINT');
+    expect(src).not.toContain('sootyPixel');
+    expect(src).not.toContain('new THREE.Color(0.74, 0.64, 0.54)');
+    expect(src).not.toContain('new THREE.Color(0.7, 0.48, 0.28)');
+    expect(src).not.toContain('new THREE.Color(0.84, 0.82, 0.78)');
+    expect(Math.max(STRAP_TINT.r, STRAP_TINT.g, STRAP_TINT.b)).toBeLessThan(0.22);
+  });
+
   it('batches wood and straps into MeshPhysical meshes at 1 cm per texel', () => {
-    const src = readFileSync(resolve(__dirname, '../src/voxel-floor1/ceiling-beams.ts'), 'utf8');
     expect(src).toContain('MeshPhysicalMaterial');
     expect(src).toContain('mergeGeometries');
     expect(src).toContain('castWhenOn = false');
     expect(src).toContain('castShadow = false');
     expect(src).toContain('receiveShadow = true');
     expect(src).toContain('sootyOakMap');
+    expect(src).toContain('ironStrapMap');
+    expect(src).toContain('makeIronStrapMap');
+    expect(src).toContain('ironStrapPixel');
     expect(src).toContain('listBeamStraps');
     expect(src).toContain('setWoodUvs');
     expect(src).toContain('[0.27, 0.71]');
     expect(src).toContain('[0.15, 0.49, 0.83]');
+    expect(src).toContain('auditCeilingBeams');
     expect(src).not.toContain('chunkCeilingBeams');
     expect(src).not.toContain('UV_TILE');
     const html = readFileSync(resolve(__dirname, '../voxel-floor1.html'), 'utf8');
@@ -148,6 +199,23 @@ describe('floor-1 ceiling timber', () => {
     expect(straps.isMesh).toBe(true);
     expect(wood.material).toBeInstanceOf(THREE.MeshPhysicalMaterial);
     expect(straps.material).toBeInstanceOf(THREE.MeshPhysicalMaterial);
+    const woodMat = wood.material as THREE.MeshPhysicalMaterial;
+    const strapMat = straps.material as THREE.MeshPhysicalMaterial;
+    expect(strapMat.color.r).toBeLessThan(woodMat.color.r * 0.5);
+    expect(Math.max(strapMat.color.r, strapMat.color.g, strapMat.color.b)).toBeLessThan(0.22);
+    expect(woodMat.color.r).toBe(1);
+    expect(woodMat.color.g).toBe(1);
+    expect(woodMat.color.b).toBe(1);
+    expect(woodMat.roughness).toBe(1);
+    expect(woodMat.metalness).toBe(0);
+    expect(woodMat.clearcoat).toBe(0);
+    expect(woodMat.sheen).toBe(0);
+    expect(woodMat.specularIntensity).toBe(0);
+    expect(woodMat.envMapIntensity).toBe(0);
+    expect(strapMat.roughness).toBeCloseTo(0.82, 5);
+    expect(strapMat.metalness).toBeCloseTo(0.08, 5);
+    expect(strapMat.map).toBeInstanceOf(THREE.DataTexture);
+    expect(strapMat.map).not.toBe(tex);
     for (const mesh of [wood, straps]) {
       expect(mesh.castShadow).toBe(false);
       expect(mesh.userData.castWhenOn).toBe(false);
@@ -162,7 +230,7 @@ describe('floor-1 ceiling timber', () => {
     expect(bb.max.z - bb.min.z).toBeGreaterThan(10);
     expect(bb.min.y).toBeGreaterThan(1.5);
 
-    const hall = beams.find((b) => b.kind === 'corridor' && Math.abs(b.x - 2 * CELL) < 0.2)!;
+    const hall = beams.find((b) => b.kind === 'room')!;
     const one = meshCeilingBeams(tex, [hall])!;
     const oneWood = one.getObjectByName('ceiling-beams-wood') as THREE.Mesh;
     const uv = oneWood.geometry.getAttribute('uv');
@@ -173,5 +241,24 @@ describe('floor-1 ceiling timber', () => {
     expect(one.getObjectByName('ceiling-beams-straps')).toBeTruthy();
     const strapIdx = (one.getObjectByName('ceiling-beams-straps') as THREE.Mesh).geometry.getIndex();
     expect(strapIdx && strapIdx.count / 3).toBe(listBeamStraps([hall]).length * 12);
+  });
+
+  it('asserts every beam sits on the grid, ends on a wall or the pair, and misses openings', () => {
+    expect(BEAM_GRID).toBeCloseTo(CELL / 2, 8);
+    expect(isBeamGridLine(2 * CELL)).toBe(true);
+    expect(isBeamGridLine(2.5 * CELL)).toBe(true);
+    expect(isBeamGridLine(2.28 * CELL)).toBe(false);
+    const issues = auditCeilingBeams(floor1Map, beams);
+    expect(issues, issues.map((i) => i.message).join('\n')).toEqual([]);
+    for (const b of beams) {
+      const cross = b.sx >= b.sz ? b.z : b.x;
+      expect(isBeamGridLine(cross), `${b.kind} cross ${(cross / CELL).toFixed(3)}`).toBe(true);
+    }
+    for (const spec of [...listDoors(floor1Map), ...listSecrets(floor1Map)]) {
+      expect(skipCeilingBeamCell(floor1Map, spec.x, spec.y)).toBe(true);
+      for (const b of beams) {
+        expect(cellOverlapsBeam(spec.x, spec.y, b), `${b.kind} over opening ${spec.x},${spec.y}`).toBe(false);
+      }
+    }
   });
 });

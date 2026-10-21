@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { loadPng, type PngPixels } from '../voxel-lab/materials';
 import { CEILING_VARIANTS, CRACKED_CEILING_FILE } from './constants';
-import { enablePaintedSampling } from './painted';
+import { enableWoodSampling } from './painted';
 import { mappedCeilingFile } from './layout';
 import { pickVariant } from './variants';
 
@@ -136,7 +136,7 @@ export async function loadCrackedCeiling(): Promise<PngPixels> {
   ctx.putImageData(put, 0, 0);
   const texture = new THREE.Texture(canvas);
   texture.colorSpace = THREE.SRGBColorSpace;
-  enablePaintedSampling(texture);
+  enableWoodSampling(texture);
   const img = new Image();
   img.width = image.width;
   img.height = image.height;

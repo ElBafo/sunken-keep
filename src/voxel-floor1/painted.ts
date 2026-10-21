@@ -3,15 +3,53 @@ import { CUTOUT_ALPHA_TEST } from './constants';
 
 type Pixels = { width: number; height: number; data: ArrayLike<number> };
 
+/** Darken rubble so it stays below the wall albedo even under a torch. */
+export const RUBBLE_TINT = new THREE.Color(0.66, 0.66, 0.66);
+
 export function isPaintedShellFile(file: string): boolean {
   return file.startsWith('floor_') || file.startsWith('ceiling');
 }
 
+export function isRubbleCeilingFile(file: string): boolean {
+  return file.startsWith('ceiling_rubble_');
+}
+
+export function isPlankCeilingFile(file: string): boolean {
+  return file.startsWith('ceiling_planks_');
+}
+
+export function isWoodCeilingFile(file: string): boolean {
+  return isPlankCeilingFile(file) || file.startsWith('ceiling_cracked');
+}
+
+/** Grain bump on wood — kept tiny so torch light does not streak like varnish. */
+export const WOOD_NORMAL_SCALE = 0.05;
+
 /** Painted 256 tiles: crisp texels up close, nearest mips in the distance. */
 export function enablePaintedSampling(tex: THREE.Texture): void {
+  tex.colorSpace = THREE.SRGBColorSpace;
   tex.magFilter = THREE.NearestFilter;
   tex.minFilter = THREE.NearestMipmapNearestFilter;
   tex.generateMipmaps = true;
+  tex.needsUpdate = true;
+}
+
+/**
+ * Wood maps match the wall path: sRGB, nearest, no mips.
+ * Box-filtered mips turn 1-texel near-black gaps grey at distance.
+ */
+export function enableWoodSampling(tex: THREE.Texture): void {
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.generateMipmaps = false;
+  tex.needsUpdate = true;
+}
+
+/** Repeat so UV scale > 1 does not clamp-smear at cell edges. */
+export function enableRubbleRepeat(tex: THREE.Texture): void {
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
   tex.needsUpdate = true;
 }
 
@@ -62,12 +100,19 @@ export function paintedShellMaterial(
 ): THREE.MeshPhysicalMaterial {
   const water = file === 'floor_water.png';
   const cutout = file.startsWith('ceiling_cracked');
-  enablePaintedSampling(map);
-  return new THREE.MeshPhysicalMaterial({
+  const rubble = isRubbleCeilingFile(file);
+  const wood = isWoodCeilingFile(file);
+  if (wood) enableWoodSampling(map);
+  else enablePaintedSampling(map);
+  if (rubble) {
+    enableRubbleRepeat(map);
+    if (normal) enableRubbleRepeat(normal);
+  }
+  const mat = new THREE.MeshPhysicalMaterial({
     map,
     normalMap: normal,
-    normalScale: new THREE.Vector2(0.14, 0.14),
-    roughness: water ? 0.62 : 0.92,
+    normalScale: new THREE.Vector2(wood ? WOOD_NORMAL_SCALE : 0.14, wood ? WOOD_NORMAL_SCALE : 0.14),
+    roughness: water ? 0.62 : wood ? 1 : 0.92,
     metalness: 0,
     clearcoat: water ? 0.12 : 0,
     clearcoatRoughness: water ? 0.45 : 1,
@@ -77,4 +122,15 @@ export function paintedShellMaterial(
     polygonOffsetFactor: 1,
     polygonOffsetUnits: 1
   });
+  if (wood) {
+    mat.sheen = 0;
+    mat.clearcoat = 0;
+    mat.envMapIntensity = 0;
+    // Default dielectric spec (F0 ~0.04) adds a lantern floor on the flat
+    // ceiling and lifts (17,15,13) gaps to mid-grey. Walls keep true-black
+    // mortar because those texels are 0. This is a construction uniform.
+    mat.specularIntensity = 0;
+  }
+  if (rubble) mat.color.copy(RUBBLE_TINT);
+  return mat;
 }

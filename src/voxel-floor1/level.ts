@@ -77,6 +77,7 @@ export async function buildFloor1(
     if (job.kind === 'ceiling' && isBeamCeiling(job.tx, job.tz, floor1Sunbeams)) {
       job.file = CRACKED_CEILING_FILE;
       job.batch = CRACKED_CEILING_FILE;
+      job.uvScale = 1;
     }
   }
   const neededFiles = new Set<string>();
@@ -181,6 +182,7 @@ export async function buildFloor1(
       } else {
         const farMat = farBakeMaterial(tex);
         farMat.name = `far:${batch}`;
+        farMat.color.copy(painted.color);
         if (batch === CRACKED_CEILING_FILE) farMat.alphaTest = painted.alphaTest;
         farMats.set(batch, farMat);
       }
@@ -329,6 +331,8 @@ export async function buildFloor1(
           tz: f.tz,
           segs: f.segs,
           uOffset: f.uOffset,
+          uvRot: f.uvRot,
+          uvScale: f.uvScale,
           size:
             f.kind === 'floor' || f.kind === 'ceiling' ? CELL + 2 * (CAMERA_NEAR + 0.12) : CELL
         })),
