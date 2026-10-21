@@ -14,13 +14,17 @@ import {
 import {
   BRICK_COURSE,
   CHAMFER,
+  doorHasLeaf,
   doorOpeningStyle,
   facetedTop,
   FLOOR1_DOOR_STYLES,
   FRONT_PROUD,
   inOpeningVoid,
   JAMB_TOP_FACETED,
+  JAMB_TOP_LINTEL,
+  LEAF_PAD,
   listHeadRoles,
+  listLeafQuads,
   listOpeningQuads,
   lintelTop,
   OPEN_U0,
@@ -79,9 +83,12 @@ describe('floor-1 door opening styles', () => {
   it('uses exactly five planar head slabs on a faceted door', () => {
     expect(listHeadRoles('faceted')).toEqual(['jamb-top', 'chamfer', 'keystone', 'chamfer', 'jamb-top']);
     const quads = listOpeningQuads('faceted');
-    const fronts = quads.filter((q) => q.kind === 'front');
-    expect(fronts).toHaveLength(5);
-    expect(fronts.map((q) => q.role)).toEqual(['jamb-top', 'chamfer', 'keystone', 'chamfer', 'jamb-top']);
+    const headFronts = quads.filter(
+      (q) => q.kind === 'front' && (q.role === 'jamb-top' || q.role === 'chamfer' || q.role === 'keystone')
+    );
+    expect(headFronts).toHaveLength(5);
+    expect(headFronts.map((q) => q.role)).toEqual(['jamb-top', 'chamfer', 'keystone', 'chamfer', 'jamb-top']);
+    expect(quads.filter((q) => q.role === 'corner' && q.kind === 'front')).toHaveLength(2);
     expect(quads.filter((q) => q.role === 'chamfer' && q.kind === 'soffit')).toHaveLength(2);
     expect(quads.filter((q) => q.role === 'keystone' && q.kind === 'soffit')).toHaveLength(1);
     for (const q of quads) {
@@ -160,6 +167,24 @@ describe('floor-1 door opening styles', () => {
     expect(failures).toEqual([]);
   });
 
+  it('gives every floor-1 door a leaf that matches its opening, and no plain archways', () => {
+    expect(doors.every((d) => doorHasLeaf(d.x, d.y))).toBe(true);
+    expect(doors).toHaveLength(4);
+    const faceted = listLeafQuads('faceted');
+    const lintel = listLeafQuads('lintel');
+    expect(faceted.filter((q) => q.kind === 'front')).toHaveLength(4);
+    expect(lintel.filter((q) => q.kind === 'front')).toHaveLength(1);
+    const fTop = Math.max(...faceted.flatMap((q) => q.corners.map((c) => c[1])));
+    const lTop = Math.max(...lintel.flatMap((q) => q.corners.map((c) => c[1])));
+    expect(fTop).toBeGreaterThan(JAMB_TOP_FACETED);
+    expect(fTop).toBeLessThan(facetedTop());
+    expect(lTop).toBeLessThanOrEqual(JAMB_TOP_LINTEL);
+    expect(lTop).toBeCloseTo(JAMB_TOP_LINTEL - LEAF_PAD, 5);
+    const art = readFileSync(resolve(__dirname, '../docs/ART_DIRECTION.md'), 'utf8');
+    expect(art).toContain('leaf top follows those same five facets');
+    expect(art).toContain('rectangular under the lintel');
+  });
+
   it('keeps painted doorway floors at 1 UV per cell and documents the styles', () => {
     const floors = enumerateFaces(floor1Map).filter((j) => j.kind === 'floor' && j.file.startsWith('floor_'));
     const doorKeys = new Set(doors.map((d) => `${d.x},${d.y}`));
@@ -171,6 +196,7 @@ describe('floor-1 door opening styles', () => {
     expect(art).toContain('flush');
     const src = readFileSync(resolve(__dirname, '../src/voxel-floor1/openings.ts'), 'utf8');
     expect(src).toContain('openingSlabMeshes');
+    expect(src).toContain('leafMeshes');
     expect(src).toContain('wrapT = THREE.RepeatWrapping');
   });
 

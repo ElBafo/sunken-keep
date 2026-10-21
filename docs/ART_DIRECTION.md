@@ -26,8 +26,8 @@ Doors, arches, and secret-wall nooks use the same stone as the surrounding room.
 
 Doorways are big flat slabs, not curves — a curved soffit reads as a strip of thin stones at phone resolution.
 
-- **Main doors** (between halls): faceted opening made of exactly five big flat slabs across the head — left jamb top, left 45°, flat keystone, right 45°, right jamb top. Each slab is one planar front and one planar soffit (no subdivisions). Wall above the arch is normal stone up to the cornice. Jambs are cut into the wall (flush, or 2–3 cm proud).
-- **Side doors** (small rooms, corridors, pantry / cellar / lair): flat lintel cut into the wall. Jambs flush (or 2–3 cm proud). At least one brick course of wall between the lintel and the cornice. Same room stone, same tint or slightly darker, chipped worn ends.
+- **Main doors** (between halls): faceted opening made of exactly five big flat slabs across the head — left jamb top, left 45°, flat keystone, right 45°, right jamb top. Each slab is one planar front and one planar soffit (no subdivisions). Wall above the arch is normal stone up to the cornice. Jambs are cut into the wall (flush, or 2–3 cm proud). Corners between the 45° slabs and the wall are filled with room stone (no holes). The door leaf top follows those same five facets.
+- **Side doors** (small rooms, corridors, pantry / cellar / lair): flat lintel cut into the wall. Jambs flush (or 2–3 cm proud). At least one brick course of wall between the lintel and the cornice. Same room stone, same tint or slightly darker, chipped worn ends. The door leaf is rectangular under the lintel.
 
 ## Tiles and density
 

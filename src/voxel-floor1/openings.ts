@@ -19,7 +19,6 @@ import {
   CELL,
   DOOR_CLOSE_MS,
   DOOR_OPEN_MS,
-  DOOR_PANEL_INSET,
   DOOR_SLIDE,
   DOOR_UNLOCK_LEAD_MS,
   LAYER_SIZE
@@ -27,6 +26,7 @@ import {
 import { projectArchOpeningUvs } from './uv-audit';
 import {
   doorOpeningStyle,
+  leafMeshes,
   openingPunchRect,
   openingSlabMeshes,
   punchOpening,
@@ -55,13 +55,6 @@ import {
   type WallLook
 } from './wall-look';
 
-const INSET: Record<'N' | 'E' | 'S' | 'W', [number, number]> = {
-  N: [0, -1],
-  E: [1, 0],
-  S: [0, 1],
-  W: [-1, 0]
-};
-
 export type OpeningKind = 'door' | 'secret';
 
 export type OpeningVisual = {
@@ -81,18 +74,6 @@ export type DoorResult = 'none' | 'busy' | 'locked' | 'unlocking' | 'toggled';
 
 function keyOf(x: number, y: number): string {
   return `${x},${y}`;
-}
-
-function offsetToWorld(
-  base: (u: number, v: number, d: number) => [number, number, number],
-  nx: number,
-  nz: number,
-  dist: number
-): (u: number, v: number, d: number) => [number, number, number] {
-  return (u, v, d) => {
-    const p = base(u, v, d);
-    return [p[0] + nx * dist, p[1], p[2] + nz * dist];
-  };
 }
 
 const MORTAR_LUMA = 30 / 255;
@@ -645,6 +626,8 @@ export async function buildFloor1Openings(
   const wallPngs = new Map<string, (typeof panelPng)>();
   wallFiles.forEach((file, i) => wallPngs.set(file, pngs[i + 1]));
   const panelVol = volumeFromImageData(panelPng.data);
+  panelPng.texture.wrapS = THREE.ClampToEdgeWrapping;
+  panelPng.texture.wrapT = THREE.ClampToEdgeWrapping;
 
   const makeMat = (png: { texture: THREE.Texture }, vol: { roughness: Uint8Array; dims: [number, number, number] }) => {
     const mat = voxelMaterial(png.texture, pbrMap(vol.roughness, vol.dims[0], vol.dims[1]));
@@ -705,16 +688,14 @@ export async function buildFloor1Openings(
     kind: OpeningKind
   ): void => {
     const face = view.face as 'N' | 'E' | 'S' | 'W';
-    const [inx, inz] = INSET[face];
-    const toWorld = makeToWorld(view.face, view.tx, view.tz, panelVol.dims, LAYER_SIZE, CELL, 'center');
     if (kind === 'door') {
+      const style = doorOpeningStyle(visual.x, visual.y);
       const surround = lookForZoneBase(view.tx, view.tz);
       const wallPng = wallPngOrFamilyBase(surround, `door-frame:${visual.x},${visual.y}:${face}`);
       const mat = surroundMat(surround);
       if (wallPng && mat) {
         const wallSrc = volumeFromImageData(wallPng.data);
         finishVolume(wallSrc, surround);
-        const style = doorOpeningStyle(visual.x, visual.y);
         const punched = punchOpening(wallSrc.volume, wallSrc.dims, style);
         const plateWorld = makeToWorld(view.face, view.tx, view.tz, wallSrc.dims, LAYER_SIZE, CELL, 'center');
         const plate = greedyMesh(punched, wallSrc.dims, plateWorld, { cullNeg: [false, false, false] });
@@ -757,19 +738,21 @@ export async function buildFloor1Openings(
           }
         }
       }
-      const panelWorld = offsetToWorld(toWorld, inx, inz, DOOR_PANEL_INSET);
-      const panelGeo = meshVolume(panelVol.volume, panelVol.dims, panelWorld, view.tx, view.tz, torches, beams);
-      if (panelGeo) {
-        const slider = new THREE.Group();
-        slider.name = `door-panel:${visual.x},${visual.y}:${face}`;
-        const panel = new THREE.Mesh(panelGeo, panelMat);
-        panel.castShadow = true;
-        panel.receiveShadow = true;
-        panel.frustumCulled = false;
-        slider.add(panel);
-        slider.frustumCulled = false;
-        group.add(slider);
-        visual.panels.push(slider);
+      const leaf = leafMeshes(style, face, view.tx, view.tz);
+      if (leaf.positions.length) {
+        const leafGeo = geometryWithBake([{ mesh: leaf, tx: view.tx, tz: view.tz }], torches, beams);
+        if (leafGeo) {
+          const slider = new THREE.Group();
+          slider.name = `door-panel:${visual.x},${visual.y}:${face}`;
+          const panel = new THREE.Mesh(leafGeo, panelMat);
+          panel.castShadow = true;
+          panel.receiveShadow = true;
+          panel.frustumCulled = false;
+          slider.add(panel);
+          slider.frustumCulled = false;
+          group.add(slider);
+          visual.panels.push(slider);
+        }
       }
       return;
     }
