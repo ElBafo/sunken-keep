@@ -231,7 +231,7 @@ describe('floor-1 floor and ceiling come from Levie’s map', () => {
       expect(mat.map?.minFilter).toBe(THREE.NearestFilter);
     }
     expect(rubble.roughness).toBe(0.92);
-    expect(rubble.specularIntensity).toBe(1);
+    expect(rubble.specularIntensity).toBe(0);
     expect(rubble.map?.generateMipmaps).toBe(false);
     expect(rubble.map?.minFilter).toBe(THREE.NearestFilter);
     expect(rubble.normalScale.x).toBeCloseTo(0.14, 5);

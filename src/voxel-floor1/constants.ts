@@ -80,8 +80,11 @@ export const PLANK_CEILING_VARIANTS = [
 export const CRACKED_CEILING_FILE = 'ceiling_cracked.png';
 /** One 256² rubble tile per 2 m cell — same density as the floor, readable on a phone. */
 export const RUBBLE_UV_SCALE = 1;
-/** Door / arch reveal into the opening. Front stays a 3 cm room-side relief. */
-export const ARCH_DEPTH = 0.32;
+/**
+ * Reveal into the door cell. Half a CELL so both sides meet in the middle
+ * (wall-thick soffit) while the room-side face stays a 3 cm relief.
+ */
+export const ARCH_DEPTH = CELL * 0.48;
 export const ARCH_FRONT = 0.03;
 export const ARCH_LAYERS = Math.round((ARCH_DEPTH + ARCH_FRONT) / LAYER_SIZE);
 

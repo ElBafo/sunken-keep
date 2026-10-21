@@ -122,7 +122,7 @@ export function paintedShellMaterial(
     polygonOffsetFactor: 1,
     polygonOffsetUnits: 1
   });
-  if (wood) {
+  if (wood || rubble) {
     mat.sheen = 0;
     mat.clearcoat = 0;
     mat.envMapIntensity = 0;

@@ -224,7 +224,7 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
   });
 
   it('gives door arches a real reveal into the opening', () => {
-    expect(ARCH_DEPTH).toBeCloseTo(0.32, 5);
+    expect(ARCH_DEPTH).toBeCloseTo(CELL * 0.48, 5);
     expect(ARCH_FRONT).toBeCloseTo(0.03, 5);
     expect(ARCH_LAYERS).toBeGreaterThan(20);
     const wall = new Uint8Array(8).fill(1);
