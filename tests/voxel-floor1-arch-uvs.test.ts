@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
-import { ARCH_FRONT, CELL, CORNICE_HEIGHT, DOOR_WALL_DEPTH } from '../src/voxel-floor1/constants';
+import { CELL, CORNICE_HEIGHT, DOOR_WALL_DEPTH } from '../src/voxel-floor1/constants';
 import { greedyMesh } from '../src/voxel-lab/mesher';
 import {
   makeArchHoleMask,
@@ -112,12 +112,14 @@ describe('floor-1 door opening styles', () => {
     for (const q of quads) {
       expect(q.corners).toHaveLength(4);
     }
-    expect(CHAMFER).toBeCloseTo(0.3, 5);
+    expect(CHAMFER).toBeCloseTo(0.2, 5);
     expect(FRONT_PROUD).toBeLessThanOrEqual(0.03);
     expect(wallAboveOpening('faceted')).toBeGreaterThanOrEqual(BRICK_COURSE - 1e-6);
     expect(facetedTop()).toBeLessThan(CELL - CORNICE_HEIGHT);
     expect(inOpeningVoid('faceted', (OPEN_U0 + OPEN_U1) / 2, 0.6)).toBe(true);
-    expect(inOpeningVoid('faceted', (OPEN_U0 + OPEN_U1) / 2, facetedTop() - 0.02)).toBe(true);
+    expect(inOpeningVoid('faceted', (OPEN_U0 + OPEN_U1) / 2, JAMB_TOP_FACETED - 0.02)).toBe(true);
+    expect(inOpeningVoid('faceted', (OPEN_U0 + OPEN_U1) / 2, JAMB_TOP_FACETED + 0.02)).toBe(false);
+    expect(inOpeningVoid('faceted', (OPEN_U0 + OPEN_U1) / 2, facetedTop() - 0.02)).toBe(false);
     expect(inOpeningVoid('faceted', OPEN_U0 + 0.02, facetedTop() - 0.02)).toBe(false);
     expect(inOpeningVoid('faceted', OPEN_U1 - 0.02, facetedTop() - 0.02)).toBe(false);
     expect(inOpeningVoid('faceted', OPEN_U0 + 0.02, JAMB_TOP_FACETED - 0.02)).toBe(true);
@@ -154,7 +156,7 @@ describe('floor-1 door opening styles', () => {
     const raw = rawArchMesh('W', 5, 2);
     const skewed = listSkewedQuads(raw.mesh.positions, raw.mesh.uvs);
     expect(skewed.length).toBeGreaterThan(0);
-    expect(skewed.some((q) => q.worldA > 0.5 || q.worldB > 0.5)).toBe(true);
+    expect(skewed.some((q) => q.worldA > 0.12 || q.worldB > 0.12)).toBe(true);
     expect(quadIsStreaked(raw.mesh.positions, raw.mesh.uvs, skewed[0].index, 0.05, 0.02) || skewed[0].ratio < 0.5).toBe(
       true
     );
@@ -190,28 +192,30 @@ describe('floor-1 door opening styles', () => {
     expect(doors).toHaveLength(4);
     const faceted = listLeafQuads('faceted');
     const lintel = listLeafQuads('lintel');
-    expect(faceted.filter((q) => q.kind === 'front')).toHaveLength(4);
+    expect(faceted.filter((q) => q.kind === 'front')).toHaveLength(1);
     expect(lintel.filter((q) => q.kind === 'front')).toHaveLength(1);
     const fTop = Math.max(...faceted.flatMap((q) => q.corners.map((c) => c[1])));
     const lTop = Math.max(...lintel.flatMap((q) => q.corners.map((c) => c[1])));
-    expect(fTop).toBeGreaterThan(JAMB_TOP_FACETED);
+    expect(fTop).toBeCloseTo(JAMB_TOP_FACETED - LEAF_PAD, 5);
     expect(fTop).toBeLessThan(facetedTop());
     expect(lTop).toBeLessThanOrEqual(JAMB_TOP_LINTEL);
     expect(lTop).toBeCloseTo(JAMB_TOP_LINTEL - LEAF_PAD, 5);
     expect(LEAF_REVEAL).toBeCloseTo(DOOR_WALL_DEPTH * 0.25, 5);
-    expect(ROOM_DEPTH).toBeCloseTo(ARCH_FRONT, 5);
-    expect(Math.abs(LEAF_FRONT - LEAF_BACK)).toBeLessThanOrEqual(ARCH_FRONT + 1e-6);
+    expect(ROOM_DEPTH).toBeCloseTo(0.15, 5);
+    expect(DOOR_WALL_DEPTH).toBeCloseTo(0.3, 5);
+    expect(Math.abs(LEAF_FRONT - LEAF_BACK)).toBeLessThanOrEqual(ROOM_DEPTH + 1e-6);
     expect(listIronQuads('faceted').length).toBeGreaterThan(8);
     expect(listIronQuads('lintel').length).toBeGreaterThan(8);
     expect(readFileSync(resolve(__dirname, '../src/voxel-floor1/door-opening.ts'), 'utf8')).toContain(
       'door_panel'
     );
     const art = readFileSync(resolve(__dirname, '../docs/ART_DIRECTION.md'), 'utf8');
-    expect(art).toContain('leaf top follows those same five facets');
+    expect(art).toContain('relieving arch');
     expect(art).toContain('rectangular under the lintel');
     expect(art).toContain('padlock');
     expect(art).toContain('door_panel.png');
     expect(art).toContain('exempt from the antique-oak');
+    expect(art).toContain('never near white');
   });
 
   it('keeps painted doorway floors at 1 UV per cell and documents the styles', () => {
@@ -221,6 +225,7 @@ describe('floor-1 door opening styles', () => {
     expect(doorFloors.length).toBe(doors.length);
     const art = readFileSync(resolve(__dirname, '../docs/ART_DIRECTION.md'), 'utf8');
     expect(art).toContain('exactly five big flat slabs');
+    expect(art).toContain('30 cm');
     expect(art).toContain('brick course');
     expect(art).toContain('flush');
     expect(art).toContain('one wall between two directly adjacent room cells');

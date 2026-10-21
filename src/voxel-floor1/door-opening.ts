@@ -1,6 +1,6 @@
 import { tileCorner } from '../voxel-lab/faces';
 import type { MeshArrays } from '../voxel-lab/mesher';
-import { ARCH_FRONT, CELL, CORNICE_HEIGHT, DOOR_WALL_DEPTH, WALL_TEXELS } from './constants';
+import { CELL, CORNICE_HEIGHT, DOOR_WALL_DEPTH, DOOR_WALL_HALF, WALL_TEXELS } from './constants';
 import { faceUOffset } from './wall-look';
 
 export type DoorOpeningStyle = 'faceted' | 'lintel';
@@ -30,26 +30,35 @@ export const JOINT = 0.02;
 /** 2.5 cm proud of the wall plate — cut-in, not a pillar. */
 export const FRONT_PROUD = 0.025;
 export const BRICK_COURSE = 0.18;
-/** 45° run = rise. Keeps a full brick course of wall under the cornice. */
-export const CHAMFER = 0.3;
-export const KEYSTONE_H = 0.2;
-export const LINTEL_H = 0.22;
-export const JAMB_TOP_H = 0.4;
-export const JAMB_TOP_FACETED = 1.14;
+/** 45° run = rise on the relieving arch above the main-door lintel. */
+export const CHAMFER = 0.2;
+export const KEYSTONE_H = 0.12;
+export const LINTEL_H = 0.24;
+export const JAMB_TOP_H = 0.12;
+/** Rectangular opening height — main doors (relieving arch sits above). */
+export const JAMB_TOP_FACETED = 1.08;
+/** Rectangular opening height — side doors (plain heavy lintel). */
 export const JAMB_TOP_LINTEL = 1.4;
-/** One room's wall plate — same 3 cm relief as every other wall. */
-export const ROOM_DEPTH = ARCH_FRONT;
+/** One room's half of the 30 cm doorway wall. */
+export const ROOM_DEPTH = DOOR_WALL_HALF;
 export const FRONT = ROOM_DEPTH + FRONT_PROUD;
 /** Slight overlap past the shared edge so the two room plates seal. */
 export const BACK = -0.004;
 /** Door leaf sits in the combined wall thickness, centred on the edge. */
 export const LEAF_PAD = 0.03;
-export const LEAF_THICK = 0.018;
+export const LEAF_THICK = 0.04;
 /** Quarter of the two-sided wall so the frame still reads from each room. */
 export const LEAF_REVEAL = DOOR_WALL_DEPTH * 0.25;
 export const LEAF_FRONT = LEAF_THICK / 2;
 export const LEAF_BACK = -LEAF_THICK / 2;
 export const IRON_PROUD = 0.004;
+/** Painted door in `door_panel.png` (crop the arched cap, keep padlock / studs). */
+export const DOOR_PANEL_V0 = 0.05;
+export const DOOR_PANEL_V1 = 0.7;
+/** Aged leaf pixels stay at or under this luma — duller than lit stone. */
+export const LEAF_MAX_LUMA = 0.42;
+/** Fills sit a hair proud of the 15 cm plate so they do not z-fight. */
+const FILL_PROUD = 0.006;
 
 export type QuadRole =
   | 'jamb-top'
@@ -73,33 +82,24 @@ export type OpeningQuad = {
 
 export type OpeningHole = { u0: number; u1: number; v0: number; v1: number };
 
-/** Bounding box of the inner void. Faceted is not this rectangle — see inOpeningVoid. */
+export function jambTop(style: DoorOpeningStyle): number {
+  return style === 'faceted' ? JAMB_TOP_FACETED : JAMB_TOP_LINTEL;
+}
+
+/** Rectangular walkable void — lintel and relieving arch sit above this. */
 export function openingPunchRect(style: DoorOpeningStyle): OpeningHole {
-  const v1 =
-    style === 'faceted' ? JAMB_TOP_FACETED + CHAMFER + KEYSTONE_H : JAMB_TOP_LINTEL + LINTEL_H;
   return {
     u0: OPEN_U0,
     u1: OPEN_U1,
     v0: 0,
-    v1
+    v1: jambTop(style)
   };
 }
 
-/** True inside the walkable opening. Faceted head is five straight segments, not a box. */
+/** True inside the walkable opening. Both styles are a rectangle under the lintel. */
 export function inOpeningVoid(style: DoorOpeningStyle, u: number, v: number): boolean {
   if (v < 0) return false;
-  if (style === 'lintel') {
-    return u >= OPEN_U0 && u < OPEN_U1 && v < lintelTop();
-  }
-  if (v >= facetedTop()) return false;
-  if (v <= JAMB_TOP_FACETED) {
-    return u >= OPEN_U0 && u < OPEN_U1;
-  }
-  const rise = v - JAMB_TOP_FACETED;
-  if (rise < CHAMFER) {
-    return u >= OPEN_U0 + rise && u < OPEN_U1 - rise;
-  }
-  return u >= OPEN_U0 + CHAMFER && u < OPEN_U1 - CHAMFER;
+  return u >= OPEN_U0 && u < OPEN_U1 && v < jambTop(style);
 }
 
 export function punchOpening(
@@ -148,8 +148,13 @@ export function lintelTop(): number {
   return JAMB_TOP_LINTEL + LINTEL_H;
 }
 
+/** Top of the five-slab relieving arch above a main-door lintel. */
 export function facetedTop(): number {
-  return JAMB_TOP_FACETED + CHAMFER + KEYSTONE_H;
+  return JAMB_TOP_FACETED + LINTEL_H + CHAMFER + KEYSTONE_H;
+}
+
+export function mainLintelTop(): number {
+  return JAMB_TOP_FACETED + LINTEL_H;
 }
 
 export function corniceBottom(): number {
@@ -223,16 +228,16 @@ export function pointInQuadUV(u: number, v: number, corners: OpeningQuad['corner
 export function listFacetedCornerFills(): OpeningQuad[] {
   const u0 = OPEN_U0;
   const u1 = OPEN_U1;
-  const jt = JAMB_TOP_FACETED;
-  const kb = jt + CHAMFER;
+  const spring = mainLintelTop();
+  const kb = spring + CHAMFER;
   const ft = facetedTop();
-  const cf = ROOM_DEPTH;
+  const cf = ROOM_DEPTH + FILL_PROUD;
   const fronts: OpeningQuad[] = [
     {
       role: 'corner',
       kind: 'front',
       corners: [
-        [u0, jt, cf],
+        [u0, spring, cf],
         [u0 + CHAMFER, kb, cf],
         [u0 + CHAMFER, ft, cf],
         [u0, ft, cf]
@@ -242,7 +247,7 @@ export function listFacetedCornerFills(): OpeningQuad[] {
       role: 'corner',
       kind: 'front',
       corners: [
-        [u1, jt, cf],
+        [u1, spring, cf],
         [u1, ft, cf],
         [u1 - CHAMFER, ft, cf],
         [u1 - CHAMFER, kb, cf]
@@ -324,11 +329,15 @@ export function roomInward(face: FaceNESW): [number, number, number] {
   }
 }
 
-/** Five head slabs, left to right, each with one front and one soffit. */
+/**
+ * Rectangular opening, heavy lintel, then a five-slab relieving arch above
+ * the lintel with stone fill in the tympanum.
+ */
 export function listFacetedHeadQuads(): OpeningQuad[] {
   const u0 = OPEN_U0;
   const u1 = OPEN_U1;
   const jt = JAMB_TOP_FACETED;
+  const spring = mainLintelTop();
   const ch = CHAMFER;
   const kh = KEYSTONE_H;
   const th = SLAB_THICK;
@@ -336,20 +345,41 @@ export function listFacetedHeadQuads(): OpeningQuad[] {
   const inv = 1 / Math.SQRT2;
   const out: OpeningQuad[] = [];
 
-  const leftTop0 = jt - JAMB_TOP_H;
+  out.push({
+    role: 'lintel',
+    kind: 'front',
+    corners: frontRect(u0 - 0.08, u1 + 0.08, jt, spring)
+  });
+  out.push({
+    role: 'lintel',
+    kind: 'soffit',
+    corners: soffitRect(u0, u1, jt, jt)
+  });
+  out.push({
+    role: 'jamb-soffit',
+    kind: 'soffit',
+    corners: soffitRect(u0, u0, 0, jt - j)
+  });
+  out.push({
+    role: 'jamb-soffit',
+    kind: 'soffit',
+    corners: soffitRect(u1, u1, 0, jt - j)
+  });
+
+  const leftTop0 = spring;
   out.push({
     role: 'jamb-top',
     kind: 'front',
-    corners: frontRect(u0 - th, u0 - j, leftTop0, jt)
+    corners: frontRect(u0 - th, u0 - j, leftTop0 - 0.02, leftTop0 + JAMB_TOP_H)
   });
   out.push({
     role: 'jamb-top',
     kind: 'soffit',
-    corners: soffitRect(u0, u0, leftTop0 + j, jt - j)
+    corners: soffitRect(u0, u0, leftTop0 + j, leftTop0 + JAMB_TOP_H)
   });
 
-  const la0: [number, number] = [u0 + j, jt + j];
-  const la1: [number, number] = [u0 + ch - j, jt + ch - j];
+  const la0: [number, number] = [u0 + j, spring + j];
+  const la1: [number, number] = [u0 + ch - j, spring + ch - j];
   const lp: [number, number] = [-inv * 0.12, inv * 0.12];
   out.push({
     role: 'chamfer',
@@ -374,7 +404,7 @@ export function listFacetedHeadQuads(): OpeningQuad[] {
 
   const k0 = u0 + ch + j;
   const k1 = u1 - ch - j;
-  const kb = jt + ch;
+  const kb = spring + ch;
   out.push({
     role: 'keystone',
     kind: 'front',
@@ -386,8 +416,8 @@ export function listFacetedHeadQuads(): OpeningQuad[] {
     corners: soffitRect(k0, k1, kb, kb)
   });
 
-  const ra0: [number, number] = [u1 - ch + j, jt + ch - j];
-  const ra1: [number, number] = [u1 - j, jt + j];
+  const ra0: [number, number] = [u1 - ch + j, spring + ch - j];
+  const ra1: [number, number] = [u1 - j, spring + j];
   const rp: [number, number] = [inv * 0.12, inv * 0.12];
   out.push({
     role: 'chamfer',
@@ -413,26 +443,67 @@ export function listFacetedHeadQuads(): OpeningQuad[] {
   out.push({
     role: 'jamb-top',
     kind: 'front',
-    corners: frontRect(u1 + j, u1 + th, leftTop0, jt)
+    corners: frontRect(u1 + j, u1 + th, leftTop0 - 0.02, leftTop0 + JAMB_TOP_H)
   });
   out.push({
     role: 'jamb-top',
     kind: 'soffit',
-    corners: soffitRect(u1, u1, leftTop0 + j, jt - j)
+    corners: soffitRect(u1, u1, leftTop0 + j, leftTop0 + JAMB_TOP_H)
   });
 
+  const ft = kb + kh;
+  const cf = ROOM_DEPTH + FILL_PROUD;
   out.push({
-    role: 'jamb-soffit',
-    kind: 'soffit',
-    corners: soffitRect(u0, u0, 0, leftTop0)
+    role: 'corner',
+    kind: 'front',
+    corners: [
+      [u0 - th, spring, cf],
+      [u0, spring, cf],
+      [u0 + ch, kb, cf],
+      [u0 - th, kb, cf]
+    ]
   });
   out.push({
-    role: 'jamb-soffit',
-    kind: 'soffit',
-    corners: soffitRect(u1, u1, 0, leftTop0)
+    role: 'corner',
+    kind: 'front',
+    corners: [
+      [u0 - th, kb, cf],
+      [u0 + ch, kb, cf],
+      [u0 + ch, ft, cf],
+      [u0 - th, ft, cf]
+    ]
   });
-
-  out.push(...listFacetedCornerFills());
+  out.push({
+    role: 'corner',
+    kind: 'front',
+    corners: [
+      [u1, spring, cf],
+      [u1 + th, spring, cf],
+      [u1 + th, kb, cf],
+      [u1 - ch, kb, cf]
+    ]
+  });
+  out.push({
+    role: 'corner',
+    kind: 'front',
+    corners: [
+      [u1 - ch, kb, cf],
+      [u1 + th, kb, cf],
+      [u1 + th, ft, cf],
+      [u1 - ch, ft, cf]
+    ]
+  });
+  const tymp = ROOM_DEPTH + FILL_PROUD;
+  out.push({
+    role: 'corner',
+    kind: 'front',
+    corners: [
+      [u0 + ch, spring, tymp],
+      [u1 - ch, spring, tymp],
+      [u1 - ch, kb, tymp],
+      [u0 + ch, kb, tymp]
+    ]
+  });
   out.push({
     role: 'chamfer-end',
     kind: 'soffit',
@@ -584,90 +655,23 @@ export function doorHasLeaf(x: number, y: number): boolean {
   return `${x},${y}` in FLOOR1_DOOR_STYLES;
 }
 
-/** Front / back / edge quads for a leaf that matches the opening silhouette. */
+/** Front / back / edge quads for a rectangular leaf under the lintel. */
 export function listLeafQuads(style: DoorOpeningStyle): OpeningQuad[] {
   const pad = LEAF_PAD;
   const u0 = OPEN_U0 + pad;
   const u1 = OPEN_U1 - pad;
+  const top = jambTop(style) - pad;
   const out: OpeningQuad[] = [];
-  const pushPair = (a0: number, a1: number, y0: number, y1: number): void => {
-    out.push({ role: 'leaf', kind: 'front', corners: leafFrontRect(a0, a1, y0, y1) });
-    out.push({ role: 'leaf', kind: 'back', corners: leafBackRect(a0, a1, y0, y1) });
-  };
-
-  if (style === 'lintel') {
-    const top = JAMB_TOP_LINTEL - pad;
-    pushPair(u0, u1, 0, top);
-    out.push({ role: 'leaf', kind: 'soffit', corners: leafEdge(u0, u0, 0, top) });
-    out.push({ role: 'leaf', kind: 'soffit', corners: leafEdge(u1, u1, 0, top) });
-    out.push({ role: 'leaf', kind: 'soffit', corners: leafEdge(u0, u1, top, top) });
-    return out;
-  }
-
-  const jt = JAMB_TOP_FACETED;
-  const ch = CHAMFER;
-  const top = jt + ch - pad;
-  pushPair(u0, u1, 0, jt);
-  out.push({
-    role: 'leaf',
-    kind: 'front',
-    corners: [
-      [u0, jt, LEAF_FRONT],
-      [u0 + ch, jt, LEAF_FRONT],
-      [u0 + ch, top, LEAF_FRONT],
-      [u0 + (top - jt), top, LEAF_FRONT]
-    ]
-  });
-  out.push({
-    role: 'leaf',
-    kind: 'back',
-    corners: [
-      [u0, jt, LEAF_BACK],
-      [u0 + (top - jt), top, LEAF_BACK],
-      [u0 + ch, top, LEAF_BACK],
-      [u0 + ch, jt, LEAF_BACK]
-    ]
-  });
-  pushPair(u0 + ch, u1 - ch, jt, top);
-  out.push({
-    role: 'leaf',
-    kind: 'front',
-    corners: [
-      [u1 - ch, jt, LEAF_FRONT],
-      [u1, jt, LEAF_FRONT],
-      [u1 - (top - jt), top, LEAF_FRONT],
-      [u1 - ch, top, LEAF_FRONT]
-    ]
-  });
-  out.push({
-    role: 'leaf',
-    kind: 'back',
-    corners: [
-      [u1 - ch, jt, LEAF_BACK],
-      [u1 - ch, top, LEAF_BACK],
-      [u1 - (top - jt), top, LEAF_BACK],
-      [u1, jt, LEAF_BACK]
-    ]
-  });
-  out.push({ role: 'leaf', kind: 'soffit', corners: leafEdge(u0, u0, 0, jt) });
-  out.push({
-    role: 'leaf',
-    kind: 'soffit',
-    corners: leafEdge(u0, u0 + (top - jt), jt, top)
-  });
-  out.push({ role: 'leaf', kind: 'soffit', corners: leafEdge(u0 + (top - jt), u1 - (top - jt), top, top) });
-  out.push({
-    role: 'leaf',
-    kind: 'soffit',
-    corners: leafEdge(u1 - (top - jt), u1, top, jt)
-  });
-  out.push({ role: 'leaf', kind: 'soffit', corners: leafEdge(u1, u1, jt, 0) });
+  out.push({ role: 'leaf', kind: 'front', corners: leafFrontRect(u0, u1, 0, top) });
+  out.push({ role: 'leaf', kind: 'back', corners: leafBackRect(u0, u1, 0, top) });
+  out.push({ role: 'leaf', kind: 'soffit', corners: leafEdge(u0, u0, 0, top) });
+  out.push({ role: 'leaf', kind: 'soffit', corners: leafEdge(u1, u1, 0, top) });
+  out.push({ role: 'leaf', kind: 'soffit', corners: leafEdge(u0, u1, top, top) });
   return out;
 }
 
-export function listLeafHeadRoles(style: DoorOpeningStyle): QuadRole[] {
-  if (style === 'lintel') return ['leaf'];
-  return ['leaf', 'leaf', 'leaf'];
+export function listLeafHeadRoles(_style: DoorOpeningStyle): QuadRole[] {
+  return ['leaf'];
 }
 
 function ironRect(a0: number, a1: number, u0: number, u1: number): OpeningQuad['corners'] {
@@ -685,7 +689,7 @@ export function listIronQuads(style: DoorOpeningStyle): OpeningQuad[] {
   const pad = LEAF_PAD;
   const a0 = OPEN_U0 + pad;
   const a1 = OPEN_U1 - pad;
-  const top = style === 'lintel' ? JAMB_TOP_LINTEL - pad : JAMB_TOP_FACETED + CHAMFER - pad;
+  const top = jambTop(style) - pad;
   const out: OpeningQuad[] = [];
   const push = (x0: number, x1: number, y0: number, y1: number): void => {
     out.push({ role: 'iron', kind: 'front', corners: ironRect(x0, x1, y0, y1) });
@@ -753,14 +757,33 @@ function mapLocal(face: FaceNESW, tx: number, tz: number, a: number, u: number, 
   }
 }
 
-/** Sample the painted door in the centre of the 2 m `door_panel` tile. */
-function woodUv(a: number, u: number): [number, number] {
-  return [a / CELL, u / CELL];
+/** Map a rectangular leaf onto the painted door, cropping only the arched cap. */
+function woodUv(a: number, u: number, leafTop: number): [number, number] {
+  const t = leafTop > 1e-6 ? Math.min(1, Math.max(0, u / leafTop)) : 0;
+  return [a / CELL, DOOR_PANEL_V0 + t * (DOOR_PANEL_V1 - DOOR_PANEL_V0)];
+}
+
+function pixelLuma(r: number, g: number, b: number): number {
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function rustIron(luma: number): [number, number, number] {
+  const tone = Math.min(luma, 0.58);
+  return [tone * 0.36 + 0.07, tone * 0.22 + 0.045, tone * 0.14 + 0.032];
+}
+
+function clampLeafLuma(r: number, g: number, b: number): [number, number, number] {
+  const luma = pixelLuma(r, g, b);
+  if (luma <= LEAF_MAX_LUMA) return [r, g, b];
+  const k = LEAF_MAX_LUMA / luma;
+  return [r * k, g * k, b * k];
 }
 
 /**
  * Recolour/age pass on `door_panel.png`. Keeps the plank layout, bands,
  * studs, and padlock; shifts wood to dark grey-brown and iron to rusty matte.
+ * Original highlight pixels on studs / rivets / the padlock become dull
+ * rusty or dark-grey iron — never near white, no specular sparkle.
  */
 export function ageDoorPanelPixels(
   src: ArrayLike<number>,
@@ -782,13 +805,14 @@ export function ageDoorPanelPixels(
       const maxc = Math.max(r, g, b);
       const minc = Math.min(r, g, b);
       const sat = maxc > 1e-6 ? (maxc - minc) / maxc : 0;
-      const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+      const luma = pixelLuma(r, g, b);
       const dx = (x - cx) / rx;
       const dy = (y - cy) / ry;
       const inDoor = dx * dx + dy * dy <= 1.15;
       const edge = Math.min(1, Math.sqrt(dx * dx + dy * dy));
       const wood = sat > 0.12 && r > g + 0.02 && r > b + 0.04 && luma < 0.78;
-      const iron = inDoor && sat < 0.2 && luma > 0.28 && luma < 0.88 && !wood;
+      const highlight = inDoor && !wood && sat < 0.38 && luma >= 0.55;
+      const iron = inDoor && !wood && sat < 0.28 && luma > 0.22;
       let nr = r;
       let ng = g;
       let nb = b;
@@ -804,10 +828,11 @@ export function ageDoorPanelPixels(
         nr *= grime;
         ng *= grime * 0.98;
         nb *= grime * 0.92;
-      } else if (iron) {
-        nr = luma * 0.28 + 0.06;
-        ng = luma * 0.18 + 0.04;
-        nb = luma * 0.12 + 0.03;
+      } else if (iron || highlight) {
+        [nr, ng, nb] = rustIron(luma);
+      }
+      if (inDoor) {
+        [nr, ng, nb] = clampLeafLuma(nr, ng, nb);
       }
       out[i] = Math.round(Math.min(1, nr) * 255);
       out[i + 1] = Math.round(Math.min(1, ng) * 255);
@@ -825,7 +850,8 @@ function pushQuad(
   face: FaceNESW,
   tx: number,
   tz: number,
-  wood = false
+  wood = false,
+  leafTop = 0
 ): void {
   const world = corners.map((c) => mapLocal(face, tx, tz, c[0], c[1], c[2]));
   const ax = world[1][0] - world[0][0];
@@ -844,7 +870,7 @@ function pushQuad(
   const uOff = faceUOffset(face, tx, tz);
   const uv: Array<[number, number]> = [];
   if (wood && (kind === 'front' || kind === 'back')) {
-    for (const c of corners) uv.push(woodUv(c[0], c[1]));
+    for (const c of corners) uv.push(woodUv(c[0], c[1], leafTop));
   } else if (kind === 'front') {
     for (const c of corners) uv.push([c[0] / CELL + uOff, c[1] / CELL]);
   } else {
@@ -888,8 +914,9 @@ export function leafMeshes(
 ): { wood: MeshArrays; iron: MeshArrays } {
   const wood = emptyMesh();
   const iron = emptyMesh();
+  const top = jambTop(style) - LEAF_PAD;
   for (const q of listLeafQuads(style)) {
-    pushQuad(wood, q.corners, q.kind, face, tx, tz, true);
+    pushQuad(wood, q.corners, q.kind, face, tx, tz, true, top);
   }
   for (const q of listIronQuads(style)) {
     pushQuad(iron, q.corners, q.kind, face, tx, tz);

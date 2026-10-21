@@ -88,15 +88,19 @@ export const CRACKED_CEILING_FILE = 'ceiling_cracked.png';
 /** One 256² rubble tile per 2 m cell — same density as the floor, readable on a phone. */
 export const RUBBLE_UV_SCALE = 1;
 /**
- * Room-side relief of a normal wall plate (~3 cm). Door openings cut through
- * this same thickness — they are a punched wall, not a 0.96 m passage cell.
+ * Room-side relief of a normal (non-door) wall plate (~3 cm).
  */
 export const ARCH_FRONT = 0.03;
-/** Combined two-sided wall at a door edge (each room has one ARCH_FRONT plate). */
-export const DOOR_WALL_DEPTH = ARCH_FRONT * 2;
+/**
+ * Combined two-sided doorway wall (~30 cm). Each room owns half, sealed
+ * with that room's stone. Not a passage cell.
+ */
+export const DOOR_WALL_DEPTH = 0.3;
+export const DOOR_WALL_HALF = DOOR_WALL_DEPTH / 2;
 /** Legacy deep-reveal helper depth. Door openings do not use this. */
 export const ARCH_DEPTH = CELL * 0.48;
 export const ARCH_LAYERS = Math.max(3, Math.round(ARCH_FRONT / LAYER_SIZE));
+export const DOOR_LAYERS = Math.max(3, Math.round(DOOR_WALL_HALF / LAYER_SIZE));
 
 /** One brick-course band, flush on the wall. 256×64 tile spans two cells. */
 export const CORNICE_HEIGHT = 0.18;
