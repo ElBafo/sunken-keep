@@ -51,7 +51,7 @@ export const DOOR_UNLOCK_LEAD_MS = 350;
  * Far enough that the faceted / lintel void is clear; the mesh is clipped
  * at the cornice and hidden when fully open so it never pokes through.
  */
-export const DOOR_LEAF_SLIDE = 1.66;
+export const DOOR_LEAF_SLIDE = 1.84;
 export const DOOR_LEAF_MS = 600;
 
 /** Real cubes within this Chebyshev distance; flat-but-lit beyond. */

@@ -21,24 +21,31 @@ export function doorOpeningStyle(x: number, y: number): DoorOpeningStyle {
   return FLOOR1_DOOR_STYLES[`${x},${y}`] ?? 'lintel';
 }
 
-export const OPEN_WIDTH = 1.16;
+export const OPEN_WIDTH = 1.12;
 export const OPEN_U0 = (CELL - OPEN_WIDTH) / 2;
 export const OPEN_U1 = OPEN_U0 + OPEN_WIDTH;
 /** Visible thickness of each head slab on the wall face. */
-export const SLAB_THICK = 0.26;
-export const JOINT = 0.02;
-/** 2.5 cm proud of the wall plate — cut-in, not a pillar. */
-export const FRONT_PROUD = 0.025;
+export const SLAB_THICK = 0.28;
+export const JOINT = 0.024;
+/** 3 cm proud of the wall plate so the lintel and arch read. */
+export const FRONT_PROUD = 0.03;
 export const BRICK_COURSE = 0.18;
 /** 45° run = rise on the relieving arch above the main-door lintel. */
-export const CHAMFER = 0.2;
-export const KEYSTONE_H = 0.12;
-export const LINTEL_H = 0.24;
-export const JAMB_TOP_H = 0.12;
-/** Rectangular opening height — main doors (relieving arch sits above). */
-export const JAMB_TOP_FACETED = 1.08;
-/** Rectangular opening height — side doors (plain heavy lintel). */
-export const JAMB_TOP_LINTEL = 1.4;
+export const CHAMFER = 0.1;
+export const KEYSTONE_H = 0.04;
+/** Heavy single lintel block, 26 cm. */
+export const LINTEL_H = 0.26;
+/** How far the lintel bears into the wall past each jamb. */
+export const LINTEL_BEAR = 0.18;
+export const JAMB_TOP_H = 0.1;
+/**
+ * Tall rectangular opening — floor to lintel. Same size on main and side
+ * doors so it reads as a full-height door in the 2 m cell, not a garage cut.
+ */
+export const JAMB_TOP_FACETED = 1.42;
+export const JAMB_TOP_LINTEL = 1.42;
+/** Field-brick V on banded walls — below the carved knot course. */
+export const FIELD_STONE_V0 = 0.14;
 /** One room's half of the 30 cm doorway wall. */
 export const ROOM_DEPTH = DOOR_WALL_HALF;
 export const FRONT = ROOM_DEPTH + FRONT_PROUD;
@@ -353,7 +360,7 @@ export function listFacetedHeadQuads(): OpeningQuad[] {
   out.push({
     role: 'lintel',
     kind: 'front',
-    corners: frontRect(u0 - 0.08, u1 + 0.08, jt, spring)
+    corners: frontRect(u0 - LINTEL_BEAR, u1 + LINTEL_BEAR, jt, spring)
   });
   out.push({
     role: 'lintel',
@@ -584,7 +591,7 @@ export function listLintelQuads(): OpeningQuad[] {
   out.push({
     role: 'lintel',
     kind: 'front',
-    corners: frontRect(u0 - 0.06, u1 + 0.06, jt, jt + lh)
+    corners: frontRect(u0 - LINTEL_BEAR, u1 + LINTEL_BEAR, jt, jt + lh)
   });
   out.push({
     role: 'lintel',
@@ -854,6 +861,15 @@ export function ageDoorPanelPixels(
   return out;
 }
 
+const FIELD_STONE_ROLES = new Set<QuadRole>([
+  'lintel',
+  'chamfer',
+  'keystone',
+  'jamb-top',
+  'corner',
+  'chip'
+]);
+
 function pushQuad(
   mesh: MeshArrays,
   corners: Array<[number, number, number]>,
@@ -862,7 +878,8 @@ function pushQuad(
   tx: number,
   tz: number,
   wood = false,
-  leafTop = 0
+  leafTop = 0,
+  role?: QuadRole
 ): void {
   const world = corners.map((c) => mapLocal(face, tx, tz, c[0], c[1], c[2]));
   const ax = world[1][0] - world[0][0];
@@ -882,6 +899,9 @@ function pushQuad(
   const uv: Array<[number, number]> = [];
   if (wood && (kind === 'front' || kind === 'back')) {
     for (const c of corners) uv.push(woodUv(c[0], c[1], leafTop));
+  } else if (kind === 'front' && role && FIELD_STONE_ROLES.has(role)) {
+    const y0 = Math.min(...corners.map((c) => c[1]));
+    for (const c of corners) uv.push([c[0] / CELL + uOff, FIELD_STONE_V0 + (c[1] - y0) / CELL]);
   } else if (kind === 'front') {
     for (const c of corners) uv.push([c[0] / CELL + uOff, c[1] / CELL]);
   } else {
@@ -911,8 +931,15 @@ export function openingSlabMeshes(
   const stone = emptyMesh();
   const lintel = emptyMesh();
   for (const q of listOpeningQuads(style)) {
-    const dest = q.role === 'lintel' || q.role === 'chip' ? lintel : stone;
-    pushQuad(dest, q.corners, q.kind, face, tx, tz);
+    const dest =
+      q.role === 'lintel' ||
+      q.role === 'chip' ||
+      q.role === 'jamb-top' ||
+      q.role === 'chamfer' ||
+      q.role === 'keystone'
+        ? lintel
+        : stone;
+    pushQuad(dest, q.corners, q.kind, face, tx, tz, false, 0, q.role);
   }
   return { stone, lintel };
 }

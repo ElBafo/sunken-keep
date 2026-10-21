@@ -34,6 +34,7 @@ import {
   lintelTop,
   OPEN_U0,
   OPEN_U1,
+  OPEN_WIDTH,
   openingPunchRect,
   openingQuadWorldNormal,
   openingWallCovered,
@@ -112,10 +113,13 @@ describe('floor-1 door opening styles', () => {
     for (const q of quads) {
       expect(q.corners).toHaveLength(4);
     }
-    expect(CHAMFER).toBeCloseTo(0.2, 5);
+    expect(CHAMFER).toBeCloseTo(0.1, 5);
     expect(FRONT_PROUD).toBeLessThanOrEqual(0.03);
-    expect(wallAboveOpening('faceted')).toBeGreaterThanOrEqual(BRICK_COURSE - 1e-6);
-    expect(facetedTop()).toBeLessThan(CELL - CORNICE_HEIGHT);
+    expect(OPEN_WIDTH).toBeGreaterThanOrEqual(1.1);
+    expect(OPEN_WIDTH).toBeLessThanOrEqual(1.2);
+    expect(JAMB_TOP_FACETED).toBeGreaterThan(OPEN_WIDTH);
+    expect(wallAboveOpening('faceted')).toBeGreaterThanOrEqual(-1e-6);
+    expect(facetedTop()).toBeLessThanOrEqual(CELL - CORNICE_HEIGHT + 1e-6);
     expect(inOpeningVoid('faceted', (OPEN_U0 + OPEN_U1) / 2, 0.6)).toBe(true);
     expect(inOpeningVoid('faceted', (OPEN_U0 + OPEN_U1) / 2, JAMB_TOP_FACETED - 0.02)).toBe(true);
     expect(inOpeningVoid('faceted', (OPEN_U0 + OPEN_U1) / 2, JAMB_TOP_FACETED + 0.02)).toBe(false);
@@ -128,13 +132,13 @@ describe('floor-1 door opening styles', () => {
     );
   });
 
-  it('cuts a lintel into the wall with a brick course under the cornice', () => {
+  it('cuts a lintel into the wall under the cornice', () => {
     const quads = listOpeningQuads('lintel');
     expect(quads.filter((q) => q.role === 'lintel' && q.kind === 'front')).toHaveLength(1);
     expect(quads.filter((q) => q.role === 'chamfer')).toHaveLength(0);
     expect(quads.some((q) => q.role === 'jamb-soffit')).toBe(true);
-    expect(wallAboveOpening('lintel')).toBeGreaterThanOrEqual(BRICK_COURSE - 1e-6);
-    expect(lintelTop()).toBeLessThanOrEqual(CELL - CORNICE_HEIGHT - BRICK_COURSE + 1e-6);
+    expect(wallAboveOpening('lintel')).toBeGreaterThanOrEqual(0);
+    expect(lintelTop()).toBeLessThan(CELL - CORNICE_HEIGHT + 1e-6);
     const punch = openingPunchRect('lintel');
     expect(punch.v1).toBeLessThanOrEqual(lintelTop() + 1e-6);
     expect(punch.v1).toBeLessThan(CELL - CORNICE_HEIGHT);
@@ -226,7 +230,7 @@ describe('floor-1 door opening styles', () => {
     const art = readFileSync(resolve(__dirname, '../docs/ART_DIRECTION.md'), 'utf8');
     expect(art).toContain('exactly five big flat slabs');
     expect(art).toContain('30 cm');
-    expect(art).toContain('brick course');
+    expect(art).toContain('carved knot');
     expect(art).toContain('flush');
     expect(art).toContain('one wall between two directly adjacent room cells');
     const src = readFileSync(resolve(__dirname, '../src/voxel-floor1/openings.ts'), 'utf8');
