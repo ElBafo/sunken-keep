@@ -202,7 +202,7 @@ export function listFacetedHeadQuads(): OpeningQuad[] {
 
   const la0: [number, number] = [u0 + j, jt + j];
   const la1: [number, number] = [u0 + ch - j, jt + ch - j];
-  const lp: [number, number] = [-inv * th, inv * th];
+  const lp: [number, number] = [-inv * 0.12, inv * 0.12];
   out.push({
     role: 'chamfer',
     kind: 'front',
@@ -240,7 +240,7 @@ export function listFacetedHeadQuads(): OpeningQuad[] {
 
   const ra0: [number, number] = [u1 - ch + j, jt + ch - j];
   const ra1: [number, number] = [u1 - j, jt + j];
-  const rp: [number, number] = [inv * th, inv * th];
+  const rp: [number, number] = [inv * 0.12, inv * 0.12];
   out.push({
     role: 'chamfer',
     kind: 'front',
@@ -285,44 +285,45 @@ export function listFacetedHeadQuads(): OpeningQuad[] {
   });
 
   const ft = kb + kh;
+  const cf = ROOM_DEPTH;
   out.push({
     role: 'corner',
     kind: 'front',
     corners: [
-      [u0 - th, jt, FRONT],
-      [u0, jt, FRONT],
-      [u0 + ch, kb, FRONT],
-      [u0 - th, kb, FRONT]
+      [u0 - th, jt, cf],
+      [u0, jt, cf],
+      [u0 + ch, kb, cf],
+      [u0 - th, kb, cf]
     ]
   });
   out.push({
     role: 'corner',
     kind: 'front',
     corners: [
-      [u0 - th, kb, FRONT],
-      [u0 + ch, kb, FRONT],
-      [u0 + ch, ft, FRONT],
-      [u0 - th, ft, FRONT]
+      [u0 - th, kb, cf],
+      [u0 + ch, kb, cf],
+      [u0 + ch, ft, cf],
+      [u0 - th, ft, cf]
     ]
   });
   out.push({
     role: 'corner',
     kind: 'front',
     corners: [
-      [u1, jt, FRONT],
-      [u1 + th, jt, FRONT],
-      [u1 + th, kb, FRONT],
-      [u1 - ch, kb, FRONT]
+      [u1, jt, cf],
+      [u1 + th, jt, cf],
+      [u1 + th, kb, cf],
+      [u1 - ch, kb, cf]
     ]
   });
   out.push({
     role: 'corner',
     kind: 'front',
     corners: [
-      [u1 - ch, kb, FRONT],
-      [u1 + th, kb, FRONT],
-      [u1 + th, ft, FRONT],
-      [u1 - ch, ft, FRONT]
+      [u1 - ch, kb, cf],
+      [u1 + th, kb, cf],
+      [u1 + th, ft, cf],
+      [u1 - ch, ft, cf]
     ]
   });
   out.push({
