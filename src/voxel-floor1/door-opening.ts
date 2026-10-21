@@ -45,7 +45,7 @@ export const FRONT = ROOM_DEPTH + FRONT_PROUD;
 /** Slight overlap past the shared edge so the two room plates seal. */
 export const BACK = -0.004;
 /** Door leaf sits in the combined wall thickness, centred on the edge. */
-export const LEAF_PAD = 0.03;
+export const LEAF_PAD = 0.012;
 export const LEAF_THICK = 0.04;
 /** Quarter of the two-sided wall so the frame still reads from each room. */
 export const LEAF_REVEAL = DOOR_WALL_DEPTH * 0.25;
@@ -56,10 +56,10 @@ export const IRON_PROUD = 0.004;
  * Painted wood in `door_panel.png` — the rectangular plank body only.
  * Crops the arched cap and the stone / dark recess around it.
  */
-export const DOOR_PANEL_U0 = 0.285;
-export const DOOR_PANEL_U1 = 0.715;
-export const DOOR_PANEL_V0 = 0.09;
-export const DOOR_PANEL_V1 = 0.655;
+export const DOOR_PANEL_U0 = 0.32;
+export const DOOR_PANEL_U1 = 0.66;
+export const DOOR_PANEL_V0 = 0.1;
+export const DOOR_PANEL_V1 = 0.6;
 /** Aged leaf pixels stay at or under this luma — duller than lit stone. */
 export const LEAF_MAX_LUMA = 0.42;
 /** Fills sit a hair proud of the 15 cm plate so they do not z-fight. */
