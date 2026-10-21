@@ -25,6 +25,48 @@ export function isWoodCeilingFile(file: string): boolean {
 /** Grain bump on wood — kept tiny so torch light does not streak like varnish. */
 export const WOOD_NORMAL_SCALE = 0.05;
 
+/**
+ * Same MeshPhysical lighting contract as the stone walls (ior, fog, no
+ * emissive / env / IBL). Spec stays 0 so wood is matte; MeshBasic was
+ * skipping lights and staying visible in unlit halls.
+ */
+export function dungeonWoodMaterial(
+  map: THREE.Texture,
+  opts?: {
+    normal?: THREE.Texture;
+    color?: THREE.ColorRepresentation;
+    alphaTest?: number;
+    name?: string;
+  }
+): THREE.MeshPhysicalMaterial {
+  enableWoodSampling(map);
+  const mat = new THREE.MeshPhysicalMaterial({
+    map,
+    normalMap: opts?.normal,
+    normalScale: opts?.normal
+      ? new THREE.Vector2(WOOD_NORMAL_SCALE, WOOD_NORMAL_SCALE)
+      : new THREE.Vector2(0, 0),
+    color: opts?.color ?? 0xffffff,
+    roughness: 1,
+    metalness: 0,
+    ior: 1.45,
+    clearcoat: 0,
+    clearcoatRoughness: 1,
+    sheen: 0,
+    specularIntensity: 0,
+    envMapIntensity: 0,
+    fog: true,
+    emissive: 0x000000,
+    emissiveIntensity: 0,
+    alphaTest: opts?.alphaTest ?? 0,
+    polygonOffset: true,
+    polygonOffsetFactor: 1,
+    polygonOffsetUnits: 1
+  });
+  if (opts?.name) mat.name = opts.name;
+  return mat;
+}
+
 /** Painted 256 tiles: crisp texels up close, nearest mips in the distance. */
 export function enablePaintedSampling(tex: THREE.Texture): void {
   tex.colorSpace = THREE.SRGBColorSpace;
@@ -108,21 +150,31 @@ export function paintedShellMaterial(
     enableRubbleRepeat(map);
     if (normal) enableRubbleRepeat(normal);
   }
+  if (wood) {
+    return dungeonWoodMaterial(map, {
+      normal,
+      alphaTest: cutout ? CUTOUT_ALPHA_TEST : 0
+    });
+  }
   const mat = new THREE.MeshPhysicalMaterial({
     map,
     normalMap: normal,
-    normalScale: new THREE.Vector2(wood ? WOOD_NORMAL_SCALE : 0.14, wood ? WOOD_NORMAL_SCALE : 0.14),
-    roughness: water ? 0.62 : wood ? 1 : 0.92,
+    normalScale: new THREE.Vector2(0.14, 0.14),
+    roughness: water ? 0.62 : 0.92,
     metalness: 0,
+    ior: 1.45,
     clearcoat: water ? 0.12 : 0,
     clearcoatRoughness: water ? 0.45 : 1,
     envMapIntensity: 0,
-    alphaTest: cutout ? CUTOUT_ALPHA_TEST : 0,
+    fog: true,
+    emissive: 0x000000,
+    emissiveIntensity: 0,
+    alphaTest: 0,
     polygonOffset: true,
     polygonOffsetFactor: 1,
     polygonOffsetUnits: 1
   });
-  if (wood || rubble) {
+  if (rubble) {
     mat.sheen = 0;
     mat.clearcoat = 0;
     mat.envMapIntensity = 0;
@@ -130,7 +182,7 @@ export function paintedShellMaterial(
     // ceiling and lifts (17,15,13) gaps to mid-grey. Walls keep true-black
     // mortar because those texels are 0. This is a construction uniform.
     mat.specularIntensity = 0;
+    mat.color.copy(RUBBLE_TINT);
   }
-  if (rubble) mat.color.copy(RUBBLE_TINT);
   return mat;
 }

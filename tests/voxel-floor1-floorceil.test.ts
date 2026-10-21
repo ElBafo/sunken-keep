@@ -12,6 +12,7 @@ import {
 } from '../src/voxel-floor1/constants';
 import { compositeCrackedCeiling, crackedCeilingHasGap, scaleNearest } from '../src/voxel-floor1/crack';
 import {
+  dungeonWoodMaterial,
   isPaintedShellFile,
   normalFromAlbedo,
   paintedShellMaterial,
@@ -219,12 +220,18 @@ describe('floor-1 floor and ceiling come from Levie’s map', () => {
     const rubble = paintedShellMaterial(new THREE.Texture(), nrm, 'ceiling_rubble_1.png');
     const floor = paintedShellMaterial(new THREE.Texture(), nrm, 'floor_stone.png');
     for (const mat of [plank, cracked]) {
+      expect(mat).toBeInstanceOf(THREE.MeshPhysicalMaterial);
       expect(mat.roughness).toBe(1);
       expect(mat.metalness).toBe(0);
       expect(mat.clearcoat).toBe(0);
       expect(mat.sheen).toBe(0);
       expect(mat.envMapIntensity).toBe(0);
       expect(mat.specularIntensity).toBe(0);
+      expect(mat.fog).toBe(true);
+      expect(mat.emissive.r).toBe(0);
+      expect(mat.emissive.g).toBe(0);
+      expect(mat.emissive.b).toBe(0);
+      expect(mat.ior).toBeCloseTo(1.45, 5);
       expect(mat.normalScale.x).toBeLessThan(0.08);
       expect(mat.map?.colorSpace).toBe(THREE.SRGBColorSpace);
       expect(mat.map?.generateMipmaps).toBe(false);
@@ -237,6 +244,19 @@ describe('floor-1 floor and ceiling come from Levie’s map', () => {
     expect(rubble.normalScale.x).toBeCloseTo(0.14, 5);
     expect(floor.roughness).toBe(0.92);
     expect(floor.normalScale.x).toBeCloseTo(0.14, 5);
+    expect(floor.fog).toBe(true);
+    const wood = dungeonWoodMaterial(new THREE.Texture());
+    expect(wood).toBeInstanceOf(THREE.MeshPhysicalMaterial);
+    expect(wood).not.toBeInstanceOf(THREE.MeshBasicMaterial);
+    expect(wood.fog).toBe(true);
+    expect(wood.specularIntensity).toBe(0);
+    const props = readFileSync(resolve(__dirname, '../src/voxel-floor1/props.ts'), 'utf8');
+    const openings = readFileSync(resolve(__dirname, '../src/voxel-floor1/openings.ts'), 'utf8');
+    const beams = readFileSync(resolve(__dirname, '../src/voxel-floor1/ceiling-beams.ts'), 'utf8');
+    expect(props).toContain('dungeonWoodMaterial');
+    expect(openings).toContain('dungeonWoodMaterial');
+    expect(beams).toContain('dungeonWoodMaterial');
+    expect(props).not.toMatch(/new THREE\.MeshBasicMaterial\(\{\s*map: woodBeam/);
   });
 
   it('does not put floor or ceiling tiles on the wall mip/atlas path', () => {

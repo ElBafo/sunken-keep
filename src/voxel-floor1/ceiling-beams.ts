@@ -3,6 +3,7 @@ import floor1DecorJson from '../../levels/floor1_decor.json';
 import { CELL, CORNICE_DEPTH } from './constants';
 import { floor1Sunbeams } from './fixtures';
 import { isShellTile, isTrueWall, tileAt, type FloorMap, type FloorTile } from './layout';
+import { dungeonWoodMaterial } from './painted';
 
 /**
  * Shallow ceiling rib: 0.14 m across, 0.09 m down, flush just under the slab.
@@ -870,15 +871,7 @@ export function meshCeilingBeams(map: THREE.Texture, boxes: CeilingBeamBox[]): T
       beamMesh(
         'ceiling-beams-wood',
         woodGeo,
-        new THREE.MeshPhysicalMaterial({
-          map: woodMap,
-          roughness: 1,
-          metalness: 0,
-          clearcoat: 0,
-          sheen: 0,
-          specularIntensity: 0,
-          envMapIntensity: 0
-        })
+        dungeonWoodMaterial(woodMap, { name: 'ceiling-beams-wood' })
       )
     );
   }

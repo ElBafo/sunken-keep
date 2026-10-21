@@ -25,6 +25,7 @@ import {
   LEAF_FRONT,
   LEAF_PAD,
   LEAF_REVEAL,
+  listFacetedCornerFills,
   listHeadRoles,
   listIronQuads,
   listLeafQuads,
@@ -33,6 +34,10 @@ import {
   OPEN_U0,
   OPEN_U1,
   openingPunchRect,
+  openingQuadWorldNormal,
+  openingWallCovered,
+  openingWallIsWatertight,
+  roomInward,
   ROOM_DEPTH,
   wallAboveOpening
 } from '../src/voxel-floor1/door-opening';
@@ -92,7 +97,8 @@ describe('floor-1 door opening styles', () => {
     );
     expect(headFronts).toHaveLength(5);
     expect(headFronts.map((q) => q.role)).toEqual(['jamb-top', 'chamfer', 'keystone', 'chamfer', 'jamb-top']);
-    expect(quads.filter((q) => q.role === 'corner' && q.kind === 'front')).toHaveLength(4);
+    expect(quads.filter((q) => q.role === 'corner' && q.kind === 'front')).toHaveLength(2);
+    expect(quads.filter((q) => q.role === 'corner' && q.kind === 'back')).toHaveLength(2);
     expect(
       quads.some(
         (q) =>
@@ -221,6 +227,38 @@ describe('floor-1 door opening styles', () => {
     expect(src).toContain('specularIntensity: 0');
     expect(src).toContain('wrapT = THREE.RepeatWrapping');
     expect(src).not.toContain('door_panel.png');
+  });
+
+  it('keeps the faceted wall watertight from both sides of both main doors', () => {
+    expect(openingWallIsWatertight('faceted', 'front')).toBe(true);
+    expect(openingWallIsWatertight('faceted', 'back')).toBe(true);
+    const leftU = OPEN_U0 + CHAMFER * 0.25;
+    const rightU = OPEN_U1 - CHAMFER * 0.25;
+    const midV = JAMB_TOP_FACETED + CHAMFER * 0.55;
+    expect(inOpeningVoid('faceted', leftU, midV)).toBe(false);
+    expect(inOpeningVoid('faceted', rightU, midV)).toBe(false);
+    expect(openingWallCovered('faceted', leftU, midV, 'front')).toBe(true);
+    expect(openingWallCovered('faceted', leftU, midV, 'back')).toBe(true);
+    expect(openingWallCovered('faceted', rightU, midV, 'front')).toBe(true);
+    expect(openingWallCovered('faceted', rightU, midV, 'back')).toBe(true);
+    const fills = listFacetedCornerFills();
+    expect(fills.filter((q) => q.kind === 'front')).toHaveLength(2);
+    expect(fills.filter((q) => q.kind === 'back')).toHaveLength(2);
+
+    const facetedDoors = views.filter((v) => v.style === 'faceted');
+    expect(facetedDoors.length).toBeGreaterThanOrEqual(4);
+    for (const view of facetedDoors) {
+      const face = view.face as 'N' | 'E' | 'S' | 'W';
+      const inward = roomInward(face);
+      for (const q of listOpeningQuads('faceted').filter((row) => row.role === 'corner')) {
+        const n = openingQuadWorldNormal(q, face, view.tx, view.tz);
+        const facing = n[0] * inward[0] + n[1] * inward[1] + n[2] * inward[2];
+        if (q.kind === 'front') expect(facing).toBeGreaterThan(0.5);
+        else expect(facing).toBeLessThan(-0.5);
+      }
+      const mesh = meshDoorOpening(solidWall().volume, solidWall().dims, face, view.tx, view.tz, 'faceted');
+      expect(mesh.quads).toBeGreaterThan(4);
+    }
   });
 
   it('reprojects a soffit strip that only sampled one texture row', () => {

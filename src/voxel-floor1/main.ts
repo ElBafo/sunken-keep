@@ -77,8 +77,13 @@ type Floor1Api = {
   stepBack: () => boolean;
   turnLeft: () => boolean;
   turnRight: () => boolean;
-  meanLuma: (band?: { y0?: number; y1?: number }) => number;
-  meanRgb: (band?: { y0?: number; y1?: number }) => { r: number; g: number; b: number; rb: number };
+  meanLuma: (band?: { x0?: number; x1?: number; y0?: number; y1?: number }) => number;
+  meanRgb: (band?: { x0?: number; x1?: number; y0?: number; y1?: number }) => {
+    r: number;
+    g: number;
+    b: number;
+    rb: number;
+  };
   sconceVisible: (x: number, y: number, face: string) => boolean;
   hasKey: boolean;
   giveKey: () => void;
@@ -310,12 +315,14 @@ async function boot(): Promise<void> {
   };
 
   const samplePixels = (
-    band?: { y0?: number; y1?: number }
+    band?: { x0?: number; x1?: number; y0?: number; y1?: number }
   ): { r: number; g: number; b: number; luma: number; rb: number; n: number } => {
     renderFrame();
     const gl = renderer.getContext();
     const w = gl.drawingBufferWidth;
     const h = gl.drawingBufferHeight;
+    const x0 = Math.max(0, Math.floor((band?.x0 ?? 0) * w));
+    const x1 = Math.min(w, Math.ceil((band?.x1 ?? 1) * w));
     const y0 = Math.max(0, Math.floor((band?.y0 ?? 0) * h));
     const y1 = Math.min(h, Math.ceil((band?.y1 ?? 1) * h));
     const rows = Math.max(1, y1 - y0);
@@ -324,12 +331,15 @@ async function boot(): Promise<void> {
     let r = 0;
     let g = 0;
     let b = 0;
-    const n = pixels.length / 4;
-    for (let i = 0; i < n; i++) {
-      const o = i * 4;
-      r += pixels[o];
-      g += pixels[o + 1];
-      b += pixels[o + 2];
+    let n = 0;
+    for (let row = 0; row < rows; row++) {
+      for (let col = x0; col < x1; col++) {
+        const o = (row * w + col) * 4;
+        r += pixels[o];
+        g += pixels[o + 1];
+        b += pixels[o + 2];
+        n += 1;
+      }
     }
     const rr = n > 0 ? r / n / 255 : 0;
     const gg = n > 0 ? g / n / 255 : 0;

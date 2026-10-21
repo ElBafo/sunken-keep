@@ -4,6 +4,7 @@ import { ARCH_DEPTH, ARCH_FRONT, CELL, CORNICE_HEIGHT, WALL_TEXELS } from './con
 import { faceUOffset } from './wall-look';
 
 export type DoorOpeningStyle = 'faceted' | 'lintel';
+export type FaceNESW = 'N' | 'E' | 'S' | 'W';
 
 /**
  * Main doors sit between halls. Side doors are cellar / lair / pantry-type.
@@ -176,6 +177,151 @@ function soffitRect(a0: number, a1: number, u0: number, u1: number): OpeningQuad
   ];
 }
 
+/** Reverse winding so a room-facing quad also exists from the opening / other room. */
+export function flipQuadCorners(corners: OpeningQuad['corners']): OpeningQuad['corners'] {
+  return [corners[0], corners[3], corners[2], corners[1]];
+}
+
+function pointInTri(
+  px: number,
+  py: number,
+  ax: number,
+  ay: number,
+  bx: number,
+  by: number,
+  cx: number,
+  cy: number
+): boolean {
+  const v0x = cx - ax;
+  const v0y = cy - ay;
+  const v1x = bx - ax;
+  const v1y = by - ay;
+  const v2x = px - ax;
+  const v2y = py - ay;
+  const den = v0x * v1y - v1x * v0y;
+  if (Math.abs(den) < 1e-12) return false;
+  const a = (v2x * v1y - v1x * v2y) / den;
+  const b = (v0x * v2y - v2x * v0y) / den;
+  return a >= -1e-5 && b >= -1e-5 && a + b <= 1 + 1e-5;
+}
+
+/** True if (across, up) sits inside the quad's wall-plane projection. */
+export function pointInQuadUV(u: number, v: number, corners: OpeningQuad['corners']): boolean {
+  return (
+    pointInTri(u, v, corners[0][0], corners[0][1], corners[1][0], corners[1][1], corners[2][0], corners[2][1]) ||
+    pointInTri(u, v, corners[0][0], corners[0][1], corners[2][0], corners[2][1], corners[3][0], corners[3][1])
+  );
+}
+
+/**
+ * Room-stone fills between the faceted opening outline and the punched wall
+ * rectangle. Front faces the room; back faces the reveal so the triangles
+ * are not culled from either side.
+ */
+export function listFacetedCornerFills(): OpeningQuad[] {
+  const u0 = OPEN_U0;
+  const u1 = OPEN_U1;
+  const jt = JAMB_TOP_FACETED;
+  const kb = jt + CHAMFER;
+  const ft = facetedTop();
+  const cf = ROOM_DEPTH;
+  const fronts: OpeningQuad[] = [
+    {
+      role: 'corner',
+      kind: 'front',
+      corners: [
+        [u0, jt, cf],
+        [u0 + CHAMFER, kb, cf],
+        [u0 + CHAMFER, ft, cf],
+        [u0, ft, cf]
+      ]
+    },
+    {
+      role: 'corner',
+      kind: 'front',
+      corners: [
+        [u1, jt, cf],
+        [u1, ft, cf],
+        [u1 - CHAMFER, ft, cf],
+        [u1 - CHAMFER, kb, cf]
+      ]
+    }
+  ];
+  return [
+    ...fronts,
+    ...fronts.map((q) => ({
+      role: q.role,
+      kind: 'back' as const,
+      corners: flipQuadCorners(q.corners)
+    }))
+  ];
+}
+
+/**
+ * Wall cell minus the walkable opening must be covered from `side`.
+ * Inside the rectangular punch, only the faceted corner fills (and any
+ * overlapping slabs) close the two triangles beside the 45° chamfers.
+ */
+export function openingWallCovered(
+  style: DoorOpeningStyle,
+  u: number,
+  v: number,
+  side: 'front' | 'back'
+): boolean {
+  if (inOpeningVoid(style, u, v)) return true;
+  const rect = openingPunchRect(style);
+  if (u < rect.u0 || u >= rect.u1 || v < rect.v0 || v >= rect.v1) return true;
+  return listOpeningQuads(style).some((q) => q.kind === side && pointInQuadUV(u, v, q.corners));
+}
+
+export function openingWallIsWatertight(
+  style: DoorOpeningStyle,
+  side: 'front' | 'back',
+  step = CELL / 64
+): boolean {
+  for (let v = step * 0.5; v < CELL; v += step) {
+    for (let u = step * 0.5; u < CELL; u += step) {
+      if (!openingWallCovered(style, u, v, side)) return false;
+    }
+  }
+  return true;
+}
+
+/** World-space unit normal for an opening quad (same winding as the mesh). */
+export function openingQuadWorldNormal(
+  q: OpeningQuad,
+  face: FaceNESW,
+  tx: number,
+  tz: number
+): [number, number, number] {
+  const world = q.corners.map((c) => mapLocal(face, tx, tz, c[0], c[1], c[2]));
+  const ax = world[1][0] - world[0][0];
+  const ay = world[1][1] - world[0][1];
+  const az = world[1][2] - world[0][2];
+  const bx = world[3][0] - world[0][0];
+  const by = world[3][1] - world[0][1];
+  const bz = world[3][2] - world[0][2];
+  let nx = ay * bz - az * by;
+  let ny = az * bx - ax * bz;
+  let nz = ax * by - ay * bx;
+  const len = Math.hypot(nx, ny, nz) || 1;
+  return [nx / len, ny / len, nz / len];
+}
+
+/** Unit vector from the wall plate into the viewing room. */
+export function roomInward(face: FaceNESW): [number, number, number] {
+  switch (face) {
+    case 'N':
+      return [0, 0, 1];
+    case 'S':
+      return [0, 0, -1];
+    case 'W':
+      return [1, 0, 0];
+    case 'E':
+      return [-1, 0, 0];
+  }
+}
+
 /** Five head slabs, left to right, each with one front and one soffit. */
 export function listFacetedHeadQuads(): OpeningQuad[] {
   const u0 = OPEN_U0;
@@ -284,48 +430,7 @@ export function listFacetedHeadQuads(): OpeningQuad[] {
     corners: soffitRect(u1, u1, 0, leftTop0)
   });
 
-  const ft = kb + kh;
-  const cf = ROOM_DEPTH;
-  out.push({
-    role: 'corner',
-    kind: 'front',
-    corners: [
-      [u0 - th, jt, cf],
-      [u0, jt, cf],
-      [u0 + ch, kb, cf],
-      [u0 - th, kb, cf]
-    ]
-  });
-  out.push({
-    role: 'corner',
-    kind: 'front',
-    corners: [
-      [u0 - th, kb, cf],
-      [u0 + ch, kb, cf],
-      [u0 + ch, ft, cf],
-      [u0 - th, ft, cf]
-    ]
-  });
-  out.push({
-    role: 'corner',
-    kind: 'front',
-    corners: [
-      [u1, jt, cf],
-      [u1 + th, jt, cf],
-      [u1 + th, kb, cf],
-      [u1 - ch, kb, cf]
-    ]
-  });
-  out.push({
-    role: 'corner',
-    kind: 'front',
-    corners: [
-      [u1 - ch, kb, cf],
-      [u1 + th, kb, cf],
-      [u1 + th, ft, cf],
-      [u1 - ch, ft, cf]
-    ]
-  });
+  out.push(...listFacetedCornerFills());
   out.push({
     role: 'chamfer-end',
     kind: 'soffit',
@@ -630,8 +735,6 @@ export function listIronQuads(style: DoorOpeningStyle): OpeningQuad[] {
   push(cx - 0.012, cx + 0.012, cy + rOut - 0.008, cy + rOut + 0.048);
   return out;
 }
-
-type FaceNESW = 'N' | 'E' | 'S' | 'W';
 
 function mapLocal(face: FaceNESW, tx: number, tz: number, a: number, u: number, d: number): [number, number, number] {
   const { ox, oz } = tileCorner(tx, tz, CELL, 'center');

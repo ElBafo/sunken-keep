@@ -29,7 +29,7 @@ import {
   leafMeshes,
   openingPunchRect,
   openingSlabMeshes,
-  punchOpening,
+  punchOpeningRect,
   type DoorOpeningStyle
 } from './door-opening';
 import { floor1Sconces, floor1Sunbeams } from './fixtures';
@@ -41,6 +41,7 @@ import {
   type FloorMap,
   type FloorTile
 } from './layout';
+import { dungeonWoodMaterial } from './painted';
 import { faceHash } from './variants';
 import { lookPixels } from './wall-once';
 import {
@@ -405,7 +406,7 @@ export function meshDoorOpening(
   tz: number,
   style: DoorOpeningStyle
 ): { positions: number[]; normals: number[]; uvs: number[]; quads: number } {
-  const punched = punchOpening(wall, wallDims, style);
+  const punched = punchOpeningRect(wall, wallDims, openingPunchRect(style));
   const plateWorld = makeToWorld(face, tx, tz, wallDims, LAYER_SIZE, CELL, 'center');
   const plate = greedyMesh(punched, wallDims, plateWorld, { cullNeg: [false, false, false] });
   const uvs = plate.mesh.uvs.slice();
@@ -660,17 +661,10 @@ export async function buildFloor1Openings(
     if (!realLights) patchBakeMaterial(mat);
     return mat;
   };
-  const woodMat = new THREE.MeshPhysicalMaterial({
-    map: plankPng.texture,
+  const woodMat = dungeonWoodMaterial(plankPng.texture, {
     color: new THREE.Color(0.7, 0.68, 0.64),
-    roughness: 1,
-    metalness: 0,
-    clearcoat: 0,
-    sheen: 0,
-    specularIntensity: 0,
-    envMapIntensity: 0
+    name: 'door-leaf-wood'
   });
-  woodMat.fog = true;
   if (!realLights) patchBakeMaterial(woodMat);
   const rustMap = makeDoorRustMap();
   const ironMat = new THREE.MeshPhysicalMaterial({
@@ -745,7 +739,7 @@ export async function buildFloor1Openings(
       if (wallPng && mat) {
         const wallSrc = volumeFromImageData(wallPng.data);
         finishVolume(wallSrc, surround);
-        const punched = punchOpening(wallSrc.volume, wallSrc.dims, style);
+        const punched = punchOpeningRect(wallSrc.volume, wallSrc.dims, openingPunchRect(style));
         const plateWorld = makeToWorld(view.face, view.tx, view.tz, wallSrc.dims, LAYER_SIZE, CELL, 'center');
         const plate = greedyMesh(punched, wallSrc.dims, plateWorld, { cullNeg: [false, false, false] });
         projectArchOpeningUvs(
