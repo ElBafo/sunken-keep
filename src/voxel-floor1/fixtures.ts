@@ -10,7 +10,7 @@ import {
   SCONCE_WIDTH_TILES,
   WALL_MOUNT_INSET
 } from './constants';
-import { isWalkableTile, tileAt, type FloorMap } from './layout';
+import { canCross, isWalkableTile, tileAt, type FloorMap } from './layout';
 
 export type WallFace = 'N' | 'E' | 'S' | 'W';
 
@@ -188,6 +188,7 @@ export function floodReach(map: FloorMap, originX: number, originY: number, radi
       const key = `${nx},${ny}`;
       if (reach.has(key)) continue;
       if (!isWalkableTile(tileAt(map, nx, ny))) continue;
+      if (!canCross(map, x, y, nx, ny)) continue;
       if (Math.hypot(nx - originX, ny - originY) > radius) continue;
       reach.add(key);
       queue.push([nx, ny]);

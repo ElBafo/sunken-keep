@@ -254,8 +254,10 @@ describe('floor-1 floor and ceiling come from Levie’s map', () => {
     const openings = readFileSync(resolve(__dirname, '../src/voxel-floor1/openings.ts'), 'utf8');
     const beams = readFileSync(resolve(__dirname, '../src/voxel-floor1/ceiling-beams.ts'), 'utf8');
     expect(props).toContain('dungeonWoodMaterial');
-    expect(openings).toContain('dungeonWoodMaterial');
     expect(beams).toContain('dungeonWoodMaterial');
+    expect(openings).toContain('specularIntensity: 0');
+    expect(openings).toContain('door_panel_aged');
+    expect(openings).not.toContain('MeshBasicMaterial');
     expect(props).not.toMatch(/new THREE\.MeshBasicMaterial\(\{\s*map: woodBeam/);
   });
 
