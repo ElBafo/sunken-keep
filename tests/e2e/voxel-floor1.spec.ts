@@ -108,7 +108,7 @@ test('floor-1 door (4,2) starts closed and slides up', async ({ page }) => {
   );
 
   await page.evaluate(() => {
-    (window as unknown as { __voxelFloor1: Floor1 }).__voxelFloor1.setPosition(5, 2, 3);
+    (window as unknown as { __voxelFloor1: Floor1 }).__voxelFloor1.setPosition(4, 2, 3);
   });
   await page.waitForTimeout(400);
 
@@ -159,7 +159,7 @@ test('floor-1 door (4,2) starts closed and slides up', async ({ page }) => {
   expect(opened.busy).toBe(false);
   expect(opened.locked).toBe(false);
   expect(opened.button).toBe('Close');
-  expect(opened.x).toBe(5);
+  expect(opened.x).toBe(4);
   expect(opened.y).toBe(2);
 
   const stepped = await page.evaluate(() =>
@@ -169,7 +169,7 @@ test('floor-1 door (4,2) starts closed and slides up', async ({ page }) => {
   await page.waitForFunction(
     () => {
       const api = (window as unknown as { __voxelFloor1: Floor1 }).__voxelFloor1;
-      return api.gridX === 4 && api.gridY === 2;
+      return api.gridX === 3 && api.gridY === 2;
     },
     null,
     { timeout: 4000 }

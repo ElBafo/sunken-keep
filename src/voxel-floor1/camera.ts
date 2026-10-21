@@ -1,6 +1,6 @@
 import type { Camera } from 'three';
 import { BACK_OFFSET, CAMERA_PITCH, CELL, EYE_HEIGHT, MOVE_MS, TURN_MS } from './constants';
-import { canStep, type FloorMap } from './layout';
+import { canCross, type FloorMap } from './layout';
 
 export const DIRS = [
   [0, -1],
@@ -108,7 +108,7 @@ export class GridMover {
     const [dx, dy] = DIRS[this.dir];
     const nx = this.x + dx * dirSign;
     const ny = this.y + dy * dirSign;
-    if (!canStep(this.map, nx, ny)) return false;
+    if (!canCross(this.map, this.x, this.y, nx, ny)) return false;
     this.start(nx, ny, this.dir, MOVE_MS, 'step');
     return true;
   }

@@ -13,17 +13,16 @@ import {
   type FarTorch
 } from './bake';
 import {
-  ARCH_DEPTH,
-  ARCH_FRONT,
-  ARCH_LAYERS,
   CELL,
   CORNICE_HEIGHT,
   DOOR_CLOSE_MS,
+  DOOR_LAYERS,
   DOOR_LEAF_MS,
   DOOR_LEAF_SLIDE,
   DOOR_OPEN_MS,
   DOOR_SLIDE,
   DOOR_UNLOCK_LEAD_MS,
+  DOOR_WALL_HALF,
   LAYER_SIZE
 } from './constants';
 import { projectArchOpeningUvs } from './uv-audit';
@@ -33,11 +32,12 @@ import {
   leafMeshes,
   openingPunchRect,
   openingSlabMeshes,
-  punchOpeningRect,
+  punchOpening,
   type DoorOpeningStyle
 } from './door-opening';
 import { floor1Sconces, floor1Sunbeams } from './fixtures';
 import {
+  doorEdgeAt,
   listDoors,
   listSecrets,
   openingViews,
@@ -306,7 +306,7 @@ function shiftFaceU(geo: THREE.BufferGeometry, face: string, tx: number, tz: num
 export function solidifyArchVolume(
   wall: Uint8Array,
   dims: [number, number, number],
-  newD = ARCH_LAYERS
+  newD = DOOR_LAYERS
 ): { volume: Uint8Array; dims: [number, number, number] } {
   const [W, H, D] = dims;
   const slice = W * H;
@@ -332,8 +332,8 @@ export function solidifyArchVolume(
 }
 
 /**
- * d=0 is the back of the reveal (into the opening). d=D is the room-side
- * face, 3 cm proud like the neighbouring walls.
+ * d=0 is the shared cell edge. d=D is the room-side face of the 15 cm
+ * doorway half-wall.
  */
 export function makeArchToWorld(
   face: FaceId,
@@ -345,17 +345,17 @@ export function makeArchToWorld(
   const [W, H, D] = dims;
   const sx = cell / W;
   const sy = cell / H;
-  const layer = (ARCH_DEPTH + ARCH_FRONT) / Math.max(1, D);
+  const layer = DOOR_WALL_HALF / Math.max(1, D);
   const { ox, oz } = tileCorner(tileX, tileZ, cell, 'center');
   switch (face) {
     case 'N':
-      return (u, v, d) => [ox + u * sx, v * sy, oz - ARCH_DEPTH + d * layer];
+      return (u, v, d) => [ox + u * sx, v * sy, oz + d * layer];
     case 'S':
-      return (u, v, d) => [ox + cell - u * sx, v * sy, oz + cell + ARCH_DEPTH - d * layer];
+      return (u, v, d) => [ox + cell - u * sx, v * sy, oz + cell - d * layer];
     case 'W':
-      return (u, v, d) => [ox - ARCH_DEPTH + d * layer, v * sy, oz + cell - u * sx];
+      return (u, v, d) => [ox + d * layer, v * sy, oz + cell - u * sx];
     case 'E':
-      return (u, v, d) => [ox + cell + ARCH_DEPTH - d * layer, v * sy, oz + u * sx];
+      return (u, v, d) => [ox + cell - d * layer, v * sy, oz + u * sx];
     default:
       return makeToWorld(face, tileX, tileZ, dims, LAYER_SIZE, cell, 'center');
   }
@@ -383,9 +383,10 @@ export function meshDoorOpening(
   tz: number,
   style: DoorOpeningStyle
 ): { positions: number[]; normals: number[]; uvs: number[]; quads: number } {
-  const punched = punchOpeningRect(wall, wallDims, openingPunchRect(style));
-  const plateWorld = makeToWorld(face, tx, tz, wallDims, LAYER_SIZE, CELL, 'center');
-  const plate = greedyMesh(punched, wallDims, plateWorld, { cullNeg: [false, false, false] });
+  const punched = punchOpening(wall, wallDims, style);
+  const solid = solidifyArchVolume(punched, wallDims, DOOR_LAYERS);
+  const plateWorld = makeArchToWorld(face, tx, tz, solid.dims);
+  const plate = greedyMesh(solid.volume, solid.dims, plateWorld, { cullNeg: [false, false, false] });
   const uvs = plate.mesh.uvs.slice();
   projectArchOpeningUvs(
     plate.mesh.positions,
@@ -745,9 +746,10 @@ export async function buildFloor1Openings(
       if (wallPng && mat) {
         const wallSrc = volumeFromImageData(wallPng.data);
         finishVolume(wallSrc, surround);
-        const punched = punchOpeningRect(wallSrc.volume, wallSrc.dims, openingPunchRect(style));
-        const plateWorld = makeToWorld(view.face, view.tx, view.tz, wallSrc.dims, LAYER_SIZE, CELL, 'center');
-        const plate = greedyMesh(punched, wallSrc.dims, plateWorld, { cullNeg: [false, false, false] });
+        const punched = punchOpening(wallSrc.volume, wallSrc.dims, style);
+        const solid = solidifyArchVolume(punched, wallSrc.dims, DOOR_LAYERS);
+        const plateWorld = makeArchToWorld(view.face, view.tx, view.tz, solid.dims);
+        const plate = greedyMesh(solid.volume, solid.dims, plateWorld, { cullNeg: [false, false, false] });
         projectArchOpeningUvs(
           plate.mesh.positions,
           plate.mesh.normals,
@@ -775,7 +777,7 @@ export async function buildFloor1Openings(
           const lintelGeo = geometryWithBake([{ mesh: slabs.lintel, tx: view.tx, tz: view.tz }], torches, beams);
           if (lintelGeo) {
             const lintelMat = mat.clone();
-            lintelMat.color.setRGB(0.72, 0.7, 0.66);
+            lintelMat.color.setRGB(0.9, 0.88, 0.84);
             if (!realLights) patchBakeMaterial(lintelMat);
             lintelMats.push(lintelMat);
             const lintel = new THREE.Mesh(lintelGeo, lintelMat);
@@ -787,6 +789,9 @@ export async function buildFloor1Openings(
           }
         }
       }
+      const host = doorEdgeAt(visual.x, visual.y);
+      const hostView = !!host && view.tx === host.x && view.tz === host.y && view.face === host.face;
+      if (!hostView) return;
       const leaf = leafMeshes(style, face, view.tx, view.tz);
       if (leaf.wood.positions.length) {
         const woodGeo = geometryWithBake([{ mesh: leaf.wood, tx: view.tx, tz: view.tz }], torches, beams);

@@ -18,7 +18,9 @@ import {
 } from '../src/voxel-floor1/constants';
 import { dirToRot, easeInOutQuad } from '../src/voxel-floor1/camera';
 import {
+  canCross,
   canStep,
+  doorBetween,
   enumerateFaces,
   floor1Map,
   isSolidTile,
@@ -66,26 +68,29 @@ describe('voxel-floor1 uses the game camera spec and New Game start', () => {
   });
 });
 
-describe('doors and secrets are plain blocking walls', () => {
-  it('treats closed doors and secret walls as solid, empties as walkable', () => {
-    expect(isSolidTile(tileAt(floor1Map, 4, 2))).toBe(true);
-    expect(tileAt(floor1Map, 4, 2)?.door).toBe(true);
+describe('doors are wall edges; secrets stay blocking cells', () => {
+  it('treats former door tiles as room floors and secrets as solid', () => {
+    expect(isSolidTile(tileAt(floor1Map, 4, 2))).toBe(false);
+    expect(tileAt(floor1Map, 4, 2)?.door).toBeFalsy();
+    expect(canStep(floor1Map, 4, 2)).toBe(true);
     expect(isSolidTile(tileAt(floor1Map, 5, 1))).toBe(true);
     expect(tileAt(floor1Map, 5, 1)?.secret).toBe(true);
     expect(isWalkableTile(tileAt(floor1Map, 3, 14))).toBe(true);
     expect(isWalkableTile(tileAt(floor1Map, 2, 14))).toBe(true);
     expect(canStep(floor1Map, 2, 14)).toBe(true);
     expect(canStep(floor1Map, 3, 15)).toBe(false);
-    expect(canStep(floor1Map, 4, 2)).toBe(false);
     expect(canStep(floor1Map, 5, 1)).toBe(false);
   });
 
-  it('unblocks stepping once a door or secret is open, without changing baked faces', () => {
+  it('blocks crossing a closed door edge and unblocks when open, without remeshing', () => {
     resetFloor1Doors();
     const before = enumerateFaces(floor1Map).length;
+    expect(doorBetween(4, 2, 3, 2)?.face).toBe('W');
+    expect(canCross(floor1Map, 4, 2, 3, 2)).toBe(false);
+    expect(canCross(floor1Map, 3, 2, 4, 2)).toBe(false);
     const door = tileAt(floor1Map, 4, 2)!;
     door.doorOpen = true;
-    expect(canStep(floor1Map, 4, 2)).toBe(true);
+    expect(canCross(floor1Map, 4, 2, 3, 2)).toBe(true);
     expect(enumerateFaces(floor1Map).length).toBe(before);
     door.doorOpen = false;
     const secret = tileAt(floor1Map, 5, 1)!;
@@ -95,12 +100,12 @@ describe('doors and secrets are plain blocking walls', () => {
     resetFloor1Doors();
   });
 
-  it('keeps Classic floor-1 door and secret cells', () => {
-    expect(listDoors()).toEqual([
-      { x: 4, y: 2, locked: true },
-      { x: 14, y: 2, locked: false },
-      { x: 19, y: 5, locked: false },
-      { x: 6, y: 8, locked: false }
+  it('keeps Classic floor-1 door ids on the host cells', () => {
+    expect(listDoors().map((d) => ({ x: d.x, y: d.y, locked: d.locked, face: d.face }))).toEqual([
+      { x: 4, y: 2, locked: true, face: 'W' },
+      { x: 14, y: 2, locked: false, face: 'E' },
+      { x: 6, y: 8, locked: false, face: 'N' },
+      { x: 19, y: 5, locked: false, face: 'N' }
     ]);
     expect(listSecrets()).toEqual([
       { x: 5, y: 1 },
@@ -108,12 +113,12 @@ describe('doors and secrets are plain blocking walls', () => {
     ]);
   });
 
-  it('emits floor on door and secret cells, not stone faces into those openings', () => {
+  it('emits floor on host and secret cells, not baked stone on the door edge', () => {
     const faces = enumerateFaces(floor1Map);
     expect(faces.some((f) => f.kind === 'floor' && f.tx === 4 && f.tz === 2)).toBe(true);
     expect(faces.some((f) => f.kind === 'floor' && f.tx === 5 && f.tz === 1)).toBe(true);
     expect(faces.some((f) => f.tx === 3 && f.tz === 2 && f.face === 'E')).toBe(false);
-    expect(faces.some((f) => f.tx === 5 && f.tz === 2 && f.face === 'W')).toBe(false);
+    expect(faces.some((f) => f.tx === 4 && f.tz === 2 && f.face === 'W')).toBe(false);
     expect(faces.some((f) => f.tx === 4 && f.tz === 2 && f.face === 'N')).toBe(true);
     expect(faces.some((f) => f.kind === 'floor' && f.tx === 2 && f.tz === 14)).toBe(true);
   });

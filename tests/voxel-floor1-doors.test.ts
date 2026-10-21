@@ -3,9 +3,7 @@ import { describe, expect, it, beforeEach } from 'vitest';
 import { readFileSync, readdirSync } from 'fs';
 import { resolve } from 'path';
 import {
-  ARCH_DEPTH,
   ARCH_FRONT,
-  ARCH_LAYERS,
   CELL,
   DOOR_CLOSE_MS,
   DOOR_OPEN_MS,
@@ -14,7 +12,7 @@ import {
   DOOR_LEAF_SLIDE,
   DOOR_UNLOCK_LEAD_MS
 } from '../src/voxel-floor1/constants';
-import { ageDoorPanelPixels, facetedTop, lintelTop } from '../src/voxel-floor1/door-opening';
+import { ageDoorPanelPixels, LEAF_MAX_LUMA, lintelTop } from '../src/voxel-floor1/door-opening';
 import { greedyMesh } from '../src/voxel-lab/mesher';
 import {
   OpeningSystem,
@@ -30,7 +28,6 @@ import { lookForSecret } from '../src/voxel-floor1/wall-look';
 
 function fakeDoor(locked: boolean): OpeningVisual {
   const tile = tileAt(floor1Map, 4, 2)!;
-  tile.door = true;
   tile.doorLocked = locked;
   tile.doorOpen = false;
   return {
@@ -50,7 +47,7 @@ function fakeDoor(locked: boolean): OpeningVisual {
 describe('voxel-floor1 doors match Classic timing and lock rules', () => {
   beforeEach(() => resetFloor1Doors());
 
-  it('starts all four door tiles closed with a leaf style', () => {
+  it('starts all four door edges closed with a leaf style', () => {
     const doors = [
       [4, 2],
       [14, 2],
@@ -59,14 +56,13 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     ] as const;
     for (const [x, y] of doors) {
       const tile = tileAt(floor1Map, x, y);
-      expect(tile?.door, `${x},${y}`).toBe(true);
+      expect(tile?.door, `${x},${y}`).toBeFalsy();
       expect(tile?.doorOpen, `${x},${y}`).toBeFalsy();
     }
   });
 
   it('slides the leaf up like a portcullis in 0.6s and keeps the secret Y-slide', () => {
     expect(DOOR_LEAF_MS).toBe(600);
-    expect(DOOR_LEAF_SLIDE).toBeGreaterThan(facetedTop() - 1e-6);
     expect(DOOR_LEAF_SLIDE).toBeGreaterThan(lintelTop() - 1e-6);
     expect(DOOR_SLIDE).toBeCloseTo(1.42, 8);
     expect(DOOR_OPEN_MS).toBe(1450);
@@ -88,11 +84,27 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     src[mid] = 170;
     src[mid + 1] = 172;
     src[mid + 2] = 176;
+    const stud = mid + 4;
+    src[stud] = 255;
+    src[stud + 1] = 255;
+    src[stud + 2] = 252;
+    src[stud + 3] = 255;
     const aged = ageDoorPanelPixels(src, w, h);
     expect(aged[0]).toBeLessThan(140);
     expect(aged[0] - aged[2]).toBeLessThan(40);
     expect(aged[mid]).toBeLessThan(90);
     expect(aged[mid]).toBeGreaterThan(aged[mid + 2]);
+    const studLuma = (0.2126 * aged[stud] + 0.7152 * aged[stud + 1] + 0.0722 * aged[stud + 2]) / 255;
+    expect(studLuma).toBeLessThanOrEqual(LEAF_MAX_LUMA + 1e-3);
+    expect(Math.max(aged[stud], aged[stud + 1], aged[stud + 2])).toBeLessThan(140);
+    expect(aged[stud]).toBeGreaterThan(aged[stud + 2]);
+    let maxLuma = 0;
+    for (let i = 0; i < w * h; i++) {
+      const luma =
+        (0.2126 * aged[i * 4] + 0.7152 * aged[i * 4 + 1] + 0.0722 * aged[i * 4 + 2]) / 255;
+      if (luma > maxLuma) maxLuma = luma;
+    }
+    expect(maxLuma).toBeLessThanOrEqual(LEAF_MAX_LUMA + 1e-3);
   });
 
   it('refuses a locked door without a key and does not start the slide', () => {
@@ -283,22 +295,21 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     expect(recessed[0 + 0 * W + 2 * W * H]).toBe(1);
   });
 
-  it('gives door arches a real reveal into the opening', () => {
-    expect(ARCH_DEPTH).toBeCloseTo(CELL * 0.48, 5);
+  it('cuts the door opening through a 30 cm doorway wall', () => {
     expect(ARCH_FRONT).toBeCloseTo(0.03, 5);
-    expect(ARCH_LAYERS).toBeGreaterThan(20);
     const wall = new Uint8Array(8).fill(1);
     wall[2] = 0;
     wall[6] = 0;
-    const arch = solidifyArchVolume(wall, [2, 2, 2], 6);
-    expect(arch.dims[2]).toBe(6);
+    const arch = solidifyArchVolume(wall, [2, 2, 2], 15);
+    expect(arch.dims[2]).toBe(15);
     expect(arch.volume[0]).toBe(1);
     expect(arch.volume[2]).toBe(0);
-    const toWorld = makeArchToWorld('W', 5, 2, [2, 2, 6]);
+    const toWorld = makeArchToWorld('W', 4, 2, [2, 2, 15]);
     const back = toWorld(0, 0, 0);
-    const front = toWorld(0, 0, 6);
-    expect(front[0] - back[0]).toBeCloseTo(ARCH_DEPTH + ARCH_FRONT, 5);
-    expect(front[0]).toBeGreaterThan((5 - 0.5) * CELL - 0.001);
-    expect(back[0]).toBeLessThan((5 - 0.5) * CELL);
+    const front = toWorld(0, 0, 15);
+    expect(front[0] - back[0]).toBeCloseTo(0.15, 5);
+    expect(back[0]).toBeCloseTo((4 - 0.5) * CELL, 5);
+    expect(front[0] - back[0]).toBeGreaterThan(0.12);
+    expect(front[0] - back[0]).toBeLessThan(0.2);
   });
 });

@@ -48,10 +48,10 @@ export const DOOR_PANEL_INSET = 0.05;
 export const DOOR_UNLOCK_LEAD_MS = 350;
 /**
  * Door leaf rides up into the wall above the opening (portcullis).
- * Far enough that the faceted / lintel void is clear; the mesh is clipped
+ * Far enough that the lintel void is clear; the mesh is clipped
  * at the cornice and hidden when fully open so it never pokes through.
  */
-export const DOOR_LEAF_SLIDE = 1.66;
+export const DOOR_LEAF_SLIDE = 1.84;
 export const DOOR_LEAF_MS = 600;
 
 /** Real cubes within this Chebyshev distance; flat-but-lit beyond. */
@@ -88,12 +88,19 @@ export const CRACKED_CEILING_FILE = 'ceiling_cracked.png';
 /** One 256² rubble tile per 2 m cell — same density as the floor, readable on a phone. */
 export const RUBBLE_UV_SCALE = 1;
 /**
- * Reveal into the door cell. Half a CELL so both sides meet in the middle
- * (wall-thick soffit) while the room-side face stays a 3 cm relief.
+ * Room-side relief of a normal (non-door) wall plate (~3 cm).
  */
-export const ARCH_DEPTH = CELL * 0.48;
 export const ARCH_FRONT = 0.03;
-export const ARCH_LAYERS = Math.round((ARCH_DEPTH + ARCH_FRONT) / LAYER_SIZE);
+/**
+ * Combined two-sided doorway wall (~30 cm). Each room owns half, sealed
+ * with that room's stone. Not a passage cell.
+ */
+export const DOOR_WALL_DEPTH = 0.3;
+export const DOOR_WALL_HALF = DOOR_WALL_DEPTH / 2;
+/** Legacy deep-reveal helper depth. Door openings do not use this. */
+export const ARCH_DEPTH = CELL * 0.48;
+export const ARCH_LAYERS = Math.max(3, Math.round(ARCH_FRONT / LAYER_SIZE));
+export const DOOR_LAYERS = Math.max(3, Math.round(DOOR_WALL_HALF / LAYER_SIZE));
 
 /** One brick-course band, flush on the wall. 256×64 tile spans two cells. */
 export const CORNICE_HEIGHT = 0.18;
