@@ -103,6 +103,30 @@ for p in sorted([p for p in sq if p not in floor], key=lambda p: hv('f', p)):
     floor[p] = t
     cnt[t] = cnt.get(t, 0) + 1
 
+# Door cells used to be their own tile. They are floor now and must use the
+# same stone as the room they belong to (water-edge lock still wins).
+NESW = [(0, -1), (1, 0), (0, 1), (-1, 0)]
+for d in sorted(doors):
+    if d in edge:
+        continue
+    zid = zone_at(*d)
+    pick = None
+    for dx, dy in NESW:
+        q = (d[0] + dx, d[1] + dy)
+        if q not in floor or floor[q] == 'floor_water':
+            continue
+        if zone_at(*q) == zid:
+            pick = q
+            break
+        if pick is None:
+            pick = q
+    if pick:
+        old = floor[d]
+        floor[d] = floor[pick]
+        if old != floor[d]:
+            cnt[old] = cnt.get(old, 1) - 1
+            cnt[floor[d]] = cnt.get(floor[d], 0) + 1
+
 # --- ceiling ---
 C_RUBBLE = {'ceiling_rubble_1': 1, 'ceiling_rubble_2': 1, 'ceiling_rubble_3': 1}
 C_PLANKS = {'ceiling_planks_1': 1, 'ceiling_planks_2': 1, 'ceiling_planks_3': 1}
@@ -133,7 +157,7 @@ out = {
     'floor': 'floor1',
     'for': 'PR #63 Artie ceiling r3 — rubble + planks in pantry/guard hall',
     'rules': {
-        'floor': 'floor_water locked on cistern and cellar pool squares; floor_stone locked on squares that touch water. Spread is floor_stone / _2 / _4. floor_stone_3 is a rare feature (at most 4, under a lamp or by a door, never adjacent). Tiles share edge bands so joints run through any mix; no per-cell flip or rotation.',
+        'floor': 'floor_water locked on cistern and cellar pool squares; floor_stone locked on squares that touch water. Spread is floor_stone / _2 / _4. floor_stone_3 is a rare feature (at most 4, under a lamp or by a door, never adjacent). Door cells (4,2) (14,2) (6,8) (19,5) inherit the room-side stone (water-edge still wins). Offline edge rewrite (levels/tools/edge_match_floor_tiles.py) stamps a 16-24 px master edge band so joints run through any mix; no per-cell flip or rotation.',
         'ceiling': 'ceiling_rubble_1/_2/_3 replace planks everywhere except pantry and guard_hall, which keep ceiling_planks_1/_2/_3. Rubble is edge-matched and isotropic (no UV rotation). Plank boards run along tile x; pantry/guard primary beams run N–S so the boards already cross them (no 90° turn). Overlays sit on top: sunbeam crack at daylight (11,2), roots at (1,2), copper pipes along y=1 (1-3, 9-13) and y=6 (8-11).',
     },
     'squares': [
