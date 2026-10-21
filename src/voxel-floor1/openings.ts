@@ -33,7 +33,6 @@ import {
   openingPunchRect,
   openingSlabMeshes,
   punchOpening,
-  punchOpeningRect,
   type DoorOpeningStyle
 } from './door-opening';
 import { floor1Sconces, floor1Sunbeams } from './fixtures';
