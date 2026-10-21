@@ -66,6 +66,15 @@ export const DOOR_PANEL_V0 = 0.1;
 export const DOOR_PANEL_V1 = 0.6;
 /** Aged leaf pixels stay at or under this luma — duller than lit stone. */
 export const LEAF_MAX_LUMA = 0.42;
+/** Painted leaf size after the pad / lintel inset. */
+export const LEAF_WIDTH_M = OPEN_WIDTH - 2 * LEAF_PAD;
+export const LEAF_HEIGHT_M = JAMB_TOP - LEAF_PAD;
+/**
+ * Realistic padlock on the 1.12 m door. 10–14 cm target; may grow a texel
+ * for phone readability but stays under 16 cm.
+ */
+export const PADLOCK_WIDTH_M = 0.14;
+export const PADLOCK_MAX_WIDTH_M = 0.16;
 export type QuadRole = 'lintel' | 'jamb-soffit' | 'chip' | 'leaf' | 'iron';
 export type QuadKind = 'front' | 'soffit' | 'back';
 
@@ -505,11 +514,429 @@ function clampLeafLuma(r: number, g: number, b: number): [number, number, number
   return [r * k, g * k, b * k];
 }
 
+function pixelSat(r: number, g: number, b: number): number {
+  const maxc = Math.max(r, g, b);
+  const minc = Math.min(r, g, b);
+  return maxc > 1e-6 ? (maxc - minc) / maxc : 0;
+}
+
+function isWoodTone(r: number, g: number, b: number): boolean {
+  const luma = pixelLuma(r, g, b);
+  return pixelSat(r, g, b) > 0.12 && r > g + 0.02 && r > b + 0.04 && luma < 0.78;
+}
+
+function isMetalTone(r: number, g: number, b: number): boolean {
+  if (isWoodTone(r, g, b)) return false;
+  const luma = pixelLuma(r, g, b);
+  return pixelSat(r, g, b) < 0.35 && luma > 0.22 && luma < 0.95;
+}
+
+/** Image-space rectangle of the cropped plank body (PNG y=0 is top). */
+export function doorPanelLeafRect(
+  width: number,
+  height: number
+): { x0: number; x1: number; y0: number; y1: number } {
+  return {
+    x0: Math.round(DOOR_PANEL_U0 * width),
+    x1: Math.round(DOOR_PANEL_U1 * width),
+    y0: Math.round((1 - DOOR_PANEL_V1) * height),
+    y1: Math.round((1 - DOOR_PANEL_V0) * height)
+  };
+}
+
+export function leafMetersPerTexel(
+  width: number,
+  height: number
+): { x: number; y: number } {
+  const leaf = doorPanelLeafRect(width, height);
+  return {
+    x: LEAF_WIDTH_M / Math.max(1, leaf.x1 - leaf.x0),
+    y: LEAF_HEIGHT_M / Math.max(1, leaf.y1 - leaf.y0)
+  };
+}
+
+/** Padlock width in texels — at least 6 px when that still stays under 16 cm. */
+export function padlockWidthTexels(width: number, height: number): number {
+  const mx = leafMetersPerTexel(width, height).x;
+  const maxN = Math.max(1, Math.floor(PADLOCK_MAX_WIDTH_M / mx + 1e-9));
+  const n = Math.round(PADLOCK_WIDTH_M / mx);
+  return Math.min(maxN, Math.max(6, n));
+}
+
+type LeafRect = { x0: number; x1: number; y0: number; y1: number };
+
+function srcRgb(
+  src: ArrayLike<number>,
+  width: number,
+  x: number,
+  y: number
+): [number, number, number] {
+  const i = (y * width + x) * 4;
+  return [src[i] / 255, src[i + 1] / 255, src[i + 2] / 255];
+}
+
+function detectBandRows(
+  src: ArrayLike<number>,
+  width: number,
+  leaf: LeafRect
+): number[][] {
+  const span = leaf.x1 - leaf.x0;
+  const rows: number[] = [];
+  for (let y = leaf.y0; y < leaf.y1; y++) {
+    let iron = 0;
+    for (let x = leaf.x0; x < leaf.x1; x++) {
+      const [r, g, b] = srcRgb(src, width, x, y);
+      if (!isWoodTone(r, g, b) && pixelSat(r, g, b) < 0.35 && pixelLuma(r, g, b) > 0.18) {
+        iron += 1;
+      }
+    }
+    if (iron >= span * 0.4) rows.push(y);
+  }
+  const filled = new Set(rows);
+  for (let y = leaf.y0 + 1; y < leaf.y1 - 1; y++) {
+    if (!filled.has(y) && filled.has(y - 1) && filled.has(y + 1)) filled.add(y);
+  }
+  const groups: number[][] = [];
+  let cur: number[] = [];
+  for (const y of [...filled].sort((a, b) => a - b)) {
+    if (!cur.length || y === cur[cur.length - 1] + 1) cur.push(y);
+    else {
+      groups.push(cur);
+      cur = [y];
+    }
+  }
+  if (cur.length) groups.push(cur);
+  return groups;
+}
+
+type LockBlob = { cells: Array<[number, number]>; x0: number; x1: number; y0: number; y1: number };
+
+function blobBounds(cells: Array<[number, number]>): LockBlob {
+  let x0 = cells[0][0];
+  let x1 = cells[0][0];
+  let y0 = cells[0][1];
+  let y1 = cells[0][1];
+  for (const [x, y] of cells) {
+    if (x < x0) x0 = x;
+    if (x > x1) x1 = x;
+    if (y < y0) y0 = y;
+    if (y > y1) y1 = y;
+  }
+  return { cells, x0, x1, y0, y1 };
+}
+
+/**
+ * Oversized painted lock on the plank body. Null unless the blob is wide
+ * enough on the 1.12 m door that it would read as a third of the leaf.
+ */
+function detectOversizedPadlock(
+  src: ArrayLike<number>,
+  width: number,
+  height: number,
+  leaf: LeafRect,
+  bandRows: Set<number>
+): LockBlob | null {
+  if (width < 64 || height < 64) return null;
+  const yLo = leaf.y0 + 4;
+  const yHi = leaf.y1 - 4;
+  const metals: Array<[number, number]> = [];
+  for (let y = yLo; y < yHi; y++) {
+    if (bandRows.has(y)) continue;
+    for (let x = leaf.x0 + 4; x < leaf.x1 - 4; x++) {
+      const [r, g, b] = srcRgb(src, width, x, y);
+      if (isMetalTone(r, g, b)) metals.push([x, y]);
+    }
+  }
+  if (metals.length < 30) return null;
+
+  const seen = new Set<number>();
+  const comps: LockBlob[] = [];
+  const key = (x: number, y: number) => y * width + x;
+  const metalSet = new Set(metals.map(([x, y]) => key(x, y)));
+  const nbrs = [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+    [1, 1],
+    [1, -1],
+    [-1, 1],
+    [-1, -1]
+  ];
+  for (const [sx, sy] of metals) {
+    const sk = key(sx, sy);
+    if (seen.has(sk)) continue;
+    const cells: Array<[number, number]> = [];
+    const stack = [[sx, sy]];
+    seen.add(sk);
+    while (stack.length) {
+      const [x, y] = stack.pop()!;
+      cells.push([x, y]);
+      for (const [dx, dy] of nbrs) {
+        const nx = x + dx;
+        const ny = y + dy;
+        const nk = key(nx, ny);
+        if (metalSet.has(nk) && !seen.has(nk)) {
+          seen.add(nk);
+          stack.push([nx, ny]);
+        }
+      }
+    }
+    comps.push(blobBounds(cells));
+  }
+  comps.sort((a, b) => b.cells.length - a.cells.length);
+  const leafCx = (leaf.x0 + leaf.x1) * 0.5;
+  const leafCy = (leaf.y0 + leaf.y1) * 0.5;
+  const distC = (c: LockBlob) =>
+    Math.abs((c.x0 + c.x1) * 0.5 - leafCx) + Math.abs((c.y0 + c.y1) * 0.5 - leafCy);
+  const seed = comps.find((c) => distC(c) < 18 && c.cells.length >= 20);
+  if (!seed) return null;
+  const mx = leafMetersPerTexel(width, height).x;
+  const widthM = (seed.x1 - seed.x0 + 1) * mx;
+  if (widthM < 0.2) return null;
+  return seed;
+}
+
+function padlockMask(
+  width: number,
+  leaf: LeafRect,
+  lock: LockBlob,
+  bandRows: Set<number>
+): Set<number> {
+  const key = (x: number, y: number) => y * width + x;
+  const mask = new Set<number>();
+  // Cover the shackle above the body. Replacing the whole box from
+  // same-column donors continues planks; leftover lock pixels cannot hide.
+  const x0 = Math.max(leaf.x0 + 2, lock.x0 - 3);
+  const x1 = Math.min(leaf.x1 - 3, lock.x1 + 3);
+  const y0 = Math.max(leaf.y0, lock.y0 - 16);
+  const y1 = Math.min(leaf.y1 - 1, lock.y1 + 8);
+  for (let y = y0; y <= y1; y++) {
+    if (bandRows.has(y)) continue;
+    for (let x = x0; x <= x1; x++) mask.add(key(x, y));
+  }
+  return mask;
+}
+
+function fillPadlockHole(
+  out: Uint8ClampedArray,
+  width: number,
+  leaf: LeafRect,
+  mask: Set<number>,
+  bandRows: Set<number>
+): void {
+  const key = (x: number, y: number) => y * width + x;
+  let minY = 1e9;
+  let maxY = 0;
+  for (const k of mask) {
+    const y = Math.floor(k / width);
+    if (y < minY) minY = y;
+    if (y > maxY) maxY = y;
+  }
+  const copy = (dx: number, dy: number, sx: number, sy: number): void => {
+    const di = (dy * width + dx) * 4;
+    const si = (sy * width + sx) * 4;
+    out[di] = out[si];
+    out[di + 1] = out[si + 1];
+    out[di + 2] = out[si + 2];
+    out[di + 3] = out[si + 3];
+  };
+  const crackRows = new Set<number>();
+  const span = Math.max(1, leaf.x1 - leaf.x0);
+  for (let y = leaf.y0; y < leaf.y1; y++) {
+    let dark = 0;
+    for (let x = leaf.x0; x < leaf.x1; x++) {
+      const i = (y * width + x) * 4;
+      if (out[i] + out[i + 1] + out[i + 2] < 48) dark += 1;
+    }
+    if (dark >= span * 0.45) crackRows.add(y);
+  }
+  const colWantsGap = new Map<number, boolean>();
+  for (let x = leaf.x0; x < leaf.x1; x++) {
+    let dark = 0;
+    let n = 0;
+    for (let y = leaf.y0; y < leaf.y1; y++) {
+      if (mask.has(key(x, y)) || bandRows.has(y) || crackRows.has(y)) continue;
+      if (y >= minY && y <= maxY) continue;
+      n += 1;
+      const i = (y * width + x) * 4;
+      if (out[i] + out[i + 1] + out[i + 2] < 70) dark += 1;
+    }
+    colWantsGap.set(x, n > 0 && dark / n >= 0.5);
+  }
+  const goodDonor = (x: number, y: number): boolean => {
+    if (x < leaf.x0 || x >= leaf.x1 || y < leaf.y0 || y >= leaf.y1) return false;
+    if (mask.has(key(x, y))) return false;
+    if (bandRows.has(y) || crackRows.has(y)) return false;
+    if (!(y < minY || y > maxY)) return false;
+    const i = (y * width + x) * 4;
+    const dark = out[i] + out[i + 1] + out[i + 2] < 70;
+    if (dark && !colWantsGap.get(x)) return false;
+    return true;
+  };
+  const donorOf = new Map<number, [number, number]>();
+  for (const k of mask) {
+    const x = k % width;
+    if (donorOf.has(x)) continue;
+    let above: [number, number] | null = null;
+    for (let ny = minY - 1; ny >= leaf.y0; ny--) {
+      if (goodDonor(x, ny)) {
+        above = [x, ny];
+        break;
+      }
+    }
+    let below: [number, number] | null = null;
+    for (let ny = maxY + 1; ny < leaf.y1; ny++) {
+      if (goodDonor(x, ny)) {
+        below = [x, ny];
+        break;
+      }
+    }
+    const pick = above ?? below;
+    if (pick) donorOf.set(x, pick);
+  }
+  for (const k of mask) {
+    const x = k % width;
+    const y = (k - x) / width;
+    const pick = donorOf.get(x);
+    if (pick) {
+      copy(x, y, pick[0], pick[1]);
+      continue;
+    }
+    for (let d = 1; d < leaf.x1 - leaf.x0; d++) {
+      const left = donorOf.get(x - d);
+      const right = donorOf.get(x + d);
+      if (left) {
+        copy(x, y, left[0], left[1]);
+        break;
+      }
+      if (right) {
+        copy(x, y, right[0], right[1]);
+        break;
+      }
+    }
+  }
+}
+
+function putAged(
+  out: Uint8ClampedArray,
+  width: number,
+  x: number,
+  y: number,
+  rgb: [number, number, number]
+): void {
+  const [r, g, b] = clampLeafLuma(rgb[0], rgb[1], rgb[2]);
+  const i = (y * width + x) * 4;
+  out[i] = Math.round(Math.min(1, r) * 255);
+  out[i + 1] = Math.round(Math.min(1, g) * 255);
+  out[i + 2] = Math.round(Math.min(1, b) * 255);
+  out[i + 3] = 255;
+}
+
+/**
+ * Small rusty padlock hung from a staple on the upper (middle) band,
+ * a little toward +U — the opening / latch edge.
+ */
+function paintHaspAndPadlock(
+  out: Uint8ClampedArray,
+  width: number,
+  height: number,
+  leaf: LeafRect,
+  midBand: number[]
+): void {
+  const lockW = padlockWidthTexels(width, height);
+  const lockH = lockW + 3;
+  const leafCx = (leaf.x0 + leaf.x1) * 0.5;
+  const lockCx = Math.round(leafCx + (leaf.x1 - leaf.x0) * 0.14);
+  const x0 = lockCx - Math.floor(lockW / 2);
+  const by = midBand[midBand.length - 1];
+  const y0 = by - 1;
+  const outline: [number, number, number] = [0.055, 0.04, 0.03];
+  const body: [number, number, number] = [0.3, 0.2, 0.14];
+  const hi: [number, number, number] = [0.38, 0.26, 0.18];
+  const hole: [number, number, number] = [0.035, 0.025, 0.02];
+  const hasp: [number, number, number] = rustIron(0.32);
+  const hx = lockCx;
+  for (const yy of [by - 2, by - 1, by]) {
+    if (yy >= leaf.y0) {
+      putAged(out, width, hx - 1, yy, outline);
+      putAged(out, width, hx + 1, yy, outline);
+    }
+  }
+  putAged(out, width, hx - 1, by, hasp);
+  putAged(out, width, hx, by, hasp);
+  putAged(out, width, hx + 1, by, hasp);
+
+  const sprite: number[][] = [
+    [0, 1, 1, 1, 1, 0],
+    [1, 2, 1, 1, 2, 1],
+    [1, 2, 0, 0, 2, 1],
+    [1, 2, 0, 0, 2, 1],
+    [1, 3, 2, 2, 2, 1],
+    [1, 2, 4, 4, 2, 1],
+    [1, 2, 4, 4, 2, 1],
+    [1, 2, 2, 2, 2, 1],
+    [1, 1, 1, 1, 1, 1]
+  ];
+  const cols: Record<number, [number, number, number]> = {
+    1: outline,
+    2: body,
+    3: hi,
+    4: hole
+  };
+  const painted = new Set<number>();
+  const key = (x: number, y: number) => y * width + x;
+  const scaleX = lockW / 6;
+  const scaleY = lockH / sprite.length;
+  for (let j = 0; j < lockH; j++) {
+    const sj = Math.min(sprite.length - 1, Math.floor(j / scaleY));
+    for (let i = 0; i < lockW; i++) {
+      const si = Math.min(5, Math.floor(i / scaleX));
+      const v = sprite[sj][si];
+      if (!v) continue;
+      const x = x0 + i;
+      const y = y0 + j;
+      if (x < 0 || y < 0 || x >= width || y >= height) continue;
+      putAged(out, width, x, y, cols[v]);
+      painted.add(key(x, y));
+    }
+  }
+  for (const k of painted) {
+    const x = k % width;
+    const y = (k - x) / width;
+    const sx = x + 1;
+    const sy = y + 1;
+    if (sx >= width || sy >= height || painted.has(key(sx, sy))) continue;
+    const i = (sy * width + sx) * 4;
+    out[i] = Math.round(out[i] * 0.45);
+    out[i + 1] = Math.round(out[i + 1] * 0.42);
+    out[i + 2] = Math.round(out[i + 2] * 0.4);
+  }
+}
+
+function shrinkOversizedPadlock(
+  src: ArrayLike<number>,
+  out: Uint8ClampedArray,
+  width: number,
+  height: number
+): void {
+  const leaf = doorPanelLeafRect(width, height);
+  if (leaf.x1 - leaf.x0 < 16 || leaf.y1 - leaf.y0 < 16) return;
+  const groups = detectBandRows(src, width, leaf);
+  const bandRows = new Set(groups.flat());
+  const lock = detectOversizedPadlock(src, width, height, leaf, bandRows);
+  if (!lock) return;
+  const mask = padlockMask(width, leaf, lock, bandRows);
+  fillPadlockHole(out, width, leaf, mask, bandRows);
+  if (groups[0]?.length) paintHaspAndPadlock(out, width, height, leaf, groups[0]);
+}
+
 /**
  * Recolour/age pass on `door_panel.png`. Keeps the plank layout, bands,
- * studs, and padlock; shifts wood to dark grey-brown and iron to rusty matte.
- * Original highlight pixels on studs / rivets / the padlock become dull
- * rusty or dark-grey iron — never near white, no specular sparkle.
+ * and studs; shifts wood to dark grey-brown and iron to rusty matte.
+ * The original oversized padlock is replaced with continued plank / band
+ * pixels and a realistic lock hung from a hasp on the middle iron band.
+ * Stud / rivet highlights stay dull rusty — never near white.
  */
 export function ageDoorPanelPixels(
   src: ArrayLike<number>,
@@ -566,6 +993,7 @@ export function ageDoorPanelPixels(
       out[i + 3] = a;
     }
   }
+  shrinkOversizedPadlock(src, out, width, height);
   return out;
 }
 
