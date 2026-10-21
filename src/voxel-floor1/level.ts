@@ -7,7 +7,13 @@ import { CAMERA_NEAR, CELL, CRACKED_CEILING_FILE, CULL_CHEB, LAYER_SIZE, VOXEL_C
 import { floor1Sconces, floor1Sunbeams } from './fixtures';
 import { canStep, chebyshev, enumerateFaces, type FaceJob, type FloorMap } from './layout';
 import { isBeamCeiling, loadCrackedCeiling } from './crack';
-import { isPaintedShellFile, normalFromAlbedo, paintedShellMaterial } from './painted';
+import {
+  isPaintedShellFile,
+  isPlankCeilingFile,
+  normalFromAlbedo,
+  paintedShellMaterial,
+  weatherPlankPixels
+} from './painted';
 import { lookPixels } from './wall-once';
 import {
   bulgePose,
@@ -77,6 +83,7 @@ export async function buildFloor1(
     if (job.kind === 'ceiling' && isBeamCeiling(job.tx, job.tz, floor1Sunbeams)) {
       job.file = CRACKED_CEILING_FILE;
       job.batch = CRACKED_CEILING_FILE;
+      job.uvScale = 1;
     }
   }
   const neededFiles = new Set<string>();
@@ -112,7 +119,14 @@ export async function buildFloor1(
 
   for (const file of neededFiles) {
     const png = pngs.get(file)!;
-    texByBatch.set(file, png.texture);
+    if (isPlankCeilingFile(file)) {
+      weatherPlankPixels(png.data.data);
+      const map = textureFromPixels(png.data);
+      map.userData.plankWeathered = true;
+      texByBatch.set(file, map);
+    } else {
+      texByBatch.set(file, png.texture);
+    }
     if (isPaintedShellFile(file)) {
       normalByBatch.set(file, normalFromAlbedo(png.data));
       continue;
@@ -181,6 +195,7 @@ export async function buildFloor1(
       } else {
         const farMat = farBakeMaterial(tex);
         farMat.name = `far:${batch}`;
+        farMat.color.copy(painted.color);
         if (batch === CRACKED_CEILING_FILE) farMat.alphaTest = painted.alphaTest;
         farMats.set(batch, farMat);
       }
@@ -330,6 +345,7 @@ export async function buildFloor1(
           segs: f.segs,
           uOffset: f.uOffset,
           uvRot: f.uvRot,
+          uvScale: f.uvScale,
           size:
             f.kind === 'floor' || f.kind === 'ceiling' ? CELL + 2 * (CAMERA_NEAR + 0.12) : CELL
         })),

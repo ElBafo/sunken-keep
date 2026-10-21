@@ -78,6 +78,8 @@ export const PLANK_CEILING_VARIANTS = [
   'ceiling_planks_3.png'
 ] as const;
 export const CRACKED_CEILING_FILE = 'ceiling_cracked.png';
+/** Rubble stones tile 2×2 in each CELL so they read half-size. */
+export const RUBBLE_UV_SCALE = 2;
 
 /** Heavy stone band at the wall–ceiling join. 256×64 tile spans one CELL. */
 export const CORNICE_HEIGHT = 0.32;

@@ -1,11 +1,25 @@
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
+import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
 import floor1FloorCeil from '../levels/floor1_floorceil.json';
-import { CEILING_VARIANTS, FLOOR_VARIANTS, PLANK_CEILING_VARIANTS } from '../src/voxel-floor1/constants';
+import {
+  CELL,
+  CEILING_VARIANTS,
+  FLOOR_VARIANTS,
+  PLANK_CEILING_VARIANTS,
+  RUBBLE_UV_SCALE
+} from '../src/voxel-floor1/constants';
 import { compositeCrackedCeiling, crackedCeilingHasGap, scaleNearest } from '../src/voxel-floor1/crack';
-import { isPaintedShellFile, normalFromAlbedo } from '../src/voxel-floor1/painted';
-import { shellUv } from '../src/voxel-floor1/bake';
+import {
+  isPaintedShellFile,
+  normalFromAlbedo,
+  paintedShellMaterial,
+  PLANK_TINT,
+  RUBBLE_TINT,
+  weatherPlankPixel
+} from '../src/voxel-floor1/painted';
+import { shellUv, shellUvScaled } from '../src/voxel-floor1/bake';
 import {
   enumerateFaces,
   floor1Map,
@@ -146,6 +160,71 @@ describe('floor-1 floor and ceiling come from Levie’s map', () => {
     const painted = readFileSync(resolve(__dirname, '../src/voxel-floor1/painted.ts'), 'utf8');
     expect(painted).toContain('NearestMipmapNearestFilter');
     expect(painted).toContain('generateMipmaps = true');
+  });
+
+  it('tiles rubble 2×2 per cell and darkens it below the walls', () => {
+    expect(RUBBLE_UV_SCALE).toBe(2);
+    expect(shellUvScaled(0, 0, 0, CELL, CELL, 2)).toEqual([0, 0]);
+    expect(shellUvScaled(1, 1, 0, CELL, CELL, 2)).toEqual([2, 2]);
+    expect(shellUvScaled(0.5, 0.5, 0, CELL, CELL, 2)).toEqual([1, 1]);
+    expect(shellUvScaled(0, 0, 0, CELL, CELL, 1)).toEqual([0, 0]);
+    expect(shellUvScaled(1, 1, 90, CELL, CELL, 1)).toEqual([1, 0]);
+    const jobs = enumerateFaces(floor1Map);
+    for (const j of jobs) {
+      if (j.kind === 'ceiling' && j.file.startsWith('ceiling_rubble_')) {
+        expect(j.uvScale).toBe(2);
+      } else {
+        expect(j.uvScale).toBe(1);
+      }
+    }
+    expect(jobs.find((j) => j.kind === 'ceiling' && j.tx === 2 && j.tz === 11)?.uvScale).toBe(2);
+    expect(jobs.find((j) => j.kind === 'ceiling' && j.tx === 10 && j.tz === 4)?.uvScale).toBe(1);
+    expect(jobs.find((j) => j.kind === 'floor' && j.tx === 2 && j.tz === 11)?.uvScale).toBe(1);
+    const map = new THREE.Texture();
+    const nrm = new THREE.DataTexture(new Uint8Array(16), 2, 2);
+    const mat = paintedShellMaterial(map, nrm, 'ceiling_rubble_1.png');
+    expect(Math.max(mat.color.r, mat.color.g, mat.color.b)).toBeLessThanOrEqual(0.7);
+    expect(Math.min(mat.color.r, mat.color.g, mat.color.b)).toBeGreaterThanOrEqual(0.65);
+    expect(map.wrapS).toBe(THREE.RepeatWrapping);
+    expect(map.wrapT).toBe(THREE.RepeatWrapping);
+    expect(nrm.wrapS).toBe(THREE.RepeatWrapping);
+    expect(map.minFilter).toBe(THREE.NearestMipmapNearestFilter);
+    expect(map.magFilter).toBe(THREE.NearestFilter);
+    expect(RUBBLE_TINT.r).toBeCloseTo(0.66, 2);
+    const level = readFileSync(resolve(__dirname, '../src/voxel-floor1/level.ts'), 'utf8');
+    expect(level).toContain('farMat.color.copy(painted.color)');
+    expect(level).toContain('weatherPlankPixels');
+    const bake = readFileSync(resolve(__dirname, '../src/voxel-floor1/bake.ts'), 'utf8');
+    expect(bake).toContain('shellUvScaled');
+    expect(bake).not.toMatch(/customProgramCacheKey = \(\) => 'floor1-far-bake-v9'/);
+  });
+
+  it('weathers pantry and guard planks toward grey-brown oak', () => {
+    const src = [50 / 255, 37 / 255, 28 / 255] as const;
+    const out = weatherPlankPixel(src[0], src[1], src[2]);
+    const srcLuma = 0.2126 * src[0] + 0.7152 * src[1] + 0.0722 * src[2];
+    const outLuma = 0.2126 * out[0] + 0.7152 * out[1] + 0.0722 * out[2];
+    const srcRB = src[0] / src[2];
+    const outRB = out[0] / Math.max(1e-6, out[2]);
+    expect(outLuma).toBeLessThan(srcLuma);
+    expect(outLuma).toBeGreaterThan(srcLuma * 0.7);
+    expect(outRB).toBeLessThan(srcRB * 0.75);
+    expect(outRB).toBeGreaterThan(1);
+    expect(outRB).toBeLessThan(1.35);
+    const map = new THREE.Texture();
+    const mat = paintedShellMaterial(map, undefined, 'ceiling_planks_1.png');
+    expect(mat.color.r).toBeCloseTo(PLANK_TINT.r, 5);
+    expect(mat.color.b).toBeGreaterThan(mat.color.r);
+    const weathered = new THREE.Texture();
+    weathered.userData.plankWeathered = true;
+    const done = paintedShellMaterial(weathered, undefined, 'ceiling_planks_2.png');
+    expect(done.color.r).toBe(1);
+    expect(done.color.g).toBe(1);
+    expect(done.color.b).toBe(1);
+    const crack = readFileSync(resolve(__dirname, '../src/voxel-floor1/crack.ts'), 'utf8');
+    expect(crack).toContain('weatherPlankPixels');
+    const painted = readFileSync(resolve(__dirname, '../src/voxel-floor1/painted.ts'), 'utf8');
+    expect(painted).not.toContain('onBeforeCompile');
   });
 
   it('does not put floor or ceiling tiles on the wall mip/atlas path', () => {

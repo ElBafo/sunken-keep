@@ -267,6 +267,25 @@ export function shellUv(u: number, v: number, rot: 0 | 90 = 0): [number, number]
   return rot === 90 ? [v, 1 - u] : [u, v];
 }
 
+/**
+ * Face u,v are 0–1 across `size`. When `uvScale` is 2, map so one CELL
+ * holds two repeats (overlap beyond the cell keeps wrapping).
+ */
+export function shellUvScaled(
+  u: number,
+  v: number,
+  rot: 0 | 90,
+  size: number,
+  cell: number,
+  uvScale: number
+): [number, number] {
+  if (uvScale === 1) return shellUv(u, v, rot);
+  const lu = ((u - 0.5) * size) / cell + 0.5;
+  const lv = ((v - 0.5) * size) / cell + 0.5;
+  const [su, sv] = shellUv(lu, lv, rot);
+  return [su * uvScale, sv * uvScale];
+}
+
 function packFlatQuad(
   pose: { x: number; y: number; z: number; rotX: number; rotY: number },
   tx: number,
@@ -276,7 +295,8 @@ function packFlatQuad(
   torches: FarTorch[],
   beams: FarBeam[],
   uOffset = 0,
-  uvRot: 0 | 90 = 0
+  uvRot: 0 | 90 = 0,
+  uvScale = 1
 ): {
   positions: number[];
   normals: number[];
@@ -301,7 +321,7 @@ function packFlatQuad(
       const p = rotateOffset(px, py, 0, pose.rotX, pose.rotY);
       positions.push(p[0] + pose.x, p[1] + pose.y, p[2] + pose.z);
       normals.push(n[0], n[1], n[2]);
-      const [su, sv] = shellUv(u, v, uvRot);
+      const [su, sv] = shellUvScaled(u, v, uvRot, size, CELL, uvScale);
       uvs.push(su + uOffset, sv);
     }
   }
@@ -328,6 +348,7 @@ export function flatGeometryWithBake(
     size?: number;
     uOffset?: number;
     uvRot?: 0 | 90;
+    uvScale?: number;
   }>,
   torches: FarTorch[],
   cell: number,
@@ -343,7 +364,8 @@ export function flatGeometryWithBake(
       torches,
       beams,
       item.uOffset ?? 0,
-      item.uvRot ?? 0
+      item.uvRot ?? 0,
+      item.uvScale ?? 1
     )
   );
   return geometryFromMerged(mergeFar(packed));
