@@ -263,14 +263,14 @@ export type CornicePiece = CorniceSeg;
 export function cornicePieces(seg: CorniceSeg): CornicePiece[] {
   const alongX = seg.face === 'N' || seg.face === 'S';
   const len = alongX ? seg.sx : seg.sz;
-  const parts = 3;
+  const parts = 4;
   const out: CornicePiece[] = [];
   let cursor = 0;
   for (let i = 0; i < parts; i++) {
-    const share = i === parts - 1 ? 1 - cursor / len : 0.28 + hash01(seg.tx, seg.tz, seg.face, 4 + i) * 0.16;
+    const share = i === parts - 1 ? 1 - cursor / len : 0.18 + hash01(seg.tx, seg.tz, seg.face, 4 + i) * 0.16;
     const slen = i === parts - 1 ? len - cursor : share * len;
-    const hMul = 0.86 + hash01(seg.tx, seg.tz, seg.face, 11 + i) * 0.2;
-    const dMul = 0.78 + hash01(seg.tx, seg.tz, seg.face, 19 + i) * 0.34;
+    const hMul = 0.7 + hash01(seg.tx, seg.tz, seg.face, 11 + i) * 0.34;
+    const dMul = 0.58 + hash01(seg.tx, seg.tz, seg.face, 19 + i) * 0.55;
     const sy = CORNICE_HEIGHT * hMul;
     const sd = CORNICE_DEPTH * dMul;
     const mid = cursor + slen / 2 - len / 2;
@@ -290,7 +290,7 @@ export function cornicePieces(seg: CorniceSeg): CornicePiece[] {
   }
   const chipAt = Math.floor(hash01(seg.tx, seg.tz, seg.face, 41) * parts);
   const host = out[chipAt];
-  const chip = 0.07 + hash01(seg.tx, seg.tz, seg.face, 43) * 0.06;
+  const chip = 0.18 + hash01(seg.tx, seg.tz, seg.face, 43) * 0.14;
   if (alongX) {
     out.push({
       ...host,
@@ -308,6 +308,27 @@ export function cornicePieces(seg: CorniceSeg): CornicePiece[] {
       sz: chip,
       z: host.z + (hash01(seg.tx, seg.tz, seg.face, 47) > 0.5 ? 1 : -1) * (host.sz / 2 - chip / 2),
       y: host.y - host.sy * 0.22
+    });
+  }
+  const host2 = out[(chipAt + 2) % parts];
+  const chip2 = 0.1 + hash01(seg.tx, seg.tz, seg.face, 53) * 0.1;
+  if (alongX) {
+    out.push({
+      ...host2,
+      sx: chip2,
+      sy: host2.sy * 0.38,
+      sz: host2.sz * 0.48,
+      x: host2.x + (hash01(seg.tx, seg.tz, seg.face, 59) > 0.5 ? 1 : -1) * (host2.sx / 2 - chip2 / 2),
+      y: host2.y - host2.sy * 0.18
+    });
+  } else {
+    out.push({
+      ...host2,
+      sx: host2.sx * 0.48,
+      sy: host2.sy * 0.38,
+      sz: chip2,
+      z: host2.z + (hash01(seg.tx, seg.tz, seg.face, 59) > 0.5 ? 1 : -1) * (host2.sz / 2 - chip2 / 2),
+      y: host2.y - host2.sy * 0.18
     });
   }
   return out;
