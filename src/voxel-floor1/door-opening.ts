@@ -52,9 +52,14 @@ export const LEAF_REVEAL = DOOR_WALL_DEPTH * 0.25;
 export const LEAF_FRONT = LEAF_THICK / 2;
 export const LEAF_BACK = -LEAF_THICK / 2;
 export const IRON_PROUD = 0.004;
-/** Painted door in `door_panel.png` (crop the arched cap, keep padlock / studs). */
-export const DOOR_PANEL_V0 = 0.05;
-export const DOOR_PANEL_V1 = 0.7;
+/**
+ * Painted wood in `door_panel.png` — the rectangular plank body only.
+ * Crops the arched cap and the stone / dark recess around it.
+ */
+export const DOOR_PANEL_U0 = 0.285;
+export const DOOR_PANEL_U1 = 0.715;
+export const DOOR_PANEL_V0 = 0.09;
+export const DOOR_PANEL_V1 = 0.655;
 /** Aged leaf pixels stay at or under this luma — duller than lit stone. */
 export const LEAF_MAX_LUMA = 0.42;
 /** Fills sit a hair proud of the 15 cm plate so they do not z-fight. */
@@ -759,8 +764,14 @@ function mapLocal(face: FaceNESW, tx: number, tz: number, a: number, u: number, 
 
 /** Map a rectangular leaf onto the painted door, cropping only the arched cap. */
 function woodUv(a: number, u: number, leafTop: number): [number, number] {
+  const a0 = OPEN_U0 + LEAF_PAD;
+  const a1 = OPEN_U1 - LEAF_PAD;
+  const s = a1 > a0 ? Math.min(1, Math.max(0, (a - a0) / (a1 - a0))) : 0;
   const t = leafTop > 1e-6 ? Math.min(1, Math.max(0, u / leafTop)) : 0;
-  return [a / CELL, DOOR_PANEL_V0 + t * (DOOR_PANEL_V1 - DOOR_PANEL_V0)];
+  return [
+    DOOR_PANEL_U0 + s * (DOOR_PANEL_U1 - DOOR_PANEL_U0),
+    DOOR_PANEL_V0 + t * (DOOR_PANEL_V1 - DOOR_PANEL_V0)
+  ];
 }
 
 function pixelLuma(r: number, g: number, b: number): number {
