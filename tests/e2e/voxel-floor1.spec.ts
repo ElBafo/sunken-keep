@@ -160,11 +160,12 @@ test('floor-1 door (4,2) starts closed and swings open', async ({ page }) => {
     (window as unknown as { __voxelFloor1: Floor1 }).__voxelFloor1.stepForward()
   );
   expect(stepped).toBe(true);
-  await page.waitForTimeout(250);
-  const walked = await page.evaluate(() => {
-    const api = (window as unknown as { __voxelFloor1: Floor1 }).__voxelFloor1;
-    return { x: api.gridX, y: api.gridY };
-  });
-  expect(walked.x).toBe(4);
-  expect(walked.y).toBe(2);
+  await page.waitForFunction(
+    () => {
+      const api = (window as unknown as { __voxelFloor1: Floor1 }).__voxelFloor1;
+      return api.gridX === 4 && api.gridY === 2;
+    },
+    null,
+    { timeout: 4000 }
+  );
 });
