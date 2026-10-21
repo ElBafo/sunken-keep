@@ -124,8 +124,8 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     expect(main).toContain('openSecret');
     expect(main).not.toContain('if (remeshed) syncShadows()');
     const openings = readFileSync(resolve(dir, 'openings.ts'), 'utf8');
-    expect(openings).toContain('door_panel.png');
-    expect(openings).toContain('door_open.png');
+    expect(openings).toContain('ceiling_planks_1.png');
+    expect(openings).toContain('doorOpeningStyle');
     expect(openings).toContain('FLOOR1_WALL_FILES');
     expect(openings).toContain('lookForSecret');
     expect(openings).toContain('lookForZoneBase');
@@ -133,7 +133,8 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     expect(openings).toContain('openingHoleMask');
     expect(openings).toContain('solidifyArchVolume');
     expect(openings).toContain('makeArchToWorld');
-    expect(openings).toContain('remapDegenerateUvs');
+    expect(openings).toContain('projectArchOpeningUvs');
+    expect(openings).toContain('wrapT = THREE.RepeatWrapping');
     expect(openings).toContain('warnMissingWallTexture');
     expect(openings).toContain('familyBaseFile');
     expect(openings).not.toContain('using door_open');

@@ -19,12 +19,19 @@ import {
   CELL,
   DOOR_CLOSE_MS,
   DOOR_OPEN_MS,
-  DOOR_PANEL_INSET,
   DOOR_SLIDE,
   DOOR_UNLOCK_LEAD_MS,
   LAYER_SIZE
 } from './constants';
-import { remapDegenerateUvs } from './uv-audit';
+import { projectArchOpeningUvs } from './uv-audit';
+import {
+  doorOpeningStyle,
+  leafMeshes,
+  openingPunchRect,
+  openingSlabMeshes,
+  punchOpening,
+  type DoorOpeningStyle
+} from './door-opening';
 import { floor1Sconces, floor1Sunbeams } from './fixtures';
 import {
   listDoors,
@@ -48,13 +55,6 @@ import {
   type WallLook
 } from './wall-look';
 
-const INSET: Record<'N' | 'E' | 'S' | 'W', [number, number]> = {
-  N: [0, -1],
-  E: [1, 0],
-  S: [0, 1],
-  W: [-1, 0]
-};
-
 export type OpeningKind = 'door' | 'secret';
 
 export type OpeningVisual = {
@@ -76,19 +76,33 @@ function keyOf(x: number, y: number): string {
   return `${x},${y}`;
 }
 
-function offsetToWorld(
-  base: (u: number, v: number, d: number) => [number, number, number],
-  nx: number,
-  nz: number,
-  dist: number
-): (u: number, v: number, d: number) => [number, number, number] {
-  return (u, v, d) => {
-    const p = base(u, v, d);
-    return [p[0] + nx * dist, p[1], p[2] + nz * dist];
-  };
-}
-
 const MORTAR_LUMA = 30 / 255;
+
+function makeDoorRustMap(): THREE.DataTexture {
+  const w = 32;
+  const h = 32;
+  const data = new Uint8Array(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const i = (y * w + x) * 4;
+      const n = ((x * 17 + y * 31) ^ (x * y * 13)) & 15;
+      const rust = n < 3;
+      data[i] = rust ? 48 : 22;
+      data[i + 1] = rust ? 32 : 20;
+      data[i + 2] = rust ? 22 : 18;
+      data[i + 3] = 255;
+    }
+  }
+  const tex = new THREE.DataTexture(data, w, h, THREE.RGBAFormat);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
+  tex.magFilter = THREE.NearestFilter;
+  tex.minFilter = THREE.NearestFilter;
+  tex.generateMipmaps = false;
+  tex.needsUpdate = true;
+  return tex;
+}
 
 type PixelImage = { width: number; height: number; data: ArrayLike<number> };
 
@@ -369,15 +383,81 @@ export function makeArchToWorld(
   }
 }
 
-function projectArchUvs(geo: THREE.BufferGeometry): void {
-  const pos = geo.getAttribute('position');
-  const uv = geo.getAttribute('uv');
-  if (!pos || !uv) return;
-  const positions = pos.array as unknown as number[];
-  const uvs = uv.array as unknown as number[];
-  remapDegenerateUvs(positions, uvs, CELL);
-  pos.needsUpdate = true;
-  uv.needsUpdate = true;
+/** Punch a rectangular plate, add style slabs, project UVs. Used by the density audit. */
+export function meshArchOpening(
+  wall: Uint8Array,
+  wallDims: [number, number, number],
+  _opening: Uint8Array,
+  _openingDims: [number, number, number],
+  face: 'N' | 'E' | 'S' | 'W',
+  tx: number,
+  tz: number,
+  style: DoorOpeningStyle = 'lintel'
+): { positions: number[]; normals: number[]; uvs: number[]; quads: number } {
+  return meshDoorOpening(wall, wallDims, face, tx, tz, style);
+}
+
+export function meshDoorOpening(
+  wall: Uint8Array,
+  wallDims: [number, number, number],
+  face: 'N' | 'E' | 'S' | 'W',
+  tx: number,
+  tz: number,
+  style: DoorOpeningStyle
+): { positions: number[]; normals: number[]; uvs: number[]; quads: number } {
+  const punched = punchOpening(wall, wallDims, style);
+  const plateWorld = makeToWorld(face, tx, tz, wallDims, LAYER_SIZE, CELL, 'center');
+  const plate = greedyMesh(punched, wallDims, plateWorld, { cullNeg: [false, false, false] });
+  const uvs = plate.mesh.uvs.slice();
+  projectArchOpeningUvs(
+    plate.mesh.positions,
+    plate.mesh.normals,
+    uvs,
+    face,
+    CELL,
+    faceUOffset(face, tx, tz)
+  );
+  const positions = plate.mesh.positions.slice();
+  const normals = plate.mesh.normals.slice();
+  const slabs = openingSlabMeshes(style, face, tx, tz);
+  for (const slab of [slabs.stone, slabs.lintel]) {
+    positions.push(...slab.positions);
+    normals.push(...slab.normals);
+    uvs.push(...slab.uvs);
+  }
+  return {
+    positions,
+    normals,
+    uvs,
+    quads: (positions.length / 3 / 4) | 0
+  };
+}
+
+/** Axis-aligned doorway void. No circular soffit — curves read as thin stones at phone res. */
+export function makeArchHoleMask(W: number, H: number): Uint8Array {
+  const hole = new Uint8Array(W * H);
+  const rect = openingPunchRect('lintel');
+  const u0 = Math.floor((rect.u0 / CELL) * W);
+  const u1 = Math.ceil((rect.u1 / CELL) * W);
+  const v1 = Math.ceil((rect.v1 / CELL) * H);
+  for (let v = 0; v < v1; v++) {
+    for (let u = u0; u < u1; u++) {
+      hole[u + v * W] = 1;
+    }
+  }
+  return hole;
+}
+
+export function holeMaskToVolume(mask: Uint8Array, W: number, H: number, D: number): Uint8Array {
+  const volume = new Uint8Array(W * H * D);
+  const slice = W * H;
+  for (let v = 0; v < H; v++) {
+    for (let u = 0; u < W; u++) {
+      if (mask[u + v * W]) continue;
+      for (let d = 0; d < D; d++) volume[u + v * W + d * slice] = 1;
+    }
+  }
+  return volume;
 }
 
 function meshVolume(
@@ -565,16 +645,14 @@ export async function buildFloor1Openings(
 
   const wallFiles = [...FLOOR1_WALL_FILES];
   const pngs = await Promise.all([
-    loadPng('door_panel.png'),
-    loadPng('door_open.png'),
+    loadPng('ceiling_planks_1.png'),
     ...wallFiles.map((file) => loadPng(file))
   ]);
-  const panelPng = pngs[0];
-  const framePng = pngs[1];
-  const wallPngs = new Map<string, (typeof panelPng)>();
-  wallFiles.forEach((file, i) => wallPngs.set(file, pngs[i + 2]));
-  const panelVol = volumeFromImageData(panelPng.data);
-  const frameVol = volumeFromImageData(framePng.data);
+  const plankPng = pngs[0];
+  const wallPngs = new Map<string, (typeof plankPng)>();
+  wallFiles.forEach((file, i) => wallPngs.set(file, pngs[i + 1]));
+  plankPng.texture.wrapS = THREE.RepeatWrapping;
+  plankPng.texture.wrapT = THREE.RepeatWrapping;
 
   const makeMat = (png: { texture: THREE.Texture }, vol: { roughness: Uint8Array; dims: [number, number, number] }) => {
     const mat = voxelMaterial(png.texture, pbrMap(vol.roughness, vol.dims[0], vol.dims[1]));
@@ -582,9 +660,34 @@ export async function buildFloor1Openings(
     if (!realLights) patchBakeMaterial(mat);
     return mat;
   };
-  const panelMat = makeMat(panelPng, panelVol);
+  const woodMat = new THREE.MeshPhysicalMaterial({
+    map: plankPng.texture,
+    color: new THREE.Color(0.7, 0.68, 0.64),
+    roughness: 1,
+    metalness: 0,
+    clearcoat: 0,
+    sheen: 0,
+    specularIntensity: 0,
+    envMapIntensity: 0
+  });
+  woodMat.fog = true;
+  if (!realLights) patchBakeMaterial(woodMat);
+  const rustMap = makeDoorRustMap();
+  const ironMat = new THREE.MeshPhysicalMaterial({
+    map: rustMap,
+    color: new THREE.Color(0.22, 0.18, 0.14),
+    roughness: 1,
+    metalness: 0,
+    clearcoat: 0,
+    sheen: 0,
+    specularIntensity: 0,
+    envMapIntensity: 0
+  });
+  ironMat.fog = true;
+  if (!realLights) patchBakeMaterial(ironMat);
   const secretMats = new Map<string, THREE.MeshPhysicalMaterial>();
   const surroundMats = new Map<string, THREE.MeshPhysicalMaterial>();
+  const lintelMats: THREE.MeshPhysicalMaterial[] = [];
   const secretMat = (
     look: WallLook,
     png: { texture: THREE.Texture },
@@ -593,6 +696,7 @@ export async function buildFloor1Openings(
     const hit = secretMats.get(look.key);
     if (hit) return hit;
     png.texture.wrapS = THREE.RepeatWrapping;
+    png.texture.wrapT = THREE.RepeatWrapping;
     const mat = makeMat(png, src);
     secretMats.set(look.key, mat);
     return mat;
@@ -611,6 +715,7 @@ export async function buildFloor1Openings(
     const png = wallPngOrFamilyBase(look, `door-surround:${look.file}`);
     if (!png) return null;
     png.texture.wrapS = THREE.RepeatWrapping;
+    png.texture.wrapT = THREE.RepeatWrapping;
     const src = volumeFromImageData(png.data);
     finishVolume(src, look);
     const mat = makeMat(png, src);
@@ -632,51 +737,78 @@ export async function buildFloor1Openings(
     kind: OpeningKind
   ): void => {
     const face = view.face as 'N' | 'E' | 'S' | 'W';
-    const [inx, inz] = INSET[face];
-    const toWorld = makeToWorld(view.face, view.tx, view.tz, panelVol.dims, LAYER_SIZE, CELL, 'center');
     if (kind === 'door') {
+      const style = doorOpeningStyle(visual.x, visual.y);
       const surround = lookForZoneBase(view.tx, view.tz);
       const wallPng = wallPngOrFamilyBase(surround, `door-frame:${visual.x},${visual.y}:${face}`);
       const mat = surroundMat(surround);
       if (wallPng && mat) {
         const wallSrc = volumeFromImageData(wallPng.data);
         finishVolume(wallSrc, surround);
-        const punched = maskVolumeWithOpening(wallSrc.volume, wallSrc.dims, frameVol.volume, frameVol.dims);
-        const arch = solidifyArchVolume(punched, wallSrc.dims);
-        const surroundWorld = makeArchToWorld(view.face, view.tx, view.tz, arch.dims);
-        const frameGeo = meshVolume(
-          arch.volume,
-          arch.dims,
-          surroundWorld,
-          view.tx,
-          view.tz,
-          torches,
-          beams,
-          true
+        const punched = punchOpening(wallSrc.volume, wallSrc.dims, style);
+        const plateWorld = makeToWorld(view.face, view.tx, view.tz, wallSrc.dims, LAYER_SIZE, CELL, 'center');
+        const plate = greedyMesh(punched, wallSrc.dims, plateWorld, { cullNeg: [false, false, false] });
+        projectArchOpeningUvs(
+          plate.mesh.positions,
+          plate.mesh.normals,
+          plate.mesh.uvs,
+          face,
+          CELL,
+          faceUOffset(face, view.tx, view.tz)
         );
+        const slabs = openingSlabMeshes(style, face, view.tx, view.tz);
+        const items = [{ mesh: plate.mesh, tx: view.tx, tz: view.tz }];
+        if (slabs.stone.positions.length) items.push({ mesh: slabs.stone, tx: view.tx, tz: view.tz });
+        const frameGeo = geometryWithBake(items, torches, beams);
         if (frameGeo) {
-          projectArchUvs(frameGeo);
-          shiftFaceU(frameGeo, face, view.tx, view.tz);
           const frame = new THREE.Mesh(frameGeo, mat);
           frame.name = `door-frame:${visual.x},${visual.y}:${face}`;
           frame.userData.surroundFile = surround.file;
           frame.userData.surroundLook = surround.key;
+          frame.userData.doorStyle = style;
           frame.castShadow = true;
           frame.receiveShadow = true;
           frame.frustumCulled = false;
           group.add(frame);
         }
+        if (slabs.lintel.positions.length) {
+          const lintelGeo = geometryWithBake([{ mesh: slabs.lintel, tx: view.tx, tz: view.tz }], torches, beams);
+          if (lintelGeo) {
+            const lintelMat = mat.clone();
+            lintelMat.color.setRGB(0.72, 0.7, 0.66);
+            if (!realLights) patchBakeMaterial(lintelMat);
+            lintelMats.push(lintelMat);
+            const lintel = new THREE.Mesh(lintelGeo, lintelMat);
+            lintel.name = `door-lintel:${visual.x},${visual.y}:${face}`;
+            lintel.castShadow = true;
+            lintel.receiveShadow = true;
+            lintel.frustumCulled = false;
+            group.add(lintel);
+          }
+        }
       }
-      const panelWorld = offsetToWorld(toWorld, inx, inz, DOOR_PANEL_INSET);
-      const panelGeo = meshVolume(panelVol.volume, panelVol.dims, panelWorld, view.tx, view.tz, torches, beams);
-      if (panelGeo) {
+      const leaf = leafMeshes(style, face, view.tx, view.tz);
+      if (leaf.wood.positions.length) {
+        const woodGeo = geometryWithBake([{ mesh: leaf.wood, tx: view.tx, tz: view.tz }], torches, beams);
         const slider = new THREE.Group();
         slider.name = `door-panel:${visual.x},${visual.y}:${face}`;
-        const panel = new THREE.Mesh(panelGeo, panelMat);
-        panel.castShadow = true;
-        panel.receiveShadow = true;
-        panel.frustumCulled = false;
-        slider.add(panel);
+        if (woodGeo) {
+          const panel = new THREE.Mesh(woodGeo, woodMat);
+          panel.castShadow = true;
+          panel.receiveShadow = true;
+          panel.frustumCulled = false;
+          slider.add(panel);
+        }
+        if (leaf.iron.positions.length) {
+          const ironGeo = geometryWithBake([{ mesh: leaf.iron, tx: view.tx, tz: view.tz }], torches, beams);
+          if (ironGeo) {
+            const iron = new THREE.Mesh(ironGeo, ironMat);
+            iron.castShadow = true;
+            iron.receiveShadow = true;
+            iron.frustumCulled = false;
+            slider.add(iron);
+          }
+        }
         slider.frustumCulled = false;
         group.add(slider);
         visual.panels.push(slider);
@@ -750,7 +882,13 @@ export async function buildFloor1Openings(
     system.register(visual);
   }
 
-  system.bindLights(torches, beams, realLights, [panelMat, ...secretMats.values(), ...surroundMats.values()]);
+  system.bindLights(torches, beams, realLights, [
+    woodMat,
+    ironMat,
+    ...secretMats.values(),
+    ...surroundMats.values(),
+    ...lintelMats
+  ]);
 
   return { group, system };
 }
