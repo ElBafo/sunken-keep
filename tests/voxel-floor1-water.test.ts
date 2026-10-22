@@ -67,11 +67,11 @@ describe('voxel-floor1 water is one puddle per region', () => {
     expect(waterDeepness(floor1Map, 2, 1, 0.5, 0.5)).toBe(1);
     expect(waterDeepness(floor1Map, 2, 2, 0.5, 0.5)).toBe(1);
     expect(waterDeepness(floor1Map, 3, 1, 0.5, 0.5)).toBeLessThan(0.4);
-    expect(puddleAlpha(floor1Map, 2, 1, 0.5, 0.5)).toBeGreaterThan(0.8);
-    expect(puddleAlpha(floor1Map, 3, 1, 0.5, 0.5)).toBeGreaterThan(0.4);
-    expect(puddleAlpha(floor1Map, 3, 1, 0.5, 0.5)).toBeLessThan(0.7);
+    expect(puddleAlpha(floor1Map, 2, 1, 0.5, 0.5)).toBeGreaterThan(0.75);
+    expect(puddleAlpha(floor1Map, 3, 1, 0.5, 0.5)).toBeGreaterThan(0.18);
+    expect(puddleAlpha(floor1Map, 3, 1, 0.5, 0.5)).toBeLessThan(0.5);
     expect(puddleAlpha(floor1Map, 2, 1, 0.5, 0.5)).toBeGreaterThan(
-      puddleAlpha(floor1Map, 3, 1, 0.5, 0.5) + 0.2
+      puddleAlpha(floor1Map, 3, 1, 0.5, 0.5) + 0.3
     );
     expect(waterDeepness(floor1Map, 2, 1, 1, 0.5)).toBeCloseTo(
       waterDeepness(floor1Map, 3, 1, 0, 0.5),
@@ -82,15 +82,24 @@ describe('voxel-floor1 water is one puddle per region', () => {
     );
   });
 
+  it('wanders the cistern south dry edge instead of a straight cell line', () => {
+    const samples: number[] = [];
+    for (const x of [1, 2, 3]) {
+      for (let i = 0; i <= 10; i++) samples.push(puddleEdgeInset(x, 4, 'S', i / 10));
+    }
+    expect(Math.max(...samples) - Math.min(...samples)).toBeGreaterThan(0.08);
+  });
+
   it('keeps puddle edges irregular and stray drips inside the cell', () => {
     for (const cell of listWaterCells(floor1Map)) {
       for (const face of dryFacingFaces(floor1Map, cell.x, cell.y)) {
         expect(puddleEdgeIsIrregular(floor1Map, cell.x, cell.y, face), `${cell.x},${cell.y} ${face}`).toBe(
           true
         );
-        const a = puddleEdgeInset(cell.x, cell.y, face, 0.15);
-        const b = puddleEdgeInset(cell.x, cell.y, face, 0.72);
-        expect(Math.abs(a - b)).toBeGreaterThan(0.006);
+        const along = [0.08, 0.22, 0.4, 0.58, 0.75, 0.92].map((t) =>
+          puddleEdgeInset(cell.x, cell.y, face, t)
+        );
+        expect(Math.max(...along) - Math.min(...along), `${cell.x},${cell.y} ${face}`).toBeGreaterThan(0.012);
       }
     }
     for (const s of listStrayPuddles(floor1Map)) {
@@ -150,6 +159,8 @@ describe('voxel-floor1 water dip leaves no border gap', () => {
     expect(level).not.toContain('applyWaterBedPose');
     expect(main).toContain('buildFloor1Water');
     expect(water).toContain('listWaterRegions');
+    expect(water).toContain('paintSoftBlob');
+    expect(water).not.toContain('water-sparkles');
     expect(water).not.toContain('water-lips');
     expect(water).not.toContain('onBeforeCompile');
     expect(water).not.toContain('ShaderMaterial');

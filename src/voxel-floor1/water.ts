@@ -10,15 +10,15 @@ export const WATER_INSET_MIN = 0.11;
 export const WATER_INSET_MAX = 0.15;
 export const WATER_DIP_SHALLOW = 0.028;
 export const WATER_DIP_DEEP = 0.06;
-export const WATER_FLOOR_SEGS = 8;
-export const WATER_RIPPLE_AMP = 0.004;
+export const WATER_FLOOR_SEGS = 12;
+export const WATER_RIPPLE_AMP = 0.003;
 const WATER_RIPPLE_HZ = 0.16;
-export const WATER_SURFACE_COLOR = 0x1a2c22;
-export const WATER_DEEP_COLOR = 0x040706;
-const WATER_SHALLOW_RGB = { r: 0x1a / 255, g: 0x2c / 255, b: 0x22 / 255 };
-const WATER_DEEP_RGB = { r: 0x04 / 255, g: 0x07 / 255, b: 0x06 / 255 };
-const PUDDLE_ALPHA_SHALLOW = 0.56;
-const PUDDLE_ALPHA_DEEP = 0.94;
+export const WATER_SURFACE_COLOR = 0x0c100e;
+export const WATER_DEEP_COLOR = 0x030403;
+const WATER_SHALLOW_RGB = { r: 0.045, g: 0.055, b: 0.05 };
+const WATER_DEEP_RGB = { r: 0.012, g: 0.016, b: 0.014 };
+const PUDDLE_ALPHA_SHALLOW = 0.3;
+const PUDDLE_ALPHA_DEEP = 0.88;
 
 export const WATER_FACES = ['N', 'E', 'S', 'W'] as const;
 export type WaterFace = (typeof WATER_FACES)[number];
@@ -121,21 +121,35 @@ function smoothstep(e0: number, e1: number, x: number): number {
   return t * t * (3 - 2 * t);
 }
 
-/** Seeded warp so a dry-facing puddle edge is not a straight cell line. */
+/**
+ * How far the puddle body sits in from a dry face, in cell units.
+ * World-space bays and tongues so a 3-cell cistern edge wanders in
+ * the player's view instead of reading as one straight line.
+ */
 export function puddleEdgeInset(tx: number, tz: number, face: WaterFace, along: number): number {
-  const n = hash01(tx, tz, face.charCodeAt(0));
-  const mid = WATER_INSET_MIN + (WATER_INSET_MAX - WATER_INSET_MIN) * n;
-  const wobble =
-    0.048 * Math.sin(along * Math.PI * 2 * (1.7 + n) + n * 6.2) +
-    0.028 * Math.sin(along * Math.PI * 5.3 + hash01(tx, tz, 9) * 8);
-  return Math.min(0.2, Math.max(0.07, mid + wobble));
+  const world = face === 'N' || face === 'S' ? tx - 0.5 + along : tz - 0.5 + along;
+  const faceSeed = face.charCodeAt(0) * 0.17;
+  const mid = WATER_INSET_MIN + (WATER_INSET_MAX - WATER_INSET_MIN) * 0.5;
+  const bay =
+    0.07 * Math.sin(world * Math.PI * 0.62 + faceSeed + 1.1) +
+    0.045 * Math.sin(world * Math.PI * 1.45 + faceSeed * 2.3 + 3.7) +
+    0.028 * Math.sin(world * Math.PI * 3.1 + hash01(tx, tz, 9) * 5);
+  const tongue =
+    Math.max(0, Math.sin(world * Math.PI * 2.15 + faceSeed + 0.4)) ** 10 *
+    (0.055 + 0.03 * hash01(Math.floor(world * 3 + 0.25), face.charCodeAt(0), 14));
+  const bite =
+    Math.max(0, Math.sin(world * Math.PI * 1.05 + faceSeed * 1.7 + 2.8)) ** 12 * 0.04;
+  return Math.min(0.28, Math.max(0.075, mid + bay + tongue - bite));
 }
 
 function crackSeep(tx: number, tz: number, u: number, v: number): number {
-  const a = Math.sin((u * 7.3 + hash01(tx, tz, 3)) * Math.PI * 2);
-  const b = Math.sin((v * 6.1 + hash01(tx, tz, 5)) * Math.PI * 2);
-  const ridge = 1 - Math.min(1, Math.abs(a * 0.65 + b * 0.35) * 3.4);
-  return Math.max(0, ridge) ** 2 * 0.55 * hash01(tx, tz, 7);
+  const wu = tx - 0.5 + u;
+  const wv = tz - 0.5 + v;
+  const a = Math.sin((wu * 4.6 + hash01(tx, tz, 3)) * Math.PI * 2);
+  const b = Math.sin((wv * 3.9 + hash01(tx, tz, 5)) * Math.PI * 2);
+  const c = Math.sin((wu * 1.7 - wv * 2.2 + hash01(tx, tz, 8)) * Math.PI * 2);
+  const ridge = 1 - Math.min(1, Math.abs(a * 0.5 + b * 0.28 + c * 0.22) * 2.6);
+  return Math.max(0, ridge) ** 1.6 * 0.85;
 }
 
 /**
@@ -156,9 +170,9 @@ export function puddleCoverage(map: FloorMap, tx: number, tz: number, u: number,
     if (isWaterCell(map, s.nx, s.nz)) continue;
     const inset = puddleEdgeInset(tx, tz, s.face, s.along);
     const t = s.dist / Math.max(0.04, inset);
-    const body = smoothstep(0.2, 1, t);
+    const body = smoothstep(0.18, 1, t);
     const seep =
-      crackSeep(tx, tz, u, v) * smoothstep(0.02, 0.09, s.dist) * (1 - smoothstep(0.28, 1, t));
+      crackSeep(tx, tz, u, v) * smoothstep(0.015, 0.16, s.dist) * (1 - smoothstep(0.22, 0.95, t));
     wet = Math.min(wet, Math.max(body, seep));
   }
   return wet;
@@ -197,7 +211,7 @@ export function waterDeepness(map: FloorMap, tx: number, tz: number, u: number, 
 export function puddleAlpha(map: FloorMap, tx: number, tz: number, u: number, v: number): number {
   const cover = puddleCoverage(map, tx, tz, u, v);
   const deep = waterDeepness(map, tx, tz, u, v);
-  return smoothstep(0.14, 0.38, cover) * (PUDDLE_ALPHA_SHALLOW + (PUDDLE_ALPHA_DEEP - PUDDLE_ALPHA_SHALLOW) * deep);
+  return smoothstep(0.08, 0.58, cover) * (PUDDLE_ALPHA_SHALLOW + (PUDDLE_ALPHA_DEEP - PUDDLE_ALPHA_SHALLOW) * deep);
 }
 
 /** Floor drop in metres. 0 on the matching dry-stone edge band. */
@@ -479,77 +493,79 @@ function makeRippleNormal(size = 64): THREE.DataTexture {
   return tex;
 }
 
+function paintSoftBlob(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  rx: number,
+  ry: number,
+  rgb: string,
+  alpha: number
+): void {
+  const g = ctx.createRadialGradient(x, y, 0, x, y, Math.max(rx, ry));
+  g.addColorStop(0, `rgba(${rgb}, ${alpha})`);
+  g.addColorStop(0.35, `rgba(${rgb}, ${alpha * 0.45})`);
+  g.addColorStop(0.7, `rgba(${rgb}, ${alpha * 0.12})`);
+  g.addColorStop(1, `rgba(${rgb}, 0)`);
+  ctx.fillStyle = g;
+  ctx.beginPath();
+  ctx.ellipse(x, y, rx, ry, 0, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+/** Soft wobbling torch shimmer — no hard-edged dash quads. */
 function makeStreakAtlas(): THREE.CanvasTexture {
-  const w = 128;
+  const w = 256;
   const h = 128;
   const canvas = document.createElement('canvas');
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext('2d')!;
   ctx.clearRect(0, 0, w, h);
-  for (let x = 0; x < w; x++) {
+  const warm = '255, 206, 142';
+  const dim = '198, 148, 88';
+  let x = 8;
+  while (x < w - 6) {
     const t = x / w;
     const fall = (1 - t) * (1 - t);
-    const gap = Math.sin(x * 0.38) * Math.sin(x * 0.11);
-    if (gap < -0.35) continue;
-    const mid = 32 + 9 * Math.sin(x * 0.17) + 5 * Math.sin(x * 0.41);
-    const half = 5 + 3 * Math.abs(Math.sin(x * 0.23));
-    const g = ctx.createLinearGradient(x, mid - half * 2, x, mid + half * 2);
-    g.addColorStop(0, 'rgba(0,0,0,0)');
-    g.addColorStop(0.45, `rgba(255, 196, 120, ${0.15 * fall})`);
-    g.addColorStop(0.5, `rgba(255, 226, 168, ${0.85 * fall})`);
-    g.addColorStop(0.55, `rgba(210, 150, 70, ${0.2 * fall})`);
-    g.addColorStop(1, 'rgba(0,0,0,0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(x, mid - half * 2, 1, half * 4);
-    if (x % 9 === 0) {
-      ctx.fillStyle = `rgba(255, 236, 190, ${0.55 * fall})`;
-      ctx.fillRect(x, mid - 1 + Math.sin(x * 0.5) * 6, 3, 1);
+    const gap = 0.42 + 0.7 * hash01(x, 3, 1) + 0.35 * Math.sin(x * 0.09);
+    if (hash01(x, 1, 4) > 0.78) {
+      x += gap * 7;
+      continue;
     }
+    const mid =
+      36 +
+      16 * Math.sin(x * 0.041 + 0.6) +
+      9 * Math.sin(x * 0.11 + 1.8) +
+      4 * Math.sin(x * 0.23);
+    const rx = 5 + 11 * hash01(x, 2, 6);
+    const ry = 2.2 + 3.8 * hash01(x, 5, 7);
+    paintSoftBlob(ctx, x, mid, rx, ry, warm, 0.38 * fall);
+    if (hash01(x, 8, 2) > 0.55) {
+      paintSoftBlob(
+        ctx,
+        x + (hash01(x, 9, 3) - 0.5) * 10,
+        mid + (hash01(x, 10, 4) - 0.5) * 8,
+        rx * 0.45,
+        ry * 0.7,
+        warm,
+        0.22 * fall
+      );
+    }
+    x += gap * (5 + 9 * hash01(x, 6, 8));
   }
-  for (let x = 0; x < w; x++) {
-    const t = x / w;
-    if (Math.sin(x * 0.5 + 1.2) < 0.15) continue;
-    const mid = 96 + 4 * Math.sin(x * 0.21);
-    const a = (1 - t) * 0.4;
-    ctx.fillStyle = `rgba(198, 150, 88, ${a})`;
-    ctx.fillRect(x, mid - 6, 1, 12);
-  }
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.magFilter = THREE.LinearFilter;
-  tex.minFilter = THREE.LinearFilter;
-  tex.generateMipmaps = false;
-  tex.needsUpdate = true;
-  return tex;
-}
-
-function makeSparkleTexture(): THREE.CanvasTexture {
-  const size = 64;
-  const canvas = document.createElement('canvas');
-  canvas.width = size;
-  canvas.height = size;
-  const ctx = canvas.getContext('2d')!;
-  ctx.clearRect(0, 0, size, size);
-  const dashes = [
-    [8, 18, 7, 1],
-    [22, 40, 5, 1],
-    [40, 12, 6, 1],
-    [14, 50, 4, 1],
-    [48, 34, 8, 1],
-    [30, 26, 3, 1],
-    [54, 52, 5, 1]
-  ];
-  for (const [x, y, w, h] of dashes) {
-    const g = ctx.createLinearGradient(x, y, x + w, y);
-    g.addColorStop(0, 'rgba(255, 200, 120, 0)');
-    g.addColorStop(0.5, 'rgba(255, 230, 170, 0.95)');
-    g.addColorStop(1, 'rgba(255, 200, 120, 0)');
-    ctx.fillStyle = g;
-    ctx.fillRect(x, y, w, h);
+  let wx = 10;
+  while (wx < w - 8) {
+    const t = wx / w;
+    if (hash01(wx, 20, 1) < 0.35) {
+      wx += 10;
+      continue;
+    }
+    const mid = 100 + 6 * Math.sin(wx * 0.07) + 3 * Math.sin(wx * 0.19);
+    paintSoftBlob(ctx, wx, mid, 14 + 8 * hash01(wx, 21, 2), 5 + 3 * hash01(wx, 22, 3), dim, 0.16 * (1 - t));
+    wx += 14 + 18 * hash01(wx, 23, 4);
   }
   const tex = new THREE.CanvasTexture(canvas);
-  tex.wrapS = THREE.RepeatWrapping;
-  tex.wrapT = THREE.RepeatWrapping;
   tex.magFilter = THREE.LinearFilter;
   tex.minFilter = THREE.LinearFilter;
   tex.generateMipmaps = false;
@@ -562,8 +578,8 @@ function cellGrid(tx: number, tz: number, map: FloorMap, kind: 'floor' | 'puddle
   const geo = new THREE.PlaneGeometry(CELL, CELL, segs, segs);
   geo.rotateX(-Math.PI / 2);
   const pos = geo.getAttribute('position');
+  const uvAttr = geo.getAttribute('uv');
   const col = new Float32Array(pos.count * 4);
-  const colors = kind === 'puddle';
   for (let i = 0; i < pos.count; i++) {
     const wx = pos.getX(i) + tx * CELL;
     const wz = pos.getZ(i) + tz * CELL;
@@ -574,16 +590,19 @@ function cellGrid(tx: number, tz: number, map: FloorMap, kind: 'floor' | 'puddle
     const deep = waterDeepness(map, tx, tz, u, v);
     if (kind === 'floor') {
       pos.setXYZ(i, wx, dip, wz);
-      const wet = smoothstep(0.08, 0.4, cover) * (1 - smoothstep(0.45, 0.95, cover));
-      const bedHide = 0.58 * deep * smoothstep(0.18, 0.82, cover);
-      const k = 1 - 0.4 * wet - bedHide;
-      col[i * 4] = k * 0.92;
-      col[i * 4 + 1] = k * 0.9;
-      col[i * 4 + 2] = k * 0.86;
+      uvAttr.setXY(i, u, v);
+      const wet = smoothstep(0.02, 0.22, cover) * (1 - smoothstep(0.28, 0.8, cover));
+      const bedMute = 0.22 * smoothstep(0.25, 0.85, cover);
+      const bedHide = 0.62 * deep * smoothstep(0.18, 0.82, cover);
+      const k = 1 - 0.58 * wet - bedMute - bedHide;
+      col[i * 4] = k * 0.9;
+      col[i * 4 + 1] = k * 0.88;
+      col[i * 4 + 2] = k * 0.84;
       col[i * 4 + 3] = 1;
     } else {
-      pos.setXYZ(i, wx, dip + 0.0025, wz);
-      const edgeClear = 1 - 0.28 * (1 - smoothstep(0.2, 0.7, cover));
+      pos.setXYZ(i, wx, dip + 0.002, wz);
+      uvAttr.setXY(i, wx / (CELL * 2.8), wz / (CELL * 2.8));
+      const edgeClear = 1 - 0.18 * (1 - smoothstep(0.15, 0.65, cover));
       col[i * 4] = (WATER_SHALLOW_RGB.r + (WATER_DEEP_RGB.r - WATER_SHALLOW_RGB.r) * deep) * edgeClear;
       col[i * 4 + 1] = (WATER_SHALLOW_RGB.g + (WATER_DEEP_RGB.g - WATER_SHALLOW_RGB.g) * deep) * edgeClear;
       col[i * 4 + 2] = (WATER_SHALLOW_RGB.b + (WATER_DEEP_RGB.b - WATER_SHALLOW_RGB.b) * deep) * edgeClear;
@@ -592,7 +611,6 @@ function cellGrid(tx: number, tz: number, map: FloorMap, kind: 'floor' | 'puddle
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 4));
   geo.computeVertexNormals();
-  void colors;
   return geo;
 }
 
@@ -616,6 +634,7 @@ export async function buildFloor1Water(
 
   const floorGeos = cells.map((c) => cellGrid(c.x, c.y, map, 'floor'));
   const floorGeo = mergeGeometries(floorGeos);
+  floorGeo?.computeVertexNormals();
   if (floorGeo) {
     const mesh = new THREE.Mesh(floorGeo, floorMat);
     mesh.name = 'water-broken-floor';
@@ -628,11 +647,11 @@ export async function buildFloor1Water(
 
   const puddleMat = new THREE.MeshPhysicalMaterial({
     color: 0xffffff,
-    roughness: 0.58,
+    roughness: 0.8,
     metalness: 0,
     clearcoat: 0,
     sheen: 0,
-    specularIntensity: 0.28,
+    specularIntensity: 0.1,
     envMapIntensity: 0,
     transparent: true,
     opacity: 1,
@@ -648,6 +667,7 @@ export async function buildFloor1Water(
   let puddle: THREE.Mesh | null = null;
   let restY: Float32Array | null = null;
   const puddleGeo = mergeGeometries(puddleGeos);
+  puddleGeo?.computeVertexNormals();
   if (puddleGeo) {
     const pos = puddleGeo.getAttribute('position');
     restY = new Float32Array(pos.count);
@@ -679,10 +699,10 @@ export async function buildFloor1Water(
         geo,
         new THREE.MeshPhysicalMaterial({
           color: WATER_SURFACE_COLOR,
-          roughness: 0.62,
+          roughness: 0.78,
           metalness: 0,
           transparent: true,
-          opacity: 0.38,
+          opacity: 0.22,
           depthWrite: false,
           fog: true,
           specularIntensity: 0.18,
@@ -725,9 +745,9 @@ export async function buildFloor1Water(
         geo,
         new THREE.MeshBasicMaterial({
           map: atlas,
-          color: 0xffe2a4,
+          color: 0xe8c48a,
           transparent: true,
-          opacity: 0.72,
+          opacity: 0.36,
           depthWrite: false,
           blending: THREE.AdditiveBlending,
           fog: true,
@@ -741,53 +761,6 @@ export async function buildFloor1Water(
       mesh.userData.castWhenOn = false;
       mesh.frustumCulled = false;
       mesh.renderOrder = 3;
-      group.add(mesh);
-    }
-  }
-
-  let sparkleMat: THREE.MeshBasicMaterial | null = null;
-  const glintCells = listWaterGlintCells(map, sconces);
-  const glintKeys = new Set(glintCells.map((c) => `${c.x},${c.y}`));
-  const sparkleRegions = listWaterRegions(map).filter((r) =>
-    r.cells.some((c) => glintKeys.has(`${c.x},${c.y}`))
-  );
-  if (sparkleRegions.length) {
-    sparkleMat = new THREE.MeshBasicMaterial({
-      map: makeSparkleTexture(),
-      color: 0xffe6b0,
-      transparent: true,
-      opacity: 0.42,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-      fog: true,
-      toneMapped: false,
-      side: THREE.DoubleSide
-    });
-    const geos = sparkleRegions.map((r) => {
-      const sx = (r.maxX - r.minX + 1) * CELL * 0.88;
-      const sz = (r.maxY - r.minY + 1) * CELL * 0.88;
-      const cx = ((r.minX + r.maxX) / 2) * CELL;
-      const cz = ((r.minY + r.maxY) / 2) * CELL;
-      const mid = r.cells[Math.floor(r.cells.length / 2)] ?? r.cells[0];
-      const y = puddleSurfaceY(map, mid.x, mid.y, 0.5, 0.5) + 0.005;
-      const g = new THREE.PlaneGeometry(sx, sz);
-      g.rotateX(-Math.PI / 2);
-      g.translate(cx, y, cz);
-      const uv = g.getAttribute('uv');
-      const tilesX = r.maxX - r.minX + 1;
-      const tilesZ = r.maxY - r.minY + 1;
-      for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * tilesX * 1.1, uv.getY(i) * tilesZ * 1.1);
-      return g;
-    });
-    const geo = mergeGeometries(geos);
-    if (geo) {
-      const mesh = new THREE.Mesh(geo, sparkleMat);
-      mesh.name = 'water-sparkles';
-      mesh.castShadow = false;
-      mesh.receiveShadow = false;
-      mesh.userData.castWhenOn = false;
-      mesh.frustumCulled = false;
-      mesh.renderOrder = 4;
       group.add(mesh);
     }
   }
@@ -806,10 +779,6 @@ export async function buildFloor1Water(
           pos.setY(i, restY[i] + WATER_RIPPLE_AMP * Math.sin(x * 1.7 + wave) * Math.cos(z * 1.3 + wave * 0.7));
         }
         pos.needsUpdate = true;
-      }
-      if (sparkleMat) {
-        sparkleMat.opacity = freeze ? 0.42 : 0.42 * (0.8 + 0.2 * Math.sin(t * 1.15));
-        if (sparkleMat.map) sparkleMat.map.offset.set(t * 0.02, t * 0.01);
       }
     }
   };
