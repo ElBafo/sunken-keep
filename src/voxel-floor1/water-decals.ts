@@ -109,6 +109,11 @@ export function hasWaterDecal(x: number, y: number): boolean {
   return DECAL_BY_CELL.has(`${x},${y}`);
 }
 
+/** Crack puddles (1/2/3), not the cistern shore strip. */
+export function isCrackPuddleDecal(id: string | undefined | null): boolean {
+  return id === 'puddle_1' || id === 'puddle_2' || id === 'puddle_3';
+}
+
 /** Cells with a puddle decal must use floor_stone.png, not _2/_3/_4. */
 export function decalFloorFile(x: number, y: number): string | undefined {
   return hasWaterDecal(x, y) ? WATER_DECAL_FLOOR_FILE : undefined;

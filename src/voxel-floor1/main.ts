@@ -733,7 +733,7 @@ async function boot(): Promise<void> {
     else if (!stepTracking && !mover.moving && level.pump()) level.warm(uploadPending);
     openings.system.update(now);
     markers.update();
-    water.update(now, preserveBuffer);
+    water.update(now, preserveBuffer, camera);
     syncDoorButton();
     api.hasKey = hasKey;
 

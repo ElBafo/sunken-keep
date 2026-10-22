@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CELL, SCONCE_RADIUS_TILES, TORCH_DISTANCE } from './constants';
+import { CELL, LANTERN_DISTANCE, LANTERN_HOLD, SCONCE_RADIUS_TILES, TORCH_DISTANCE } from './constants';
 import {
   FACE_INTO_ROOM,
   floodReach,
@@ -20,6 +20,8 @@ import {
   cellToDecalUv,
   clearWaterDecalMasks,
   hasWaterDecal,
+  isCrackPuddleDecal,
+  waterDecalAt,
   installDecalMaskFromPixels,
   makePlaceholderPuddleDecal,
   placeWaterDecals,
@@ -52,10 +54,17 @@ const WATER_SHALLOW_RGB = { r: 0.03, g: 0.036, b: 0.03 };
 const WATER_DEEP_RGB = { r: 0.01, g: 0.012, b: 0.011 };
 const PUDDLE_ALPHA_SHALLOW = 0.16;
 const PUDDLE_ALPHA_DEEP = 0.3;
-/** Decal cells keep almost no veil so the painted lip and grout stay visible. */
+/** Shore cells keep almost no veil so the painted lip stays readable. */
 export const PUDDLE_ALPHA_DECAL_SHALLOW = 0.04;
 export const PUDDLE_ALPHA_DECAL_DEEP = 0.08;
 export const PUDDLE_SPECULAR = 0.07;
+/** Crack puddles: darker cooler wet film, slight sheen, not brown mud. */
+export const CRACK_PUDDLE_DARKEN = 0.68;
+export const CRACK_PUDDLE_OVERLAY_DARKEN = 0.52;
+export const CRACK_PUDDLE_COOL = { r: 0.42, g: 0.64, b: 0.92 };
+export const CRACK_PUDDLE_RGB = { r: 0.018, g: 0.028, b: 0.04 };
+export const CRACK_PUDDLE_ALPHA = 0.18;
+export const CRACK_PUDDLE_SPECULAR = 0.24;
 /** Dark splash under a ceiling beam — smaller than a cell, not a glow disc. */
 export const WATER_SPLASH_M = 0.7;
 const WALL_REFLECT_RGB = { r: 0.12, g: 0.1, b: 0.08 };
@@ -342,6 +351,33 @@ export function torchWarmthAt(
   return best;
 }
 
+/** 0–1 how close a water point is to the held lantern, in XZ. */
+export function lanternWarmthAt(
+  wx: number,
+  wz: number,
+  lx: number,
+  lz: number,
+  radius = LANTERN_DISTANCE
+): number {
+  const t = 1 - Math.hypot(wx - lx, wz - lz) / radius;
+  return t > 0 ? t ** 1.5 : 0;
+}
+
+/** Darker, cooler vertex tint inside a crack-puddle mask. */
+export function crackPuddleAlbedo(
+  cover: number,
+  overlay: boolean
+): { r: number; g: number; b: number } {
+  const wet = Math.min(1, Math.max(0, cover));
+  const dark = overlay ? CRACK_PUDDLE_OVERLAY_DARKEN : CRACK_PUDDLE_DARKEN;
+  const k = 1 - dark * wet;
+  return {
+    r: k * (1 - (1 - CRACK_PUDDLE_COOL.r) * wet),
+    g: k * (1 - (1 - CRACK_PUDDLE_COOL.g) * wet),
+    b: k * (1 - (1 - CRACK_PUDDLE_COOL.b) * wet)
+  };
+}
+
 export function rgbaToMask(data: ArrayLike<number>, size: number): Float32Array {
   const out = new Float32Array(size * size);
   for (let i = 0; i < size * size; i++) {
@@ -537,11 +573,15 @@ export function waterDeepness(map: FloorMap, tx: number, tz: number, u: number, 
   return d;
 }
 
-/** Puddle veil opacity. Thin dark tint; painted decal cells stay almost clear. */
+/** Puddle veil opacity. Thin dark tint; shore stays clear; crack film is a cool wet skim. */
 export function puddleAlpha(map: FloorMap, tx: number, tz: number, u: number, v: number): number {
   const cover = puddleCoverage(map, tx, tz, u, v);
   const deep = waterDeepness(map, tx, tz, u, v);
-  const decal = hasWaterDecal(tx, tz);
+  const spec = waterDecalAt(tx, tz);
+  if (isCrackPuddleDecal(spec?.id)) {
+    return smoothstep(0.28, 0.7, cover) * CRACK_PUDDLE_ALPHA;
+  }
+  const decal = !!spec;
   const lo = decal ? PUDDLE_ALPHA_DECAL_SHALLOW : PUDDLE_ALPHA_SHALLOW;
   const hi = decal ? PUDDLE_ALPHA_DECAL_DEEP : PUDDLE_ALPHA_DEEP;
   return smoothstep(0.28, 0.7, cover) * (lo + (hi - lo) * deep);
@@ -1034,6 +1074,7 @@ function cellGrid(
     region?: WaterRegion;
     sconces?: readonly SconceSpec[];
     segs?: number;
+    crack?: boolean;
   }
 ): THREE.BufferGeometry {
   const segs = opts?.segs ?? WATER_FLOOR_SEGS;
@@ -1090,20 +1131,16 @@ function cellGrid(
       const edgeClear = 1 - 0.18 * (1 - smoothstep(0.15, 0.65, cover));
       const wallNear = wallProximity(map, tx, tz, u, v);
       const bounce = puddleReflectBoost(warmth, deep, wx, wz, wallNear);
+      const shallow = opts?.crack ? CRACK_PUDDLE_RGB : WATER_SHALLOW_RGB;
+      const deepRgb = opts?.crack ? CRACK_PUDDLE_RGB : WATER_DEEP_RGB;
       col[i * 4] =
-        (WATER_SHALLOW_RGB.r + (WATER_DEEP_RGB.r - WATER_SHALLOW_RGB.r) * deep) *
-          edgeClear *
-          (1 + 0.12 * warmth) +
+        (shallow.r + (deepRgb.r - shallow.r) * deep) * edgeClear * (1 + 0.12 * warmth) +
         WALL_REFLECT_RGB.r * bounce;
       col[i * 4 + 1] =
-        (WATER_SHALLOW_RGB.g + (WATER_DEEP_RGB.g - WATER_SHALLOW_RGB.g) * deep) *
-          edgeClear *
-          (1 + 0.08 * warmth) +
+        (shallow.g + (deepRgb.g - shallow.g) * deep) * edgeClear * (1 + 0.08 * warmth) +
         WALL_REFLECT_RGB.g * bounce;
       col[i * 4 + 2] =
-        (WATER_SHALLOW_RGB.b + (WATER_DEEP_RGB.b - WATER_SHALLOW_RGB.b) * deep) *
-          edgeClear *
-          (1 + 0.04 * warmth) +
+        (shallow.b + (deepRgb.b - shallow.b) * deep) * edgeClear * (1 + 0.04 * warmth) +
         WALL_REFLECT_RGB.b * bounce;
       col[i * 4 + 3] = puddleAlpha(map, tx, tz, u, v) * (1 + 0.05 * warmth);
     }
@@ -1148,7 +1185,8 @@ function decalOrientedGrid(
   mirror = false,
   atlas?: { index: number; cols: number; rows: number },
   map?: FloorMap,
-  darken = true
+  darken = true,
+  crack = false
 ): THREE.BufferGeometry {
   const segs = map ? WATER_FLOOR_SEGS : 1;
   const geo = new THREE.PlaneGeometry(CELL, CELL, segs, segs);
@@ -1172,10 +1210,17 @@ function decalOrientedGrid(
       uvAttr.setXY(i, local.u, local.v);
     }
     const cover = map ? puddleCoverage(map, tx, tz, u, v) : 0;
-    const k = darken ? 1 - DECAL_MASK_DARKEN * cover : 1;
-    col[i * 4] = k;
-    col[i * 4 + 1] = k;
-    col[i * 4 + 2] = k;
+    if (crack) {
+      const tint = crackPuddleAlbedo(cover, !darken);
+      col[i * 4] = tint.r;
+      col[i * 4 + 1] = tint.g;
+      col[i * 4 + 2] = tint.b;
+    } else {
+      const k = darken ? 1 - DECAL_MASK_DARKEN * cover : 1;
+      col[i * 4] = k;
+      col[i * 4 + 1] = k;
+      col[i * 4 + 2] = k;
+    }
     col[i * 4 + 3] = 1;
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 4));
@@ -1188,7 +1233,7 @@ export async function buildFloor1Water(
   sconces: readonly SconceSpec[]
 ): Promise<{
   group: THREE.Group;
-  update: (now: number, freeze: boolean) => void;
+  update: (now: number, freeze: boolean, camera?: THREE.Camera) => void;
 }> {
   const group = new THREE.Group();
   group.name = 'floor1-water';
@@ -1321,7 +1366,17 @@ export async function buildFloor1Water(
     stoneMat.specularIntensity = 0;
     stoneMat.vertexColors = true;
     const floorGeos = decalPlacements.map(({ spec }) =>
-      decalOrientedGrid(spec.x, spec.y, 0, spec.rot ?? 0, spec.mirror, undefined, map)
+      decalOrientedGrid(
+        spec.x,
+        spec.y,
+        0,
+        spec.rot ?? 0,
+        spec.mirror,
+        undefined,
+        map,
+        true,
+        isCrackPuddleDecal(spec.id)
+      )
     );
     const floorGeo = mergeGeometries(floorGeos);
     if (floorGeo) {
@@ -1379,7 +1434,8 @@ export async function buildFloor1Water(
           rows: 1
         },
         map,
-        false
+        false,
+        isCrackPuddleDecal(spec.id)
       )
     );
     const decalGeo = mergeGeometries(decalGeos);
@@ -1427,6 +1483,93 @@ export async function buildFloor1Water(
     mesh.frustumCulled = false;
     mesh.renderOrder = 1;
     group.add(mesh);
+  }
+
+  const crackCells = cells.filter((c) => isCrackPuddleDecal(waterDecalAt(c.x, c.y)?.id));
+  let crackPuddleMat: THREE.MeshPhysicalMaterial | null = null;
+  if (crackCells.length) {
+    crackPuddleMat = new THREE.MeshPhysicalMaterial({
+      color: 0xffffff,
+      roughness: 0.5,
+      metalness: 0,
+      clearcoat: 0,
+      sheen: 0,
+      specularIntensity: CRACK_PUDDLE_SPECULAR,
+      envMapIntensity: 0,
+      transparent: true,
+      opacity: 1,
+      depthWrite: false,
+      fog: true,
+      emissive: 0x000000,
+      emissiveIntensity: 0,
+      vertexColors: true,
+      normalMap: ripple,
+      normalScale: new THREE.Vector2(0.78, 0.78)
+    });
+    const crackGeos = crackCells.map((c) =>
+      cellGrid(c.x, c.y, map, 'puddle', { sconces, crack: true })
+    );
+    const crackGeo = mergeGeometries(crackGeos);
+    crackGeo?.computeVertexNormals();
+    if (crackGeo) {
+      const mesh = new THREE.Mesh(crackGeo, crackPuddleMat);
+      mesh.name = 'water-crack-puddles';
+      mesh.castShadow = false;
+      mesh.receiveShadow = true;
+      mesh.userData.castWhenOn = false;
+      mesh.frustumCulled = false;
+      mesh.renderOrder = 3;
+      group.add(mesh);
+    }
+  }
+
+  let crackGlintAttr: THREE.BufferAttribute | null = null;
+  let crackGlintWx: Float32Array | null = null;
+  let crackGlintWz: Float32Array | null = null;
+  let crackGlintPeak: Float32Array | null = null;
+  const lanternWorld = new THREE.Vector3();
+  if (crackCells.length) {
+    const glintGeos = crackCells.map((c) => cellGrid(c.x, c.y, map, 'shimmer', { sconces, segs: 8 }));
+    const glintGeo = mergeGeometries(glintGeos);
+    if (glintGeo) {
+      const pos = glintGeo.getAttribute('position');
+      const col = glintGeo.getAttribute('color') as THREE.BufferAttribute;
+      crackGlintWx = new Float32Array(pos.count);
+      crackGlintWz = new Float32Array(pos.count);
+      crackGlintPeak = new Float32Array(pos.count);
+      for (let i = 0; i < pos.count; i++) {
+        const wx = pos.getX(i);
+        const wz = pos.getZ(i);
+        crackGlintWx[i] = wx;
+        crackGlintWz[i] = wz;
+        const cover = puddleCoverageWorld(map, wx, wz);
+        const peak = smoothstep(0.58, 0.9, waterWorldNoise(wx, wz, 5.1));
+        crackGlintPeak[i] = peak * smoothstep(0.28, 0.7, cover);
+        col.setXYZW(i, 1, 0.82, 0.58, 0);
+      }
+      crackGlintAttr = col;
+      const mesh = new THREE.Mesh(
+        glintGeo,
+        new THREE.MeshBasicMaterial({
+          color: 0xf0c48a,
+          transparent: true,
+          opacity: 0.55,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          fog: false,
+          toneMapped: false,
+          vertexColors: true,
+          side: THREE.DoubleSide
+        })
+      );
+      mesh.name = 'water-crack-glints';
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      mesh.userData.castWhenOn = false;
+      mesh.frustumCulled = false;
+      mesh.renderOrder = 5;
+      group.add(mesh);
+    }
   }
 
   const strays = listStrayPuddles(map);
@@ -1606,9 +1749,10 @@ export async function buildFloor1Water(
 
   return {
     group,
-    update: (now, freeze) => {
+    update: (now: number, freeze: boolean, camera?: THREE.Camera) => {
       const t = freeze ? 0 : now * 0.001;
       if (puddleMat.normalMap) puddleMat.normalMap.offset.set(t * 0.011, t * 0.007);
+      if (crackPuddleMat?.normalMap) crackPuddleMat.normalMap.offset.set(t * 0.011, t * 0.007);
       if (shimmerMat) {
         shimmerMat.opacity = freeze ? 0.28 : 0.28 * (0.84 + 0.16 * Math.sin(t * 0.45));
         if (shimmerMat.map) shimmerMat.map.offset.set(t * 0.006, t * 0.004);
@@ -1617,6 +1761,21 @@ export async function buildFloor1Water(
         const spin = freeze ? 0 : t * 0.12;
         splashMat.map.center.set(0.5, 0.5);
         splashMat.map.rotation = spin;
+      }
+      if (crackGlintAttr && crackGlintWx && crackGlintWz && crackGlintPeak) {
+        if (camera) {
+          lanternWorld.set(LANTERN_HOLD[0], LANTERN_HOLD[1], LANTERN_HOLD[2]).applyMatrix4(camera.matrixWorld);
+        }
+        const arr = crackGlintAttr.array as Float32Array;
+        for (let i = 0; i < crackGlintWx.length; i++) {
+          const torch = torchWarmthAt(crackGlintWx[i], crackGlintWz[i], sconces);
+          const lamp = camera
+            ? lanternWarmthAt(crackGlintWx[i], crackGlintWz[i], lanternWorld.x, lanternWorld.z)
+            : 0;
+          const warmth = Math.max(torch, lamp);
+          arr[i * 4 + 3] = crackGlintPeak[i] * warmth ** 1.25 * 0.4;
+        }
+        crackGlintAttr.needsUpdate = true;
       }
     }
   };

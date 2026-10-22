@@ -20,6 +20,7 @@ import {
   decalFloorFile,
   decalUv,
   hasWaterDecal,
+  isCrackPuddleDecal,
   installDecalMaskFromPixels,
   makePlaceholderPuddleDecal,
   pickSoloPuddleId,
@@ -40,6 +41,12 @@ import {
   PUDDLE_ALPHA_DECAL_DEEP,
   PUDDLE_ALPHA_DECAL_SHALLOW,
   PUDDLE_SPECULAR,
+  CRACK_PUDDLE_ALPHA,
+  CRACK_PUDDLE_COOL,
+  CRACK_PUDDLE_DARKEN,
+  CRACK_PUDDLE_OVERLAY_DARKEN,
+  CRACK_PUDDLE_RGB,
+  CRACK_PUDDLE_SPECULAR,
   WATER_SPLASH_M,
   cisternBedCellImageRect,
   cisternBedWorldUv,
@@ -58,6 +65,8 @@ import {
   pickWaterInnerIndex,
   puddleAlpha,
   puddleCoverage,
+  crackPuddleAlbedo,
+  lanternWarmthAt,
   puddleEdgeInset,
   puddleEdgeIsIrregular,
   regionWorldUv,
@@ -254,6 +263,9 @@ describe('voxel-floor1 water dip leaves no border gap', () => {
     expect(water).toContain('waterDecalPng');
     expect(water).toContain('DECAL_MASK_DARKEN');
     expect(water).toContain('PUDDLE_ALPHA_DECAL_SHALLOW');
+    expect(water).toContain('water-crack-puddles');
+    expect(water).toContain('water-crack-glints');
+    expect(water).toContain('CRACK_PUDDLE_SPECULAR');
     expect(water).toContain('y + dip');
     expect(water).not.toContain('water-wet-ring');
     expect(water).not.toContain('water-dry-slabs');
@@ -489,16 +501,59 @@ describe('voxel-floor1 puddle decals lock to floor_stone', () => {
     expect(floorDip(floor1Map, 1, 4, 0.5, 0.92)).toBeCloseTo(0, 3);
   });
 
-  it('keeps the water veil thin on painted decal cells', () => {
+  it('keeps the water veil thin on painted shore cells', () => {
     expect(hasWaterDecal(1, 4)).toBe(true);
     expect(hasWaterDecal(5, 11)).toBe(true);
     expect(hasWaterDecal(2, 1)).toBe(false);
     expect(PUDDLE_ALPHA_DECAL_SHALLOW).toBeLessThan(0.08);
     expect(PUDDLE_ALPHA_DECAL_DEEP).toBeLessThan(0.12);
-    expect(puddleAlpha(floor1Map, 5, 11, 0.5, 0.5)).toBeLessThan(0.12);
     expect(puddleAlpha(floor1Map, 1, 4, 0.5, 0.5)).toBeLessThan(0.12);
     expect(puddleAlpha(floor1Map, 2, 1, 0.5, 0.5)).toBeGreaterThan(0.2);
     expect(PUDDLE_SPECULAR).toBeLessThan(0.12);
+  });
+});
+
+describe('voxel-floor1 crack puddles are dark cool water, not brown mud', () => {
+  it('darkens and cools albedo inside the mask', () => {
+    expect(isCrackPuddleDecal('puddle_3')).toBe(true);
+    expect(isCrackPuddleDecal('puddle_1')).toBe(true);
+    expect(isCrackPuddleDecal('puddle_shore_s')).toBe(false);
+    expect(CRACK_PUDDLE_DARKEN).toBeGreaterThan(DECAL_MASK_DARKEN);
+    expect(CRACK_PUDDLE_OVERLAY_DARKEN).toBeGreaterThan(0.3);
+    expect(CRACK_PUDDLE_COOL.b).toBeGreaterThan(CRACK_PUDDLE_COOL.r);
+    expect(CRACK_PUDDLE_RGB.b).toBeGreaterThan(CRACK_PUDDLE_RGB.r);
+    expect(CRACK_PUDDLE_RGB.r).toBeLessThan(0.03);
+    const wet = crackPuddleAlbedo(1, true);
+    const dry = crackPuddleAlbedo(0, true);
+    expect(wet.r).toBeLessThan(0.3);
+    expect(wet.b).toBeGreaterThan(wet.r);
+    expect(wet.r).toBeLessThan(dry.r - 0.4);
+    expect(dry.r).toBeCloseTo(1, 5);
+  });
+
+  it('keeps a thin specular film, slow ripple, and lantern/torch glints', () => {
+    expect(CRACK_PUDDLE_ALPHA).toBeGreaterThan(0.1);
+    expect(CRACK_PUDDLE_ALPHA).toBeLessThan(0.28);
+    expect(CRACK_PUDDLE_SPECULAR).toBeGreaterThan(PUDDLE_SPECULAR);
+    expect(CRACK_PUDDLE_SPECULAR).toBeLessThan(0.35);
+    expect(puddleAlpha(floor1Map, 5, 11, 0.5, 0.5)).toBeGreaterThan(0.1);
+    expect(puddleAlpha(floor1Map, 5, 11, 0.5, 0.5)).toBeLessThan(0.28);
+    expect(puddleAlpha(floor1Map, 5, 11, 0.5, 0.5)).toBeGreaterThan(
+      puddleAlpha(floor1Map, 1, 4, 0.5, 0.5)
+    );
+    expect(lanternWarmthAt(0, 0, 0, 0)).toBe(1);
+    expect(lanternWarmthAt(8, 8, 0, 0)).toBe(0);
+    expect(cellTorchWarmth(5, 11, floor1Sconces)).toBe(0);
+    const water = readFileSync(resolve(SRC, 'water.ts'), 'utf8');
+    expect(water).toContain('water-crack-puddles');
+    expect(water).toContain('water-crack-glints');
+    expect(water).toContain('lanternWarmthAt');
+    expect(water).toContain('CRACK_PUDDLE_RGB');
+    expect(water).toContain('crack: true');
+    expect(water).toContain('normalMap.offset.set');
+    expect(readFileSync(resolve(SRC, 'main.ts'), 'utf8')).toContain(
+      'water.update(now, preserveBuffer, camera)'
+    );
   });
 });
 
