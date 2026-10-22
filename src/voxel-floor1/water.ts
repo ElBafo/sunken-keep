@@ -10,15 +10,15 @@ export const WATER_INSET_MIN = 0.11;
 export const WATER_INSET_MAX = 0.15;
 export const WATER_DIP_SHALLOW = 0.028;
 export const WATER_DIP_DEEP = 0.06;
-export const WATER_FLOOR_SEGS = 12;
+export const WATER_FLOOR_SEGS = 16;
 export const WATER_RIPPLE_AMP = 0.003;
 const WATER_RIPPLE_HZ = 0.16;
-export const WATER_SURFACE_COLOR = 0x0c100e;
+export const WATER_SURFACE_COLOR = 0x101410;
 export const WATER_DEEP_COLOR = 0x030403;
-const WATER_SHALLOW_RGB = { r: 0.045, g: 0.055, b: 0.05 };
-const WATER_DEEP_RGB = { r: 0.012, g: 0.016, b: 0.014 };
-const PUDDLE_ALPHA_SHALLOW = 0.3;
-const PUDDLE_ALPHA_DEEP = 0.88;
+const WATER_SHALLOW_RGB = { r: 0.07, g: 0.078, b: 0.07 };
+const WATER_DEEP_RGB = { r: 0.016, g: 0.02, b: 0.018 };
+const PUDDLE_ALPHA_SHALLOW = 0.26;
+const PUDDLE_ALPHA_DEEP = 0.86;
 
 export const WATER_FACES = ['N', 'E', 'S', 'W'] as const;
 export type WaterFace = (typeof WATER_FACES)[number];
@@ -131,15 +131,15 @@ export function puddleEdgeInset(tx: number, tz: number, face: WaterFace, along: 
   const faceSeed = face.charCodeAt(0) * 0.17;
   const mid = WATER_INSET_MIN + (WATER_INSET_MAX - WATER_INSET_MIN) * 0.5;
   const bay =
-    0.07 * Math.sin(world * Math.PI * 0.62 + faceSeed + 1.1) +
-    0.045 * Math.sin(world * Math.PI * 1.45 + faceSeed * 2.3 + 3.7) +
-    0.028 * Math.sin(world * Math.PI * 3.1 + hash01(tx, tz, 9) * 5);
+    0.085 * Math.sin(world * Math.PI * 0.58 + faceSeed + 1.1) +
+    0.05 * Math.sin(world * Math.PI * 1.38 + faceSeed * 2.3 + 3.7) +
+    0.03 * Math.sin(world * Math.PI * 2.9 + hash01(tx, tz, 9) * 5);
   const tongue =
-    Math.max(0, Math.sin(world * Math.PI * 2.15 + faceSeed + 0.4)) ** 10 *
-    (0.055 + 0.03 * hash01(Math.floor(world * 3 + 0.25), face.charCodeAt(0), 14));
+    Math.max(0, Math.sin(world * Math.PI * 2.15 + faceSeed + 0.4)) ** 9 *
+    (0.06 + 0.035 * hash01(Math.floor(world * 3 + 0.25), face.charCodeAt(0), 14));
   const bite =
-    Math.max(0, Math.sin(world * Math.PI * 1.05 + faceSeed * 1.7 + 2.8)) ** 12 * 0.04;
-  return Math.min(0.28, Math.max(0.075, mid + bay + tongue - bite));
+    Math.max(0, Math.sin(world * Math.PI * 1.05 + faceSeed * 1.7 + 2.8)) ** 11 * 0.05;
+  return Math.min(0.34, Math.max(0.08, mid + bay + tongue - bite));
 }
 
 function crackSeep(tx: number, tz: number, u: number, v: number): number {
@@ -170,9 +170,9 @@ export function puddleCoverage(map: FloorMap, tx: number, tz: number, u: number,
     if (isWaterCell(map, s.nx, s.nz)) continue;
     const inset = puddleEdgeInset(tx, tz, s.face, s.along);
     const t = s.dist / Math.max(0.04, inset);
-    const body = smoothstep(0.18, 1, t);
+    const body = smoothstep(0.32, 1, t);
     const seep =
-      crackSeep(tx, tz, u, v) * smoothstep(0.015, 0.16, s.dist) * (1 - smoothstep(0.22, 0.95, t));
+      crackSeep(tx, tz, u, v) * smoothstep(0.02, 0.2, s.dist) * (1 - smoothstep(0.18, 0.85, t));
     wet = Math.min(wet, Math.max(body, seep));
   }
   return wet;
@@ -211,7 +211,7 @@ export function waterDeepness(map: FloorMap, tx: number, tz: number, u: number, 
 export function puddleAlpha(map: FloorMap, tx: number, tz: number, u: number, v: number): number {
   const cover = puddleCoverage(map, tx, tz, u, v);
   const deep = waterDeepness(map, tx, tz, u, v);
-  return smoothstep(0.08, 0.58, cover) * (PUDDLE_ALPHA_SHALLOW + (PUDDLE_ALPHA_DEEP - PUDDLE_ALPHA_SHALLOW) * deep);
+  return smoothstep(0.28, 0.7, cover) * (PUDDLE_ALPHA_SHALLOW + (PUDDLE_ALPHA_DEEP - PUDDLE_ALPHA_SHALLOW) * deep);
 }
 
 /** Floor drop in metres. 0 on the matching dry-stone edge band. */
@@ -357,28 +357,28 @@ export function listWaterTorchMarks(map: FloorMap, sconces: readonly SconceSpec[
     const { nx, nz } = FACE_INTO_ROOM[s.face];
     const wallX = room.x * CELL - nx * (CELL / 2);
     const wallZ = room.y * CELL - nz * (CELL / 2);
-    const y = puddleSurfaceY(map, room.x, room.y, 0.5 - nx * 0.2, 0.5 - nz * 0.2) + 0.004;
+    const y = puddleSurfaceY(map, room.x, room.y, 0.5 - nx * 0.15, 0.5 - nz * 0.15) + 0.004;
     out.push({
       kind: 'streak',
       tx: room.x,
       tz: room.y,
-      x: wallX + nx * (0.22 + 0.7),
+      x: wallX + nx * 0.52,
       y,
-      z: wallZ + nz * (0.22 + 0.7),
+      z: wallZ + nz * 0.52,
       rotY: planeRotY(nx, nz),
-      sx: 1.35,
-      sz: 0.48
+      sx: 0.95,
+      sz: 0.4
     });
     out.push({
       kind: 'wall',
       tx: room.x,
       tz: room.y,
-      x: wallX + nx * 0.2,
+      x: wallX + nx * 0.18,
       y: y - 0.001,
-      z: wallZ + nz * 0.2,
+      z: wallZ + nz * 0.18,
       rotY: planeRotY(-nz, nx),
-      sx: CELL * 0.62,
-      sz: 0.26
+      sx: CELL * 0.55,
+      sz: 0.22
     });
   }
   return out;
@@ -591,10 +591,10 @@ function cellGrid(tx: number, tz: number, map: FloorMap, kind: 'floor' | 'puddle
     if (kind === 'floor') {
       pos.setXYZ(i, wx, dip, wz);
       uvAttr.setXY(i, u, v);
-      const wet = smoothstep(0.02, 0.22, cover) * (1 - smoothstep(0.28, 0.8, cover));
-      const bedMute = 0.22 * smoothstep(0.25, 0.85, cover);
+      const wet = smoothstep(0.02, 0.28, cover) * (1 - smoothstep(0.32, 0.82, cover));
+      const bedMute = 0.16 * smoothstep(0.3, 0.9, cover);
       const bedHide = 0.62 * deep * smoothstep(0.18, 0.82, cover);
-      const k = 1 - 0.58 * wet - bedMute - bedHide;
+      const k = 1 - 0.62 * wet - bedMute - bedHide;
       col[i * 4] = k * 0.9;
       col[i * 4 + 1] = k * 0.88;
       col[i * 4 + 2] = k * 0.84;
@@ -747,7 +747,7 @@ export async function buildFloor1Water(
           map: atlas,
           color: 0xe8c48a,
           transparent: true,
-          opacity: 0.36,
+          opacity: 0.5,
           depthWrite: false,
           blending: THREE.AdditiveBlending,
           fog: true,
