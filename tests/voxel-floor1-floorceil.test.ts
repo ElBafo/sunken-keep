@@ -61,6 +61,7 @@ describe('floor-1 floor and ceiling come from Levie’s map', () => {
     expect(pngSize('cornice_brick.png')).toEqual({ w: 256, h: 64 });
     expect(pngSize('cornice_slab.png')).toEqual({ w: 256, h: 64 });
     expect(pngSize('ceiling_2.png')).toEqual({ w: 256, h: 256 });
+    expect(pngSize('cistern_bed.png')).toEqual({ w: 768, h: 1024 });
   });
 
   it('assigns each shell square from the JSON and falls back to pickVariant', () => {

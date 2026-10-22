@@ -1,3 +1,4 @@
+import { execFileSync } from 'child_process';
 import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import * as THREE from 'three';
@@ -8,14 +9,17 @@ import { floor1Map, isWaterCell, isWaterTile, tileAt } from '../src/voxel-floor1
 import { paintedShellMaterial } from '../src/voxel-floor1/painted';
 import {
   CISTERN_BED_FILE,
+  CISTERN_BED_FLIP_Y,
   WATER_DIP_DEEP,
   WATER_DIP_SHALLOW,
   WATER_FACES,
   WATER_INSET_MAX,
   WATER_INSET_MIN,
   WATER_NOISE_SPAN,
+  cisternBedCellImageRect,
   cisternBedWorldUv,
   cisternRegion,
+  compositeCisternBedRims,
   dryFacingFaces,
   floorDip,
   hasWaterNeighbor,
@@ -213,6 +217,8 @@ describe('voxel-floor1 water dip leaves no border gap', () => {
     expect(water).toContain('waterWorldNoise');
     expect(water).toContain('tryLoadOptionalPng');
     expect(water).toContain('CISTERN_BED_FILE');
+    expect(water).toContain('CISTERN_BED_FLIP_Y');
+    expect(water).toContain('compositeCisternBedRims');
     expect(water).toContain('regionWorldUv');
     expect(water).toContain('torchWarmthAt');
     expect(water).not.toContain('water-sparkles');
@@ -253,21 +259,84 @@ describe('voxel-floor1 water is one world-space pool', () => {
     expect(TORCH_DISTANCE).toBeGreaterThan(4);
   });
 
-  it('maps the cistern bed to pool-bounds 0..1 and falls back until the file exists', () => {
+  it('maps the cistern bed with flipY so the dark basin sits on (2,1) and (2,2)', () => {
     const region = cisternRegion(floor1Map);
     expect(region).toBeTruthy();
+    expect(CISTERN_BED_FILE).toBe('cistern_bed.png');
+    expect(CISTERN_BED_FLIP_Y).toBe(true);
+    const file = resolve(__dirname, '../public/proto3d/tex3d', CISTERN_BED_FILE);
+    expect(existsSync(file)).toBe(true);
+    const buf = readFileSync(file);
+    expect(buf.readUInt32BE(16)).toBe(768);
+    expect(buf.readUInt32BE(20)).toBe(1024);
+
     const sw = regionWorldUv(region!, (region!.minX - 0.5) * CELL, (region!.minY - 0.5) * CELL);
-    const ne = regionWorldUv(region!, (region!.maxX + 0.5) * CELL, (region!.maxY + 0.5) * CELL);
     expect(sw.u).toBeCloseTo(0, 5);
     expect(sw.v).toBeCloseTo(0, 5);
-    expect(ne.u).toBeCloseTo(1, 5);
-    expect(ne.v).toBeCloseTo(1, 5);
-    const mid = cisternBedWorldUv(floor1Map, 4, 5);
-    expect(mid.u).toBeGreaterThan(0.3);
-    expect(mid.u).toBeLessThan(0.7);
-    expect(mid.v).toBeGreaterThan(0.3);
-    expect(mid.v).toBeLessThan(0.7);
-    expect(CISTERN_BED_FILE).toBe('floor_water_cistern_bed.png');
-    expect(existsSync(resolve(__dirname, '../public/proto3d/tex3d', CISTERN_BED_FILE))).toBe(false);
+    const deepN = cisternBedWorldUv(floor1Map, 2 * CELL, 1 * CELL);
+    const deepS = cisternBedWorldUv(floor1Map, 2 * CELL, 2 * CELL);
+    const south = cisternBedWorldUv(floor1Map, 2 * CELL, 4 * CELL);
+    expect(deepN.u).toBeCloseTo(0.5, 5);
+    expect(deepN.v).toBeCloseTo(0.875, 5);
+    expect(deepS.v).toBeCloseTo(0.625, 5);
+    expect(south.v).toBeCloseTo(0.125, 5);
+    expect(deepN.v).toBeGreaterThan(deepS.v);
+    expect(deepS.v).toBeGreaterThan(south.v);
+
+    const northRect = cisternBedCellImageRect(region!, 2, 1, 768, 1024);
+    expect(northRect.x).toBeCloseTo(256, 5);
+    expect(northRect.y).toBeCloseTo(0, 5);
+    const midRect = cisternBedCellImageRect(region!, 2, 2, 768, 1024);
+    expect(midRect.y).toBeCloseTo(256, 5);
+
+    const luma = execFileSync(
+      'python3',
+      [
+        '-c',
+        `
+from PIL import Image
+im = Image.open(${JSON.stringify(file)}).convert('RGBA')
+def avg(c, r):
+    x0, y0 = c * 256, r * 256
+    pix = [im.getpixel((x0 + x, y0 + y)) for y in range(64, 192) for x in range(64, 192)]
+    return sum(0.2126*p[0] + 0.7152*p[1] + 0.0722*p[2] for p in pix) / len(pix)
+print('ok', avg(1, 0), avg(1, 1), avg(1, 3), avg(2, 3))
+`
+      ],
+      { encoding: 'utf8' }
+    );
+    const [, n, mid, s, se] = luma.trim().split(/\s+/).map(Number);
+    expect(n).toBeGreaterThan(0);
+    expect(mid).toBeLessThan(s);
+    expect(mid).toBeLessThan(se);
+  });
+
+  it('keeps dry-edge rims on the cistern and per-cell inners on the cellar', () => {
+    expect(dryFacingFaces(floor1Map, 3, 2)).toContain('E');
+    expect(dryFacingFaces(floor1Map, 2, 4)).toContain('S');
+    expect(dryFacingFaces(floor1Map, 2, 2)).toEqual([]);
+    const region = cisternRegion(floor1Map)!;
+    const north = new Float32Array([1, 1, 0, 0]);
+    const bed = {
+      width: 6,
+      height: 8,
+      data: new Uint8ClampedArray(6 * 8 * 4)
+    };
+    for (let i = 0; i < 6 * 8; i++) {
+      bed.data[i * 4] = 10;
+      bed.data[i * 4 + 1] = 10;
+      bed.data[i * 4 + 2] = 10;
+      bed.data[i * 4 + 3] = 255;
+    }
+    const rim = new Uint8ClampedArray([200, 200, 200, 255, 200, 200, 200, 255, 200, 200, 200, 255, 200, 200, 200, 255]);
+    const out = compositeCisternBedRims(bed, rim, north, 2, floor1Map, region);
+    const at = (x: number, y: number) => out[(y * 6 + x) * 4];
+    expect(at(2, 3)).toBe(10);
+    expect(at(3, 3)).toBe(10);
+    expect(at(2, 7)).toBeGreaterThan(100);
+    expect(at(3, 7)).toBeGreaterThan(100);
+    expect(at(5, 2)).toBeGreaterThan(100);
+    expect(at(5, 3)).toBeGreaterThan(100);
+    expect(readFileSync(resolve(SRC, 'water.ts'), 'utf8')).toContain('pickWaterInnerIndex');
   });
 });

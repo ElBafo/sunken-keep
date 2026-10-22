@@ -21,7 +21,9 @@ export const WATER_FLOOR_SEGS = 16;
 export const WATER_RIPPLE_AMP = 0.005;
 /** One noise tile is larger than any pool so a 2 m cell cannot read as a repeat. */
 export const WATER_NOISE_SPAN = 24;
-export const CISTERN_BED_FILE = 'floor_water_cistern_bed.png';
+export const CISTERN_BED_FILE = 'cistern_bed.png';
+/** Artist painted north at the top of the PNG and assumed Three's default. */
+export const CISTERN_BED_FLIP_Y = true;
 export const WATER_INNER_FILES = ['floor_water_inner.png', 'floor_water_inner_2.png'] as const;
 export const WATER_RIM_FILE = 'floor_water.png';
 export const WATER_RIM_MASK_N = 'floor_water_rim_mask_n.png';
@@ -152,10 +154,104 @@ export function regionWorldUv(region: WaterRegion, wx: number, wz: number): { u:
   };
 }
 
+/**
+ * Sample UV for `cistern_bed.png` with flipY=true: v=1 is the top of the
+ * PNG (north / y=1), v=0 is the south shore. u=0 is west / x=1.
+ */
+export function cisternBedWorldUvFromRegion(
+  region: WaterRegion,
+  wx: number,
+  wz: number
+): { u: number; v: number } {
+  const uv = regionWorldUv(region, wx, wz);
+  return { u: uv.u, v: 1 - uv.v };
+}
+
 export function cisternBedWorldUv(map: FloorMap, wx: number, wz: number): { u: number; v: number } {
   const region = cisternRegion(map);
   if (!region) return { u: 0, v: 0 };
-  return regionWorldUv(region, wx, wz);
+  return cisternBedWorldUvFromRegion(region, wx, wz);
+}
+
+/** Image-space rect of one cistern cell. y=0 is the top of the PNG (north). */
+export function cisternBedCellImageRect(
+  region: WaterRegion,
+  tx: number,
+  tz: number,
+  width: number,
+  height: number
+): { x: number; y: number; w: number; h: number } {
+  const cols = region.maxX - region.minX + 1;
+  const rows = region.maxY - region.minY + 1;
+  const w = width / cols;
+  const h = height / rows;
+  return {
+    x: (tx - region.minX) * w,
+    y: (tz - region.minY) * h,
+    w,
+    h
+  };
+}
+
+function asBytes(src: ArrayLike<number>): Uint8ClampedArray {
+  return src instanceof Uint8ClampedArray ? src : Uint8ClampedArray.from(src);
+}
+
+function copyRect(
+  src: ArrayLike<number>,
+  srcW: number,
+  x: number,
+  y: number,
+  w: number,
+  h: number
+): Uint8ClampedArray {
+  const bytes = asBytes(src);
+  const out = new Uint8ClampedArray(w * h * 4);
+  for (let row = 0; row < h; row++) {
+    const so = ((y + row) * srcW + x) * 4;
+    out.set(bytes.subarray(so, so + w * 4), row * w * 4);
+  }
+  return out;
+}
+
+function writeRect(
+  dest: Uint8ClampedArray,
+  destW: number,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  src: ArrayLike<number>
+): void {
+  const bytes = asBytes(src);
+  for (let row = 0; row < h; row++) {
+    dest.set(bytes.subarray(row * w * 4, (row + 1) * w * 4), ((y + row) * destW + x) * 4);
+  }
+}
+
+/** Blend the wet rim onto dry-facing sides of the cistern bed. Water–water joins stay as painted. */
+export function compositeCisternBedRims(
+  bed: { width: number; height: number; data: ArrayLike<number> },
+  rim: ArrayLike<number>,
+  northMask: Float32Array,
+  maskSize: number,
+  map: FloorMap,
+  region: WaterRegion
+): Uint8ClampedArray {
+  const out = new Uint8ClampedArray(bed.data);
+  for (const c of region.cells) {
+    const mask = rimMaskForCell(map, c.x, c.y, northMask, maskSize);
+    if (Math.max(...mask) === 0) continue;
+    const rect = cisternBedCellImageRect(region, c.x, c.y, bed.width, bed.height);
+    const x = Math.round(rect.x);
+    const y = Math.round(rect.y);
+    const w = Math.round(rect.w);
+    const h = Math.round(rect.h);
+    if (w !== maskSize || h !== maskSize) continue;
+    const cell = copyRect(out, bed.width, x, y, w, h);
+    writeRect(out, bed.width, x, y, w, h, blendWaterOverInner(cell, rim, mask, maskSize));
+  }
+  return out;
 }
 
 export async function tryLoadOptionalPng(file: string): Promise<Awaited<ReturnType<typeof loadPng>> | null> {
@@ -810,7 +906,7 @@ function cellGrid(
     if (kind === 'floor') {
       pos.setXYZ(i, wx, dip, wz);
       if (region) {
-        const uv = regionWorldUv(region, wx, wz);
+        const uv = cisternBedWorldUvFromRegion(region, wx, wz);
         uvAttr.setXY(i, uv.u, uv.v);
       } else if (atlas) {
         const colI = atlas.index % atlas.cols;
@@ -820,7 +916,7 @@ function cellGrid(
         uvAttr.setXY(i, u, v);
       }
       const wet = smoothstep(0.05, 0.3, cover) * (1 - smoothstep(0.34, 0.85, cover));
-      const bedHide = 0.42 * deep * smoothstep(0.22, 0.85, cover);
+      const bedHide = region ? 0 : 0.42 * deep * smoothstep(0.22, 0.85, cover);
       const k = 1 - 0.18 * wet - bedHide;
       col[i * 4] = k;
       col[i * 4 + 1] = k;
@@ -905,14 +1001,26 @@ export async function buildFloor1Water(
   });
   const ripple = makeRippleNormal();
   if (useCisternBed && cistern && cisternBed) {
-    const bedTex = cisternBed.texture;
-    bedTex.flipY = false;
+    const rimmed = compositeCisternBedRims(
+      cisternBed.data,
+      rimPng.data.data,
+      northMask,
+      size,
+      map,
+      cistern
+    );
+    const bedTex = textureFromPixels({
+      width: cisternBed.data.width,
+      height: cisternBed.data.height,
+      data: rimmed
+    });
+    bedTex.flipY = CISTERN_BED_FLIP_Y;
     bedTex.wrapS = THREE.ClampToEdgeWrapping;
     bedTex.wrapT = THREE.ClampToEdgeWrapping;
-    const bedMat = paintedShellMaterial(bedTex, undefined, CISTERN_BED_FILE);
+    const bedMat = paintedShellMaterial(bedTex, undefined, 'floor_water.png');
     bedMat.vertexColors = true;
     bedMat.specularIntensity = 0;
-    bedMat.map!.flipY = false;
+    bedMat.map!.flipY = CISTERN_BED_FLIP_Y;
     bedMat.map!.needsUpdate = true;
     const bedGeos = cistern.cells.map((c) => cellGrid(c.x, c.y, map, 'floor', { region: cistern }));
     const bedGeo = mergeGeometries(bedGeos);
