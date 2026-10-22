@@ -608,7 +608,12 @@ export function wetRingAmount(map: FloorMap, tx: number, tz: number, u: number, 
   const wxM = (tx - 0.5 + u) * CELL;
   const wzM = (tz - 0.5 + v) * CELL;
   const width = wetRingWidth(wxM, wzM);
-  return 1 - smoothstep(width * 0.08, width, d);
+  let amt = 1 - smoothstep(width * 0.08, width, d);
+  if (isWaterCell(map, tx, tz)) {
+    const cover = puddleCoverage(map, tx, tz, u, v);
+    amt *= smoothstep(0.05, 0.16, cover);
+  }
+  return amt;
 }
 
 export type PokingSlab = {
@@ -1222,7 +1227,9 @@ function pokingSlabGeometry(s: PokingSlab): THREE.BufferGeometry {
   const { dx, dz } = FACE_DELTA[s.face];
   const cx = (wx - dx * s.inset * 0.5) * CELL;
   const cz = (wz - dz * s.inset * 0.5) * CELL;
-  g.translate(cx, 0.0009, cz);
+  g.translate(cx, 0.003, cz);
+  const nrm = g.getAttribute('normal');
+  for (let i = 0; i < nrm.count; i++) nrm.setXYZ(i, 0, 1, 0);
   const uv = g.getAttribute('uv');
   for (let i = 0; i < uv.count; i++) {
     const u = s.along0 + uv.getX(i) * (s.along1 - s.along0);
@@ -1410,24 +1417,36 @@ export async function buildFloor1Water(
   }
 
   const slabs = listPokingSlabs(map);
-  const stonePng = stoneImages.get('floor_stone.png') ?? [...stoneImages.values()][0];
-  if (slabs.length && stonePng) {
+  if (slabs.length) {
     const slabGeos = slabs.map(pokingSlabGeometry);
     const slabGeo = mergeGeometries(slabGeos);
-    slabGeo?.computeVertexNormals();
     if (slabGeo) {
-      const slabTex = textureFromPixels(stonePng);
-      slabTex.flipY = true;
-      const slabMat = paintedShellMaterial(slabTex, undefined, 'floor_stone.png');
+      const nrm = slabGeo.getAttribute('normal');
+      for (let i = 0; i < nrm.count; i++) nrm.setXYZ(i, 0, 1, 0);
+    }
+    if (slabGeo) {
+      const stoneSrc = stonePngs.find(Boolean);
+      const slabMat = stoneSrc
+        ? paintedShellMaterial(stoneSrc.texture, undefined, 'floor_stone.png')
+        : new THREE.MeshPhysicalMaterial({
+            color: 0x7a6e5e,
+            roughness: 0.92,
+            metalness: 0,
+            specularIntensity: 0,
+            envMapIntensity: 0,
+            fog: true
+          });
+      if (stoneSrc) slabMat.color.setRGB(1.08, 1.02, 0.95);
       slabMat.polygonOffset = true;
-      slabMat.polygonOffsetFactor = -1;
-      slabMat.polygonOffsetUnits = -1;
+      slabMat.polygonOffsetFactor = -2;
+      slabMat.polygonOffsetUnits = -2;
       const mesh = new THREE.Mesh(slabGeo, slabMat);
       mesh.name = 'water-dry-slabs';
       mesh.castShadow = false;
       mesh.receiveShadow = true;
       mesh.userData.castWhenOn = false;
       mesh.frustumCulled = false;
+      mesh.renderOrder = 3;
       group.add(mesh);
     }
   }
