@@ -3,8 +3,8 @@ import { volumeFromImageData, type VolumeFromPixels } from '../voxel-lab/classif
 import { makeToWorld, tileFlatPose } from '../voxel-lab/faces';
 import { loadPng, pbrMap, textureFromPixels, voxelMaterial, type PngPixels } from '../voxel-lab/materials';
 import { greedyMesh, type MeshArrays } from '../voxel-lab/mesher';
-import { CAMERA_NEAR, CELL, CRACKED_CEILING_FILE, CULL_CHEB, LAYER_SIZE, VOXEL_CHEB } from './constants';
-import { paintedFloorSize } from './water';
+import { CELL, CRACKED_CEILING_FILE, CULL_CHEB, LAYER_SIZE, VOXEL_CHEB } from './constants';
+import { FLOOR_SEAM_PAD, paintedFloorDefaultSize, paintedFloorSize } from './water';
 import { floor1Sconces, floor1Sunbeams } from './fixtures';
 import { canStep, chebyshev, enumerateFaces, isWaterCell, type FaceJob, type FloorMap } from './layout';
 import { hasWaterDecal } from './water-decals';
@@ -353,9 +353,9 @@ export async function buildFloor1(
           uvScale: f.uvScale,
           size:
             f.kind === 'ceiling'
-              ? CELL + 2 * (CAMERA_NEAR + 0.12)
+              ? CELL + 2 * FLOOR_SEAM_PAD
               : f.kind === 'floor'
-                ? paintedFloorSize(f.tx, f.tz, map, CELL + 2 * (CAMERA_NEAR + 0.12))
+                ? paintedFloorSize(f.tx, f.tz, map, paintedFloorDefaultSize())
                 : CELL
         })),
         torches,
