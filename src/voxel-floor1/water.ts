@@ -17,8 +17,8 @@ export const WATER_SURFACE_COLOR = 0x1a2c22;
 export const WATER_DEEP_COLOR = 0x040706;
 const WATER_SHALLOW_RGB = { r: 0x1a / 255, g: 0x2c / 255, b: 0x22 / 255 };
 const WATER_DEEP_RGB = { r: 0x04 / 255, g: 0x07 / 255, b: 0x06 / 255 };
-const PUDDLE_ALPHA_SHALLOW = 0.26;
-const PUDDLE_ALPHA_DEEP = 0.92;
+const PUDDLE_ALPHA_SHALLOW = 0.56;
+const PUDDLE_ALPHA_DEEP = 0.94;
 
 export const WATER_FACES = ['N', 'E', 'S', 'W'] as const;
 export type WaterFace = (typeof WATER_FACES)[number];
@@ -171,22 +171,24 @@ export function puddleCoverageWorld(map: FloorMap, wx: number, wz: number): numb
 }
 
 /**
- * 0–1 how deep a point is. Deep tiles are 1; the basin falls off into
- * neighbouring shallow cells so (2,1)/(2,2) read as one darker channel.
+ * 0–1 how deep a point is, in world-tile space so the basin is continuous
+ * across cell joins. Deep tiles are 1; the falloff into neighbouring
+ * shallow cells makes (2,1)/(2,2) one darker channel, not two squares.
  */
 export function waterDeepness(map: FloorMap, tx: number, tz: number, u: number, v: number): number {
   if (!isWaterCell(map, tx, tz)) return 0;
-  if (isDeepWaterCell(map, tx, tz)) return 1;
+  const wx = tx - 0.5 + u;
+  const wz = tz - 0.5 + v;
   let d = 0;
-  const sides = [
-    { nx: tx - 1, nz: tz, dist: u },
-    { nx: tx + 1, nz: tz, dist: 1 - u },
-    { nx: tx, nz: tz - 1, dist: v },
-    { nx: tx, nz: tz + 1, dist: 1 - v }
-  ];
-  for (const s of sides) {
-    if (!isDeepWaterCell(map, s.nx, s.nz)) continue;
-    d = Math.max(d, (1 - smoothstep(0, 0.58, s.dist)) * 0.74);
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const nx = tx + dx;
+      const nz = tz + dy;
+      if (!isDeepWaterCell(map, nx, nz)) continue;
+      const ox = Math.max(0, nx - 0.5 - wx, wx - (nx + 0.5));
+      const oz = Math.max(0, nz - 0.5 - wz, wz - (nz + 0.5));
+      d = Math.max(d, 1 - smoothstep(0, 0.55, Math.hypot(ox, oz)));
+    }
   }
   return d;
 }
@@ -203,15 +205,12 @@ export function floorDip(map: FloorMap, tx: number, tz: number, u: number, v: nu
   const cover = puddleCoverage(map, tx, tz, u, v);
   if (cover < 0.08) return 0;
   const deep = waterDeepness(map, tx, tz, u, v);
-  const seed = hash01(tx, tz, 11);
-  const maxDip =
-    WATER_DIP_SHALLOW +
-    (WATER_DIP_DEEP - WATER_DIP_SHALLOW) * deep +
-    0.005 * seed * deep +
-    0.01 * (seed - 0.35) * (1 - deep);
-  const off =
-    0.12 * Math.sin((u + hash01(tx, tz, 13)) * Math.PI * 2) * Math.cos((v + seed) * Math.PI * 2);
-  return -Math.max(0.016, maxDip + off * 0.01) * smoothstep(0.12, 0.78, cover);
+  const wu = tx + u;
+  const wv = tz + v;
+  const wave =
+    0.005 * Math.sin(wu * 2.15) * Math.cos(wv * 1.72) + 0.003 * Math.sin(wu * 3.4 + wv * 2.2);
+  const maxDip = WATER_DIP_SHALLOW + (WATER_DIP_DEEP - WATER_DIP_SHALLOW) * deep;
+  return -(maxDip + wave) * smoothstep(0.12, 0.78, cover);
 }
 
 export function puddleSurfaceY(map: FloorMap, tx: number, tz: number, u: number, v: number): number {
@@ -748,7 +747,11 @@ export async function buildFloor1Water(
 
   let sparkleMat: THREE.MeshBasicMaterial | null = null;
   const glintCells = listWaterGlintCells(map, sconces);
-  if (glintCells.length) {
+  const glintKeys = new Set(glintCells.map((c) => `${c.x},${c.y}`));
+  const sparkleRegions = listWaterRegions(map).filter((r) =>
+    r.cells.some((c) => glintKeys.has(`${c.x},${c.y}`))
+  );
+  if (sparkleRegions.length) {
     sparkleMat = new THREE.MeshBasicMaterial({
       map: makeSparkleTexture(),
       color: 0xffe6b0,
@@ -760,13 +763,20 @@ export async function buildFloor1Water(
       toneMapped: false,
       side: THREE.DoubleSide
     });
-    const geos = glintCells.map((c) => {
-      const g = new THREE.PlaneGeometry(CELL * 0.72, CELL * 0.72);
+    const geos = sparkleRegions.map((r) => {
+      const sx = (r.maxX - r.minX + 1) * CELL * 0.88;
+      const sz = (r.maxY - r.minY + 1) * CELL * 0.88;
+      const cx = ((r.minX + r.maxX) / 2) * CELL;
+      const cz = ((r.minY + r.maxY) / 2) * CELL;
+      const mid = r.cells[Math.floor(r.cells.length / 2)] ?? r.cells[0];
+      const y = puddleSurfaceY(map, mid.x, mid.y, 0.5, 0.5) + 0.005;
+      const g = new THREE.PlaneGeometry(sx, sz);
       g.rotateX(-Math.PI / 2);
-      const y = puddleSurfaceY(map, c.x, c.y, 0.5, 0.5) + 0.005;
-      g.translate(c.x * CELL, y, c.y * CELL);
+      g.translate(cx, y, cz);
       const uv = g.getAttribute('uv');
-      for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 2.2, uv.getY(i) * 2.2);
+      const tilesX = r.maxX - r.minX + 1;
+      const tilesZ = r.maxY - r.minY + 1;
+      for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * tilesX * 1.1, uv.getY(i) * tilesZ * 1.1);
       return g;
     });
     const geo = mergeGeometries(geos);

@@ -67,10 +67,18 @@ describe('voxel-floor1 water is one puddle per region', () => {
     expect(waterDeepness(floor1Map, 2, 1, 0.5, 0.5)).toBe(1);
     expect(waterDeepness(floor1Map, 2, 2, 0.5, 0.5)).toBe(1);
     expect(waterDeepness(floor1Map, 3, 1, 0.5, 0.5)).toBeLessThan(0.4);
-    expect(puddleAlpha(floor1Map, 2, 1, 0.5, 0.5)).toBeGreaterThan(0.75);
-    expect(puddleAlpha(floor1Map, 3, 1, 0.5, 0.5)).toBeLessThan(0.45);
+    expect(puddleAlpha(floor1Map, 2, 1, 0.5, 0.5)).toBeGreaterThan(0.8);
+    expect(puddleAlpha(floor1Map, 3, 1, 0.5, 0.5)).toBeGreaterThan(0.4);
+    expect(puddleAlpha(floor1Map, 3, 1, 0.5, 0.5)).toBeLessThan(0.7);
     expect(puddleAlpha(floor1Map, 2, 1, 0.5, 0.5)).toBeGreaterThan(
-      puddleAlpha(floor1Map, 3, 1, 0.5, 0.5) + 0.3
+      puddleAlpha(floor1Map, 3, 1, 0.5, 0.5) + 0.2
+    );
+    expect(waterDeepness(floor1Map, 2, 1, 1, 0.5)).toBeCloseTo(
+      waterDeepness(floor1Map, 3, 1, 0, 0.5),
+      2
+    );
+    expect(Math.abs(floorDip(floor1Map, 2, 2, 1, 0.5) - floorDip(floor1Map, 3, 2, 0, 0.5))).toBeLessThan(
+      0.003
     );
   });
 
