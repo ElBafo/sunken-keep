@@ -8,9 +8,10 @@ export const WATER_DECAL_DIR = 'puddles';
 /** Stone under a mask texel is about half as bright so the paint reads as water. */
 export const DECAL_MASK_DARKEN = 0.5;
 
-export const CISTERN_SHORE_Y = 4;
+/** First dry row south of the cistern pool (water is y=1–4). */
+export const CISTERN_SHORE_Y = 5;
 export const CISTERN_SHORE_XS = [1, 2, 3] as const;
-/** One 1536×512 strip across (1,4)–(3,4). West at x=1, water to the north. */
+/** One 1536×512 strip across (1,5)–(3,5). West at x=1, water to the north. */
 export const SHORE_WIDE_ID = 'puddle_shore_s_wide';
 export const SHORE_WIDE_COLS = CISTERN_SHORE_XS.length;
 
@@ -45,7 +46,7 @@ export function pickSoloPuddleId(x: number, y: number): 'puddle_1' | 'puddle_2' 
 }
 
 function isCisternBasin(x: number, y: number): boolean {
-  return x >= 1 && x <= 3 && y >= 1 && y <= 3;
+  return x >= 1 && x <= 3 && y >= 1 && y <= 4;
 }
 
 function isCisternSouthShore(x: number, y: number): boolean {
@@ -67,22 +68,21 @@ export function shoreWideWorldUv(
 }
 
 /**
- * Shore is one wide strip across the cistern's south edge. Horizontal
- * water runs of 2+ get puddle_3 (matching E/W edges). Isolated cells
- * get puddle_1 or _2.
+ * Shore is one wide strip on the first dry row south of the cistern.
+ * Horizontal water runs of 2+ get puddle_3. Isolated cells get puddle_1 or _2.
  */
 export function placeWaterDecals(map: FloorMap): WaterDecalPlacement[] {
   const out: WaterDecalPlacement[] = [];
   for (const x of CISTERN_SHORE_XS) {
-    if (isWaterCell(map, x, CISTERN_SHORE_Y)) {
-      out.push({
-        x,
-        y: CISTERN_SHORE_Y,
-        id: SHORE_WIDE_ID,
-        tile: x - CISTERN_SHORE_XS[0],
-        rot: 0
-      });
-    }
+    if (isWaterCell(map, x, CISTERN_SHORE_Y)) continue;
+    if (!isWaterCell(map, x, CISTERN_SHORE_Y - 1)) continue;
+    out.push({
+      x,
+      y: CISTERN_SHORE_Y,
+      id: SHORE_WIDE_ID,
+      tile: x - CISTERN_SHORE_XS[0],
+      rot: 0
+    });
   }
   const rest: Array<{ x: number; y: number }> = [];
   for (let y = 0; y < map.height; y++) {

@@ -273,6 +273,37 @@ function writeRect(
   }
 }
 
+/**
+ * Lift only the brighter painted flags off the dark bed. Water texels
+ * (at or below the bed's typical luma) stay unchanged.
+ */
+export function liftCisternBedFlags(
+  bed: { width: number; height: number; data: ArrayLike<number> },
+  boost = 1.32
+): Uint8ClampedArray {
+  const out = new Uint8ClampedArray(bed.data);
+  const n = bed.width * bed.height;
+  const luma = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const o = i * 4;
+    luma[i] = 0.2126 * out[o] + 0.7152 * out[o + 1] + 0.0722 * out[o + 2];
+  }
+  const sorted = Float32Array.from(luma).sort();
+  const lo = sorted[Math.min(n - 1, Math.floor(n * 0.45))] ?? 24;
+  const cMin = lo + 14;
+  const cMax = lo + 28;
+  for (let i = 0; i < n; i++) {
+    const t = smoothstep(cMin, cMax, luma[i]);
+    if (t <= 0) continue;
+    const c = 1 + (boost - 1) * t;
+    const o = i * 4;
+    out[o] = Math.min(255, Math.max(0, lo + (out[o] - lo) * c));
+    out[o + 1] = Math.min(255, Math.max(0, lo + (out[o + 1] - lo) * c));
+    out[o + 2] = Math.min(255, Math.max(0, lo + (out[o + 2] - lo) * c));
+  }
+  return out;
+}
+
 /** Blend the wet rim onto dry-facing sides of the cistern bed. Water–water joins stay as painted. */
 export function compositeCisternBedRims(
   bed: { width: number; height: number; data: ArrayLike<number> },
@@ -504,9 +535,9 @@ function crackSeep(tx: number, tz: number, u: number, v: number): number {
  * wet and dry borders use the wandering inset plus crack seepage.
  */
 export function puddleCoverage(map: FloorMap, tx: number, tz: number, u: number, v: number): number {
-  if (!isWaterCell(map, tx, tz)) return 0;
   const painted = sampleWaterDecalMask(tx, tz, u, v);
   if (painted != null) return painted;
+  if (!isWaterCell(map, tx, tz)) return 0;
   let wet = 1;
   const sides: Array<{ face: WaterFace; dist: number; along: number; nx: number; nz: number }> = [
     { face: 'W', dist: u, along: v, nx: tx - 1, nz: tz },
@@ -1284,7 +1315,9 @@ export async function buildFloor1Water(
       });
     })
   );
-  const decalPlacements = placements.filter((d) => isWaterCell(map, d.x, d.y)).map((spec) => {
+  const decalPlacements = placements
+    .filter((d) => isWaterCell(map, d.x, d.y) || isShoreWideDecal(d.id))
+    .map((spec) => {
     const tile = spec.tile ?? 0;
     const pixels = resolvePuddleDecal(decalFiles, spec.id, tile);
     installDecalMaskFromPixels(spec.x, spec.y, pixels.mask);
@@ -1319,18 +1352,15 @@ export async function buildFloor1Water(
   });
   const ripple = makeRippleNormal();
   if (useCisternBed && cistern && cisternBed) {
-    const rimmed = compositeCisternBedRims(
-      cisternBed.data,
-      rimPng.data.data,
-      northMask,
-      size,
-      map,
-      cistern
-    );
+    const bedPixels = liftCisternBedFlags({
+      width: cisternBed.data.width,
+      height: cisternBed.data.height,
+      data: asBytes(cisternBed.data.data)
+    });
     const bedTex = textureFromPixels({
       width: cisternBed.data.width,
       height: cisternBed.data.height,
-      data: rimmed
+      data: bedPixels
     });
     bedTex.flipY = CISTERN_BED_FLIP_Y;
     bedTex.wrapS = THREE.ClampToEdgeWrapping;

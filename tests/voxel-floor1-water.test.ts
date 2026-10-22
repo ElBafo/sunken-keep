@@ -58,7 +58,7 @@ import {
   cisternBedCellImageRect,
   cisternBedWorldUv,
   cisternRegion,
-  compositeCisternBedRims,
+  liftCisternBedFlags,
   dryFacingFaces,
   floorDip,
   hasWaterNeighbor,
@@ -259,6 +259,7 @@ describe('voxel-floor1 water dip leaves no border gap', () => {
     expect(water).toContain('CISTERN_BED_FILE');
     expect(water).toContain('CISTERN_BED_FLIP_Y');
     expect(water).toContain('compositeCisternBedRims');
+    expect(water).toContain('liftCisternBedFlags');
     expect(water).toContain('regionWorldUv');
     expect(water).toContain('torchWarmthAt');
     expect(water).toContain('puddleReflectBoost');
@@ -375,33 +376,28 @@ print('ok', avg(1, 0), avg(1, 1), avg(1, 3), avg(2, 3))
     expect(mid).toBeLessThan(se);
   });
 
-  it('keeps dry-edge rims on the cistern and per-cell inners on the cellar', () => {
+  it('keeps the cistern bed dark at dry-facing edges and lifts flags only', () => {
     expect(dryFacingFaces(floor1Map, 3, 2)).toContain('E');
+    expect(isWaterCell(floor1Map, 4, 2)).toBe(false);
+    expect(isWaterCell(floor1Map, 3, 2)).toBe(true);
+    expect(hasWaterNeighbor(floor1Map, 4, 2)).toBe(true);
     expect(dryFacingFaces(floor1Map, 2, 4)).toContain('S');
     expect(dryFacingFaces(floor1Map, 2, 2)).toEqual([]);
-    const region = cisternRegion(floor1Map)!;
-    const north = new Float32Array([1, 1, 0, 0]);
     const bed = {
-      width: 6,
-      height: 8,
-      data: new Uint8ClampedArray(6 * 8 * 4)
+      width: 2,
+      height: 1,
+      data: new Uint8ClampedArray([20, 22, 21, 255, 58, 62, 55, 255])
     };
-    for (let i = 0; i < 6 * 8; i++) {
-      bed.data[i * 4] = 10;
-      bed.data[i * 4 + 1] = 10;
-      bed.data[i * 4 + 2] = 10;
-      bed.data[i * 4 + 3] = 255;
-    }
-    const rim = new Uint8ClampedArray([200, 200, 200, 255, 200, 200, 200, 255, 200, 200, 200, 255, 200, 200, 200, 255]);
-    const out = compositeCisternBedRims(bed, rim, north, 2, floor1Map, region);
-    const at = (x: number, y: number) => out[(y * 6 + x) * 4];
-    expect(at(2, 3)).toBe(10);
-    expect(at(3, 3)).toBe(10);
-    expect(at(2, 7)).toBeGreaterThan(100);
-    expect(at(3, 7)).toBeGreaterThan(100);
-    expect(at(5, 2)).toBeGreaterThan(100);
-    expect(at(5, 3)).toBeGreaterThan(100);
-    expect(readFileSync(resolve(SRC, 'water.ts'), 'utf8')).toContain('pickWaterInnerIndex');
+    const out = liftCisternBedFlags(bed);
+    expect(out[0]).toBe(20);
+    expect(out[1]).toBe(22);
+    expect(out[4]).toBeGreaterThan(58);
+    expect(out[4] - out[0]).toBeGreaterThan(58 - 20);
+    const src = readFileSync(resolve(SRC, 'water.ts'), 'utf8');
+    const build = src.slice(src.indexOf('export async function buildFloor1Water'));
+    expect(build).toContain('liftCisternBedFlags');
+    expect(build).not.toContain('compositeCisternBedRims');
+    expect(src).toContain('pickWaterInnerIndex');
   });
 });
 
@@ -412,14 +408,16 @@ describe('voxel-floor1 puddle decals lock to floor_stone', () => {
 
   it('maps puddle_shore_s_wide west to east on the cistern south shore', () => {
     const shore = WATER_DECALS.filter((d) => d.id === SHORE_WIDE_ID);
-    expect(CISTERN_SHORE_Y).toBe(4);
+    expect(CISTERN_SHORE_Y).toBe(5);
     expect([...CISTERN_SHORE_XS]).toEqual([1, 2, 3]);
     expect(SHORE_WIDE_COLS).toBe(3);
     expect(isShoreWideDecal(SHORE_WIDE_ID)).toBe(true);
     expect(isShoreWideDecal('puddle_shore_s')).toBe(false);
+    expect(isWaterCell(floor1Map, 1, 4)).toBe(true);
+    expect(isWaterCell(floor1Map, 1, 5)).toBe(false);
     expect(shore.map((d) => d.x)).toEqual([1, 2, 3]);
     expect(shore.map((d) => d.tile)).toEqual([0, 1, 2]);
-    expect(shore.every((d) => d.y === 4 && d.rot === 0 && !d.mirror)).toBe(true);
+    expect(shore.every((d) => d.y === 5 && d.rot === 0 && !d.mirror)).toBe(true);
     expect(WATER_DECALS.filter((d) => d.id === 'puddle_shore_s')).toHaveLength(0);
     expect(WATER_DECALS.filter((d) => d.x === 2 && d.y === 2)).toHaveLength(0);
     expect(shoreWideWorldUv(1, 0)).toBeCloseTo(0, 10);
@@ -554,22 +552,23 @@ describe('voxel-floor1 puddle decals lock to floor_stone', () => {
     const ph = makePlaceholderPuddleDecal(0, 'S');
     expect(ph.decal.width).toBe(512);
     expect(ph.mask.width).toBe(512);
-    installDecalMaskFromPixels(1, 4, ph.mask);
-    expect(sampleWaterDecalMask(1, 4, 0.5, 0.12)).toBeGreaterThan(0.7);
-    expect(sampleWaterDecalMask(1, 4, 0.5, 0.92)).toBeLessThan(0.3);
-    expect(puddleCoverage(floor1Map, 1, 4, 0.5, 0.12)).toBeGreaterThan(0.7);
-    expect(puddleCoverage(floor1Map, 1, 4, 0.5, 0.92)).toBeLessThan(0.3);
-    expect(floorDip(floor1Map, 1, 4, 0.5, 0.12)).toBeLessThan(-0.015);
-    expect(floorDip(floor1Map, 1, 4, 0.5, 0.92)).toBeCloseTo(0, 3);
+    installDecalMaskFromPixels(1, 5, ph.mask);
+    expect(sampleWaterDecalMask(1, 5, 0.5, 0.12)).toBeGreaterThan(0.7);
+    expect(sampleWaterDecalMask(1, 5, 0.5, 0.92)).toBeLessThan(0.3);
+    expect(puddleCoverage(floor1Map, 1, 5, 0.5, 0.12)).toBeGreaterThan(0.7);
+    expect(puddleCoverage(floor1Map, 1, 5, 0.5, 0.92)).toBeLessThan(0.3);
+    expect(floorDip(floor1Map, 1, 5, 0.5, 0.12)).toBeLessThan(-0.015);
+    expect(floorDip(floor1Map, 1, 5, 0.5, 0.92)).toBeCloseTo(0, 3);
   });
 
   it('keeps the water veil thin on painted shore cells', () => {
-    expect(hasWaterDecal(1, 4)).toBe(true);
+    expect(hasWaterDecal(1, 5)).toBe(true);
+    expect(hasWaterDecal(1, 4)).toBe(false);
     expect(hasWaterDecal(5, 11)).toBe(true);
     expect(hasWaterDecal(2, 1)).toBe(false);
     expect(PUDDLE_ALPHA_DECAL_SHALLOW).toBeLessThan(0.08);
     expect(PUDDLE_ALPHA_DECAL_DEEP).toBeLessThan(0.12);
-    expect(puddleAlpha(floor1Map, 1, 4, 0.5, 0.5)).toBeLessThan(0.12);
+    expect(puddleAlpha(floor1Map, 1, 5, 0.5, 0.5)).toBeLessThan(0.12);
     expect(puddleAlpha(floor1Map, 2, 1, 0.5, 0.5)).toBeGreaterThan(0.2);
     expect(PUDDLE_SPECULAR).toBeLessThan(0.12);
   });

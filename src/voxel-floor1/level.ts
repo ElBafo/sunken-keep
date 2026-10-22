@@ -7,6 +7,7 @@ import { CAMERA_NEAR, CELL, CRACKED_CEILING_FILE, CULL_CHEB, LAYER_SIZE, VOXEL_C
 import { paintedFloorSize } from './water';
 import { floor1Sconces, floor1Sunbeams } from './fixtures';
 import { canStep, chebyshev, enumerateFaces, isWaterCell, type FaceJob, type FloorMap } from './layout';
+import { hasWaterDecal } from './water-decals';
 import { isBeamCeiling, loadCrackedCeiling } from './crack';
 import { isPaintedShellFile, normalFromAlbedo, paintedShellMaterial } from './painted';
 import { lookPixels } from './wall-once';
@@ -158,7 +159,7 @@ export async function buildFloor1(
   const prepared: PreparedFace[] = [];
   for (const job of jobs) {
     const pose = bulgePose(job.face, tileFlatPose(job.face, job.tx, job.tz, CELL, 'center'), job.bulge, CELL);
-    if (job.kind === 'floor' && isWaterCell(map, job.tx, job.tz)) continue;
+    if (job.kind === 'floor' && (isWaterCell(map, job.tx, job.tz) || hasWaterDecal(job.tx, job.tz))) continue;
     if (job.kind === 'floor' || job.kind === 'ceiling') {
       quads += 1;
       triangles += 2;
