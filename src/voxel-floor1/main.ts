@@ -48,6 +48,7 @@ import { buildFloor1 } from './level';
 import { buildFloor1Markers } from './markers';
 import { buildFloor1Openings } from './openings';
 import { buildFloor1Props } from './props';
+import { buildFloor1Water } from './water';
 
 THREE.ColorManagement.enabled = true;
 
@@ -83,6 +84,7 @@ type Floor1Api = {
   setPosition: (x: number, y: number, dir: number) => void;
   setLookPitch: (rad: number) => void;
   setLookYaw: (rad: number) => void;
+  setShotPose: (x: number, y: number, z: number, pitch: number, yaw: number) => void;
   stepForward: () => boolean;
   stepBack: () => boolean;
   turnLeft: () => boolean;
@@ -114,6 +116,7 @@ type Floor1Api = {
   openSecret: (x: number, y: number) => boolean;
   secretOpen: (x: number, y: number) => boolean;
   interact: () => string;
+  objectNames: () => string[];
   lights: {
     mode: LightMode;
     lantern: number;
@@ -266,6 +269,8 @@ async function boot(): Promise<void> {
   scene.add(openings.group);
   const markers = await buildFloor1Markers(floor1Map);
   scene.add(markers.group);
+  const water = await buildFloor1Water(floor1Map, floor1Sconces);
+  scene.add(water.group);
 
   const currentSafe = (): { top: number; right: number; bottom: number; left: number } => {
     if (querySafe) return querySafe;
@@ -625,6 +630,7 @@ async function boot(): Promise<void> {
     layout: latestLayout,
     position: [camera.position.x, camera.position.y, camera.position.z],
     setPosition: (x, y, dir) => {
+      mover.hold = false;
       mover.setPosition(x, y, dir);
       camera.rotation.x = CAMERA_PITCH;
       prepareCell(x, y);
@@ -642,6 +648,15 @@ async function boot(): Promise<void> {
     setLookYaw: (rad) => {
       camera.rotation.y = rad;
       camera.updateMatrixWorld();
+    },
+    setShotPose: (x, y, z, pitch, yaw) => {
+      mover.hold = true;
+      camera.position.set(x, y, z);
+      camera.rotation.order = 'YXZ';
+      camera.rotation.x = pitch;
+      camera.rotation.y = yaw;
+      camera.updateMatrixWorld();
+      renderFrame();
     },
     stepForward: () => beginStep(1),
     stepBack: () => beginStep(-1),
@@ -688,7 +703,14 @@ async function boot(): Promise<void> {
     openSecret: (x, y) => openings.system.openSecret(x, y, performance.now()),
     secretOpen: (x, y) => openings.system.isOpen(x, y),
     interact,
-    lights: lights.stats
+    lights: lights.stats,
+    objectNames: () => {
+      const names: string[] = [];
+      scene.traverse((obj) => {
+        if (obj.name) names.push(obj.name);
+      });
+      return names;
+    }
   };
   (window as unknown as { __voxelFloor1: Floor1Api }).__voxelFloor1 = api;
 
@@ -719,6 +741,7 @@ async function boot(): Promise<void> {
     else if (!stepTracking && !mover.moving && level.pump()) level.warm(uploadPending);
     openings.system.update(now);
     markers.update();
+    water.update(now, preserveBuffer, camera);
     syncDoorButton();
     api.hasKey = hasKey;
 

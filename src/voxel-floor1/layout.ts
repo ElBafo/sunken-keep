@@ -125,6 +125,15 @@ export function tileAt(map: FloorMap, x: number, y: number): FloorTile | undefin
   return map.tiles[y][x];
 }
 
+/** Shallow or deep pool — the painted floor_water bed sits on these cells. */
+export function isWaterTile(tile: FloorTile | undefined): boolean {
+  return !!(tile?.shallowWater || tile?.deepWater);
+}
+
+export function isWaterCell(map: FloorMap, x: number, y: number): boolean {
+  return isWaterTile(tileAt(map, x, y));
+}
+
 /** True stone — door/secret openings are overlays, not baked wall faces. */
 export function isTrueWall(tile: FloorTile | undefined): boolean {
   return !tile || !!tile.wall;

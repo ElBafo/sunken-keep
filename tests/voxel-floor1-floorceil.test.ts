@@ -46,13 +46,22 @@ describe('floor-1 floor and ceiling come from Levie’s map', () => {
     expect(CEILING_VARIANTS).not.toContain('ceiling.png');
     expect(CEILING_VARIANTS.join()).not.toContain('ceiling_2');
     expect(CEILING_VARIANTS.join()).not.toContain('planks');
-    for (const name of [...FLOOR_VARIANTS, ...CEILING_VARIANTS, ...PLANK_CEILING_VARIANTS, 'floor_water.png']) {
+    for (const name of [
+      ...FLOOR_VARIANTS,
+      ...CEILING_VARIANTS,
+      ...PLANK_CEILING_VARIANTS,
+      'floor_water.png',
+      'floor_water_inner.png',
+      'floor_water_inner_2.png',
+      'floor_water_rim_mask_n.png'
+    ]) {
       expect(pngSize(name), name).toEqual({ w: 256, h: 256 });
     }
     expect(pngSize('wood_beam.png')).toEqual({ w: 64, h: 64 });
     expect(pngSize('cornice_brick.png')).toEqual({ w: 256, h: 64 });
     expect(pngSize('cornice_slab.png')).toEqual({ w: 256, h: 64 });
     expect(pngSize('ceiling_2.png')).toEqual({ w: 256, h: 256 });
+    expect(pngSize('cistern_bed.png')).toEqual({ w: 768, h: 1024 });
   });
 
   it('assigns each shell square from the JSON and falls back to pickVariant', () => {
