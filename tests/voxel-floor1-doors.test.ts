@@ -368,6 +368,16 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     expect(luma(aged, leaf.x1 - 4, leaf.y0 + 4)).toBeGreaterThanOrEqual(0.14);
   });
 
+  it('tells the player the (4,2) keyhole lock needs a key, with no leftover rune copy', () => {
+    const main = readFileSync(resolve(__dirname, '../src/voxel-floor1/main.ts'), 'utf8');
+    const locked = main.match(/result === 'locked'\) showPrompt\('([^']+)'\)/);
+    expect(locked?.[1]).toBe('The door is locked. It needs a key.');
+    expect(locked?.[1].toLowerCase()).not.toContain('rune');
+    const unlocking = main.match(/result === 'unlocking'[\s\S]*?showPrompt\('([^']+)'\)/);
+    expect(unlocking?.[1]).toBe('The key turns. The lock groans open.');
+    expect(unlocking?.[1].toLowerCase()).not.toContain('rune');
+  });
+
   it('refuses a locked door without a key and does not start the slide', () => {
     const system = new OpeningSystem();
     const visual = fakeDoor(true);

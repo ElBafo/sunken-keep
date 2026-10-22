@@ -392,7 +392,7 @@ async function boot(): Promise<void> {
     const ty = y ?? ahead?.y;
     if (tx == null || ty == null || !ahead || ahead.x !== tx || ahead.y !== ty) return 'none';
     const result = openings.system.tryDoor(tx, ty, hasKey, performance.now());
-    if (result === 'locked') showPrompt('The door is locked. A red rune glows.');
+    if (result === 'locked') showPrompt('The door is locked. It needs a key.');
     if (result === 'unlocking') {
       hasKey = false;
       showPrompt('The key turns. The lock groans open.');
