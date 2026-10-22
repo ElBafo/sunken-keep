@@ -972,14 +972,15 @@ function makeWaterfallSplash(): THREE.CanvasTexture {
       const wobble = 0.05 * Math.sin(ang * 5.4 + 0.7) + 0.028 * Math.sin(ang * 11.2 + 1.4);
       const rr = r + wobble;
       const ring =
-        Math.exp(-(((rr - 0.26) * 16) ** 2)) * 0.45 +
-        Math.exp(-(((rr - 0.46) * 12) ** 2)) * 0.72 +
-        Math.exp(-(((rr - 0.66) * 9) ** 2)) * 0.38;
-      const broken = 0.42 + 0.58 * Math.max(0, Math.sin(ang * 3.6 + 0.9));
+        Math.exp(-(((rr - 0.34) * 18) ** 2)) * 0.55 +
+        Math.exp(-(((rr - 0.52) * 14) ** 2)) * 0.9 +
+        Math.exp(-(((rr - 0.7) * 11) ** 2)) * 0.4;
+      const broken = 0.35 + 0.65 * Math.max(0, Math.sin(ang * 3.6 + 0.9));
       const spray =
-        Math.exp(-(((rr - 0.58) * 8) ** 2)) * broken * (0.35 + 0.65 * Math.max(0, Math.sin(ang * 7.1)));
-      const fade = 1 - smoothstep(0.8, 1.05, r);
-      const a = Math.min(1, (ring + spray) * fade);
+        Math.exp(-(((rr - 0.6) * 9) ** 2)) * broken * (0.3 + 0.7 * Math.max(0, Math.sin(ang * 7.1)));
+      const hole = 1 - smoothstep(0.0, 0.22, r);
+      const fade = 1 - smoothstep(0.78, 1.02, r);
+      const a = Math.min(1, (ring + spray) * fade * (1 - 0.85 * hole));
       const i = (y * s + x) * 4;
       img.data[i] = 10;
       img.data[i + 1] = 14;
