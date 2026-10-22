@@ -44,6 +44,7 @@ import {
   rgbaToMask,
   cellTorchWarmth,
   groutAt,
+  listPokingSlabs,
   listWetRingCells,
   makeTextureGroutSampler,
   proceduralGrout,
@@ -240,6 +241,7 @@ describe('voxel-floor1 water dip leaves no border gap', () => {
     expect(water).toContain('regionWorldUv');
     expect(water).toContain('torchWarmthAt');
     expect(water).toContain('water-wet-ring');
+    expect(water).toContain('water-dry-slabs');
     expect(water).toContain('makeTextureGroutSampler');
     expect(water).toContain('puddleReflectBoost');
     expect(water).toContain('WET_RING_MIN_M');
@@ -394,8 +396,12 @@ describe('voxel-floor1 water pools in broken flagstone', () => {
     expect(wetRingAmount(floor1Map, 2, 2, 0.5, 0.5)).toBeLessThan(0.08);
     const southInset = puddleEdgeInset(2, 4, 'S', 0.5);
     expect(wetRingAmount(floor1Map, 2, 4, 0.5, 1 - southInset)).toBeGreaterThan(0.4);
+    expect(wetRingAmount(floor1Map, 2, 5, 0.5, 0.04)).toBeGreaterThan(0.45);
     expect(shoreDistanceM(floor1Map, 2, 5, 0.5, 0.5)).toBeGreaterThan(0.4);
     expect(wetRingAmount(floor1Map, 3, 14, 0.5, 0.5)).toBe(0);
+    expect(listPokingSlabs(floor1Map).some((s) => s.tz === 4 && s.face === 'S' && s.inset > 0.16)).toBe(
+      true
+    );
     setWaterGroutSampler(null);
   });
 

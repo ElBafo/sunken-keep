@@ -629,6 +629,7 @@ async function boot(): Promise<void> {
     layout: latestLayout,
     position: [camera.position.x, camera.position.y, camera.position.z],
     setPosition: (x, y, dir) => {
+      mover.hold = false;
       mover.setPosition(x, y, dir);
       camera.rotation.x = CAMERA_PITCH;
       prepareCell(x, y);
@@ -648,11 +649,13 @@ async function boot(): Promise<void> {
       camera.updateMatrixWorld();
     },
     setShotPose: (x, y, z, pitch, yaw) => {
+      mover.hold = true;
       camera.position.set(x, y, z);
       camera.rotation.order = 'YXZ';
       camera.rotation.x = pitch;
       camera.rotation.y = yaw;
       camera.updateMatrixWorld();
+      renderFrame();
     },
     stepForward: () => beginStep(1),
     stepBack: () => beginStep(-1),

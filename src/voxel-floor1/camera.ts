@@ -45,6 +45,8 @@ export class GridMover {
   y: number;
   dir: number;
   moving = false;
+  /** When true, snap/update leave the camera so setShotPose can hold. */
+  hold = false;
   kind: MoveKind = 'idle';
   toX = 0;
   toY = 0;
@@ -66,6 +68,7 @@ export class GridMover {
   }
 
   snap(): void {
+    if (this.hold) return;
     poseGridCamera(this.camera, this.x, this.y, dirToRot(this.dir));
   }
 
@@ -79,6 +82,7 @@ export class GridMover {
   }
 
   update(now: number): boolean {
+    if (this.hold) return false;
     if (!this.moving) return false;
     const t = Math.min(1, (now - this.t0) / this.duration);
     const k = easeInOutQuad(t);

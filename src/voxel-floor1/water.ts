@@ -35,7 +35,7 @@ export const WATER_RIM_FILE = 'floor_water.png';
 export const WATER_RIM_MASK_N = 'floor_water_rim_mask_n.png';
 export const WATER_SURFACE_COLOR = 0x101410;
 export const WATER_DEEP_COLOR = 0x030403;
-const WATER_SHALLOW_RGB = { r: 0.032, g: 0.036, b: 0.03 };
+const WATER_SHALLOW_RGB = { r: 0.045, g: 0.052, b: 0.044 };
 const WATER_DEEP_RGB = { r: 0.012, g: 0.016, b: 0.014 };
 const PUDDLE_ALPHA_SHALLOW = 0.64;
 const PUDDLE_ALPHA_DEEP = 0.9;
@@ -583,14 +583,60 @@ export function shoreDistanceM(map: FloorMap, tx: number, tz: number, u: number,
   return best;
 }
 
-/** 1 at the waterline, 0 outside the 20–40 cm wet band. */
+function drySharedEdgeDistM(map: FloorMap, tx: number, tz: number, u: number, v: number): number {
+  if (isWaterCell(map, tx, tz)) return Infinity;
+  let best = Infinity;
+  const sides = [
+    { dist: u, nx: tx - 1, nz: tz },
+    { dist: 1 - u, nx: tx + 1, nz: tz },
+    { dist: v, nx: tx, nz: tz - 1 },
+    { dist: 1 - v, nx: tx, nz: tz + 1 }
+  ];
+  for (const s of sides) {
+    if (!isWaterCell(map, s.nx, s.nz)) continue;
+    best = Math.min(best, s.dist * CELL);
+  }
+  return best;
+}
+
+/** 1 at the waterline / dry lip, 0 outside the 20–40 cm wet band. */
 export function wetRingAmount(map: FloorMap, tx: number, tz: number, u: number, v: number): number {
-  const d = shoreDistanceM(map, tx, tz, u, v);
+  const fromLine = shoreDistanceM(map, tx, tz, u, v);
+  const fromEdge = drySharedEdgeDistM(map, tx, tz, u, v);
+  const d = Math.min(fromLine, fromEdge);
   if (!Number.isFinite(d)) return 0;
   const wxM = (tx - 0.5 + u) * CELL;
   const wzM = (tz - 0.5 + v) * CELL;
   const width = wetRingWidth(wxM, wzM);
-  return 1 - smoothstep(width * 0.12, width, d);
+  return 1 - smoothstep(width * 0.08, width, d);
+}
+
+export type PokingSlab = {
+  tx: number;
+  tz: number;
+  face: WaterFace;
+  along0: number;
+  along1: number;
+  inset: number;
+};
+
+/** Dry flagstone that steps out over the pool instead of a straight cell lip. */
+export function listPokingSlabs(map: FloorMap): PokingSlab[] {
+  const out: PokingSlab[] = [];
+  const step = Math.max(0.08, WATER_SLAB_M / CELL);
+  for (const cell of listWaterCells(map)) {
+    for (const face of dryFacingFaces(map, cell.x, cell.y)) {
+      for (let a = 0; a < 0.999; a += step) {
+        const along0 = a;
+        const along1 = Math.min(1, a + step);
+        const mid = (along0 + along1) * 0.5;
+        const inset = puddleEdgeInset(cell.x, cell.y, face, mid);
+        if (inset < 0.14) continue;
+        out.push({ tx: cell.x, tz: cell.y, face, along0, along1, inset });
+      }
+    }
+  }
+  return out;
 }
 
 export function listWetRingCells(map: FloorMap): WaterCell[] {
@@ -644,7 +690,7 @@ export function puddleReflectBoost(
   const broken = 0.28 + 0.72 * Math.max(0, n);
   const lit = smoothstep(0, 0.06, warmth);
   return (
-    lit * (0.05 + 0.11 * warmth) * broken * (0.4 + 0.6 * wallNear) * (1 - 0.35 * deep)
+    lit * (0.07 + 0.14 * warmth) * broken * (0.45 + 0.55 * wallNear) * (1 - 0.3 * deep)
   );
 }
 
@@ -1120,11 +1166,11 @@ function cellGrid(
       const y = (isWaterCell(map, tx, tz) ? dip : 0) + 0.0014;
       pos.setXYZ(i, wx, y, wz);
       uvAttr.setXY(i, u, v);
-      const warm = 0.55 + 0.45 * warmth;
-      col[i * 4] = 0.16 * warm + 0.12 * warmth;
-      col[i * 4 + 1] = 0.125 * warm + 0.05 * warmth;
-      col[i * 4 + 2] = 0.1 * warm;
-      col[i * 4 + 3] = ring * (0.62 + 0.2 * warmth);
+      const warm = 0.7 + 0.3 * warmth;
+      col[i * 4] = 0.28 * warm + 0.18 * warmth;
+      col[i * 4 + 1] = 0.2 * warm + 0.07 * warmth;
+      col[i * 4 + 2] = 0.15 * warm;
+      col[i * 4 + 3] = ring * (0.82 + 0.12 * warmth);
     } else if (kind === 'shimmer') {
       pos.setXYZ(i, wx, dip + 0.004, wz);
       const wuv = waterWorldUv(wx, wz);
@@ -1162,6 +1208,28 @@ function cellGrid(
   geo.setAttribute('color', new THREE.BufferAttribute(col, 4));
   geo.computeVertexNormals();
   return geo;
+}
+
+function pokingSlabGeometry(s: PokingSlab): THREE.BufferGeometry {
+  const alongM = (s.along1 - s.along0) * CELL;
+  const insetM = s.inset * CELL;
+  const sx = s.face === 'E' || s.face === 'W' ? insetM : alongM;
+  const sz = s.face === 'E' || s.face === 'W' ? alongM : insetM;
+  const g = new THREE.PlaneGeometry(sx, sz, 1, 1);
+  g.rotateX(-Math.PI / 2);
+  const along = (s.along0 + s.along1) * 0.5;
+  const { wx, wz } = faceWorldAlong(s.tx, s.tz, s.face, along);
+  const { dx, dz } = FACE_DELTA[s.face];
+  const cx = (wx - dx * s.inset * 0.5) * CELL;
+  const cz = (wz - dz * s.inset * 0.5) * CELL;
+  g.translate(cx, 0.0009, cz);
+  const uv = g.getAttribute('uv');
+  for (let i = 0; i < uv.count; i++) {
+    const u = s.along0 + uv.getX(i) * (s.along1 - s.along0);
+    const v = uv.getY(i) * Math.min(0.22, s.inset);
+    uv.setXY(i, u, v);
+  }
+  return g;
 }
 
 export async function buildFloor1Water(
@@ -1315,11 +1383,11 @@ export async function buildFloor1Water(
       wetGeo,
       new THREE.MeshPhysicalMaterial({
         color: 0xffffff,
-        roughness: 0.42,
+        roughness: 0.36,
         metalness: 0,
         clearcoat: 0,
         sheen: 0,
-        specularIntensity: 0.55,
+        specularIntensity: 0.7,
         envMapIntensity: 0,
         transparent: true,
         opacity: 1,
@@ -1339,6 +1407,29 @@ export async function buildFloor1Water(
     mesh.frustumCulled = false;
     mesh.renderOrder = 2;
     group.add(mesh);
+  }
+
+  const slabs = listPokingSlabs(map);
+  const stonePng = stoneImages.get('floor_stone.png') ?? [...stoneImages.values()][0];
+  if (slabs.length && stonePng) {
+    const slabGeos = slabs.map(pokingSlabGeometry);
+    const slabGeo = mergeGeometries(slabGeos);
+    slabGeo?.computeVertexNormals();
+    if (slabGeo) {
+      const slabTex = textureFromPixels(stonePng);
+      slabTex.flipY = true;
+      const slabMat = paintedShellMaterial(slabTex, undefined, 'floor_stone.png');
+      slabMat.polygonOffset = true;
+      slabMat.polygonOffsetFactor = -1;
+      slabMat.polygonOffsetUnits = -1;
+      const mesh = new THREE.Mesh(slabGeo, slabMat);
+      mesh.name = 'water-dry-slabs';
+      mesh.castShadow = false;
+      mesh.receiveShadow = true;
+      mesh.userData.castWhenOn = false;
+      mesh.frustumCulled = false;
+      group.add(mesh);
+    }
   }
 
   const strays = listStrayPuddles(map);
