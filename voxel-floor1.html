@@ -87,19 +87,23 @@
     #message-log {
       position: absolute;
       pointer-events: none;
-      padding: 8px;
+      padding: 8px 8px 8px;
       background: rgba(6, 4, 3, 0.55);
       color: #d8ccb0;
       font-size: 14px;
       line-height: 20px;
       letter-spacing: 0.02em;
       text-shadow: 1px 1px 0 #000;
-      overflow: hidden;
+      overflow: visible;
+      transition: opacity 0.4s ease;
     }
+    #message-log.fading { opacity: 0; }
     .log-line {
-      height: 20px;
-      white-space: nowrap;
-      overflow: hidden;
+      min-height: 20px;
+      white-space: pre-wrap;
+      overflow: visible;
+      overflow-wrap: anywhere;
+      word-break: normal;
     }
     #btn-door {
       position: absolute;

@@ -1,21 +1,29 @@
 import { describe, expect, it } from 'vitest';
 import spec from '../public/proto3d/camera.json';
+import logEn from '../public/log.json';
+import logEl from '../public/story/el/log.el.json';
 import {
   CAMERA_FOV,
   CAMERA_VIEW_ASPECT
 } from '../src/voxel-floor1/constants';
+import { TORCH_CAPPED_PROMPT } from '../src/voxel-floor1/fixtures';
 import {
   AIR_SAFE_BOTTOM,
   AIR_SAFE_TOP,
   CAMERA_HFOV_DEG,
+  LINE_PITCH,
+  LOG_INNER,
   TAP_MIN_PT,
   horizontalFov,
   layoutTapTargets,
+  logBoxForLineCount,
   measurePortraitLayout,
+  openAboveLog,
   overlayRects,
   rectsOverlap,
   rectsTouchSafe,
   verticalFovForAspect,
+  wrapLogMessage,
   type PortraitLayout,
   type Rect
 } from '../src/voxel-floor1/portrait-layout';
@@ -174,5 +182,52 @@ describe('voxel-floor1 Option A portrait layout maths', () => {
     }
     expect(air.pad.y).toBeGreaterThanOrEqual(544);
     expect(phone.pad.y).toBeGreaterThanOrEqual(509);
+  });
+});
+
+type LogRow = { text?: string; lines?: string[] };
+
+function existingLogMessages(): string[] {
+  const rows = [...(logEn as LogRow[]), ...(logEl as LogRow[])];
+  const out: string[] = [];
+  for (const row of rows) {
+    if (typeof row.text === 'string') out.push(row.text);
+    if (Array.isArray(row.lines)) out.push(...row.lines);
+  }
+  out.push(TORCH_CAPPED_PROMPT);
+  return out;
+}
+
+function longestExistingLogMessage(): string {
+  return existingLogMessages().reduce((best, text) => (text.length > best.length ? text : best), '');
+}
+
+describe('growing message log keeps full game text', () => {
+  it('word-wraps the longest existing message at 393 wide and lifts Open above it', () => {
+    const phone = measurePortraitLayout(393, 852, {
+      top: AIR_SAFE_TOP,
+      right: 0,
+      bottom: AIR_SAFE_BOTTOM,
+      left: 0
+    });
+    const msg = longestExistingLogMessage();
+    expect(msg.length).toBeGreaterThan(phone.logMaxChars);
+    const lines = wrapLogMessage(msg, phone.logMaxChars);
+    expect(lines.join('')).not.toMatch(/\.\.\.|…/);
+    expect(lines.join('').replace(/\s+/g, '')).toBe(msg.replace(/\s+/g, ''));
+    expect(lines.join(' ').split(/\s+/).filter(Boolean)).toEqual(msg.split(/\s+/).filter(Boolean));
+    expect(lines.length).toBeGreaterThan(2);
+    expect(lines.every((line) => line.length <= phone.logMaxChars)).toBe(true);
+
+    const log = logBoxForLineCount(phone, lines.length);
+    const open = openAboveLog(phone, log);
+    expect(log.h).toBe(LOG_INNER * 2 + lines.length * LINE_PITCH);
+    expect(log.h).toBeGreaterThan(phone.log.h);
+    expect(log.y + log.h).toBe(phone.log.y + phone.log.h);
+    expect(log.y).toBeLessThan(phone.log.y);
+    expect(open.h).toBeGreaterThanOrEqual(TAP_MIN_PT);
+    expect(open.y + open.h).toBe(log.y - 12);
+    expect(rectsOverlap(open, log)).toBe(false);
+    expect(log.y).toBeGreaterThanOrEqual(0);
   });
 });

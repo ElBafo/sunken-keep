@@ -38,6 +38,9 @@ export const LOG_INNER = 8;
 export const LOG_PAD_GAP = 5;
 export const FONT_ADVANCE = 12;
 export const LINE_PITCH = 20;
+/** Hold the full wrapped message, then fade and shrink back to the idle 2-line box. */
+export const LOG_HOLD_MS = 4000;
+export const LOG_FADE_MS = 400;
 
 export const PAD_BTN = 44;
 export const PAD_GAP = 3;
@@ -334,6 +337,63 @@ export function overlayRects(layout: PortraitLayout): Array<{ name: string; rect
     { name: 'pad', rect: layout.pad },
     { name: 'strip', rect: layout.strip }
   ];
+}
+
+/** Word-wrap a log line. Every character is kept — no ellipsis, no dropped words. */
+export function wrapLogMessage(text: string, maxChars: number): string[] {
+  if (maxChars < 1) return text ? [text] : [];
+  const out: string[] = [];
+  for (const paragraph of text.split('\n')) {
+    if (!paragraph) {
+      if (text.includes('\n')) out.push('');
+      continue;
+    }
+    if (paragraph.length <= maxChars) {
+      out.push(paragraph);
+      continue;
+    }
+    const words = paragraph.split(/(\s+)/);
+    let cur = '';
+    for (const part of words) {
+      if (!part) continue;
+      if (part.length > maxChars && !/^\s+$/.test(part)) {
+        if (cur.trim()) out.push(cur.replace(/\s+$/, ''));
+        cur = '';
+        for (let i = 0; i < part.length; i += maxChars) out.push(part.slice(i, i + maxChars));
+        continue;
+      }
+      const next = cur + part;
+      if (next.length <= maxChars) cur = next;
+      else {
+        if (cur.trim()) out.push(cur.replace(/\s+$/, ''));
+        cur = part.replace(/^\s+/, '');
+      }
+    }
+    if (cur.trim()) out.push(cur.replace(/\s+$/, ''));
+  }
+  return out.length ? out : text ? [text] : [];
+}
+
+/** Idle / short messages keep the 48 px box. Taller wraps include 8 px padding on both sides. */
+export function logHeightForLines(lineCount: number): number {
+  if (lineCount <= 2) return LOG_H;
+  return LOG_INNER * 2 + lineCount * LINE_PITCH;
+}
+
+export function logBoxForLineCount(layout: PortraitLayout, lineCount: number): Rect {
+  const bottom = layout.log.y + layout.log.h;
+  const h = logHeightForLines(lineCount);
+  const y = Math.max(0, bottom - h);
+  return { x: layout.log.x, y, w: layout.log.w, h: bottom - y };
+}
+
+export function openAboveLog(layout: PortraitLayout, log: Rect): Rect {
+  return {
+    x: layout.open.x,
+    y: log.y - OPEN_ABOVE_LOG - OPEN_H,
+    w: OPEN_W,
+    h: OPEN_H
+  };
 }
 
 export function parseSafeQuery(search: string): SafeInsets | null {

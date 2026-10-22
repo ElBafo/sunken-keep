@@ -3,11 +3,16 @@ import {
   HERO_DISPLAY,
   HP_FILL,
   HudHeroId,
+  LOG_FADE_MS,
+  LOG_HOLD_MS,
   MP_FILL,
   PAD_KEYS,
   PortraitLayout,
   Rect,
+  logBoxForLineCount,
   measurePortraitLayout,
+  openAboveLog,
+  wrapLogMessage,
   type PadKey,
   type SafeInsets
 } from './portrait-layout';
@@ -61,30 +66,6 @@ export type PartyUiHooks = {
   onHand: (id: HudHeroId, hand: 'main' | 'off') => void;
 };
 
-function wrapLogLine(text: string, maxChars: number): string[] {
-  if (maxChars < 1 || text.length <= maxChars) return [text];
-  const words = text.split(/(\s+)/);
-  const lines: string[] = [];
-  let cur = '';
-  for (const part of words) {
-    if (!part) continue;
-    if (part.length > maxChars && !/^\s+$/.test(part)) {
-      if (cur.trim()) lines.push(cur);
-      cur = '';
-      for (let i = 0; i < part.length; i += maxChars) lines.push(part.slice(i, i + maxChars));
-      continue;
-    }
-    const next = cur + part;
-    if (next.length <= maxChars) cur = next;
-    else {
-      if (cur.trim()) lines.push(cur.replace(/\s+$/, ''));
-      cur = part.replace(/^\s+/, '');
-    }
-  }
-  if (cur.trim()) lines.push(cur);
-  return lines.length ? lines : [text];
-}
-
 function asset(rel: string): string {
   return `${BASE}${rel.replace(/^\//, '')}`;
 }
@@ -117,6 +98,9 @@ export class Floor1PartyUi {
   oil = 2;
   oilMax = 4;
   logLines: string[] = [];
+  private logMessage = '';
+  private logHoldTimer = 0;
+  private logFadeTimer = 0;
   private host: HTMLElement;
   private logEl: HTMLElement;
   private compassEl: HTMLImageElement;
@@ -171,8 +155,7 @@ export class Floor1PartyUi {
     place(this.host.querySelector('#btn-bag') as HTMLElement, layout.bag);
     place(this.host.querySelector('#compass') as HTMLElement, layout.compass);
     place(this.host.querySelector('#btn-oil') as HTMLElement, layout.oil);
-    place(this.doorBtn, layout.open);
-    place(this.logEl, layout.log);
+    this.placeLogAndOpen();
     place(this.host.querySelector('#move-pad') as HTMLElement, layout.pad);
     for (const key of PAD_KEYS) {
       const btn = document.getElementById(PAD_BTN_ID[key]);
@@ -203,18 +186,44 @@ export class Floor1PartyUi {
     this.doorBtn.textContent = label;
   }
 
-  pushLog(text: string, maxLines = 2): void {
+  pushLog(text: string): void {
     if (!text) return;
-    const wrapped = wrapLogLine(text, this.layout.logMaxChars);
-    this.logLines.push(...wrapped);
-    if (this.logLines.length > 8) this.logLines.splice(0, this.logLines.length - 8);
+    this.logMessage = text;
+    this.logLines = wrapLogMessage(text, this.layout.logMaxChars);
+    this.logEl.classList.remove('fading');
+    this.placeLogAndOpen();
+    this.armLogIdle();
+  }
+
+  private placeLogAndOpen(): void {
+    if (this.logMessage) {
+      this.logLines = wrapLogMessage(this.logMessage, this.layout.logMaxChars);
+    }
+    const log = logBoxForLineCount(this.layout, this.logLines.length);
+    const open = openAboveLog(this.layout, log);
+    place(this.logEl, log);
+    place(this.doorBtn, open);
     this.logEl.replaceChildren();
-    for (const line of this.logLines.slice(-maxLines)) {
+    for (const line of this.logLines) {
       const row = document.createElement('div');
       row.className = 'log-line';
       row.textContent = line;
       this.logEl.appendChild(row);
     }
+  }
+
+  private armLogIdle(): void {
+    window.clearTimeout(this.logHoldTimer);
+    window.clearTimeout(this.logFadeTimer);
+    this.logHoldTimer = window.setTimeout(() => {
+      this.logEl.classList.add('fading');
+      this.logFadeTimer = window.setTimeout(() => {
+        this.logMessage = '';
+        this.logLines = [];
+        this.logEl.classList.remove('fading');
+        this.placeLogAndOpen();
+      }, LOG_FADE_MS);
+    }, LOG_HOLD_MS);
   }
 
   setHeroDowned(id: HudHeroId, downed: boolean): void {

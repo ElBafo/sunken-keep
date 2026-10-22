@@ -90,6 +90,8 @@ type Floor1Api = {
   strafeLeft: () => boolean;
   strafeRight: () => boolean;
   setHeroDowned: (id: HudHeroId, downed: boolean) => void;
+  pushLog: (text: string) => void;
+  logLines: string[];
   meanLuma: (band?: { x0?: number; x1?: number; y0?: number; y1?: number }) => number;
   meanRgb: (band?: { x0?: number; x1?: number; y0?: number; y1?: number }) => {
     r: number;
@@ -645,6 +647,10 @@ async function boot(): Promise<void> {
     strafeLeft: () => beginStrafe(-1),
     strafeRight: () => beginStrafe(1),
     setHeroDowned: (id, downed) => partyUi?.setHeroDowned(id, downed),
+    pushLog: (text) => partyUi?.pushLog(text),
+    get logLines() {
+      return partyUi?.logLines.slice() ?? [];
+    },
     meanLuma: (band) => samplePixels(band).luma,
     meanRgb: (band) => {
       const s = samplePixels(band);
