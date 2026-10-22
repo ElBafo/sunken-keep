@@ -120,7 +120,8 @@ describe('voxel-floor1 water lips leave no gap', () => {
     expect(mat.specularIntensity).toBe(0);
     expect(mat.emissiveIntensity).toBe(0);
     expect(mat.fog).toBe(true);
-    expect(mat.color.r).toBeLessThan(0.75);
+    expect(mat.color.r).toBeLessThan(0.95);
+    expect(mat.color.r).toBeGreaterThan(0.8);
 
     const water = readFileSync(resolve(SRC, 'water.ts'), 'utf8');
     const level = readFileSync(resolve(SRC, 'level.ts'), 'utf8');

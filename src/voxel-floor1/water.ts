@@ -17,7 +17,7 @@ export const WATER_LIP_WIDTH = 0.06;
 export const WATER_LIP_OVERLAP = 0.008;
 export const WATER_BAND_WIDTH = 0.11;
 export const WATER_SURFACE_SEGS = 4;
-export const WATER_RIPPLE_AMP = 0.0035;
+export const WATER_RIPPLE_AMP = 0.005;
 const WATER_RIPPLE_HZ = 0.16;
 
 export const WATER_FACES = ['N', 'E', 'S', 'W'] as const;
@@ -336,8 +336,8 @@ function makeBandTexture(): THREE.CanvasTexture {
   canvas.height = 8;
   const ctx = canvas.getContext('2d')!;
   const g = ctx.createLinearGradient(0, 0, 32, 0);
-  g.addColorStop(0, 'rgba(6, 5, 4, 0.72)');
-  g.addColorStop(0.45, 'rgba(8, 7, 6, 0.32)');
+  g.addColorStop(0, 'rgba(4, 3, 3, 0.82)');
+  g.addColorStop(0.4, 'rgba(6, 5, 4, 0.4)');
   g.addColorStop(1, 'rgba(8, 7, 6, 0)');
   ctx.fillStyle = g;
   ctx.fillRect(0, 0, 32, 8);
@@ -415,21 +415,21 @@ function stoneLipMaterial(map: THREE.Texture): THREE.MeshPhysicalMaterial {
 
 function waterSurfaceMaterial(normal: THREE.Texture): THREE.MeshPhysicalMaterial {
   return new THREE.MeshPhysicalMaterial({
-    color: 0x121614,
-    roughness: 0.82,
+    color: 0x1a201c,
+    roughness: 0.74,
     metalness: 0,
     clearcoat: 0,
     sheen: 0,
-    specularIntensity: 0.06,
+    specularIntensity: 0.14,
     envMapIntensity: 0,
     transparent: true,
-    opacity: 0.38,
+    opacity: 0.3,
     depthWrite: false,
     fog: true,
     emissive: 0x000000,
     emissiveIntensity: 0,
     normalMap: normal,
-    normalScale: new THREE.Vector2(0.16, 0.16)
+    normalScale: new THREE.Vector2(0.32, 0.32)
   });
 }
 
@@ -519,14 +519,15 @@ export async function buildFloor1Water(
     }
   }
 
-  const glints: Array<{ mesh: THREE.Mesh; base: number; phase: number }> = [];
-  const glintMap = makeGlintTexture();
-  for (const cell of listWaterGlintCells(map, sconces)) {
-    const mat = new THREE.MeshBasicMaterial({
+  const glintCells = listWaterGlintCells(map, sconces);
+  let glintMat: THREE.MeshBasicMaterial | null = null;
+  if (glintCells.length) {
+    const glintMap = makeGlintTexture();
+    glintMat = new THREE.MeshBasicMaterial({
       map: glintMap,
       color: 0xffe2a4,
       transparent: true,
-      opacity: 0.28,
+      opacity: 0.34,
       depthWrite: false,
       depthTest: true,
       blending: THREE.AdditiveBlending,
@@ -534,18 +535,24 @@ export async function buildFloor1Water(
       toneMapped: false,
       side: THREE.DoubleSide
     });
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(CELL * 0.34, CELL * 0.34), mat);
-    mesh.rotation.x = -Math.PI / 2;
-    mesh.position.set(cell.x * CELL, WATER_SURFACE_Y + 0.006, cell.y * CELL);
-    mesh.name = `water-glint:${cell.x},${cell.y}`;
-    mesh.castShadow = false;
-    mesh.receiveShadow = false;
-    mesh.userData.castWhenOn = false;
-    mesh.userData.skipVertexLighting = true;
-    mesh.frustumCulled = false;
-    mesh.renderOrder = 3;
-    group.add(mesh);
-    glints.push({ mesh, base: 0.26, phase: cell.x * 1.7 + cell.y * 0.9 });
+    const geos = glintCells.map((cell) => {
+      const g = new THREE.PlaneGeometry(CELL * 0.42, CELL * 0.42);
+      g.rotateX(-Math.PI / 2);
+      g.translate(cell.x * CELL, WATER_SURFACE_Y + 0.006, cell.y * CELL);
+      return g;
+    });
+    const geo = mergeGeometries(geos);
+    if (geo) {
+      const mesh = new THREE.Mesh(geo, glintMat);
+      mesh.name = 'water-glints';
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      mesh.userData.castWhenOn = false;
+      mesh.userData.skipVertexLighting = true;
+      mesh.frustumCulled = false;
+      mesh.renderOrder = 3;
+      group.add(mesh);
+    }
   }
 
   return {
@@ -574,9 +581,8 @@ export async function buildFloor1Water(
           pos.needsUpdate = true;
         }
       }
-      for (const g of glints) {
-        const mat = g.mesh.material as THREE.MeshBasicMaterial;
-        mat.opacity = freeze ? g.base : g.base * (0.82 + 0.18 * Math.sin(t * 1.1 + g.phase));
+      if (glintMat) {
+        glintMat.opacity = freeze ? 0.34 : 0.34 * (0.84 + 0.16 * Math.sin(t * 1.05));
       }
     }
   };

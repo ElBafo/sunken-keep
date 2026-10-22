@@ -177,7 +177,7 @@ export function paintedShellMaterial(
     polygonOffsetUnits: 1
   });
   if (water) {
-    mat.color.setRGB(0.62, 0.64, 0.66);
+    mat.color.setRGB(0.88, 0.9, 0.92);
     mat.specularIntensity = 0;
     mat.name = 'floor_water_bed';
   }
