@@ -11,21 +11,26 @@ import {
   CISTERN_SHORE_XS,
   CISTERN_SHORE_Y,
   DECAL_MASK_DARKEN,
+  SHORE_WIDE_COLS,
+  SHORE_WIDE_ID,
   WATER_DECAL_DIR,
   WATER_DECAL_FLOOR_FILE,
   WATER_DECAL_PX,
   WATER_DECALS,
   cellToDecalUv,
   clearWaterDecalMasks,
+  compositeDecalOverStone,
   decalFloorFile,
   decalUv,
   hasWaterDecal,
   isCrackPuddleDecal,
+  isShoreWideDecal,
   installDecalMaskFromPixels,
   makePlaceholderPuddleDecal,
   pickSoloPuddleId,
   placeWaterDecals,
   sampleWaterDecalMask,
+  shoreWideWorldUv,
   sliceDecalTile,
   waterDecalMaskPng,
   waterDecalPng
@@ -257,6 +262,9 @@ describe('voxel-floor1 water dip leaves no border gap', () => {
     expect(water).toContain("from './water-decals'");
     expect(water).toContain('water-decal-floor');
     expect(water).toContain('water-decals');
+    expect(water).toContain('water-shore-wide');
+    expect(water).toContain('compositeDecalOverStone');
+    expect(water).toContain('shoreWideWorldUv');
     expect(water).toContain('WATER_DECAL_FLOOR_FILE');
     expect(water).toContain('cellToDecalUv');
     expect(water).toContain('placeWaterDecals');
@@ -396,13 +404,21 @@ describe('voxel-floor1 puddle decals lock to floor_stone', () => {
     clearWaterDecalMasks();
   });
 
-  it('tiles puddle_shore_s west to east on the cistern south shore', () => {
-    const shore = WATER_DECALS.filter((d) => d.id === 'puddle_shore_s');
+  it('maps puddle_shore_s_wide west to east on the cistern south shore', () => {
+    const shore = WATER_DECALS.filter((d) => d.id === SHORE_WIDE_ID);
     expect(CISTERN_SHORE_Y).toBe(4);
     expect([...CISTERN_SHORE_XS]).toEqual([1, 2, 3]);
+    expect(SHORE_WIDE_COLS).toBe(3);
+    expect(isShoreWideDecal(SHORE_WIDE_ID)).toBe(true);
+    expect(isShoreWideDecal('puddle_shore_s')).toBe(false);
     expect(shore.map((d) => d.x)).toEqual([1, 2, 3]);
-    expect(shore.every((d) => d.y === 4 && d.rot === 0)).toBe(true);
+    expect(shore.map((d) => d.tile)).toEqual([0, 1, 2]);
+    expect(shore.every((d) => d.y === 4 && d.rot === 0 && !d.mirror)).toBe(true);
+    expect(WATER_DECALS.filter((d) => d.id === 'puddle_shore_s')).toHaveLength(0);
     expect(WATER_DECALS.filter((d) => d.x === 2 && d.y === 2)).toHaveLength(0);
+    expect(shoreWideWorldUv(1, 0)).toBeCloseTo(0, 10);
+    expect(shoreWideWorldUv(2, 0.5)).toBeCloseTo(0.5, 10);
+    expect(shoreWideWorldUv(3, 1)).toBeCloseTo(1, 10);
   });
 
   it('puts puddle_3 on east-west water runs and 1/2 on leftover cells', () => {
@@ -418,13 +434,14 @@ describe('voxel-floor1 puddle decals lock to floor_stone', () => {
       expect(d.id).toBe(pickSoloPuddleId(d.x, d.y));
     }
     expect(DECAL_MASK_DARKEN).toBeCloseTo(0.5, 5);
-    expect(waterDecalPng('puddle_shore_s')).toBe('puddles/puddle_shore_s.png');
+    expect(waterDecalPng(SHORE_WIDE_ID)).toBe('puddles/puddle_shore_s_wide.png');
+    expect(waterDecalMaskPng(SHORE_WIDE_ID)).toBe('puddles/puddle_shore_s_wide_mask.png');
     expect(waterDecalMaskPng('puddle_3')).toBe('puddles/puddle_3_mask.png');
     expect(WATER_DECAL_DIR).toBe('puddles');
   });
 
   it('ships each artist decal as 512×512 RGBA plus a mask under puddles/', () => {
-    for (const id of ['puddle_1', 'puddle_2', 'puddle_3', 'puddle_shore_s'] as const) {
+    for (const id of ['puddle_1', 'puddle_2', 'puddle_3'] as const) {
       const file = resolve(__dirname, '../public/proto3d/tex3d', waterDecalPng(id));
       const mask = resolve(__dirname, '../public/proto3d/tex3d', waterDecalMaskPng(id));
       expect(existsSync(file), file).toBe(true);
@@ -433,6 +450,13 @@ describe('voxel-floor1 puddle decals lock to floor_stone', () => {
       expect(decal.readUInt32BE(16)).toBe(512);
       expect(decal.readUInt32BE(20)).toBe(512);
     }
+    const wide = resolve(__dirname, '../public/proto3d/tex3d', waterDecalPng(SHORE_WIDE_ID));
+    const wideMask = resolve(__dirname, '../public/proto3d/tex3d', waterDecalMaskPng(SHORE_WIDE_ID));
+    expect(existsSync(wide), wide).toBe(true);
+    expect(existsSync(wideMask), wideMask).toBe(true);
+    const wideBuf = readFileSync(wide);
+    expect(wideBuf.readUInt32BE(16)).toBe(1536);
+    expect(wideBuf.readUInt32BE(20)).toBe(512);
   });
 
   it('forces floor_stone.png under every decal cell, never _2/_3/_4', () => {
@@ -488,6 +512,25 @@ describe('voxel-floor1 puddle decals lock to floor_stone', () => {
     expect(sliceDecalTile(strip, 0).data[0]).toBe(10);
     expect(sliceDecalTile(strip, 1).data[0]).toBe(80);
     expect(sliceDecalTile(strip, 2).data[0]).toBe(160);
+    const stone = {
+      width: 2,
+      height: 2,
+      data: new Uint8ClampedArray([
+        10, 20, 30, 255, 10, 20, 30, 255, 10, 20, 30, 255, 10, 20, 30, 255
+      ])
+    };
+    const paint = {
+      width: 2,
+      height: 2,
+      data: new Uint8ClampedArray([
+        200, 0, 0, 0, 200, 0, 0, 255, 200, 0, 0, 0, 200, 0, 0, 128
+      ])
+    };
+    const baked = compositeDecalOverStone(stone, paint, 2);
+    expect(baked.data[0]).toBe(10);
+    expect(baked.data[4]).toBe(200);
+    expect(baked.data[12]).toBe(105);
+    expect(baked.data[3]).toBe(255);
 
     const ph = makePlaceholderPuddleDecal(0, 'S');
     expect(ph.decal.width).toBe(512);
@@ -518,6 +561,7 @@ describe('voxel-floor1 crack puddles are dark cool water, not brown mud', () => 
     expect(isCrackPuddleDecal('puddle_3')).toBe(true);
     expect(isCrackPuddleDecal('puddle_1')).toBe(true);
     expect(isCrackPuddleDecal('puddle_shore_s')).toBe(false);
+    expect(isCrackPuddleDecal(SHORE_WIDE_ID)).toBe(false);
     expect(CRACK_PUDDLE_DARKEN).toBeGreaterThan(DECAL_MASK_DARKEN);
     expect(CRACK_PUDDLE_OVERLAY_DARKEN).toBeGreaterThan(0.3);
     expect(CRACK_PUDDLE_COOL.b).toBeGreaterThan(CRACK_PUDDLE_COOL.r);

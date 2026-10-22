@@ -10,6 +10,9 @@ export const DECAL_MASK_DARKEN = 0.5;
 
 export const CISTERN_SHORE_Y = 4;
 export const CISTERN_SHORE_XS = [1, 2, 3] as const;
+/** One 1536×512 strip across (1,4)–(3,4). West at x=1, water to the north. */
+export const SHORE_WIDE_ID = 'puddle_shore_s_wide';
+export const SHORE_WIDE_COLS = CISTERN_SHORE_XS.length;
 
 export type DecalRot = 0 | 90 | 180 | 270;
 
@@ -49,15 +52,36 @@ function isCisternSouthShore(x: number, y: number): boolean {
   return y === CISTERN_SHORE_Y && (CISTERN_SHORE_XS as readonly number[]).includes(x);
 }
 
+export function isShoreWideDecal(id: string | undefined | null): boolean {
+  return id === SHORE_WIDE_ID;
+}
+
+/** Cell-local u=+X → U across the 1536 strip. No rotate, no mirror. */
+export function shoreWideWorldUv(
+  x: number,
+  u: number,
+  x0: number = CISTERN_SHORE_XS[0],
+  cols: number = SHORE_WIDE_COLS
+): number {
+  return (x - x0 + u) / cols;
+}
+
 /**
- * Shore tiles across the cistern's south edge. Horizontal water runs of 2+
- * get puddle_3 (matching E/W edges). Isolated cells get puddle_1 or _2.
+ * Shore is one wide strip across the cistern's south edge. Horizontal
+ * water runs of 2+ get puddle_3 (matching E/W edges). Isolated cells
+ * get puddle_1 or _2.
  */
 export function placeWaterDecals(map: FloorMap): WaterDecalPlacement[] {
   const out: WaterDecalPlacement[] = [];
   for (const x of CISTERN_SHORE_XS) {
     if (isWaterCell(map, x, CISTERN_SHORE_Y)) {
-      out.push({ x, y: CISTERN_SHORE_Y, id: 'puddle_shore_s', rot: 0 });
+      out.push({
+        x,
+        y: CISTERN_SHORE_Y,
+        id: SHORE_WIDE_ID,
+        tile: x - CISTERN_SHORE_XS[0],
+        rot: 0
+      });
     }
   }
   const rest: Array<{ x: number; y: number }> = [];
@@ -173,6 +197,38 @@ export function sliceDecalTile(
   for (let y = 0; y < h; y++) {
     const so = ((y) * img.width + x0) * 4;
     out.set(src.subarray(so, so + w * 4), y * w * 4);
+  }
+  return { width: w, height: h, data: out };
+}
+
+/**
+ * Bake a decal over floor_stone. Alpha 0 keeps the stone texel so W/E/S
+ * edges of the wide shore join the neighbouring dry floor exactly.
+ * A 1536-wide strip tiles the 256 stone every `tilePx` columns.
+ */
+export function compositeDecalOverStone(
+  stone: DecalPixels,
+  decal: DecalPixels,
+  tilePx = WATER_DECAL_PX
+): DecalPixels {
+  const w = decal.width;
+  const h = decal.height;
+  const period = Math.max(1, tilePx);
+  const out = new Uint8ClampedArray(w * h * 4);
+  for (let y = 0; y < h; y++) {
+    const sv = Math.min(stone.height - 1, Math.floor(((y + 0.5) / h) * stone.height));
+    for (let x = 0; x < w; x++) {
+      const lx = x % period;
+      const su = Math.min(stone.width - 1, Math.floor(((lx + 0.5) / period) * stone.width));
+      const si = (sv * stone.width + su) * 4;
+      const di = (y * w + x) * 4;
+      const a = decal.data[di + 3] / 255;
+      const ia = 1 - a;
+      out[di] = decal.data[di] * a + stone.data[si] * ia;
+      out[di + 1] = decal.data[di + 1] * a + stone.data[si + 1] * ia;
+      out[di + 2] = decal.data[di + 2] * a + stone.data[si + 2] * ia;
+      out[di + 3] = 255;
+    }
   }
   return { width: w, height: h, data: out };
 }

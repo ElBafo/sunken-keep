@@ -14,19 +14,25 @@ import { isTrueWall, isWaterCell, tileAt, type FloorMap } from './layout';
 import { paintedShellMaterial } from './painted';
 import { loadPng, textureFromPixels } from '../voxel-lab/materials';
 import {
+  CISTERN_SHORE_XS,
   DECAL_MASK_DARKEN,
+  SHORE_WIDE_COLS,
+  SHORE_WIDE_ID,
   WATER_DECAL_FLOOR_FILE,
   WATER_DECAL_PX,
   cellToDecalUv,
   clearWaterDecalMasks,
+  compositeDecalOverStone,
   hasWaterDecal,
   isCrackPuddleDecal,
+  isShoreWideDecal,
   waterDecalAt,
   installDecalMaskFromPixels,
   makePlaceholderPuddleDecal,
   placeWaterDecals,
   sampleWaterDecalMask,
   setDecalPlacements,
+  shoreWideWorldUv,
   sliceDecalTile,
   waterDecalMaskPng,
   waterDecalPng,
@@ -1186,7 +1192,8 @@ function decalOrientedGrid(
   atlas?: { index: number; cols: number; rows: number },
   map?: FloorMap,
   darken = true,
-  crack = false
+  crack = false,
+  strip?: { x0: number; cols: number }
 ): THREE.BufferGeometry {
   const segs = map ? WATER_FLOOR_SEGS : 1;
   const geo = new THREE.PlaneGeometry(CELL, CELL, segs, segs);
@@ -1202,7 +1209,9 @@ function decalOrientedGrid(
     const local = cellToDecalUv(u, v, rot, mirror);
     const dip = map ? floorDip(map, tx, tz, u, v) : 0;
     pos.setXYZ(i, wx, y + dip, wz);
-    if (atlas) {
+    if (strip) {
+      uvAttr.setXY(i, shoreWideWorldUv(tx, local.u, strip.x0, strip.cols), local.v);
+    } else if (atlas) {
       const colI = atlas.index % atlas.cols;
       const rowI = Math.floor(atlas.index / atlas.cols);
       uvAttr.setXY(i, (colI + local.u) / atlas.cols, (rowI + local.v) / atlas.rows);
@@ -1361,11 +1370,80 @@ export async function buildFloor1Water(
     }
   }
 
-  if (decalPlacements.length) {
+  const stonePixels: DecalPixels = {
+    width: stonePng.data.width,
+    height: stonePng.data.height,
+    data: asBytes(stonePng.data.data)
+  };
+  const shorePlacements = decalPlacements.filter((p) => isShoreWideDecal(p.spec.id));
+  const crackPlacements = decalPlacements.filter((p) => !isShoreWideDecal(p.spec.id));
+
+  if (shorePlacements.length) {
+    const wide = decalFiles.get(SHORE_WIDE_ID)?.decal;
+    const shoreDecal =
+      wide && wide.width >= WATER_DECAL_PX * SHORE_WIDE_COLS
+        ? wide
+        : {
+            width: WATER_DECAL_PX * SHORE_WIDE_COLS,
+            height: WATER_DECAL_PX,
+            data: (() => {
+              const out = new Uint8ClampedArray(WATER_DECAL_PX * SHORE_WIDE_COLS * WATER_DECAL_PX * 4);
+              shorePlacements.forEach((p, i) => {
+                const w = Math.min(WATER_DECAL_PX, p.decal.width);
+                const h = Math.min(WATER_DECAL_PX, p.decal.height);
+                for (let y = 0; y < h; y++) {
+                  out.set(
+                    p.decal.data.subarray(y * p.decal.width * 4, y * p.decal.width * 4 + w * 4),
+                    (y * WATER_DECAL_PX * SHORE_WIDE_COLS + i * WATER_DECAL_PX) * 4
+                  );
+                }
+              });
+              return out;
+            })()
+          };
+    const baked = compositeDecalOverStone(stonePixels, shoreDecal);
+    const shoreTex = textureFromPixels(baked);
+    shoreTex.flipY = true;
+    shoreTex.wrapS = THREE.ClampToEdgeWrapping;
+    shoreTex.wrapT = THREE.ClampToEdgeWrapping;
+    const shoreMat = paintedShellMaterial(shoreTex, undefined, WATER_DECAL_FLOOR_FILE);
+    shoreMat.specularIntensity = 0;
+    shoreMat.vertexColors = true;
+    shoreMat.map!.flipY = true;
+    shoreMat.map!.wrapS = THREE.ClampToEdgeWrapping;
+    shoreMat.map!.wrapT = THREE.ClampToEdgeWrapping;
+    shoreMat.map!.needsUpdate = true;
+    const shoreGeos = shorePlacements.map(({ spec }) =>
+      decalOrientedGrid(
+        spec.x,
+        spec.y,
+        0,
+        0,
+        false,
+        undefined,
+        map,
+        true,
+        false,
+        { x0: CISTERN_SHORE_XS[0], cols: SHORE_WIDE_COLS }
+      )
+    );
+    const shoreGeo = mergeGeometries(shoreGeos);
+    if (shoreGeo) {
+      const mesh = new THREE.Mesh(shoreGeo, shoreMat);
+      mesh.name = 'water-shore-wide';
+      mesh.castShadow = false;
+      mesh.receiveShadow = true;
+      mesh.userData.castWhenOn = false;
+      mesh.frustumCulled = false;
+      group.add(mesh);
+    }
+  }
+
+  if (crackPlacements.length) {
     const stoneMat = paintedShellMaterial(stonePng.texture, undefined, WATER_DECAL_FLOOR_FILE);
     stoneMat.specularIntensity = 0;
     stoneMat.vertexColors = true;
-    const floorGeos = decalPlacements.map(({ spec }) =>
+    const floorGeos = crackPlacements.map(({ spec }) =>
       decalOrientedGrid(
         spec.x,
         spec.y,
@@ -1389,11 +1467,11 @@ export async function buildFloor1Water(
       group.add(mesh);
     }
 
-    const cols = decalPlacements.length;
+    const cols = crackPlacements.length;
     const atlasW = WATER_DECAL_PX * cols;
     const atlasH = WATER_DECAL_PX;
     const atlasData = new Uint8ClampedArray(atlasW * atlasH * 4);
-    decalPlacements.forEach((p, i) => {
+    crackPlacements.forEach((p, i) => {
       const w = Math.min(WATER_DECAL_PX, p.decal.width);
       const h = Math.min(WATER_DECAL_PX, p.decal.height);
       for (let y = 0; y < h; y++) {
@@ -1421,7 +1499,7 @@ export async function buildFloor1Water(
       emissive: 0x000000,
       vertexColors: true
     });
-    const decalGeos = decalPlacements.map(({ spec }, index) =>
+    const decalGeos = crackPlacements.map(({ spec }, index) =>
       decalOrientedGrid(
         spec.x,
         spec.y,
