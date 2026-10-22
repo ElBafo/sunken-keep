@@ -8,6 +8,10 @@ import { floor1Sconces, torchWorldPos } from '../src/voxel-floor1/fixtures';
 import { floor1Map, isWaterCell, isWaterTile, tileAt } from '../src/voxel-floor1/layout';
 import { paintedShellMaterial } from '../src/voxel-floor1/painted';
 import {
+  CISTERN_SHORE_XS,
+  CISTERN_SHORE_Y,
+  DECAL_MASK_DARKEN,
+  WATER_DECAL_DIR,
   WATER_DECAL_FLOOR_FILE,
   WATER_DECAL_PX,
   WATER_DECALS,
@@ -17,8 +21,12 @@ import {
   decalUv,
   installDecalMaskFromPixels,
   makePlaceholderPuddleDecal,
+  pickSoloPuddleId,
+  placeWaterDecals,
   sampleWaterDecalMask,
-  sliceDecalTile
+  sliceDecalTile,
+  waterDecalMaskPng,
+  waterDecalPng
 } from '../src/voxel-floor1/water-decals';
 import {
   CISTERN_BED_FILE,
@@ -233,6 +241,9 @@ describe('voxel-floor1 water dip leaves no border gap', () => {
     expect(water).toContain('water-decals');
     expect(water).toContain('WATER_DECAL_FLOOR_FILE');
     expect(water).toContain('cellToDecalUv');
+    expect(water).toContain('placeWaterDecals');
+    expect(water).toContain('waterDecalPng');
+    expect(water).toContain('DECAL_MASK_DARKEN');
     expect(water).not.toContain('water-wet-ring');
     expect(water).not.toContain('water-dry-slabs');
     expect(water).not.toContain('makeTextureGroutSampler');
@@ -363,15 +374,51 @@ describe('voxel-floor1 puddle decals lock to floor_stone', () => {
   });
 
   it('tiles puddle_shore_s west to east on the cistern south shore', () => {
-    expect(WATER_DECALS).toEqual([
-      { x: 1, y: 4, id: 'puddle_shore_s', tile: 0, rot: 0 },
-      { x: 2, y: 4, id: 'puddle_shore_s', tile: 1, rot: 0 },
-      { x: 3, y: 4, id: 'puddle_shore_s', tile: 2, rot: 0 }
-    ]);
-    expect(WATER_DECALS.map((d) => d.x)).toEqual([1, 2, 3]);
-    expect(WATER_DECALS.every((d) => d.y === 4 && d.id === 'puddle_shore_s')).toBe(true);
-    expect(WATER_DECALS.map((d) => d.tile)).toEqual([0, 1, 2]);
+    const shore = WATER_DECALS.filter((d) => d.id === 'puddle_shore_s');
+    expect(CISTERN_SHORE_Y).toBe(4);
+    expect([...CISTERN_SHORE_XS]).toEqual([1, 2, 3]);
+    expect(shore.map((d) => d.x)).toEqual([1, 2, 3]);
+    expect(shore.every((d) => d.y === 4 && d.rot === 0)).toBe(true);
+    expect(WATER_DECALS.filter((d) => d.x === 2 && d.y === 2)).toHaveLength(0);
   });
+
+  it('puts puddle_3 on east-west water runs and 1/2 on leftover cells', () => {
+    const placed = placeWaterDecals(floor1Map);
+    const byCell = new Map(placed.map((d) => [`${d.x},${d.y}`, d]));
+    for (const x of [5, 6]) expect(byCell.get(`${x},10`)?.id).toBe('puddle_3');
+    for (const x of [4, 5, 6, 7]) expect(byCell.get(`${x},11`)?.id).toBe('puddle_3');
+    for (const x of [4, 5, 6]) expect(byCell.get(`${x},12`)?.id).toBe('puddle_3');
+    expect(placed.some((d) => d.id === 'puddle_3' && !isWaterCell(floor1Map, d.x - 1, d.y) && !isWaterCell(floor1Map, d.x + 1, d.y))).toBe(false);
+    const solos = placed.filter((d) => d.id === 'puddle_1' || d.id === 'puddle_2');
+    for (const d of solos) {
+      expect(isWaterCell(floor1Map, d.x - 1, d.y) && isWaterCell(floor1Map, d.x + 1, d.y)).toBe(false);
+      expect(d.id).toBe(pickSoloPuddleId(d.x, d.y));
+    }
+    expect(DECAL_MASK_DARKEN).toBeCloseTo(0.5, 5);
+    expect(waterDecalPng('puddle_shore_s')).toBe('puddles/puddle_shore_s.png');
+    expect(waterDecalMaskPng('puddle_3')).toBe('puddles/puddle_3_mask.png');
+    expect(WATER_DECAL_DIR).toBe('puddles');
+  });
+
+  const artistPuddleFile = resolve(
+    __dirname,
+    '../public/proto3d/tex3d',
+    waterDecalPng('puddle_shore_s')
+  );
+  it.skipIf(!existsSync(artistPuddleFile))(
+    'ships each artist decal as 512×512 RGBA plus a mask under puddles/',
+    () => {
+      for (const id of ['puddle_1', 'puddle_2', 'puddle_3', 'puddle_shore_s'] as const) {
+        const file = resolve(__dirname, '../public/proto3d/tex3d', waterDecalPng(id));
+        const mask = resolve(__dirname, '../public/proto3d/tex3d', waterDecalMaskPng(id));
+        expect(existsSync(file), file).toBe(true);
+        expect(existsSync(mask), mask).toBe(true);
+        const decal = readFileSync(file);
+        expect(decal.readUInt32BE(16)).toBe(512);
+        expect(decal.readUInt32BE(20)).toBe(512);
+      }
+    }
+  );
 
   it('forces floor_stone.png under every decal cell, never _2/_3/_4', () => {
     expect(WATER_DECAL_FLOOR_FILE).toBe('floor_stone.png');
@@ -386,7 +433,7 @@ describe('voxel-floor1 puddle decals lock to floor_stone', () => {
       expect(decalFloorFile(d.x, d.y)).toBe(WATER_DECAL_FLOOR_FILE);
     }
     expect(decalFloorFile(2, 2)).toBeUndefined();
-    expect(decalFloorFile(5, 11)).toBeUndefined();
+    expect(decalFloorFile(5, 11)).toBe(WATER_DECAL_FLOOR_FILE);
     expect(FLOOR_VARIANTS.filter((f) => f !== WATER_DECAL_FLOOR_FILE)).toEqual([
       'floor_stone_2.png',
       'floor_stone_3.png',

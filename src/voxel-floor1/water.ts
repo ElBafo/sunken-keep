@@ -12,16 +12,20 @@ import { isTrueWall, isWaterCell, tileAt, type FloorMap } from './layout';
 import { paintedShellMaterial } from './painted';
 import { loadPng, textureFromPixels } from '../voxel-lab/materials';
 import {
+  DECAL_MASK_DARKEN,
   WATER_DECAL_FLOOR_FILE,
   WATER_DECAL_PX,
-  WATER_DECALS,
   cellToDecalUv,
   clearWaterDecalMasks,
   hasWaterDecal,
   installDecalMaskFromPixels,
   makePlaceholderPuddleDecal,
+  placeWaterDecals,
   sampleWaterDecalMask,
+  setDecalPlacements,
   sliceDecalTile,
+  waterDecalMaskPng,
+  waterDecalPng,
   type DecalPixels
 } from './water-decals';
 
@@ -1041,12 +1045,15 @@ function decalOrientedGrid(
   y: number,
   rot: 0 | 90 | 180 | 270 = 0,
   mirror = false,
-  atlas?: { index: number; cols: number; rows: number }
+  atlas?: { index: number; cols: number; rows: number },
+  map?: FloorMap
 ): THREE.BufferGeometry {
-  const geo = new THREE.PlaneGeometry(CELL, CELL, 1, 1);
+  const segs = map ? WATER_FLOOR_SEGS : 1;
+  const geo = new THREE.PlaneGeometry(CELL, CELL, segs, segs);
   geo.rotateX(-Math.PI / 2);
   const pos = geo.getAttribute('position');
   const uvAttr = geo.getAttribute('uv');
+  const col = new Float32Array(pos.count * 4);
   for (let i = 0; i < pos.count; i++) {
     const wx = pos.getX(i) + tx * CELL;
     const wz = pos.getZ(i) + tz * CELL;
@@ -1061,7 +1068,14 @@ function decalOrientedGrid(
     } else {
       uvAttr.setXY(i, local.u, local.v);
     }
+    const cover = map ? puddleCoverage(map, tx, tz, u, v) : 0;
+    const k = 1 - DECAL_MASK_DARKEN * cover;
+    col[i * 4] = k;
+    col[i * 4 + 1] = k;
+    col[i * 4 + 2] = k;
+    col[i * 4 + 3] = 1;
   }
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 4));
   geo.computeVertexNormals();
   return geo;
 }
@@ -1080,7 +1094,9 @@ export async function buildFloor1Water(
   clearWaterDecalMasks();
   const cells = listWaterCells(map);
   const cistern = cisternRegion(map);
-  const decalIds = [...new Set(WATER_DECALS.map((d) => d.id))];
+  const placements = placeWaterDecals(map);
+  setDecalPlacements(placements);
+  const decalIds = [...new Set(placements.map((d) => d.id))];
   const [innerA, innerB, rimPng, maskPng, cisternBed, stonePng] = await Promise.all([
     loadPng(WATER_INNER_FILES[0]),
     loadPng(WATER_INNER_FILES[1]),
@@ -1093,8 +1109,8 @@ export async function buildFloor1Water(
   await Promise.all(
     decalIds.map(async (id) => {
       const [decal, mask] = await Promise.all([
-        tryLoadOptionalPng(`${id}.png`),
-        tryLoadOptionalPng(`${id}_mask.png`)
+        tryLoadOptionalPng(waterDecalPng(id)),
+        tryLoadOptionalPng(waterDecalMaskPng(id))
       ]);
       decalFiles.set(id, {
         decal: decal ? { width: decal.data.width, height: decal.data.height, data: asBytes(decal.data.data) } : null,
@@ -1102,7 +1118,7 @@ export async function buildFloor1Water(
       });
     })
   );
-  const decalPlacements = WATER_DECALS.filter((d) => isWaterCell(map, d.x, d.y)).map((spec) => {
+  const decalPlacements = placements.filter((d) => isWaterCell(map, d.x, d.y)).map((spec) => {
     const tile = spec.tile ?? 0;
     const pixels = resolvePuddleDecal(decalFiles, spec.id, tile);
     installDecalMaskFromPixels(spec.x, spec.y, pixels.mask);
@@ -1200,8 +1216,9 @@ export async function buildFloor1Water(
   if (decalPlacements.length) {
     const stoneMat = paintedShellMaterial(stonePng.texture, undefined, WATER_DECAL_FLOOR_FILE);
     stoneMat.specularIntensity = 0;
+    stoneMat.vertexColors = true;
     const floorGeos = decalPlacements.map(({ spec }) =>
-      decalOrientedGrid(spec.x, spec.y, 0, spec.rot ?? 0, spec.mirror)
+      decalOrientedGrid(spec.x, spec.y, 0, spec.rot ?? 0, spec.mirror, undefined, map)
     );
     const floorGeo = mergeGeometries(floorGeos);
     if (floorGeo) {
@@ -1243,14 +1260,15 @@ export async function buildFloor1Water(
       opacity: 1,
       depthWrite: false,
       fog: true,
-      emissive: 0x000000
+      emissive: 0x000000,
+      vertexColors: true
     });
     const decalGeos = decalPlacements.map(({ spec }, index) =>
       decalOrientedGrid(spec.x, spec.y, 0.0012, spec.rot ?? 0, spec.mirror, {
         index,
         cols,
         rows: 1
-      })
+      }, map)
     );
     const decalGeo = mergeGeometries(decalGeos);
     if (decalGeo) {

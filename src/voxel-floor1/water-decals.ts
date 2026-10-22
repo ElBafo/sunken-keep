@@ -1,14 +1,22 @@
 /** Hand-painted puddle decals sit on floor_stone.png at 2× (512 on 256). */
 
+import { floor1Map, isWaterCell, type FloorMap } from './layout';
+
 export const WATER_DECAL_PX = 512;
 export const WATER_DECAL_FLOOR_FILE = 'floor_stone.png';
+export const WATER_DECAL_DIR = 'puddles';
+/** Stone under a mask texel is about half as bright so the paint reads as water. */
+export const DECAL_MASK_DARKEN = 0.5;
+
+export const CISTERN_SHORE_Y = 4;
+export const CISTERN_SHORE_XS = [1, 2, 3] as const;
 
 export type DecalRot = 0 | 90 | 180 | 270;
 
 export type WaterDecalPlacement = {
   x: number;
   y: number;
-  /** Stem; files are `${id}.png` and `${id}_mask.png`. */
+  /** Stem; files are `puddles/${id}.png` and `puddles/${id}_mask.png`. */
   id: string;
   /** 512 px column if the PNG is a left-to-right strip. */
   tile?: number;
@@ -16,14 +24,82 @@ export type WaterDecalPlacement = {
   mirror?: boolean;
 };
 
-/** South shore of the cistern, west → east. */
-export const WATER_DECALS: readonly WaterDecalPlacement[] = [
-  { x: 1, y: 4, id: 'puddle_shore_s', tile: 0, rot: 0 },
-  { x: 2, y: 4, id: 'puddle_shore_s', tile: 1, rot: 0 },
-  { x: 3, y: 4, id: 'puddle_shore_s', tile: 2, rot: 0 }
-];
+export function waterDecalPng(id: string): string {
+  return `${WATER_DECAL_DIR}/${id}.png`;
+}
 
-const DECAL_BY_CELL = new Map(WATER_DECALS.map((d) => [`${d.x},${d.y}`, d]));
+export function waterDecalMaskPng(id: string): string {
+  return `${WATER_DECAL_DIR}/${id}_mask.png`;
+}
+
+function hash01(x: number, y: number, salt = 0): number {
+  const n = Math.sin(x * 127.1 + y * 311.7 + salt * 74.2) * 43758.5453;
+  return n - Math.floor(n);
+}
+
+export function pickSoloPuddleId(x: number, y: number): 'puddle_1' | 'puddle_2' {
+  return hash01(x, y, 19) < 0.5 ? 'puddle_1' : 'puddle_2';
+}
+
+function isCisternBasin(x: number, y: number): boolean {
+  return x >= 1 && x <= 3 && y >= 1 && y <= 3;
+}
+
+function isCisternSouthShore(x: number, y: number): boolean {
+  return y === CISTERN_SHORE_Y && (CISTERN_SHORE_XS as readonly number[]).includes(x);
+}
+
+/**
+ * Shore tiles across the cistern's south edge. Horizontal water runs of 2+
+ * get puddle_3 (matching E/W edges). Isolated cells get puddle_1 or _2.
+ */
+export function placeWaterDecals(map: FloorMap): WaterDecalPlacement[] {
+  const out: WaterDecalPlacement[] = [];
+  for (const x of CISTERN_SHORE_XS) {
+    if (isWaterCell(map, x, CISTERN_SHORE_Y)) {
+      out.push({ x, y: CISTERN_SHORE_Y, id: 'puddle_shore_s', rot: 0 });
+    }
+  }
+  const rest: Array<{ x: number; y: number }> = [];
+  for (let y = 0; y < map.height; y++) {
+    for (let x = 0; x < map.width; x++) {
+      if (!isWaterCell(map, x, y)) continue;
+      if (isCisternBasin(x, y) || isCisternSouthShore(x, y)) continue;
+      rest.push({ x, y });
+    }
+  }
+  const byRow = new Map<number, number[]>();
+  for (const c of rest) {
+    const xs = byRow.get(c.y) ?? [];
+    xs.push(c.x);
+    byRow.set(c.y, xs);
+  }
+  for (const [y, xs] of byRow) {
+    xs.sort((a, b) => a - b);
+    let i = 0;
+    while (i < xs.length) {
+      let j = i;
+      while (j + 1 < xs.length && xs[j + 1] === xs[j] + 1) j++;
+      const run = xs.slice(i, j + 1);
+      if (run.length >= 2) {
+        for (const x of run) out.push({ x, y, id: 'puddle_3', rot: 0 });
+      } else {
+        const x = run[0];
+        out.push({ x, y, id: pickSoloPuddleId(x, y), rot: 0 });
+      }
+      i = j + 1;
+    }
+  }
+  return out;
+}
+
+export const WATER_DECALS: readonly WaterDecalPlacement[] = placeWaterDecals(floor1Map);
+
+let DECAL_BY_CELL = new Map(WATER_DECALS.map((d) => [`${d.x},${d.y}`, d]));
+
+export function setDecalPlacements(list: readonly WaterDecalPlacement[]): void {
+  DECAL_BY_CELL = new Map(list.map((d) => [`${d.x},${d.y}`, d]));
+}
 
 export function waterDecalAt(x: number, y: number): WaterDecalPlacement | undefined {
   return DECAL_BY_CELL.get(`${x},${y}`);
