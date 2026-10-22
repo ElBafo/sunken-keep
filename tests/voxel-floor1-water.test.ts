@@ -79,6 +79,10 @@ import {
   listWaterfallSplashes,
   listWaterRegions,
   paintedFloorSize,
+  paintedFloorDefaultSize,
+  listPaintedFloorQuads,
+  paintedFloorQuadsCoveringCell,
+  overlappingPaintedFloorPairs,
   blendWaterOverInner,
   pickWaterInnerIndex,
   puddleAlpha,
@@ -238,7 +242,7 @@ describe('voxel-floor1 water dip leaves no border gap', () => {
     expect(hasWaterNeighbor(floor1Map, 4, 2)).toBe(true);
     expect(hasDecalNeighbor(2, 6)).toBe(true);
     expect(paintedFloorSize(2, 6, floor1Map, defaultSize)).toBe(CELL);
-    expect(paintedFloorSize(3, 14, floor1Map, defaultSize)).toBe(defaultSize);
+    expect(paintedFloorSize(3, 14, floor1Map, defaultSize)).toBe(CELL);
     expect(isWaterCell(floor1Map, 2, 2)).toBe(true);
   });
 
@@ -732,5 +736,31 @@ describe('voxel-floor1 water keeps a faint torch bounce', () => {
     expect(puddleReflectBoost(0, 0.2, 4, 8, 0.8)).toBe(0);
     expect(puddleReflectBoost(0.4, 0.2, 4, 8, 0.8)).toBeGreaterThan(0.01);
     expect(puddleReflectBoost(0.4, 0.2, 4, 8, 0.8)).toBeLessThan(0.2);
+  });
+});
+
+describe('voxel-floor1 painted floors share edges', () => {
+  const corridor = [
+    [2, 8],
+    [2, 7],
+    [2, 6],
+    [4, 2],
+    [5, 2],
+    [5, 1],
+    [5, 3],
+    [3, 14]
+  ] as const;
+
+  it('keeps one CELL-sized flagstone quad per dry cell with no neighbour overlap', () => {
+    const quads = listPaintedFloorQuads(floor1Map);
+    for (const [x, y] of corridor) {
+      const hits = paintedFloorQuadsCoveringCell(quads, x, y);
+      expect(hits, `cell ${x},${y} covered by ${hits.map((h) => `${h.tx},${h.tz}:${h.file}/${h.size}`).join(' | ')}`).toHaveLength(1);
+      expect(hits[0]?.tx).toBe(x);
+      expect(hits[0]?.tz).toBe(y);
+      expect(hits[0]?.size).toBe(CELL);
+    }
+    expect(paintedFloorSize(3, 14, floor1Map, paintedFloorDefaultSize())).toBe(CELL);
+    expect(overlappingPaintedFloorPairs(quads)).toEqual([]);
   });
 });

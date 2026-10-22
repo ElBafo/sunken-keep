@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CELL, LANTERN_DISTANCE, LANTERN_HOLD, SCONCE_RADIUS_TILES, TORCH_DISTANCE } from './constants';
+import { CAMERA_NEAR, CELL, FLOOR_VARIANTS, LANTERN_DISTANCE, LANTERN_HOLD, SCONCE_RADIUS_TILES, TORCH_DISTANCE } from './constants';
 import {
   FACE_INTO_ROOM,
   floodReach,
@@ -10,7 +10,8 @@ import {
   type SconceSpec,
   type SunbeamSpec
 } from './fixtures';
-import { isTrueWall, isWaterCell, tileAt, type FloorMap } from './layout';
+import { isShellTile, isTrueWall, isWaterCell, mappedFloorFile, tileAt, type FloorMap } from './layout';
+import { pickVariant } from './variants';
 import { paintedShellMaterial } from './painted';
 import { loadPng, textureFromPixels } from '../voxel-lab/materials';
 import {
@@ -785,10 +786,96 @@ export function puddleEdgeIsIrregular(map: FloorMap, tx: number, tz: number, fac
   return max - min > 0.02;
 }
 
-export function paintedFloorSize(tx: number, tz: number, map: FloorMap, defaultSize: number): number {
-  if (isWaterCell(map, tx, tz) || hasWaterNeighbor(map, tx, tz)) return CELL;
-  if (hasWaterDecal(tx, tz) || hasDecalNeighbor(tx, tz)) return CELL;
-  return defaultSize;
+/**
+ * Pad used to hide near-plane cracks on ceilings. Dry floors must not use
+ * this — a 20 cm overlap with the next cell z-fights as a pale sawtooth
+ * strip at a grazing look-back.
+ */
+export const FLOOR_SEAM_PAD = CAMERA_NEAR + 0.12;
+
+export function paintedFloorDefaultSize(): number {
+  return CELL + 2 * FLOOR_SEAM_PAD;
+}
+
+export type PaintedFloorQuad = {
+  tx: number;
+  tz: number;
+  file: string;
+  size: number;
+  minX: number;
+  maxX: number;
+  minZ: number;
+  maxZ: number;
+};
+
+/**
+ * Painted dry floors stay one cell so neighbouring flagstone quads share an
+ * edge. Water / decal cells already used CELL; stretching every other floor
+ * by `FLOOR_SEAM_PAD` made two different `floor_stone*` variants coplanar
+ * over a 20 cm strip, which iPhone depth precision draws as a stair-step.
+ */
+export function paintedFloorSize(
+  _tx: number,
+  _tz: number,
+  _map: FloorMap,
+  _defaultSize: number
+): number {
+  return CELL;
+}
+
+export function listPaintedFloorQuads(map: FloorMap): PaintedFloorQuad[] {
+  const out: PaintedFloorQuad[] = [];
+  for (let tz = 0; tz < map.height; tz++) {
+    for (let tx = 0; tx < map.width; tx++) {
+      if (!isShellTile(tileAt(map, tx, tz))) continue;
+      if (isWaterCell(map, tx, tz) || hasWaterDecal(tx, tz)) continue;
+      const size = paintedFloorSize(tx, tz, map, paintedFloorDefaultSize());
+      const cx = tx * CELL;
+      const cz = tz * CELL;
+      const h = size / 2;
+      out.push({
+        tx,
+        tz,
+        file: mappedFloorFile(tx, tz) ?? pickVariant(FLOOR_VARIANTS, tx, tz, 'F'),
+        size,
+        minX: cx - h,
+        maxX: cx + h,
+        minZ: cz - h,
+        maxZ: cz + h
+      });
+    }
+  }
+  return out;
+}
+
+export function paintedFloorQuadsCoveringCell(
+  quads: readonly PaintedFloorQuad[],
+  tx: number,
+  tz: number,
+  pad = 1e-4
+): PaintedFloorQuad[] {
+  const minX = (tx - 0.5) * CELL + pad;
+  const maxX = (tx + 0.5) * CELL - pad;
+  const minZ = (tz - 0.5) * CELL + pad;
+  const maxZ = (tz + 0.5) * CELL - pad;
+  return quads.filter((q) => q.maxX > minX && q.minX < maxX && q.maxZ > minZ && q.minZ < maxZ);
+}
+
+export function overlappingPaintedFloorPairs(
+  quads: readonly PaintedFloorQuad[],
+  minOverlap = 0.001
+): Array<[PaintedFloorQuad, PaintedFloorQuad]> {
+  const pairs: Array<[PaintedFloorQuad, PaintedFloorQuad]> = [];
+  for (let i = 0; i < quads.length; i++) {
+    for (let j = i + 1; j < quads.length; j++) {
+      const a = quads[i]!;
+      const b = quads[j]!;
+      const ox = Math.min(a.maxX, b.maxX) - Math.max(a.minX, b.minX);
+      const oz = Math.min(a.maxZ, b.maxZ) - Math.max(a.minZ, b.minZ);
+      if (ox > minOverlap && oz > minOverlap) pairs.push([a, b]);
+    }
+  }
+  return pairs;
 }
 
 /**
