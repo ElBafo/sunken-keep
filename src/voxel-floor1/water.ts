@@ -64,6 +64,9 @@ const PUDDLE_ALPHA_DEEP = 0.3;
 export const PUDDLE_ALPHA_DECAL_SHALLOW = 0.04;
 export const PUDDLE_ALPHA_DECAL_DEEP = 0.08;
 export const PUDDLE_SPECULAR = 0.07;
+/** Wet-stone ring on the wide shore: warm only when a torch or lantern is in range. */
+export const SHORE_LIP_GLINT = 0.42;
+export const SHORE_LIP_WARM = { r: 1, g: 0.78, b: 0.52 };
 /** Crack puddles: darker cooler wet film, slight sheen, not brown mud. */
 export const CRACK_PUDDLE_DARKEN = 0.68;
 export const CRACK_PUDDLE_OVERLAY_DARKEN = 0.52;
@@ -367,6 +370,12 @@ export function lanternWarmthAt(
 ): number {
   const t = 1 - Math.hypot(wx - lx, wz - lz) / radius;
   return t > 0 ? t ** 1.5 : 0;
+}
+
+/** Wet-stone band around a painted waterline. Dry stone and open water stay 0. */
+export function shoreLipResponse(cover: number): number {
+  const c = Math.min(1, Math.max(0, cover));
+  return smoothstep(0.1, 0.34, c) * (1 - smoothstep(0.5, 0.82, c));
 }
 
 /** Darker, cooler vertex tint inside a crack-puddle mask. */
@@ -1377,6 +1386,11 @@ export async function buildFloor1Water(
   };
   const shorePlacements = decalPlacements.filter((p) => isShoreWideDecal(p.spec.id));
   const crackPlacements = decalPlacements.filter((p) => !isShoreWideDecal(p.spec.id));
+  let shoreRimAttr: THREE.BufferAttribute | null = null;
+  let shoreRimWx: Float32Array | null = null;
+  let shoreRimWz: Float32Array | null = null;
+  let shoreRimPeak: Float32Array | null = null;
+  const lanternWorld = new THREE.Vector3();
 
   if (shorePlacements.length) {
     const wide = decalFiles.get(SHORE_WIDE_ID)?.decal;
@@ -1480,6 +1494,60 @@ export async function buildFloor1Water(
       mesh.userData.castWhenOn = false;
       mesh.frustumCulled = false;
       mesh.renderOrder = 2;
+      group.add(mesh);
+    }
+    const rimGeos = shorePlacements.map(({ spec }) =>
+      decalOrientedGrid(
+        spec.x,
+        spec.y,
+        0.0024,
+        0,
+        false,
+        undefined,
+        map,
+        false,
+        false,
+        { x0: CISTERN_SHORE_XS[0], cols: SHORE_WIDE_COLS }
+      )
+    );
+    const rimGeo = mergeGeometries(rimGeos);
+    if (rimGeo) {
+      const pos = rimGeo.getAttribute('position');
+      const col = rimGeo.getAttribute('color') as THREE.BufferAttribute;
+      shoreRimWx = new Float32Array(pos.count);
+      shoreRimWz = new Float32Array(pos.count);
+      shoreRimPeak = new Float32Array(pos.count);
+      for (let i = 0; i < pos.count; i++) {
+        const wx = pos.getX(i);
+        const wz = pos.getZ(i);
+        shoreRimWx[i] = wx;
+        shoreRimWz[i] = wz;
+        const cover = puddleCoverageWorld(map, wx, wz);
+        const broken = 0.7 + 0.3 * Math.max(0, waterWorldNoise(wx, wz, 6.4));
+        shoreRimPeak[i] = shoreLipResponse(cover) * broken;
+        col.setXYZW(i, SHORE_LIP_WARM.r, SHORE_LIP_WARM.g, SHORE_LIP_WARM.b, 0);
+      }
+      shoreRimAttr = col;
+      const mesh = new THREE.Mesh(
+        rimGeo,
+        new THREE.MeshBasicMaterial({
+          color: 0xe8b57a,
+          transparent: true,
+          opacity: 0.5,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          fog: false,
+          toneMapped: false,
+          vertexColors: true,
+          side: THREE.DoubleSide
+        })
+      );
+      mesh.name = 'water-shore-rim';
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      mesh.userData.castWhenOn = false;
+      mesh.frustumCulled = false;
+      mesh.renderOrder = 4;
       group.add(mesh);
     }
   }
@@ -1650,7 +1718,6 @@ export async function buildFloor1Water(
   let crackGlintWx: Float32Array | null = null;
   let crackGlintWz: Float32Array | null = null;
   let crackGlintPeak: Float32Array | null = null;
-  const lanternWorld = new THREE.Vector3();
   if (crackCells.length) {
     const glintGeos = crackCells.map((c) => cellGrid(c.x, c.y, map, 'shimmer', { sconces, segs: 8 }));
     const glintGeo = mergeGeometries(glintGeos);
@@ -1885,10 +1952,10 @@ export async function buildFloor1Water(
         splashMat.map.center.set(0.5, 0.5);
         splashMat.map.rotation = spin;
       }
+      if (camera) {
+        lanternWorld.set(LANTERN_HOLD[0], LANTERN_HOLD[1], LANTERN_HOLD[2]).applyMatrix4(camera.matrixWorld);
+      }
       if (crackGlintAttr && crackGlintWx && crackGlintWz && crackGlintPeak) {
-        if (camera) {
-          lanternWorld.set(LANTERN_HOLD[0], LANTERN_HOLD[1], LANTERN_HOLD[2]).applyMatrix4(camera.matrixWorld);
-        }
         const arr = crackGlintAttr.array as Float32Array;
         for (let i = 0; i < crackGlintWx.length; i++) {
           const torch = torchWarmthAt(crackGlintWx[i], crackGlintWz[i], sconces);
@@ -1899,6 +1966,18 @@ export async function buildFloor1Water(
           arr[i * 4 + 3] = crackGlintPeak[i] * warmth ** 1.25 * 0.4;
         }
         crackGlintAttr.needsUpdate = true;
+      }
+      if (shoreRimAttr && shoreRimWx && shoreRimWz && shoreRimPeak) {
+        const arr = shoreRimAttr.array as Float32Array;
+        for (let i = 0; i < shoreRimWx.length; i++) {
+          const torch = torchWarmthAt(shoreRimWx[i], shoreRimWz[i], sconces);
+          const lamp = camera
+            ? lanternWarmthAt(shoreRimWx[i], shoreRimWz[i], lanternWorld.x, lanternWorld.z)
+            : 0;
+          const warmth = Math.max(torch, lamp);
+          arr[i * 4 + 3] = shoreRimPeak[i] * warmth ** 1.15 * SHORE_LIP_GLINT;
+        }
+        shoreRimAttr.needsUpdate = true;
       }
     }
   };

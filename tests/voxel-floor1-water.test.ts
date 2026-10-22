@@ -46,6 +46,8 @@ import {
   PUDDLE_ALPHA_DECAL_DEEP,
   PUDDLE_ALPHA_DECAL_SHALLOW,
   PUDDLE_SPECULAR,
+  SHORE_LIP_GLINT,
+  SHORE_LIP_WARM,
   CRACK_PUDDLE_ALPHA,
   CRACK_PUDDLE_COOL,
   CRACK_PUDDLE_DARKEN,
@@ -72,6 +74,7 @@ import {
   puddleCoverage,
   crackPuddleAlbedo,
   lanternWarmthAt,
+  shoreLipResponse,
   puddleEdgeInset,
   puddleEdgeIsIrregular,
   regionWorldUv,
@@ -264,8 +267,10 @@ describe('voxel-floor1 water dip leaves no border gap', () => {
     expect(water).toContain('water-decals');
     expect(water).toContain('water-shore-wide');
     expect(water).toContain('water-shore-paint');
+    expect(water).toContain('water-shore-rim');
     expect(water).toContain('compositeDecalOverStone');
     expect(water).toContain('shoreWideWorldUv');
+    expect(water).toContain('shoreLipResponse');
     expect(water).toContain('WATER_DECAL_FLOOR_FILE');
     expect(water).toContain('cellToDecalUv');
     expect(water).toContain('placeWaterDecals');
@@ -420,6 +425,19 @@ describe('voxel-floor1 puddle decals lock to floor_stone', () => {
     expect(shoreWideWorldUv(1, 0)).toBeCloseTo(0, 10);
     expect(shoreWideWorldUv(2, 0.5)).toBeCloseTo(0.5, 10);
     expect(shoreWideWorldUv(3, 1)).toBeCloseTo(1, 10);
+    expect(shoreLipResponse(0)).toBe(0);
+    expect(shoreLipResponse(1)).toBeLessThan(0.08);
+    expect(shoreLipResponse(0.32)).toBeGreaterThan(0.4);
+    expect(shoreLipResponse(0.32)).toBeGreaterThan(shoreLipResponse(0.9));
+    expect(SHORE_LIP_GLINT).toBeGreaterThan(0.2);
+    expect(SHORE_LIP_GLINT).toBeLessThan(0.6);
+    expect(SHORE_LIP_WARM.r).toBeGreaterThan(SHORE_LIP_WARM.b);
+    expect(lanternWarmthAt(4, 9.08, 4, 9.08)).toBe(1);
+    expect(lanternWarmthAt(4, 7.6, 4, 9.08)).toBeGreaterThan(0.2);
+    const water = readFileSync(resolve(SRC, 'water.ts'), 'utf8');
+    expect(water).toContain('water-shore-rim');
+    expect(water).toContain('SHORE_LIP_GLINT');
+    expect(water).not.toContain('water-lips');
   });
 
   it('puts puddle_3 on east-west water runs and 1/2 on leftover cells', () => {
