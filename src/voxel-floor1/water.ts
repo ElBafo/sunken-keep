@@ -12,6 +12,7 @@ import { isTrueWall, isWaterCell, tileAt, type FloorMap } from './layout';
 import { paintedShellMaterial } from './painted';
 import { loadPng, textureFromPixels } from '../voxel-lab/materials';
 import {
+  CISTERN_SHORE_Y,
   DECAL_MASK_DARKEN,
   WATER_DECAL_FLOOR_FILE,
   WATER_DECAL_PX,
@@ -532,12 +533,14 @@ export function waterDeepness(map: FloorMap, tx: number, tz: number, u: number, 
   return d;
 }
 
-/** Puddle veil opacity. Deep hides the bed; decal cells stay thin so the paint reads. */
+/** Puddle veil opacity. Deep hides the bed; cellar decals stay thin so the paint reads. */
 export function puddleAlpha(map: FloorMap, tx: number, tz: number, u: number, v: number): number {
   const cover = puddleCoverage(map, tx, tz, u, v);
   const deep = waterDeepness(map, tx, tz, u, v);
-  const lo = hasWaterDecal(tx, tz) ? PUDDLE_ALPHA_DECAL_SHALLOW : PUDDLE_ALPHA_SHALLOW;
-  const hi = hasWaterDecal(tx, tz) ? PUDDLE_ALPHA_DECAL_DEEP : PUDDLE_ALPHA_DEEP;
+  const shore = hasWaterDecal(tx, tz) && tz === CISTERN_SHORE_Y;
+  const decal = hasWaterDecal(tx, tz) && !shore;
+  const lo = decal ? PUDDLE_ALPHA_DECAL_SHALLOW : PUDDLE_ALPHA_SHALLOW;
+  const hi = decal ? PUDDLE_ALPHA_DECAL_DEEP : PUDDLE_ALPHA_DEEP;
   return smoothstep(0.28, 0.7, cover) * (lo + (hi - lo) * deep);
 }
 

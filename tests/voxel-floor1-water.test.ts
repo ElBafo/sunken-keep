@@ -483,14 +483,16 @@ describe('voxel-floor1 puddle decals lock to floor_stone', () => {
     expect(floorDip(floor1Map, 1, 4, 0.5, 0.92)).toBeCloseTo(0, 3);
   });
 
-  it('keeps the water veil thin on painted decal cells', () => {
+  it('keeps the water veil thin on cellar decals and joins the cistern shore', () => {
     expect(hasWaterDecal(1, 4)).toBe(true);
     expect(hasWaterDecal(5, 11)).toBe(true);
     expect(hasWaterDecal(2, 1)).toBe(false);
     expect(PUDDLE_ALPHA_DECAL_SHALLOW).toBeLessThan(0.28);
     expect(PUDDLE_ALPHA_DECAL_DEEP).toBeLessThan(0.42);
-    expect(puddleAlpha(floor1Map, 1, 4, 0.5, 0.5)).toBeLessThan(0.4);
     expect(puddleAlpha(floor1Map, 5, 11, 0.5, 0.5)).toBeLessThan(0.4);
+    expect(puddleAlpha(floor1Map, 1, 4, 0.5, 0.5)).toBeGreaterThan(
+      puddleAlpha(floor1Map, 5, 11, 0.5, 0.5)
+    );
     expect(puddleAlpha(floor1Map, 2, 1, 0.5, 0.5)).toBeGreaterThan(0.75);
   });
 });
