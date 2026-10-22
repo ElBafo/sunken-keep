@@ -833,12 +833,15 @@ export function ageDoorPanelPixels(
   return out;
 }
 
-/** Dark grey-brown iron (#3a342e) with subtle orange-brown rust; no red cast. */
+/**
+ * Dark grey-brown iron. Hue of #3a342e, value dropped so bake/torch light
+ * still reads as iron against the planks — not a tan stud, not maroon.
+ */
 export function padlockIronPixels(kind: 'body' | 'shackle', size = 8): Uint8ClampedArray {
   const data = new Uint8ClampedArray(size * size * 4);
-  const base = kind === 'shackle' ? [50, 48, 46] : [58, 52, 46];
-  const rust = [74, 58, 42];
-  const pit = [40, 36, 32];
+  const base = kind === 'shackle' ? [32, 31, 30] : [36, 32, 28];
+  const rust = [50, 40, 30];
+  const pit = [24, 22, 20];
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4;
@@ -865,7 +868,8 @@ function pushQuad(
   tz: number,
   wood = false,
   leafTop = 0,
-  role?: QuadRole
+  role?: QuadRole,
+  rustUv = false
 ): void {
   const world = corners.map((c) => mapLocal(face, tx, tz, c[0], c[1], c[2]));
   const ax = world[1][0] - world[0][0];
@@ -883,7 +887,21 @@ function pushQuad(
   nz /= len;
   const uOff = faceUOffset(face, tx, tz);
   const uv: Array<[number, number]> = [];
-  if (wood && (kind === 'front' || kind === 'back')) {
+  if (rustUv) {
+    const ax = corners[1][0] - corners[0][0];
+    const ay = corners[1][1] - corners[0][1];
+    const az = corners[1][2] - corners[0][2];
+    const bx = corners[3][0] - corners[0][0];
+    const by = corners[3][1] - corners[0][1];
+    const bz = corners[3][2] - corners[0][2];
+    const al = ax * ax + ay * ay + az * az || 1;
+    const bl = bx * bx + by * by + bz * bz || 1;
+    for (const c of corners) {
+      const du = ((c[0] - corners[0][0]) * ax + (c[1] - corners[0][1]) * ay + (c[2] - corners[0][2]) * az) / al;
+      const dv = ((c[0] - corners[0][0]) * bx + (c[1] - corners[0][1]) * by + (c[2] - corners[0][2]) * bz) / bl;
+      uv.push([du, dv]);
+    }
+  } else if (wood && (kind === 'front' || kind === 'back')) {
     for (const c of corners) uv.push(woodUv(c[0], c[1], leafTop));
   } else if (kind === 'front' && role && FIELD_STONE_ROLES.has(role)) {
     const y0 = Math.min(...corners.map((c) => c[1]));
@@ -937,10 +955,10 @@ export function leafMeshes(
     pushQuad(wood, q.corners, q.kind, face, tx, tz, true, top);
   }
   for (const q of listPadlockQuads(style, 'body')) {
-    pushQuad(iron, q.corners, q.kind, face, tx, tz);
+    pushQuad(iron, q.corners, q.kind, face, tx, tz, false, 0, q.role, true);
   }
   for (const q of listPadlockQuads(style, 'shackle')) {
-    pushQuad(shackle, q.corners, q.kind, face, tx, tz);
+    pushQuad(shackle, q.corners, q.kind, face, tx, tz, false, 0, q.role, true);
   }
   return { wood, iron, shackle };
 }

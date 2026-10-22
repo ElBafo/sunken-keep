@@ -229,19 +229,21 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     for (let i = 0; i < body.length; i += 4) {
       expect(body[i] - body[i + 2]).toBeLessThan(36);
       expect(sat(body, i)).toBeLessThan(0.48);
-      expect(luma(body, i)).toBeGreaterThan(0.12);
-      expect(luma(body, i)).toBeLessThan(0.32);
-      if (body[i] === 58 && body[i + 1] === 52 && body[i + 2] === 46) bodyBase += 1;
-      if (body[i] === 74 && body[i + 1] === 58 && body[i + 2] === 42) rust += 1;
+      expect(luma(body, i)).toBeGreaterThan(0.08);
+      expect(luma(body, i)).toBeLessThan(0.28);
+      expect(body[i]).toBeGreaterThanOrEqual(body[i + 1]);
+      expect(body[i + 1]).toBeGreaterThanOrEqual(body[i + 2] - 2);
+      if (body[i] <= 40 && body[i] - body[i + 2] <= 12) bodyBase += 1;
+      if (body[i] - body[i + 2] >= 14 && body[i + 1] > body[i + 2]) rust += 1;
     }
     expect(bodyBase).toBeGreaterThan(8);
     expect(rust).toBeGreaterThan(0);
     let shackGrey = 0;
     for (let i = 0; i < shackle.length; i += 4) {
-      expect(Math.abs(shackle[i] - shackle[i + 1])).toBeLessThanOrEqual(8);
-      expect(shackle[i] - shackle[i + 2]).toBeLessThan(16);
+      expect(Math.abs(shackle[i] - shackle[i + 1])).toBeLessThanOrEqual(4);
+      expect(shackle[i] - shackle[i + 2]).toBeLessThan(8);
       expect(sat(shackle, i)).toBeLessThan(0.22);
-      if (shackle[i] === 50 && shackle[i + 1] === 48 && shackle[i + 2] === 46) shackGrey += 1;
+      if (shackle[i] <= 36 && Math.abs(shackle[i] - shackle[i + 2]) <= 4) shackGrey += 1;
     }
     expect(shackGrey).toBeGreaterThan(8);
   });
