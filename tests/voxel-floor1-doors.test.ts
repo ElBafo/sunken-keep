@@ -275,11 +275,11 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     for (let i = 0; i < plate.length; i += 4) {
       expect(plate[i] - plate[i + 2]).toBeLessThan(36);
       expect(sat(plate, i)).toBeLessThan(0.48);
-      expect(luma(plate, i)).toBeGreaterThan(0.12);
-      expect(luma(plate, i)).toBeLessThan(0.3);
+      expect(luma(plate, i)).toBeGreaterThan(0.08);
+      expect(luma(plate, i)).toBeLessThan(0.26);
       expect(plate[i]).toBeGreaterThanOrEqual(plate[i + 1]);
       expect(plate[i + 1]).toBeGreaterThanOrEqual(plate[i + 2] - 2);
-      if (Math.abs(plate[i] - 58) <= 4 && Math.abs(plate[i + 1] - 52) <= 4 && Math.abs(plate[i + 2] - 46) <= 4) {
+      if (plate[i] <= 44 && plate[i] - plate[i + 2] <= 12) {
         base += 1;
       }
       if (plate[i] - plate[i + 2] >= 14 && plate[i + 1] > plate[i + 2]) rust += 1;

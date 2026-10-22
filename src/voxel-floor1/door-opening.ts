@@ -74,8 +74,8 @@ export const KEYHOLE_PLATE_W = 0.08;
 export const KEYHOLE_PLATE_H = 0.12;
 export const KEYHOLE_PLATE_D = 0.006;
 export const KEYHOLE_PLATE_MAX_HEIGHT_M = 0.16;
-/** World-Y of the plate centre — handle height, near eye level. */
-export const KEYHOLE_PLATE_CY = 0.92;
+/** World-Y of the plate centre — beside the ring handle, lock height. */
+export const KEYHOLE_PLATE_CY = 0.78;
 /** Black keyhole cut: round top plus a tapered slot. */
 export const KEYHOLE_CUT_W = 0.015;
 export const KEYHOLE_CUT_H = 0.04;
@@ -621,7 +621,7 @@ export function listKeyholePlateQuads(
       plate.push(...ironBox(rx - rivet * 0.5, rx + rivet * 0.5, ry - rivet * 0.5, ry + rivet * 0.5, rz0, rz1));
     }
   }
-  const cut = keyholeCutQuads(cx, cy, z1 - 0.002);
+  const cut = keyholeCutQuads(cx, cy, z1 + 0.0008);
   if (part === 'plate') return plate;
   if (part === 'cut') return cut;
   return [...plate, ...cut];
@@ -827,12 +827,15 @@ export function ageDoorPanelPixels(
   return out;
 }
 
-/** Dark rusty grey iron — #3a342e with a few rust pits. Fully matte. */
+/**
+ * Dark rusty grey iron. Hue of #3a342e, value dropped so bake/torch light
+ * still reads as iron against the planks.
+ */
 export function lockPlateIronPixels(size = 8): Uint8ClampedArray {
   const data = new Uint8ClampedArray(size * size * 4);
-  const base = [58, 52, 46];
-  const rust = [70, 54, 40];
-  const pit = [42, 38, 34];
+  const base = [40, 36, 32];
+  const rust = [54, 42, 32];
+  const pit = [28, 26, 24];
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4;
