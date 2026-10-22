@@ -27,10 +27,11 @@ export const WALL_MOUNT_NEAR_CULL = CAMERA_NEAR + 0.5;
 export const CUTOUT_ALPHA_TEST = 0.5;
 export const CAMERA_PITCH = (cameraSpec.pitchDeg * Math.PI) / 180;
 export const BACK_OFFSET = cameraSpec.backOffsetTiles * CELL;
-/** Same logical 3D view box as proto3d — keeps hall length matching Classic. */
+/** Classic 270×380 letterbox — kept as the reference that yields 61.61° horizontal FOV. */
 export const CAMERA_VIEW_W = cameraSpec.view[0];
 export const CAMERA_VIEW_H = cameraSpec.view[1];
 export const CAMERA_VIEW_ASPECT = CAMERA_VIEW_W / CAMERA_VIEW_H;
+export { CAMERA_HFOV_DEG } from './portrait-layout';
 /** Same fog window as proto3d so a far square does not vanish early. */
 export const FOG_NEAR = 10;
 export const FOG_FAR = 28;

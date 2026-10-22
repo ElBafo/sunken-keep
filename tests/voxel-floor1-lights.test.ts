@@ -367,10 +367,12 @@ describe('voxel-floor1 still does not import proto3d', () => {
     expect(main).toContain('BRACKET_LAYER');
     expect(main).toContain('setBakeBlends');
     expect(main).toContain('CAMERA_VIEW_ASPECT');
-    expect(main).toContain('CAMERA_VIEW_W');
+    expect(main).toContain('CAMERA_HFOV_DEG');
     expect(main).toContain('setLookPitch');
     expect(main).toContain('setLookYaw');
-    expect(main).toContain('renderer.setSize(CAMERA_VIEW_W, CAMERA_VIEW_H, false)');
+    expect(main).toContain('renderer.setSize(layout.view.w, layout.view.h, false)');
+    expect(main).toContain('applyCameraProjection');
+    expect(main).not.toContain('renderer.setSize(CAMERA_VIEW_W, CAMERA_VIEW_H, false)');
     expect(main).not.toContain('TorchLightPools');
     expect(main).toContain('parseLightMode');
     expect(main).toContain('readStoredQuality');

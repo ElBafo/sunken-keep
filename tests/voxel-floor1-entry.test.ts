@@ -19,14 +19,18 @@ describe('voxel-floor1 is a standalone Vite page', () => {
     expect(html).toContain('id="btn-back"');
     expect(html).toContain('id="btn-left"');
     expect(html).toContain('id="btn-right"');
+    expect(html).toContain('id="btn-strafe-left"');
+    expect(html).toContain('id="btn-strafe-right"');
     expect(html).toContain('id="btn-quality"');
     expect(html).toContain('id="btn-door"');
-    expect(html).toContain('id="prompt"');
-    expect(html).toContain('id="gfx"');
-    expect(html).toContain('Turn Left');
-    expect(html).toContain('Turn Right');
+    expect(html).toContain('id="game-hud"');
+    expect(html).toContain('id="party-strip"');
+    expect(html).toContain('id="message-log"');
+    expect(html).toContain('id="move-pad"');
+    expect(html).toContain('env(safe-area-inset-top');
     expect(html).not.toContain('id="party-hud"');
     expect(html).not.toContain('id="game-stage"');
+    expect(html).not.toContain('id="game-letterbox"');
   });
 
   it('hides the fps readout unless ?dev=1', () => {
@@ -51,6 +55,8 @@ describe('voxel-floor1 is a standalone Vite page', () => {
   it('does not import proto3d renderer modules', () => {
     expect(main).not.toContain("from '../proto3d/");
     expect(main).not.toContain('lab-render');
+    expect(main).toContain('measurePortraitLayout');
+    expect(main).toContain('applyCameraProjection');
     expect(main).toContain("from '../voxel-lab/look'");
     expect(main).toContain('torchesActive');
     expect(main).toContain('sunbeamsActive');

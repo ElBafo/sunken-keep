@@ -16,6 +16,7 @@ type Floor1 = {
   cell: number;
   eyeHeight: number;
   fov: number;
+  hfov: number;
   setPosition: (x: number, y: number, dir: number) => void;
   stepForward: () => boolean;
   turnLeft: () => boolean;
@@ -45,11 +46,16 @@ test('voxel-floor1 boots at New Game start with a lit lantern', async ({ page })
 
   const left = page.locator('#btn-left');
   const right = page.locator('#btn-right');
-  await expect(left).toHaveText('Turn Left');
-  await expect(right).toHaveText('Turn Right');
+  await expect(left).toHaveAttribute('aria-label', 'Turn left');
+  await expect(right).toHaveAttribute('aria-label', 'Turn right');
   const leftBox = await left.boundingBox();
   expect(leftBox).not.toBeNull();
   expect(leftBox!.height).toBeGreaterThanOrEqual(44);
+  const strip = page.locator('#party-strip');
+  await expect(strip).toBeVisible();
+  const stripBox = await strip.boundingBox();
+  expect(stripBox).not.toBeNull();
+  expect(stripBox!.width).toBeGreaterThanOrEqual(390);
 
   const state = await page.evaluate(() => {
     const api = (window as unknown as { __voxelFloor1: Floor1 }).__voxelFloor1;
@@ -61,6 +67,7 @@ test('voxel-floor1 boots at New Game start with a lit lantern', async ({ page })
       cell: api.cell,
       eyeHeight: api.eyeHeight,
       fov: api.fov,
+      hfov: api.hfov,
       draws: api.draws,
       triangles: api.triangles,
       luma: api.meanLuma()
@@ -71,7 +78,7 @@ test('voxel-floor1 boots at New Game start with a lit lantern', async ({ page })
   expect(state.dir).toBe(3);
   expect(state.lantern).toBe(true);
   expect(state.cell).toBe(2);
-  expect(state.fov).toBe(80);
+  expect(state.hfov).toBeCloseTo(61.61, 2);
   expect(state.eyeHeight).toBeCloseTo(0.94, 2);
   expect(state.draws).toBeGreaterThan(0);
   expect(state.triangles).toBeGreaterThan(0);
