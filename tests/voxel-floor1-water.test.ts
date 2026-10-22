@@ -44,6 +44,13 @@ import {
   WATER_DIP_SHALLOW,
   WATER_INSET_MAX,
   WATER_INSET_MIN,
+  WATER_SURFACE_MIN_BELOW,
+  DECAL_LIFT,
+  DECAL_OFFSET_FACTOR,
+  DECAL_OFFSET_UNITS,
+  hasDecalNeighbor,
+  waterOverlayY,
+  puddleSurfaceY,
   WATER_NOISE_SPAN,
   PUDDLE_ALPHA_DECAL_DEEP,
   PUDDLE_ALPHA_DECAL_SHALLOW,
@@ -213,10 +220,11 @@ describe('voxel-floor1 water dip leaves no border gap', () => {
   const defaultSize = CELL + 2 * (CAMERA_NEAR + 0.12);
 
   it('keeps the matching stone edge at floor height and dips only inside', () => {
-    expect(WATER_DIP_SHALLOW).toBeGreaterThanOrEqual(0.02);
-    expect(WATER_DIP_SHALLOW).toBeLessThanOrEqual(0.04);
+    expect(WATER_DIP_SHALLOW).toBeGreaterThanOrEqual(0.06);
+    expect(WATER_DIP_SHALLOW).toBeLessThanOrEqual(0.08);
     expect(WATER_DIP_DEEP).toBeGreaterThan(WATER_DIP_SHALLOW);
-    expect(WATER_DIP_DEEP).toBeLessThanOrEqual(0.06);
+    expect(WATER_DIP_DEEP).toBeGreaterThanOrEqual(0.08);
+    expect(WATER_DIP_DEEP).toBeLessThanOrEqual(0.1);
 
     expect(floorDip(floor1Map, 1, 1, 0, 0.5)).toBeCloseTo(0, 3);
     expect(floorDip(floor1Map, 1, 1, 0.5, 0)).toBeCloseTo(0, 3);
@@ -228,6 +236,8 @@ describe('voxel-floor1 water dip leaves no border gap', () => {
 
     expect(paintedFloorSize(4, 2, floor1Map, defaultSize)).toBe(CELL);
     expect(hasWaterNeighbor(floor1Map, 4, 2)).toBe(true);
+    expect(hasDecalNeighbor(2, 6)).toBe(true);
+    expect(paintedFloorSize(2, 6, floor1Map, defaultSize)).toBe(CELL);
     expect(paintedFloorSize(3, 14, floor1Map, defaultSize)).toBe(defaultSize);
     expect(isWaterCell(floor1Map, 2, 2)).toBe(true);
   });
@@ -299,6 +309,39 @@ describe('voxel-floor1 water dip leaves no border gap', () => {
     expect(water).not.toContain('ShaderMaterial');
     expect(water).not.toContain('../proto3d/');
     expect(water).toContain('castShadow = false');
+  });
+});
+
+describe('voxel-floor1 floor overlays stay off the dry stone', () => {
+  it('keeps the wet film below the floor at the cistern door and shore', () => {
+    expect(WATER_SURFACE_MIN_BELOW).toBeGreaterThanOrEqual(0.06);
+    expect(WATER_SURFACE_MIN_BELOW).toBeLessThanOrEqual(0.1);
+    expect(DECAL_LIFT).toBeGreaterThanOrEqual(0.006);
+    expect(DECAL_LIFT).toBeLessThan(0.02);
+    expect(DECAL_OFFSET_FACTOR).toBeLessThan(0);
+    expect(DECAL_OFFSET_UNITS).toBeLessThanOrEqual(-8);
+    expect(waterOverlayY(0)).toBeCloseTo(-WATER_SURFACE_MIN_BELOW, 5);
+    expect(waterOverlayY(0, 0.002)).toBeLessThanOrEqual(-0.06);
+    expect(waterOverlayY(-0.09)).toBeCloseTo(-0.09 + DECAL_LIFT, 5);
+    expect(waterOverlayY(-0.09)).toBeLessThan(-WATER_SURFACE_MIN_BELOW + 1e-6);
+    expect(puddleSurfaceY(floor1Map, 3, 2, 1, 0.5)).toBeLessThanOrEqual(-0.06);
+    expect(puddleSurfaceY(floor1Map, 3, 2, 0.5, 0.5)).toBeLessThan(-0.05);
+    expect(puddleSurfaceY(floor1Map, 4, 2, 0.5, 0.5)).toBeLessThanOrEqual(-0.06);
+    expect(puddleSurfaceY(floor1Map, 1, 5, 0.5, 0.92)).toBeLessThanOrEqual(-0.06);
+    expect(floorDip(floor1Map, 4, 2, 0.5, 0.5)).toBeCloseTo(0, 3);
+  });
+
+  it('does not stretch an untextured film onto the dry shore or skip polygonOffset', () => {
+    const water = readFileSync(resolve(SRC, 'water.ts'), 'utf8');
+    expect(water).toContain('polygonOffsetFactor: DECAL_OFFSET_FACTOR');
+    expect(water).toContain('function floorOverlayFlags');
+    expect(water).toContain('depthWrite: false');
+    expect(water).toContain('alphaTest');
+    expect(water).toContain('.filter((c) => !hasWaterDecal(c.x, c.y))');
+    expect(water).not.toContain('shorePlacements.map((p) => ({ x: p.spec.x, y: p.spec.y }))');
+    expect(hasWaterDecal(1, 5)).toBe(true);
+    expect(hasWaterDecal(4, 2)).toBe(false);
+    expect(isWaterCell(floor1Map, 4, 2)).toBe(false);
   });
 });
 
@@ -473,7 +516,10 @@ describe('voxel-floor1 puddle decals lock to floor_stone', () => {
     expect(water).not.toContain('water-lips');
     expect(build).toContain('paintedShellMaterial(stonePng.texture');
     expect(build).not.toContain('compositeDecalOverStone');
-    expect(build).toContain('shorePlacements.map((p) => ({ x: p.spec.x, y: p.spec.y }))');
+    expect(water).toContain('waterOverlayY');
+    expect(build).toContain('floorOverlayFlags');
+    expect(build).toContain('DECAL_LIFT');
+    expect(build).not.toContain('shorePlacements.map((p) => ({ x: p.spec.x, y: p.spec.y }))');
     const stone = new THREE.Texture();
     paintedShellMaterial(stone, undefined, WATER_DECAL_FLOOR_FILE);
     expect(stone.generateMipmaps).toBe(true);
