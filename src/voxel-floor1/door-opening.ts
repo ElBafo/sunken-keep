@@ -69,14 +69,19 @@ export const LEAF_MAX_LUMA = 0.42;
 /** Painted leaf size after the pad / lintel inset. */
 export const LEAF_WIDTH_M = OPEN_WIDTH - 2 * LEAF_PAD;
 export const LEAF_HEIGHT_M = JAMB_TOP - LEAF_PAD;
-/** 3D rusty padlock hung from the painted middle band. */
-export const PADLOCK_BODY_W = 0.06;
-export const PADLOCK_BODY_H = 0.07;
-export const PADLOCK_BODY_D = 0.025;
-export const PADLOCK_SHACKLE_T = 0.01;
-export const PADLOCK_MAX_HEIGHT_M = 0.16;
-/** World-Y of the painted middle iron band (crop V → leaf height). */
-export const PADLOCK_BAND_Y = 1.222;
+/** 3D iron lock plate (escutcheon) on key-locked leaves only. */
+export const KEYHOLE_PLATE_W = 0.12;
+export const KEYHOLE_PLATE_H = 0.18;
+export const KEYHOLE_PLATE_D = 0.025;
+export const KEYHOLE_PLATE_BEVEL = 0.012;
+export const KEYHOLE_PLATE_MAX_HEIGHT_M = 0.22;
+/** World-Y of the plate centre — beside the ring handle, lock height. */
+export const KEYHOLE_PLATE_CY = 0.8;
+/** Black keyhole cut: round top plus a tapered slot. */
+export const KEYHOLE_CUT_W = 0.025;
+export const KEYHOLE_CUT_H = 0.06;
+/** Host cells whose level-data door is key-locked (Unlock button). */
+export const FLOOR1_KEYHOLE_DOORS = new Set(['4,2']);
 export type QuadRole = 'lintel' | 'jamb-soffit' | 'chip' | 'leaf' | 'iron';
 export type QuadKind = 'front' | 'soffit' | 'back';
 
@@ -386,6 +391,11 @@ export function doorHasLeaf(x: number, y: number): boolean {
   return `${x},${y}` in FLOOR1_DOOR_STYLES;
 }
 
+/** True for doors that start key-locked in the level data. The plate stays after unlock. */
+export function doorHasKeyholePlate(x: number, y: number): boolean {
+  return FLOOR1_KEYHOLE_DOORS.has(`${x},${y}`);
+}
+
 /** Front / back / edge quads for a rectangular leaf under the lintel. */
 export function listLeafQuads(style: DoorOpeningStyle): OpeningQuad[] {
   const pad = LEAF_PAD;
@@ -527,150 +537,196 @@ function ironBox(
   ];
 }
 
-function ironTube(
-  ax: number,
-  ay: number,
-  az: number,
-  bx: number,
-  by: number,
-  bz: number,
-  thick: number
+function plateBounds(): { cx: number; cy: number; z0: number; z1: number } {
+  const a0 = OPEN_U0 + LEAF_PAD;
+  const a1 = OPEN_U1 - LEAF_PAD;
+  const seam = (a0 + a1) * 0.5;
+  return {
+    cx: seam + 0.012 + KEYHOLE_PLATE_W * 0.5,
+    cy: KEYHOLE_PLATE_CY,
+    z0: LEAF_FRONT + IRON_PROUD,
+    z1: LEAF_FRONT + IRON_PROUD + KEYHOLE_PLATE_D
+  };
+}
+
+function bevelledPlateQuads(
+  cx: number,
+  cy: number,
+  z0: number,
+  z1: number,
+  hw: number,
+  hh: number,
+  inset: number
 ): OpeningQuad[] {
-  const dx = bx - ax;
-  const dy = by - ay;
-  const dz = bz - az;
-  const len = Math.hypot(dx, dy, dz) || 1e-6;
-  const ux = dx / len;
-  const uy = dy / len;
-  const uz = dz / len;
-  let px = uy;
-  let py = -ux;
-  let pz = 0;
-  if (Math.hypot(px, py, pz) < 1e-6) {
-    px = 0;
-    py = uz;
-    pz = -uy;
-  }
-  const pl = Math.hypot(px, py, pz) || 1;
-  px /= pl;
-  py /= pl;
-  pz /= pl;
-  const qx = uy * pz - uz * py;
-  const qy = uz * px - ux * pz;
-  const qz = ux * py - uy * px;
-  const h = thick / 2;
-  const ring = [
-    [-px - qx, -py - qy, -pz - qz],
-    [px - qx, py - qy, pz - qz],
-    [px + qx, py + qy, pz + qz],
-    [-px + qx, -py + qy, -pz + qz]
-  ];
-  const a = ring.map((r) => [ax + r[0] * h, ay + r[1] * h, az + r[2] * h] as [number, number, number]);
-  const b = ring.map((r) => [bx + r[0] * h, by + r[1] * h, bz + r[2] * h] as [number, number, number]);
+  const x0 = cx - hw;
+  const x1 = cx + hw;
+  const y0 = cy - hh;
+  const y1 = cy + hh;
+  const fx0 = x0 + inset;
+  const fx1 = x1 - inset;
+  const fy0 = y0 + inset;
+  const fy1 = y1 - inset;
   const q = (corners: OpeningQuad['corners']): OpeningQuad => ({
     role: 'iron',
     kind: 'front',
     corners
   });
   return [
-    q([a[0], a[1], b[1], b[0]]),
-    q([a[1], a[2], b[2], b[1]]),
-    q([a[2], a[3], b[3], b[2]]),
-    q([a[3], a[0], b[0], b[3]])
+    q([
+      [fx0, fy0, z1],
+      [fx1, fy0, z1],
+      [fx1, fy1, z1],
+      [fx0, fy1, z1]
+    ]),
+    q([
+      [x0, y0, z0],
+      [x0, y1, z0],
+      [x1, y1, z0],
+      [x1, y0, z0]
+    ]),
+    q([
+      [x0, y0, z0],
+      [x1, y0, z0],
+      [fx1, fy0, z1],
+      [fx0, fy0, z1]
+    ]),
+    q([
+      [x0, y1, z0],
+      [fx0, fy1, z1],
+      [fx1, fy1, z1],
+      [x1, y1, z0]
+    ]),
+    q([
+      [x0, y0, z0],
+      [fx0, fy0, z1],
+      [fx0, fy1, z1],
+      [x0, y1, z0]
+    ]),
+    q([
+      [x1, y0, z0],
+      [x1, y1, z0],
+      [fx1, fy1, z1],
+      [fx1, fy0, z1]
+    ])
   ];
+}
+
+function keyholeCutQuads(cx: number, cy: number, z: number): OpeningQuad[] {
+  const r = KEYHOLE_CUT_W * 0.5;
+  const halfH = KEYHOLE_CUT_H * 0.5;
+  const s = 1 / Math.SQRT2;
+  const circY = cy + halfH - r;
+  const ring: Array<[number, number]> = [
+    [1, 0],
+    [s, s],
+    [0, 1],
+    [-s, s],
+    [-1, 0],
+    [-s, -s],
+    [0, -1],
+    [s, -s]
+  ];
+  const q = (corners: OpeningQuad['corners']): OpeningQuad => ({
+    role: 'iron',
+    kind: 'front',
+    corners
+  });
+  const out: OpeningQuad[] = [];
+  for (let i = 0; i < 8; i += 2) {
+    const a = ring[i];
+    const b = ring[(i + 1) & 7];
+    const d = ring[(i + 2) & 7];
+    out.push(
+      q([
+        [cx, circY, z],
+        [cx + a[0] * r, circY + a[1] * r, z],
+        [cx + b[0] * r, circY + b[1] * r, z],
+        [cx + d[0] * r, circY + d[1] * r, z]
+      ])
+    );
+  }
+  const topW = r * 0.62;
+  const botW = r * 0.36;
+  const slotTop = circY - r * 0.2;
+  const slotBot = cy - halfH;
+  out.push(
+    q([
+      [cx - topW, slotTop, z],
+      [cx + topW, slotTop, z],
+      [cx + botW, slotBot, z],
+      [cx - botW, slotBot, z]
+    ])
+  );
+  return out;
 }
 
 /**
- * Hasp on the painted middle band near the centre seam, plus a dark rusty
- * padlock (6×7×2.5 cm body, ~1 cm round shackle, keyhole).
+ * Iron escutcheon at handle height beside the centre seam: 12×18 cm plate,
+ * 2.5 cm proud with a bevel, four tiny rivets, and a black keyhole cut.
  */
-export function listPadlockQuads(
+export function listKeyholePlateQuads(
   _style: DoorOpeningStyle = 'lintel',
-  part: 'all' | 'body' | 'shackle' = 'all'
+  part: 'all' | 'plate' | 'cut' = 'all'
 ): OpeningQuad[] {
-  const a0 = OPEN_U0 + LEAF_PAD;
-  const a1 = OPEN_U1 - LEAF_PAD;
-  const cx = (a0 + a1) * 0.5 + 0.035;
-  const bandY = PADLOCK_BAND_Y;
-  const bodyW = PADLOCK_BODY_W;
-  const bodyH = PADLOCK_BODY_H;
-  const bodyD = PADLOCK_BODY_D;
-  const t = PADLOCK_SHACKLE_T;
-  const z0 = LEAF_FRONT + IRON_PROUD;
-  const z1 = z0 + bodyD;
-  const zc = (z0 + z1) * 0.5;
-  const bodyTop = bandY - 0.012;
-  const bodyBot = bodyTop - bodyH;
-  const body: OpeningQuad[] = [];
-  const shackle: OpeningQuad[] = [];
-  body.push(...ironBox(cx - bodyW * 0.5, cx + bodyW * 0.5, bodyBot, bodyTop, z0, z1));
-  body.push(
-    ...ironBox(
-      cx - bodyW * 0.42,
-      cx + bodyW * 0.42,
-      bodyBot - 0.008,
-      bodyBot + 0.002,
-      z0 + 0.003,
-      z1 - 0.003
-    )
-  );
-  const holeW = 0.008;
-  const holeH = 0.014;
-  const holeY = bodyBot + bodyH * 0.42;
-  body.push(
-    ...ironBox(
-      cx - holeW * 0.5,
-      cx + holeW * 0.5,
-      holeY,
-      holeY + holeH,
-      z1 - 0.008,
-      z1 + 0.001
-    )
-  );
-  const haspW = 0.02;
-  const haspOut = 0.018;
-  const haspT = 0.008;
-  body.push(...ironTube(cx - haspW * 0.5, bandY, z0, cx - haspW * 0.5, bandY, z0 + haspOut, haspT));
-  body.push(...ironTube(cx + haspW * 0.5, bandY, z0, cx + haspW * 0.5, bandY, z0 + haspOut, haspT));
-  body.push(
-    ...ironTube(cx - haspW * 0.5, bandY, z0 + haspOut, cx + haspW * 0.5, bandY, z0 + haspOut, haspT)
-  );
-  const r = 0.02;
-  const postTop = bandY;
-  const left = cx - r;
-  const right = cx + r;
-  shackle.push(...ironTube(left, bodyTop, zc, left, postTop, zc, t));
-  shackle.push(...ironTube(right, bodyTop, zc, right, postTop, zc, t));
-  const s = 1 / Math.SQRT2;
-  const arc: Array<[number, number]> = [
-    [-1, 0],
-    [-s, s],
-    [0, 1],
-    [s, s],
-    [1, 0]
-  ];
-  for (let i = 0; i < arc.length - 1; i++) {
-    const a = arc[i];
-    const b = arc[i + 1];
-    shackle.push(
-      ...ironTube(cx + a[0] * r, postTop + a[1] * r, zc, cx + b[0] * r, postTop + b[1] * r, zc, t)
-    );
+  const { cx, cy, z0, z1 } = plateBounds();
+  const hw = KEYHOLE_PLATE_W * 0.5;
+  const hh = KEYHOLE_PLATE_H * 0.5;
+  const plate = bevelledPlateQuads(cx, cy, z0, z1, hw, hh, KEYHOLE_PLATE_BEVEL);
+  const rivet = 0.008;
+  const inset = KEYHOLE_PLATE_BEVEL + 0.01;
+  const rz0 = z1 - 0.002;
+  const rz1 = z1 + 0.003;
+  for (const sx of [-1, 1]) {
+    for (const sy of [-1, 1]) {
+      const rx = cx + sx * (hw - inset);
+      const ry = cy + sy * (hh - inset);
+      plate.push(...ironBox(rx - rivet * 0.5, rx + rivet * 0.5, ry - rivet * 0.5, ry + rivet * 0.5, rz0, rz1));
+    }
   }
-  if (part === 'body') return body;
-  if (part === 'shackle') return shackle;
-  return [...body, ...shackle];
+  const cut = keyholeCutQuads(cx, cy, z1 + 0.001);
+  if (part === 'plate') return plate;
+  if (part === 'cut') return cut;
+  return [...plate, ...cut];
 }
 
-export function padlockHeightM(style: DoorOpeningStyle = 'lintel'): number {
+export function keyholePlateHeightM(style: DoorOpeningStyle = 'lintel'): number {
   let minY = 1e9;
   let maxY = -1e9;
-  for (const q of listPadlockQuads(style)) {
+  for (const q of listKeyholePlateQuads(style, 'plate')) {
     for (const c of q.corners) {
       if (c[1] < minY) minY = c[1];
       if (c[1] > maxY) maxY = c[1];
     }
   }
   return maxY - minY;
+}
+
+export function keyholePlateWidthM(style: DoorOpeningStyle = 'lintel'): number {
+  let minX = 1e9;
+  let maxX = -1e9;
+  for (const q of listKeyholePlateQuads(style, 'plate')) {
+    for (const c of q.corners) {
+      if (c[0] < minX) minX = c[0];
+      if (c[0] > maxX) maxX = c[0];
+    }
+  }
+  return maxX - minX;
+}
+
+export function keyholeCutSizeM(style: DoorOpeningStyle = 'lintel'): { w: number; h: number } {
+  let minX = 1e9;
+  let maxX = -1e9;
+  let minY = 1e9;
+  let maxY = -1e9;
+  for (const q of listKeyholePlateQuads(style, 'cut')) {
+    for (const c of q.corners) {
+      if (c[0] < minX) minX = c[0];
+      if (c[0] > maxX) maxX = c[0];
+      if (c[1] < minY) minY = c[1];
+      if (c[1] > maxY) maxY = c[1];
+    }
+  }
+  return { w: maxX - minX, h: maxY - minY };
 }
 
 function mapLocal(face: FaceNESW, tx: number, tz: number, a: number, u: number, d: number): [number, number, number] {
@@ -834,24 +890,35 @@ export function ageDoorPanelPixels(
 }
 
 /**
- * Dark grey-brown iron. Hue of #3a342e, value dropped so bake/torch light
- * still reads as iron against the planks — not a tan stud, not maroon.
+ * Plain dark rusty-grey iron with subtle noise. Hue of #3a342e, value
+ * dropped so bake/torch still reads as iron — no orange rust blocks.
  */
-export function padlockIronPixels(kind: 'body' | 'shackle', size = 8): Uint8ClampedArray {
+export function lockPlateIronPixels(size = 32): Uint8ClampedArray {
   const data = new Uint8ClampedArray(size * size * 4);
-  const base = kind === 'shackle' ? [32, 31, 30] : [36, 32, 28];
-  const rust = [50, 40, 30];
-  const pit = [24, 22, 20];
+  const br = 38;
+  const bg = 35;
+  const bb = 32;
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4;
-      const n = (x * 17 + y * 31 + (kind === 'body' ? 0 : 5)) & 7;
-      const c = kind === 'body' && (n === 0 || n === 4) ? rust : n === 2 ? pit : base;
-      data[i] = c[0];
-      data[i + 1] = c[1];
-      data[i + 2] = c[2];
+      const n = ((x * 13 + y * 37 + x * y * 3) % 7) - 3;
+      data[i] = br + n;
+      data[i + 1] = bg + n;
+      data[i + 2] = bb + Math.max(-3, n - 1);
       data[i + 3] = 255;
     }
+  }
+  return data;
+}
+
+/** Solid black keyhole — unlit, emissive 0. */
+export function keyholeCutPixels(size = 4): Uint8ClampedArray {
+  const data = new Uint8ClampedArray(size * size * 4);
+  for (let i = 0; i < data.length; i += 4) {
+    data[i] = 0;
+    data[i + 1] = 0;
+    data[i + 2] = 0;
+    data[i + 3] = 255;
   }
   return data;
 }
@@ -945,22 +1012,25 @@ export function leafMeshes(
   style: DoorOpeningStyle,
   face: FaceNESW,
   tx: number,
-  tz: number
-): { wood: MeshArrays; iron: MeshArrays; shackle: MeshArrays } {
+  tz: number,
+  keyholePlate = false
+): { wood: MeshArrays; iron: MeshArrays; keyhole: MeshArrays } {
   const wood = emptyMesh();
   const iron = emptyMesh();
-  const shackle = emptyMesh();
+  const keyhole = emptyMesh();
   const top = jambTop(style) - LEAF_PAD;
   for (const q of listLeafQuads(style)) {
     pushQuad(wood, q.corners, q.kind, face, tx, tz, true, top);
   }
-  for (const q of listPadlockQuads(style, 'body')) {
-    pushQuad(iron, q.corners, q.kind, face, tx, tz, false, 0, q.role, true);
+  if (keyholePlate) {
+    for (const q of listKeyholePlateQuads(style, 'plate')) {
+      pushQuad(iron, q.corners, q.kind, face, tx, tz, false, 0, q.role, true);
+    }
+    for (const q of listKeyholePlateQuads(style, 'cut')) {
+      pushQuad(keyhole, q.corners, q.kind, face, tx, tz, false, 0, q.role, true);
+    }
   }
-  for (const q of listPadlockQuads(style, 'shackle')) {
-    pushQuad(shackle, q.corners, q.kind, face, tx, tz, false, 0, q.role, true);
-  }
-  return { wood, iron, shackle };
+  return { wood, iron, keyhole };
 }
 
 export function openingUsesWallTexels(): number {

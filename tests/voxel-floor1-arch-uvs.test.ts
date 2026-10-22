@@ -205,7 +205,7 @@ describe('floor-1 door opening styles', () => {
     expect(art).toContain('slides up');
     expect(art).toContain('rectangular under the lintel');
     expect(art).toContain('plank-column');
-    expect(art).toContain('padlock');
+    expect(art).toContain('keyhole');
     expect(art).toContain('door_panel.png');
     expect(art).toContain('exempt from the antique-oak');
     expect(art).toContain('never near white');
