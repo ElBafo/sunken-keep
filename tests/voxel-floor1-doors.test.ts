@@ -15,13 +15,18 @@ import {
 import { inflateSync } from 'zlib';
 import {
   ageDoorPanelPixels,
+  doorHasKeyholePlate,
   doorPanelLeafRect,
+  KEYHOLE_PLATE_MAX_HEIGHT_M,
+  keyholeCutPixels,
+  keyholeCutSizeM,
+  keyholePlateHeightM,
+  keyholePlateWidthM,
   LEAF_MAX_LUMA,
+  leafMeshes,
   lintelTop,
-  PADLOCK_MAX_HEIGHT_M,
-  listPadlockQuads,
-  padlockHeightM,
-  padlockIronPixels
+  listKeyholePlateQuads,
+  lockPlateIronPixels
 } from '../src/voxel-floor1/door-opening';
 import { greedyMesh } from '../src/voxel-lab/mesher';
 import {
@@ -33,7 +38,7 @@ import {
   solidifyArchVolume,
   type OpeningVisual
 } from '../src/voxel-floor1/openings';
-import { floor1Map, openingViews, resetFloor1Doors, tileAt } from '../src/voxel-floor1/layout';
+import { FLOOR1_DOOR_EDGES, floor1Map, openingViews, resetFloor1Doors, tileAt } from '../src/voxel-floor1/layout';
 import { lookForSecret } from '../src/voxel-floor1/wall-look';
 
 function paeth(a: number, b: number, c: number): number {
@@ -197,23 +202,64 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     expect(aged[stud]).toBeGreaterThan(aged[stud + 2]);
   });
 
-  it('hangs a 3D padlock on the leaf under 16 cm', () => {
-    expect(listPadlockQuads('lintel').length).toBeGreaterThan(8);
-    const h = padlockHeightM('lintel');
-    expect(h).toBeGreaterThan(0.08);
-    expect(h).toBeLessThan(PADLOCK_MAX_HEIGHT_M);
+  it('does not hang a 3D padlock or hasp on any door', () => {
+    const door = readFileSync(resolve(__dirname, '../src/voxel-floor1/door-opening.ts'), 'utf8');
     const openings = readFileSync(resolve(__dirname, '../src/voxel-floor1/openings.ts'), 'utf8');
+    expect(door).not.toContain('listPadlockQuads');
+    expect(door).not.toContain('PADLOCK_BODY');
+    expect(door).not.toMatch(/padlock/i);
+    expect(openings).not.toMatch(/padlock/i);
+    expect(openings).not.toContain('slider.add(shackle)');
+    expect(openings).not.toContain('door_padlock');
     expect(openings).toContain('door_panel_aged.png');
-    expect(openings).toContain('door-lock:');
-    expect(openings).toContain('slider.add(lock)');
-    expect(openings).toContain('slider.add(shackle)');
     expect(openings).toContain('userData.doorLeaf = true');
     expect(openings).toContain('specularIntensity: 0');
   });
 
-  it('tints the 3D padlock dark grey-brown iron with rust patches, no red cast', () => {
-    const body = padlockIronPixels('body', 8);
-    const shackle = padlockIronPixels('shackle', 8);
+  it('puts exactly one keyhole plate on key-locked doors, none on unlocked, under 16 cm', () => {
+    const doors = [
+      [4, 2],
+      [14, 2],
+      [6, 8],
+      [19, 5]
+    ] as const;
+    const locked = doors.filter(([x, y]) => doorHasKeyholePlate(x, y));
+    const unlocked = doors.filter(([x, y]) => !doorHasKeyholePlate(x, y));
+    expect(locked).toEqual([[4, 2]]);
+    expect(unlocked).toHaveLength(3);
+    for (const edge of FLOOR1_DOOR_EDGES) {
+      expect(doorHasKeyholePlate(edge.x, edge.y), `${edge.x},${edge.y}`).toBe(edge.locked);
+    }
+    const lockedLeaf = leafMeshes('lintel', 'W', 4, 2, true);
+    const unlockedLeaf = leafMeshes('lintel', 'E', 14, 2, false);
+    expect(lockedLeaf.iron.positions.length).toBeGreaterThan(0);
+    expect(lockedLeaf.keyhole.positions.length).toBeGreaterThan(0);
+    expect(unlockedLeaf.iron.positions.length).toBe(0);
+    expect(unlockedLeaf.keyhole.positions.length).toBe(0);
+    expect(listKeyholePlateQuads('lintel', 'plate').length).toBeGreaterThan(8);
+    expect(listKeyholePlateQuads('lintel', 'cut').length).toBeGreaterThan(2);
+    const h = keyholePlateHeightM('lintel');
+    expect(h).toBeGreaterThan(0.1);
+    expect(h).toBeLessThan(KEYHOLE_PLATE_MAX_HEIGHT_M);
+    expect(h).toBeLessThan(0.16);
+    expect(keyholePlateWidthM('lintel')).toBeCloseTo(0.08, 2);
+    const cut = keyholeCutSizeM('lintel');
+    expect(cut.w).toBeGreaterThan(0.012);
+    expect(cut.w).toBeLessThan(0.02);
+    expect(cut.h).toBeGreaterThan(0.035);
+    expect(cut.h).toBeLessThan(0.05);
+    const openings = readFileSync(resolve(__dirname, '../src/voxel-floor1/openings.ts'), 'utf8');
+    expect(openings).toContain('doorHasKeyholePlate');
+    expect(openings).toContain('door-lock-plate:');
+    expect(openings).toContain('door-keyhole:');
+    expect(openings).toContain('slider.add(plate)');
+    expect(openings).toContain('slider.add(cut)');
+    expect(openings).toContain('leafMeshes(style, face, view.tx, view.tz, doorHasKeyholePlate');
+  });
+
+  it('tints the lock plate dark rusty grey iron like #3a342e, with a black keyhole', () => {
+    const plate = lockPlateIronPixels(8);
+    const cut = keyholeCutPixels(4);
     const luma = (p: Uint8ClampedArray, i: number) =>
       (0.2126 * p[i] + 0.7152 * p[i + 1] + 0.0722 * p[i + 2]) / 255;
     const sat = (p: Uint8ClampedArray, i: number) => {
@@ -224,28 +270,26 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
       const minc = Math.min(r, g, b);
       return maxc > 0 ? (maxc - minc) / maxc : 0;
     };
-    let bodyBase = 0;
+    let base = 0;
     let rust = 0;
-    for (let i = 0; i < body.length; i += 4) {
-      expect(body[i] - body[i + 2]).toBeLessThan(36);
-      expect(sat(body, i)).toBeLessThan(0.48);
-      expect(luma(body, i)).toBeGreaterThan(0.08);
-      expect(luma(body, i)).toBeLessThan(0.28);
-      expect(body[i]).toBeGreaterThanOrEqual(body[i + 1]);
-      expect(body[i + 1]).toBeGreaterThanOrEqual(body[i + 2] - 2);
-      if (body[i] <= 40 && body[i] - body[i + 2] <= 12) bodyBase += 1;
-      if (body[i] - body[i + 2] >= 14 && body[i + 1] > body[i + 2]) rust += 1;
+    for (let i = 0; i < plate.length; i += 4) {
+      expect(plate[i] - plate[i + 2]).toBeLessThan(36);
+      expect(sat(plate, i)).toBeLessThan(0.48);
+      expect(luma(plate, i)).toBeGreaterThan(0.12);
+      expect(luma(plate, i)).toBeLessThan(0.3);
+      expect(plate[i]).toBeGreaterThanOrEqual(plate[i + 1]);
+      expect(plate[i + 1]).toBeGreaterThanOrEqual(plate[i + 2] - 2);
+      if (Math.abs(plate[i] - 58) <= 4 && Math.abs(plate[i + 1] - 52) <= 4 && Math.abs(plate[i + 2] - 46) <= 4) {
+        base += 1;
+      }
+      if (plate[i] - plate[i + 2] >= 14 && plate[i + 1] > plate[i + 2]) rust += 1;
     }
-    expect(bodyBase).toBeGreaterThan(8);
+    expect(base).toBeGreaterThan(8);
     expect(rust).toBeGreaterThan(0);
-    let shackGrey = 0;
-    for (let i = 0; i < shackle.length; i += 4) {
-      expect(Math.abs(shackle[i] - shackle[i + 1])).toBeLessThanOrEqual(4);
-      expect(shackle[i] - shackle[i + 2]).toBeLessThan(8);
-      expect(sat(shackle, i)).toBeLessThan(0.22);
-      if (shackle[i] <= 36 && Math.abs(shackle[i] - shackle[i + 2]) <= 4) shackGrey += 1;
+    for (let i = 0; i < cut.length; i += 4) {
+      expect(luma(cut, i)).toBeLessThan(0.05);
+      expect(cut[i]).toBeLessThan(16);
     }
-    expect(shackGrey).toBeGreaterThan(8);
   });
 
   it('fills arched-cap corner texels from the plank column below, without UV stretch', () => {
