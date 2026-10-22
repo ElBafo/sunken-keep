@@ -131,14 +131,14 @@ export function puddleEdgeInset(tx: number, tz: number, face: WaterFace, along: 
   const faceSeed = face.charCodeAt(0) * 0.17;
   const mid = WATER_INSET_MIN + (WATER_INSET_MAX - WATER_INSET_MIN) * 0.5;
   const bay =
-    0.085 * Math.sin(world * Math.PI * 0.58 + faceSeed + 1.1) +
-    0.05 * Math.sin(world * Math.PI * 1.38 + faceSeed * 2.3 + 3.7) +
-    0.03 * Math.sin(world * Math.PI * 2.9 + hash01(tx, tz, 9) * 5);
+    0.1 * Math.sin(world * Math.PI * 1.28 + faceSeed + 0.4) +
+    0.055 * Math.sin(world * Math.PI * 2.05 + faceSeed * 2.3 + 2.2) +
+    0.028 * Math.sin(world * Math.PI * 3.4 + hash01(tx, tz, 9) * 5);
   const tongue =
-    Math.max(0, Math.sin(world * Math.PI * 2.15 + faceSeed + 0.4)) ** 9 *
-    (0.06 + 0.035 * hash01(Math.floor(world * 3 + 0.25), face.charCodeAt(0), 14));
+    Math.max(0, Math.sin(world * Math.PI * 1.7 + faceSeed + 1.1)) ** 8 *
+    (0.07 + 0.04 * hash01(Math.floor(world * 2.5 + 0.2), face.charCodeAt(0), 14));
   const bite =
-    Math.max(0, Math.sin(world * Math.PI * 1.05 + faceSeed * 1.7 + 2.8)) ** 11 * 0.05;
+    Math.max(0, Math.sin(world * Math.PI * 0.95 + faceSeed * 1.7 + 2.1)) ** 10 * 0.055;
   const grain = 0.018 * Math.sin(world * Math.PI * 6.4 + faceSeed * 3 + along * 8);
   return Math.min(0.34, Math.max(0.11, mid + bay + tongue - bite) + grain);
 }
@@ -592,7 +592,7 @@ function cellGrid(tx: number, tz: number, map: FloorMap, kind: 'floor' | 'puddle
     if (kind === 'floor') {
       pos.setXYZ(i, wx, dip, wz);
       uvAttr.setXY(i, u, v);
-      const shore = 1 - smoothstep(0.04, 0.4, cover);
+      const shore = 1 - smoothstep(0.03, 0.5, cover);
       const wet = smoothstep(0.05, 0.3, cover) * (1 - smoothstep(0.34, 0.85, cover));
       const bedHide = 0.55 * deep * smoothstep(0.2, 0.85, cover);
       const k = (0.95 + 3.6 * shore) * (1 - 0.38 * wet) * (1 - bedHide);
