@@ -17,6 +17,7 @@ import {
   ageDoorPanelPixels,
   doorHasKeyholePlate,
   doorPanelLeafRect,
+  KEYHOLE_PLATE_D,
   KEYHOLE_PLATE_MAX_HEIGHT_M,
   keyholeCutPixels,
   keyholeCutSizeM,
@@ -216,7 +217,7 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     expect(openings).toContain('specularIntensity: 0');
   });
 
-  it('puts exactly one keyhole plate on key-locked doors, none on unlocked, under 16 cm', () => {
+  it('puts exactly one keyhole plate on key-locked doors, none on unlocked, under 22 cm', () => {
     const doors = [
       [4, 2],
       [14, 2],
@@ -239,15 +240,17 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     expect(listKeyholePlateQuads('lintel', 'plate').length).toBeGreaterThan(8);
     expect(listKeyholePlateQuads('lintel', 'cut').length).toBeGreaterThan(2);
     const h = keyholePlateHeightM('lintel');
-    expect(h).toBeGreaterThan(0.1);
+    expect(h).toBeGreaterThan(0.16);
     expect(h).toBeLessThan(KEYHOLE_PLATE_MAX_HEIGHT_M);
-    expect(h).toBeLessThan(0.16);
-    expect(keyholePlateWidthM('lintel')).toBeCloseTo(0.08, 2);
+    expect(h).toBeLessThan(0.22);
+    expect(keyholePlateWidthM('lintel')).toBeCloseTo(0.12, 2);
+    expect(KEYHOLE_PLATE_D).toBeGreaterThanOrEqual(0.02);
+    expect(KEYHOLE_PLATE_D).toBeLessThanOrEqual(0.03);
     const cut = keyholeCutSizeM('lintel');
-    expect(cut.w).toBeGreaterThan(0.012);
-    expect(cut.w).toBeLessThan(0.02);
-    expect(cut.h).toBeGreaterThan(0.035);
-    expect(cut.h).toBeLessThan(0.05);
+    expect(cut.w).toBeGreaterThan(0.022);
+    expect(cut.w).toBeLessThan(0.03);
+    expect(cut.h).toBeGreaterThan(0.055);
+    expect(cut.h).toBeLessThan(0.07);
     const openings = readFileSync(resolve(__dirname, '../src/voxel-floor1/openings.ts'), 'utf8');
     expect(openings).toContain('doorHasKeyholePlate');
     expect(openings).toContain('door-lock-plate:');
@@ -258,7 +261,7 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
   });
 
   it('tints the lock plate dark rusty grey iron like #3a342e, with a black keyhole', () => {
-    const plate = lockPlateIronPixels(8);
+    const plate = lockPlateIronPixels(32);
     const cut = keyholeCutPixels(4);
     const luma = (p: Uint8ClampedArray, i: number) =>
       (0.2126 * p[i] + 0.7152 * p[i + 1] + 0.0722 * p[i + 2]) / 255;
@@ -270,26 +273,29 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
       const minc = Math.min(r, g, b);
       return maxc > 0 ? (maxc - minc) / maxc : 0;
     };
-    let base = 0;
-    let rust = 0;
+    let minL = 1;
+    let maxL = 0;
     for (let i = 0; i < plate.length; i += 4) {
-      expect(plate[i] - plate[i + 2]).toBeLessThan(36);
-      expect(sat(plate, i)).toBeLessThan(0.48);
-      expect(luma(plate, i)).toBeGreaterThan(0.08);
-      expect(luma(plate, i)).toBeLessThan(0.26);
-      expect(plate[i]).toBeGreaterThanOrEqual(plate[i + 1]);
-      expect(plate[i + 1]).toBeGreaterThanOrEqual(plate[i + 2] - 2);
-      if (plate[i] <= 44 && plate[i] - plate[i + 2] <= 12) {
-        base += 1;
-      }
-      if (plate[i] - plate[i + 2] >= 14 && plate[i + 1] > plate[i + 2]) rust += 1;
+      expect(plate[i] - plate[i + 2]).toBeLessThan(12);
+      expect(sat(plate, i)).toBeLessThan(0.22);
+      const lum = luma(plate, i);
+      expect(lum).toBeGreaterThan(0.08);
+      expect(lum).toBeLessThan(0.2);
+      expect(plate[i]).toBeGreaterThanOrEqual(plate[i + 1] - 1);
+      expect(plate[i + 1]).toBeGreaterThanOrEqual(plate[i + 2] - 1);
+      if (lum < minL) minL = lum;
+      if (lum > maxL) maxL = lum;
     }
-    expect(base).toBeGreaterThan(8);
-    expect(rust).toBeGreaterThan(0);
+    expect(maxL - minL).toBeGreaterThan(0.01);
+    expect(maxL - minL).toBeLessThan(0.08);
     for (let i = 0; i < cut.length; i += 4) {
-      expect(luma(cut, i)).toBeLessThan(0.05);
-      expect(cut[i]).toBeLessThan(16);
+      expect(cut[i]).toBe(0);
+      expect(cut[i + 1]).toBe(0);
+      expect(cut[i + 2]).toBe(0);
     }
+    const openings = readFileSync(resolve(__dirname, '../src/voxel-floor1/openings.ts'), 'utf8');
+    expect(openings).toContain('emissive: new THREE.Color(0, 0, 0)');
+    expect(openings).toContain('LinearFilter');
   });
 
   it('fills arched-cap corner texels from the plank column below, without UV stretch', () => {

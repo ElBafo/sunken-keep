@@ -70,15 +70,16 @@ export const LEAF_MAX_LUMA = 0.42;
 export const LEAF_WIDTH_M = OPEN_WIDTH - 2 * LEAF_PAD;
 export const LEAF_HEIGHT_M = JAMB_TOP - LEAF_PAD;
 /** 3D iron lock plate (escutcheon) on key-locked leaves only. */
-export const KEYHOLE_PLATE_W = 0.08;
-export const KEYHOLE_PLATE_H = 0.12;
-export const KEYHOLE_PLATE_D = 0.006;
-export const KEYHOLE_PLATE_MAX_HEIGHT_M = 0.16;
+export const KEYHOLE_PLATE_W = 0.12;
+export const KEYHOLE_PLATE_H = 0.18;
+export const KEYHOLE_PLATE_D = 0.025;
+export const KEYHOLE_PLATE_BEVEL = 0.012;
+export const KEYHOLE_PLATE_MAX_HEIGHT_M = 0.22;
 /** World-Y of the plate centre — beside the ring handle, lock height. */
-export const KEYHOLE_PLATE_CY = 0.78;
+export const KEYHOLE_PLATE_CY = 0.8;
 /** Black keyhole cut: round top plus a tapered slot. */
-export const KEYHOLE_CUT_W = 0.015;
-export const KEYHOLE_CUT_H = 0.04;
+export const KEYHOLE_CUT_W = 0.025;
+export const KEYHOLE_CUT_H = 0.06;
 /** Host cells whose level-data door is key-locked (Unlock button). */
 export const FLOOR1_KEYHOLE_DOORS = new Set(['4,2']);
 export type QuadRole = 'lintel' | 'jamb-soffit' | 'chip' | 'leaf' | 'iron';
@@ -548,6 +549,68 @@ function plateBounds(): { cx: number; cy: number; z0: number; z1: number } {
   };
 }
 
+function bevelledPlateQuads(
+  cx: number,
+  cy: number,
+  z0: number,
+  z1: number,
+  hw: number,
+  hh: number,
+  inset: number
+): OpeningQuad[] {
+  const x0 = cx - hw;
+  const x1 = cx + hw;
+  const y0 = cy - hh;
+  const y1 = cy + hh;
+  const fx0 = x0 + inset;
+  const fx1 = x1 - inset;
+  const fy0 = y0 + inset;
+  const fy1 = y1 - inset;
+  const q = (corners: OpeningQuad['corners']): OpeningQuad => ({
+    role: 'iron',
+    kind: 'front',
+    corners
+  });
+  return [
+    q([
+      [fx0, fy0, z1],
+      [fx1, fy0, z1],
+      [fx1, fy1, z1],
+      [fx0, fy1, z1]
+    ]),
+    q([
+      [x0, y0, z0],
+      [x0, y1, z0],
+      [x1, y1, z0],
+      [x1, y0, z0]
+    ]),
+    q([
+      [x0, y0, z0],
+      [x1, y0, z0],
+      [fx1, fy0, z1],
+      [fx0, fy0, z1]
+    ]),
+    q([
+      [x0, y1, z0],
+      [fx0, fy1, z1],
+      [fx1, fy1, z1],
+      [x1, y1, z0]
+    ]),
+    q([
+      [x0, y0, z0],
+      [fx0, fy0, z1],
+      [fx0, fy1, z1],
+      [x0, y1, z0]
+    ]),
+    q([
+      [x1, y0, z0],
+      [x1, y1, z0],
+      [fx1, fy1, z1],
+      [fx1, fy0, z1]
+    ])
+  ];
+}
+
 function keyholeCutQuads(cx: number, cy: number, z: number): OpeningQuad[] {
   const r = KEYHOLE_CUT_W * 0.5;
   const halfH = KEYHOLE_CUT_H * 0.5;
@@ -598,8 +661,8 @@ function keyholeCutQuads(cx: number, cy: number, z: number): OpeningQuad[] {
 }
 
 /**
- * Iron escutcheon at handle height beside the centre seam: 8×12 cm plate,
- * four tiny rivets, and a black keyhole cut (round top + tapered slot).
+ * Iron escutcheon at handle height beside the centre seam: 12×18 cm plate,
+ * 2.5 cm proud with a bevel, four tiny rivets, and a black keyhole cut.
  */
 export function listKeyholePlateQuads(
   _style: DoorOpeningStyle = 'lintel',
@@ -608,12 +671,11 @@ export function listKeyholePlateQuads(
   const { cx, cy, z0, z1 } = plateBounds();
   const hw = KEYHOLE_PLATE_W * 0.5;
   const hh = KEYHOLE_PLATE_H * 0.5;
-  const plate: OpeningQuad[] = [];
-  plate.push(...ironBox(cx - hw, cx + hw, cy - hh, cy + hh, z0, z1));
-  const rivet = 0.007;
-  const inset = 0.012;
-  const rz0 = z1 - 0.001;
-  const rz1 = z1 + 0.002;
+  const plate = bevelledPlateQuads(cx, cy, z0, z1, hw, hh, KEYHOLE_PLATE_BEVEL);
+  const rivet = 0.008;
+  const inset = KEYHOLE_PLATE_BEVEL + 0.01;
+  const rz0 = z1 - 0.002;
+  const rz1 = z1 + 0.003;
   for (const sx of [-1, 1]) {
     for (const sy of [-1, 1]) {
       const rx = cx + sx * (hw - inset);
@@ -621,7 +683,7 @@ export function listKeyholePlateQuads(
       plate.push(...ironBox(rx - rivet * 0.5, rx + rivet * 0.5, ry - rivet * 0.5, ry + rivet * 0.5, rz0, rz1));
     }
   }
-  const cut = keyholeCutQuads(cx, cy, z1 + 0.0008);
+  const cut = keyholeCutQuads(cx, cy, z1 + 0.001);
   if (part === 'plate') return plate;
   if (part === 'cut') return cut;
   return [...plate, ...cut];
@@ -828,35 +890,34 @@ export function ageDoorPanelPixels(
 }
 
 /**
- * Dark rusty grey iron. Hue of #3a342e, value dropped so bake/torch light
- * still reads as iron against the planks.
+ * Plain dark rusty-grey iron with subtle noise. Hue of #3a342e, value
+ * dropped so bake/torch still reads as iron — no orange rust blocks.
  */
-export function lockPlateIronPixels(size = 8): Uint8ClampedArray {
+export function lockPlateIronPixels(size = 32): Uint8ClampedArray {
   const data = new Uint8ClampedArray(size * size * 4);
-  const base = [40, 36, 32];
-  const rust = [54, 42, 32];
-  const pit = [28, 26, 24];
+  const br = 38;
+  const bg = 35;
+  const bb = 32;
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const i = (y * size + x) * 4;
-      const n = (x * 17 + y * 31) & 7;
-      const c = n === 0 || n === 4 ? rust : n === 2 ? pit : base;
-      data[i] = c[0];
-      data[i + 1] = c[1];
-      data[i + 2] = c[2];
+      const n = ((x * 13 + y * 37 + x * y * 3) % 7) - 3;
+      data[i] = br + n;
+      data[i + 1] = bg + n;
+      data[i + 2] = bb + Math.max(-3, n - 1);
       data[i + 3] = 255;
     }
   }
   return data;
 }
 
-/** Near-black keyhole cut so the slot reads at phone size. */
+/** Solid black keyhole — unlit, emissive 0. */
 export function keyholeCutPixels(size = 4): Uint8ClampedArray {
   const data = new Uint8ClampedArray(size * size * 4);
   for (let i = 0; i < data.length; i += 4) {
-    data[i] = 8;
-    data[i + 1] = 6;
-    data[i + 2] = 5;
+    data[i] = 0;
+    data[i + 1] = 0;
+    data[i + 2] = 0;
     data[i + 3] = 255;
   }
   return data;

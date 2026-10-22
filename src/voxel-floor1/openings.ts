@@ -30,7 +30,6 @@ import {
   ageDoorPanelPixels,
   doorHasKeyholePlate,
   doorOpeningStyle,
-  keyholeCutPixels,
   leafMeshes,
   lockPlateIronPixels,
   openingPunchRect,
@@ -689,26 +688,38 @@ export async function buildFloor1Openings(
   woodMat.name = 'door_panel_aged';
   woodMat.fog = true;
   if (!realLights) patchBakeMaterial(woodMat);
-  const ironMatFor = (pixels: Uint8ClampedArray, size: number, name: string): THREE.MeshPhysicalMaterial => {
-    const map = textureFromPixels({ width: size, height: size, data: pixels });
-    const mat = new THREE.MeshPhysicalMaterial({
-      map,
-      color: new THREE.Color(1, 1, 1),
-      roughness: 1,
-      metalness: 0,
-      clearcoat: 0,
-      sheen: 0,
-      specularIntensity: 0,
-      envMapIntensity: 0,
-      clippingPlanes: [leafClip]
-    });
-    mat.name = name;
-    mat.fog = true;
-    if (!realLights) patchBakeMaterial(mat);
-    return mat;
-  };
-  const ironMat = ironMatFor(lockPlateIronPixels(8), 8, 'door_lock_plate');
-  const keyholeMat = ironMatFor(keyholeCutPixels(4), 4, 'door_keyhole_cut');
+  const plateMap = textureFromPixels({ width: 32, height: 32, data: lockPlateIronPixels(32) });
+  plateMap.wrapS = THREE.ClampToEdgeWrapping;
+  plateMap.wrapT = THREE.ClampToEdgeWrapping;
+  plateMap.magFilter = THREE.LinearFilter;
+  plateMap.minFilter = THREE.LinearFilter;
+  const ironMat = new THREE.MeshPhysicalMaterial({
+    map: plateMap,
+    color: new THREE.Color(1, 1, 1),
+    roughness: 1,
+    metalness: 0,
+    clearcoat: 0,
+    sheen: 0,
+    specularIntensity: 0,
+    envMapIntensity: 0,
+    clippingPlanes: [leafClip]
+  });
+  ironMat.name = 'door_lock_plate';
+  ironMat.fog = true;
+  if (!realLights) patchBakeMaterial(ironMat);
+  const keyholeMat = new THREE.MeshPhysicalMaterial({
+    color: new THREE.Color(0, 0, 0),
+    emissive: new THREE.Color(0, 0, 0),
+    roughness: 1,
+    metalness: 0,
+    clearcoat: 0,
+    sheen: 0,
+    specularIntensity: 0,
+    envMapIntensity: 0,
+    clippingPlanes: [leafClip]
+  });
+  keyholeMat.name = 'door_keyhole_cut';
+  keyholeMat.fog = true;
   const secretMats = new Map<string, THREE.MeshPhysicalMaterial>();
   const surroundMats = new Map<string, THREE.MeshPhysicalMaterial>();
   const lintelMats: THREE.MeshPhysicalMaterial[] = [];
