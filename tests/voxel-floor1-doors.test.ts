@@ -12,16 +12,13 @@ import {
   DOOR_LEAF_SLIDE,
   DOOR_UNLOCK_LEAD_MS
 } from '../src/voxel-floor1/constants';
-import { inflateSync } from 'zlib';
 import {
   ageDoorPanelPixels,
-  doorPanelLeafRect,
   LEAF_MAX_LUMA,
-  LEAF_WIDTH_M,
   lintelTop,
-  PADLOCK_MAX_WIDTH_M,
-  PADLOCK_WIDTH_M,
-  padlockWidthTexels
+  PADLOCK_MAX_HEIGHT_M,
+  listPadlockQuads,
+  padlockHeightM
 } from '../src/voxel-floor1/door-opening';
 import { greedyMesh } from '../src/voxel-lab/mesher';
 import {
@@ -35,86 +32,6 @@ import {
 } from '../src/voxel-floor1/openings';
 import { floor1Map, openingViews, resetFloor1Doors, tileAt } from '../src/voxel-floor1/layout';
 import { lookForSecret } from '../src/voxel-floor1/wall-look';
-
-function decodePngRgba(buf: Buffer): { width: number; height: number; data: Uint8ClampedArray } {
-  if (buf[0] !== 0x89 || buf.toString('ascii', 1, 4) !== 'PNG') throw new Error('not png');
-  let off = 8;
-  let width = 0;
-  let height = 0;
-  let bitDepth = 0;
-  let colorType = 0;
-  const idats: Buffer[] = [];
-  let palette: Buffer | null = null;
-  while (off + 12 <= buf.length) {
-    const len = buf.readUInt32BE(off);
-    const type = buf.toString('ascii', off + 4, off + 8);
-    const data = buf.subarray(off + 8, off + 8 + len);
-    if (type === 'IHDR') {
-      width = data.readUInt32BE(0);
-      height = data.readUInt32BE(4);
-      bitDepth = data[8];
-      colorType = data[9];
-    } else if (type === 'PLTE') palette = Buffer.from(data);
-    else if (type === 'IDAT') idats.push(Buffer.from(data));
-    else if (type === 'IEND') break;
-    off += 12 + len;
-  }
-  const inflated = inflateSync(Buffer.concat(idats));
-  const bpp = colorType === 6 ? 4 : colorType === 2 ? 3 : 1;
-  if (bitDepth !== 8) throw new Error(`bit ${bitDepth}`);
-  const stride = width * bpp;
-  const raw = new Uint8Array(width * height * bpp);
-  let src = 0;
-  let prev = new Uint8Array(stride);
-  for (let y = 0; y < height; y++) {
-    const filter = inflated[src++];
-    const row = inflated.subarray(src, src + stride);
-    src += stride;
-    const out = new Uint8Array(stride);
-    for (let i = 0; i < stride; i++) {
-      const a = i >= bpp ? out[i - bpp] : 0;
-      const b = prev[i];
-      const c = i >= bpp ? prev[i - bpp] : 0;
-      const x = row[i];
-      let v = x;
-      if (filter === 1) v = x + a;
-      else if (filter === 2) v = x + b;
-      else if (filter === 3) v = x + ((a + b) >> 1);
-      else if (filter === 4) {
-        const p = a + b - c;
-        const pa = Math.abs(p - a);
-        const pb = Math.abs(p - b);
-        const pc = Math.abs(p - c);
-        v = x + (pa <= pb && pa <= pc ? a : pb <= pc ? b : c);
-      }
-      out[i] = v & 255;
-    }
-    raw.set(out, y * stride);
-    prev = out;
-  }
-  const rgba = new Uint8ClampedArray(width * height * 4);
-  for (let i = 0; i < width * height; i++) {
-    if (colorType === 3) {
-      if (!palette) throw new Error('no plte');
-      const idx = raw[i] * 3;
-      rgba[i * 4] = palette[idx];
-      rgba[i * 4 + 1] = palette[idx + 1];
-      rgba[i * 4 + 2] = palette[idx + 2];
-      rgba[i * 4 + 3] = 255;
-    } else if (colorType === 2) {
-      rgba[i * 4] = raw[i * 3];
-      rgba[i * 4 + 1] = raw[i * 3 + 1];
-      rgba[i * 4 + 2] = raw[i * 3 + 2];
-      rgba[i * 4 + 3] = 255;
-    } else {
-      rgba[i * 4] = raw[i * 4];
-      rgba[i * 4 + 1] = raw[i * 4 + 1];
-      rgba[i * 4 + 2] = raw[i * 4 + 2];
-      rgba[i * 4 + 3] = raw[i * 4 + 3];
-    }
-  }
-  return { width, height, data: rgba };
-}
 
 function fakeDoor(locked: boolean): OpeningVisual {
   const tile = tileAt(floor1Map, 4, 2)!;
@@ -160,143 +77,41 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     expect(DOOR_UNLOCK_LEAD_MS).toBe(350);
   });
 
-  it('ages door_panel wood to grey-brown and iron to rust without a new design', () => {
+  it('clamps leftover bright studs without recolouring already-aged leaf pixels', () => {
     const w = 16;
     const h = 16;
     const src = new Uint8ClampedArray(w * h * 4);
     for (let i = 0; i < w * h; i++) {
-      src[i * 4] = 200;
-      src[i * 4 + 1] = 110;
-      src[i * 4 + 2] = 48;
+      src[i * 4] = 70;
+      src[i * 4 + 1] = 58;
+      src[i * 4 + 2] = 44;
       src[i * 4 + 3] = 255;
     }
-    const mid = ((h >> 1) * w + (w >> 1)) * 4;
-    src[mid] = 170;
-    src[mid + 1] = 172;
-    src[mid + 2] = 176;
-    const stud = mid + 4;
+    const stud = ((h >> 1) * w + (w >> 1)) * 4;
     src[stud] = 255;
     src[stud + 1] = 255;
     src[stud + 2] = 252;
     src[stud + 3] = 255;
     const aged = ageDoorPanelPixels(src, w, h);
-    expect(aged[0]).toBeLessThan(140);
-    expect(aged[0] - aged[2]).toBeLessThan(40);
-    expect(aged[mid]).toBeLessThan(90);
-    expect(aged[mid]).toBeGreaterThan(aged[mid + 2]);
+    expect(aged[0]).toBe(70);
+    expect(aged[1]).toBe(58);
+    expect(aged[2]).toBe(44);
     const studLuma = (0.2126 * aged[stud] + 0.7152 * aged[stud + 1] + 0.0722 * aged[stud + 2]) / 255;
     expect(studLuma).toBeLessThanOrEqual(LEAF_MAX_LUMA + 1e-3);
     expect(Math.max(aged[stud], aged[stud + 1], aged[stud + 2])).toBeLessThan(140);
     expect(aged[stud]).toBeGreaterThan(aged[stud + 2]);
-    let maxLuma = 0;
-    for (let i = 0; i < w * h; i++) {
-      const luma =
-        (0.2126 * aged[i * 4] + 0.7152 * aged[i * 4 + 1] + 0.0722 * aged[i * 4 + 2]) / 255;
-      if (luma > maxLuma) maxLuma = luma;
-    }
-    expect(maxLuma).toBeLessThanOrEqual(LEAF_MAX_LUMA + 1e-3);
   });
 
-  it('maps a 10–14 cm padlock onto the 1.12 m leaf and keeps it under 16 cm', () => {
-    const w = 128;
-    const h = 128;
-    const px = padlockWidthTexels(w, h);
-    const leaf = doorPanelLeafRect(w, h);
-    const meters = (px * LEAF_WIDTH_M) / (leaf.x1 - leaf.x0);
-    expect(PADLOCK_WIDTH_M).toBeGreaterThanOrEqual(0.1);
-    expect(PADLOCK_WIDTH_M).toBeLessThanOrEqual(0.14);
-    expect(PADLOCK_MAX_WIDTH_M).toBeLessThanOrEqual(0.16);
-    expect(meters).toBeGreaterThanOrEqual(0.1);
-    expect(meters).toBeLessThanOrEqual(PADLOCK_MAX_WIDTH_M + 1e-6);
-    expect(px).toBeGreaterThanOrEqual(6);
-  });
-
-  it('replaces the huge door_panel padlock with continued planks and a small hasp lock', () => {
-    const png = decodePngRgba(readFileSync(resolve(__dirname, '../public/proto3d/tex3d/door_panel.png')));
-    const aged = ageDoorPanelPixels(png.data, png.width, png.height);
-    const leaf = doorPanelLeafRect(png.width, png.height);
-    const oldCx = Math.round((leaf.x0 + leaf.x1) * 0.5);
-    const oldCy = Math.round(leaf.y0 + (leaf.y1 - leaf.y0) * 0.52);
-    let woodish = 0;
-    for (const [dx, dy] of [
-      [-5, 0],
-      [-3, 2],
-      [3, -2],
-      [-4, 4],
-      [0, -6]
-    ] as const) {
-      const i = ((oldCy + dy) * png.width + (oldCx + dx)) * 4;
-      const r = aged[i] / 255;
-      const g = aged[i + 1] / 255;
-      const b = aged[i + 2] / 255;
-      const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-      const sat = (Math.max(r, g, b) - Math.min(r, g, b)) / Math.max(r, g, b, 1e-6);
-      if (sat > 0.1 && r > b && luma > 0.08 && luma < 0.4) woodish += 1;
-    }
-    expect(woodish, 'old lock area is continued plank, not leftover iron').toBeGreaterThanOrEqual(3);
-
-    const colVar = (x0: number, x1: number, y0: number, y1: number): number => {
-      let acc = 0;
-      let n = 0;
-      for (let x = x0; x <= x1; x++) {
-        const vals: number[] = [];
-        for (let y = y0; y <= y1; y++) {
-          const p = (y * png.width + x) * 4;
-          vals.push(0.2126 * aged[p] + 0.7152 * aged[p + 1] + 0.0722 * aged[p + 2]);
-        }
-        const mean = vals.reduce((s, v) => s + v, 0) / vals.length;
-        acc += vals.reduce((s, v) => s + (v - mean) ** 2, 0) / vals.length;
-        n += 1;
-      }
-      return acc / Math.max(1, n);
-    };
-    const oldVar = colVar(oldCx - 5, oldCx + 2, oldCy - 4, oldCy + 8);
-    const nbrVar = colVar(leaf.x0 + 4, leaf.x0 + 10, oldCy - 4, oldCy + 8);
-    expect(oldVar, 'old lock columns keep plank grain, not a column-smear').toBeGreaterThan(nbrVar * 0.35);
-
-    const lockW = padlockWidthTexels(png.width, png.height);
-    const leafCx = (leaf.x0 + leaf.x1) * 0.5;
-    const lockCx = Math.round(leafCx + (leaf.x1 - leaf.x0) * 0.14);
-    expect(lockCx).toBeGreaterThan(leafCx);
-    const lockY = leaf.y0 + 10;
-    let dark = 0;
-    let iron = 0;
-    let brownLock = 0;
-    let lockPx = 0;
-    for (let y = lockY; y < lockY + lockW + 8; y++) {
-      for (let x = lockCx - 3; x <= lockCx + 2; x++) {
-        const p = (y * png.width + x) * 4;
-        const r = aged[p] / 255;
-        const g = aged[p + 1] / 255;
-        const b = aged[p + 2] / 255;
-        const L = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-        const sat = (Math.max(r, g, b) - Math.min(r, g, b)) / Math.max(r, g, b, 1e-6);
-        if (L < 0.12) {
-          dark += 1;
-          lockPx += 1;
-        } else if (L < 0.32 && sat < 0.28) {
-          iron += 1;
-          lockPx += 1;
-          if (r > b + 0.05) brownLock += 1;
-        }
-      }
-    }
-    expect(dark, 'outline and keyhole stay readable').toBeGreaterThan(6);
-    expect(dark + iron, 'small grey-iron lock stays readable on the middle band').toBeGreaterThan(12);
-    expect(brownLock / Math.max(1, lockPx), 'padlock is dark grey iron, not brown wood').toBeLessThan(0.25);
-
-    let maxChan = 0;
-    let maxLuma = 0;
-    for (let y = leaf.y0; y < leaf.y1; y++) {
-      for (let x = leaf.x0; x < leaf.x1; x++) {
-        const p = (y * png.width + x) * 4;
-        maxChan = Math.max(maxChan, aged[p], aged[p + 1], aged[p + 2]);
-        const L = (0.2126 * aged[p] + 0.7152 * aged[p + 1] + 0.0722 * aged[p + 2]) / 255;
-        if (L > maxLuma) maxLuma = L;
-      }
-    }
-    expect(maxChan).toBeLessThan(140);
-    expect(maxLuma).toBeLessThanOrEqual(LEAF_MAX_LUMA + 1e-3);
+  it('hangs a 3D padlock on the leaf under 16 cm', () => {
+    expect(listPadlockQuads('lintel').length).toBeGreaterThan(8);
+    const h = padlockHeightM('lintel');
+    expect(h).toBeGreaterThan(0.08);
+    expect(h).toBeLessThan(PADLOCK_MAX_HEIGHT_M);
+    const openings = readFileSync(resolve(__dirname, '../src/voxel-floor1/openings.ts'), 'utf8');
+    expect(openings).toContain('door_panel_aged.png');
+    expect(openings).toContain('door-lock:');
+    expect(openings).toContain('slider.add(lock)');
+    expect(openings).toContain('userData.doorLeaf = true');
   });
 
   it('refuses a locked door without a key and does not start the slide', () => {
@@ -399,7 +214,7 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     expect(main).toContain('hitFacingDoorLeaf');
     expect(main).toContain("'Close'");
     expect(main).toContain('localClippingEnabled');
-    expect(openings).toContain('door_panel.png');
+    expect(openings).toContain('door_panel_aged.png');
     expect(openings).toContain('ageDoorPanelPixels');
     expect(openings).toContain('DOOR_LEAF_SLIDE');
     expect(openings).toContain('doorLeaf');

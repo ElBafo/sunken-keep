@@ -226,7 +226,7 @@ describe('floor-1 door opening styles', () => {
     expect(src).toContain('ceiling_planks_1.png');
     expect(src).toContain('specularIntensity: 0');
     expect(src).toContain('wrapT = THREE.RepeatWrapping');
-    expect(src).toContain('door_panel.png');
+    expect(src).toContain('door_panel_aged.png');
   });
 
   it('keeps every lintel doorway watertight from both sides', () => {

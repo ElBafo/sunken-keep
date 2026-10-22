@@ -57,7 +57,7 @@ export const LEAF_FRONT = LEAF_THICK / 2;
 export const LEAF_BACK = -LEAF_THICK / 2;
 export const IRON_PROUD = 0.004;
 /**
- * Painted wood in `door_panel.png` — the rectangular plank body only.
+ * Painted wood in `door_panel_aged.png` — the rectangular plank body only.
  * Crops the arched cap and the stone / dark recess around it.
  */
 export const DOOR_PANEL_U0 = 0.32;
@@ -69,12 +69,14 @@ export const LEAF_MAX_LUMA = 0.42;
 /** Painted leaf size after the pad / lintel inset. */
 export const LEAF_WIDTH_M = OPEN_WIDTH - 2 * LEAF_PAD;
 export const LEAF_HEIGHT_M = JAMB_TOP - LEAF_PAD;
-/**
- * Realistic padlock on the 1.12 m door. 10–14 cm target; may grow a texel
- * for phone readability but stays under 16 cm.
- */
-export const PADLOCK_WIDTH_M = 0.14;
-export const PADLOCK_MAX_WIDTH_M = 0.16;
+/** 3D rusty padlock hung from the painted middle band. */
+export const PADLOCK_BODY_W = 0.06;
+export const PADLOCK_BODY_H = 0.07;
+export const PADLOCK_BODY_D = 0.025;
+export const PADLOCK_SHACKLE_T = 0.01;
+export const PADLOCK_MAX_HEIGHT_M = 0.16;
+/** World-Y of the painted middle iron band (crop V → leaf height). */
+export const PADLOCK_BAND_Y = 1.222;
 export type QuadRole = 'lintel' | 'jamb-soffit' | 'chip' | 'leaf' | 'iron';
 export type QuadKind = 'front' | 'soffit' | 'back';
 
@@ -472,6 +474,199 @@ export function listIronQuads(style: DoorOpeningStyle): OpeningQuad[] {
   return out;
 }
 
+function ironBox(
+  x0: number,
+  x1: number,
+  y0: number,
+  y1: number,
+  z0: number,
+  z1: number
+): OpeningQuad[] {
+  const q = (corners: OpeningQuad['corners']): OpeningQuad => ({
+    role: 'iron',
+    kind: 'front',
+    corners
+  });
+  return [
+    q([
+      [x0, y0, z1],
+      [x1, y0, z1],
+      [x1, y1, z1],
+      [x0, y1, z1]
+    ]),
+    q([
+      [x1, y0, z0],
+      [x0, y0, z0],
+      [x0, y1, z0],
+      [x1, y1, z0]
+    ]),
+    q([
+      [x0, y0, z0],
+      [x0, y0, z1],
+      [x0, y1, z1],
+      [x0, y1, z0]
+    ]),
+    q([
+      [x1, y0, z1],
+      [x1, y0, z0],
+      [x1, y1, z0],
+      [x1, y1, z1]
+    ]),
+    q([
+      [x0, y0, z0],
+      [x1, y0, z0],
+      [x1, y0, z1],
+      [x0, y0, z1]
+    ]),
+    q([
+      [x0, y1, z1],
+      [x1, y1, z1],
+      [x1, y1, z0],
+      [x0, y1, z0]
+    ])
+  ];
+}
+
+function ironTube(
+  ax: number,
+  ay: number,
+  az: number,
+  bx: number,
+  by: number,
+  bz: number,
+  thick: number
+): OpeningQuad[] {
+  const dx = bx - ax;
+  const dy = by - ay;
+  const dz = bz - az;
+  const len = Math.hypot(dx, dy, dz) || 1e-6;
+  const ux = dx / len;
+  const uy = dy / len;
+  const uz = dz / len;
+  let px = uy;
+  let py = -ux;
+  let pz = 0;
+  if (Math.hypot(px, py, pz) < 1e-6) {
+    px = 0;
+    py = uz;
+    pz = -uy;
+  }
+  const pl = Math.hypot(px, py, pz) || 1;
+  px /= pl;
+  py /= pl;
+  pz /= pl;
+  const qx = uy * pz - uz * py;
+  const qy = uz * px - ux * pz;
+  const qz = ux * py - uy * px;
+  const h = thick / 2;
+  const ring = [
+    [-px - qx, -py - qy, -pz - qz],
+    [px - qx, py - qy, pz - qz],
+    [px + qx, py + qy, pz + qz],
+    [-px + qx, -py + qy, -pz + qz]
+  ];
+  const a = ring.map((r) => [ax + r[0] * h, ay + r[1] * h, az + r[2] * h] as [number, number, number]);
+  const b = ring.map((r) => [bx + r[0] * h, by + r[1] * h, bz + r[2] * h] as [number, number, number]);
+  const q = (corners: OpeningQuad['corners']): OpeningQuad => ({
+    role: 'iron',
+    kind: 'front',
+    corners
+  });
+  return [
+    q([a[0], a[1], b[1], b[0]]),
+    q([a[1], a[2], b[2], b[1]]),
+    q([a[2], a[3], b[3], b[2]]),
+    q([a[3], a[0], b[0], b[3]])
+  ];
+}
+
+/**
+ * Hasp on the painted middle band near the centre seam, plus a dark rusty
+ * padlock (6×7×2.5 cm body, ~1 cm round shackle, keyhole).
+ */
+export function listPadlockQuads(_style: DoorOpeningStyle = 'lintel'): OpeningQuad[] {
+  const a0 = OPEN_U0 + LEAF_PAD;
+  const a1 = OPEN_U1 - LEAF_PAD;
+  const cx = (a0 + a1) * 0.5 + 0.035;
+  const bandY = PADLOCK_BAND_Y;
+  const bodyW = PADLOCK_BODY_W;
+  const bodyH = PADLOCK_BODY_H;
+  const bodyD = PADLOCK_BODY_D;
+  const t = PADLOCK_SHACKLE_T;
+  const z0 = LEAF_FRONT + IRON_PROUD;
+  const z1 = z0 + bodyD;
+  const zc = (z0 + z1) * 0.5;
+  const bodyTop = bandY - 0.012;
+  const bodyBot = bodyTop - bodyH;
+  const out: OpeningQuad[] = [];
+  out.push(...ironBox(cx - bodyW * 0.5, cx + bodyW * 0.5, bodyBot, bodyTop, z0, z1));
+  out.push(
+    ...ironBox(
+      cx - bodyW * 0.42,
+      cx + bodyW * 0.42,
+      bodyBot - 0.008,
+      bodyBot + 0.002,
+      z0 + 0.003,
+      z1 - 0.003
+    )
+  );
+  const holeW = 0.008;
+  const holeH = 0.014;
+  const holeY = bodyBot + bodyH * 0.42;
+  out.push(
+    ...ironBox(
+      cx - holeW * 0.5,
+      cx + holeW * 0.5,
+      holeY,
+      holeY + holeH,
+      z1 - 0.008,
+      z1 + 0.001
+    )
+  );
+  const haspW = 0.02;
+  const haspOut = 0.018;
+  const haspT = 0.008;
+  out.push(...ironTube(cx - haspW * 0.5, bandY, z0, cx - haspW * 0.5, bandY, z0 + haspOut, haspT));
+  out.push(...ironTube(cx + haspW * 0.5, bandY, z0, cx + haspW * 0.5, bandY, z0 + haspOut, haspT));
+  out.push(
+    ...ironTube(cx - haspW * 0.5, bandY, z0 + haspOut, cx + haspW * 0.5, bandY, z0 + haspOut, haspT)
+  );
+  const r = 0.02;
+  const postTop = bandY;
+  const left = cx - r;
+  const right = cx + r;
+  out.push(...ironTube(left, bodyTop, zc, left, postTop, zc, t));
+  out.push(...ironTube(right, bodyTop, zc, right, postTop, zc, t));
+  const s = 1 / Math.SQRT2;
+  const arc: Array<[number, number]> = [
+    [-1, 0],
+    [-s, s],
+    [0, 1],
+    [s, s],
+    [1, 0]
+  ];
+  for (let i = 0; i < arc.length - 1; i++) {
+    const a = arc[i];
+    const b = arc[i + 1];
+    out.push(
+      ...ironTube(cx + a[0] * r, postTop + a[1] * r, zc, cx + b[0] * r, postTop + b[1] * r, zc, t)
+    );
+  }
+  return out;
+}
+
+export function padlockHeightM(style: DoorOpeningStyle = 'lintel'): number {
+  let minY = 1e9;
+  let maxY = -1e9;
+  for (const q of listPadlockQuads(style)) {
+    for (const c of q.corners) {
+      if (c[1] < minY) minY = c[1];
+      if (c[1] > maxY) maxY = c[1];
+    }
+  }
+  return maxY - minY;
+}
+
 function mapLocal(face: FaceNESW, tx: number, tz: number, a: number, u: number, d: number): [number, number, number] {
   const { ox, oz } = tileCorner(tx, tz, CELL, 'center');
   switch (face) {
@@ -514,23 +709,6 @@ function clampLeafLuma(r: number, g: number, b: number): [number, number, number
   return [r * k, g * k, b * k];
 }
 
-function pixelSat(r: number, g: number, b: number): number {
-  const maxc = Math.max(r, g, b);
-  const minc = Math.min(r, g, b);
-  return maxc > 1e-6 ? (maxc - minc) / maxc : 0;
-}
-
-function isWoodTone(r: number, g: number, b: number): boolean {
-  const luma = pixelLuma(r, g, b);
-  return pixelSat(r, g, b) > 0.12 && r > g + 0.02 && r > b + 0.04 && luma < 0.78;
-}
-
-function isMetalTone(r: number, g: number, b: number): boolean {
-  if (isWoodTone(r, g, b)) return false;
-  const luma = pixelLuma(r, g, b);
-  return pixelSat(r, g, b) < 0.35 && luma > 0.22 && luma < 0.95;
-}
-
 /** Image-space rectangle of the cropped plank body (PNG y=0 is top). */
 export function doorPanelLeafRect(
   width: number,
@@ -544,532 +722,9 @@ export function doorPanelLeafRect(
   };
 }
 
-export function leafMetersPerTexel(
-  width: number,
-  height: number
-): { x: number; y: number } {
-  const leaf = doorPanelLeafRect(width, height);
-  return {
-    x: LEAF_WIDTH_M / Math.max(1, leaf.x1 - leaf.x0),
-    y: LEAF_HEIGHT_M / Math.max(1, leaf.y1 - leaf.y0)
-  };
-}
-
-/** Padlock width in texels — at least 6 px when that still stays under 16 cm. */
-export function padlockWidthTexels(width: number, height: number): number {
-  const mx = leafMetersPerTexel(width, height).x;
-  const maxN = Math.max(1, Math.floor(PADLOCK_MAX_WIDTH_M / mx + 1e-9));
-  const n = Math.round(PADLOCK_WIDTH_M / mx);
-  return Math.min(maxN, Math.max(6, n));
-}
-
-type LeafRect = { x0: number; x1: number; y0: number; y1: number };
-
-function srcRgb(
-  src: ArrayLike<number>,
-  width: number,
-  x: number,
-  y: number
-): [number, number, number] {
-  const i = (y * width + x) * 4;
-  return [src[i] / 255, src[i + 1] / 255, src[i + 2] / 255];
-}
-
-function detectBandRows(
-  src: ArrayLike<number>,
-  width: number,
-  leaf: LeafRect
-): number[][] {
-  const span = leaf.x1 - leaf.x0;
-  const rows: number[] = [];
-  for (let y = leaf.y0; y < leaf.y1; y++) {
-    let iron = 0;
-    for (let x = leaf.x0; x < leaf.x1; x++) {
-      const [r, g, b] = srcRgb(src, width, x, y);
-      if (!isWoodTone(r, g, b) && pixelSat(r, g, b) < 0.35 && pixelLuma(r, g, b) > 0.18) {
-        iron += 1;
-      }
-    }
-    if (iron >= span * 0.4) rows.push(y);
-  }
-  const filled = new Set(rows);
-  for (let y = leaf.y0 + 1; y < leaf.y1 - 1; y++) {
-    if (!filled.has(y) && filled.has(y - 1) && filled.has(y + 1)) filled.add(y);
-  }
-  const groups: number[][] = [];
-  let cur: number[] = [];
-  for (const y of [...filled].sort((a, b) => a - b)) {
-    if (!cur.length || y === cur[cur.length - 1] + 1) cur.push(y);
-    else {
-      groups.push(cur);
-      cur = [y];
-    }
-  }
-  if (cur.length) groups.push(cur);
-  return groups;
-}
-
-type LockBlob = { cells: Array<[number, number]>; x0: number; x1: number; y0: number; y1: number };
-
-function blobBounds(cells: Array<[number, number]>): LockBlob {
-  let x0 = cells[0][0];
-  let x1 = cells[0][0];
-  let y0 = cells[0][1];
-  let y1 = cells[0][1];
-  for (const [x, y] of cells) {
-    if (x < x0) x0 = x;
-    if (x > x1) x1 = x;
-    if (y < y0) y0 = y;
-    if (y > y1) y1 = y;
-  }
-  return { cells, x0, x1, y0, y1 };
-}
-
 /**
- * Oversized painted lock on the plank body. Null unless the blob is wide
- * enough on the 1.12 m door that it would read as a third of the leaf.
- */
-function detectOversizedPadlock(
-  src: ArrayLike<number>,
-  width: number,
-  height: number,
-  leaf: LeafRect,
-  bandRows: Set<number>
-): LockBlob | null {
-  if (width < 64 || height < 64) return null;
-  const yLo = leaf.y0 + 4;
-  const yHi = leaf.y1 - 4;
-  const metals: Array<[number, number]> = [];
-  for (let y = yLo; y < yHi; y++) {
-    if (bandRows.has(y)) continue;
-    for (let x = leaf.x0 + 4; x < leaf.x1 - 4; x++) {
-      const [r, g, b] = srcRgb(src, width, x, y);
-      if (isMetalTone(r, g, b)) metals.push([x, y]);
-    }
-  }
-  if (metals.length < 30) return null;
-
-  const seen = new Set<number>();
-  const comps: LockBlob[] = [];
-  const key = (x: number, y: number) => y * width + x;
-  const metalSet = new Set(metals.map(([x, y]) => key(x, y)));
-  const nbrs = [
-    [1, 0],
-    [-1, 0],
-    [0, 1],
-    [0, -1],
-    [1, 1],
-    [1, -1],
-    [-1, 1],
-    [-1, -1]
-  ];
-  for (const [sx, sy] of metals) {
-    const sk = key(sx, sy);
-    if (seen.has(sk)) continue;
-    const cells: Array<[number, number]> = [];
-    const stack = [[sx, sy]];
-    seen.add(sk);
-    while (stack.length) {
-      const [x, y] = stack.pop()!;
-      cells.push([x, y]);
-      for (const [dx, dy] of nbrs) {
-        const nx = x + dx;
-        const ny = y + dy;
-        const nk = key(nx, ny);
-        if (metalSet.has(nk) && !seen.has(nk)) {
-          seen.add(nk);
-          stack.push([nx, ny]);
-        }
-      }
-    }
-    comps.push(blobBounds(cells));
-  }
-  comps.sort((a, b) => b.cells.length - a.cells.length);
-  const leafCx = (leaf.x0 + leaf.x1) * 0.5;
-  const leafCy = (leaf.y0 + leaf.y1) * 0.5;
-  const distC = (c: LockBlob) =>
-    Math.abs((c.x0 + c.x1) * 0.5 - leafCx) + Math.abs((c.y0 + c.y1) * 0.5 - leafCy);
-  const seed = comps.find((c) => distC(c) < 18 && c.cells.length >= 20);
-  if (!seed) return null;
-  const mx = leafMetersPerTexel(width, height).x;
-  const widthM = (seed.x1 - seed.x0 + 1) * mx;
-  if (widthM < 0.2) return null;
-  return seed;
-}
-
-/**
- * Tight lock + shackle + keyhole mask. Band rows stay iron. A 1 px dilate
- * clears the outline without eating neighbouring planks.
- */
-function padlockMask(
-  src: ArrayLike<number>,
-  width: number,
-  leaf: LeafRect,
-  lock: LockBlob,
-  bandRows: Set<number>
-): Set<number> {
-  const key = (x: number, y: number) => y * width + x;
-  const mask = new Set<number>();
-  for (const [x, y] of lock.cells) {
-    if (!bandRows.has(y)) mask.add(key(x, y));
-  }
-  const x0 = Math.max(leaf.x0, lock.x0 - 4);
-  const x1 = Math.min(leaf.x1 - 1, lock.x1 + 4);
-  const y0 = Math.max(leaf.y0, lock.y0 - 16);
-  const y1 = Math.min(leaf.y1 - 1, lock.y1 + 4);
-  for (let y = y0; y <= y1; y++) {
-    if (bandRows.has(y)) continue;
-    for (let x = x0; x <= x1; x++) {
-      const [r, g, b] = srcRgb(src, width, x, y);
-      if (isMetalTone(r, g, b)) {
-        mask.add(key(x, y));
-        continue;
-      }
-      if (
-        x >= lock.x0 - 2 &&
-        x <= lock.x1 + 2 &&
-        !isWoodTone(r, g, b) &&
-        pixelLuma(r, g, b) < 0.18
-      ) {
-        mask.add(key(x, y));
-      }
-    }
-  }
-  const extra: number[] = [];
-  const nbrs = [
-    [1, 0],
-    [-1, 0],
-    [0, 1],
-    [0, -1]
-  ];
-  for (const k of mask) {
-    const x = k % width;
-    const y = (k - x) / width;
-    for (const [dx, dy] of nbrs) {
-      const nx = x + dx;
-      const ny = y + dy;
-      if (nx < leaf.x0 || nx >= leaf.x1 || ny < leaf.y0 || ny >= leaf.y1) continue;
-      if (bandRows.has(ny)) continue;
-      extra.push(key(nx, ny));
-    }
-  }
-  for (const k of extra) mask.add(k);
-  return mask;
-}
-
-/** Board gaps from clean rows above the first iron band — never from lock shadow. */
-function detectCleanGapColumns(
-  src: ArrayLike<number>,
-  width: number,
-  leaf: LeafRect,
-  bandRows: Set<number>
-): Set<number> {
-  const firstBand = bandRows.size ? Math.min(...bandRows) : leaf.y0 + 10;
-  const gaps = new Set<number>();
-  for (let x = leaf.x0; x < leaf.x1; x++) {
-    let dark = 0;
-    let n = 0;
-    for (let y = leaf.y0; y < firstBand; y++) {
-      const [r, g, b] = srcRgb(src, width, x, y);
-      n += 1;
-      if (r + g + b < 0.28) dark += 1;
-    }
-    if (n > 0 && dark / n >= 0.4) gaps.add(x);
-  }
-  return gaps;
-}
-
-function plankRuns(leaf: LeafRect, gapCols: Set<number>): Array<{ x0: number; x1: number }> {
-  const runs: Array<{ x0: number; x1: number }> = [];
-  let start: number | null = null;
-  for (let x = leaf.x0; x <= leaf.x1; x++) {
-    const gap = x >= leaf.x1 || gapCols.has(x);
-    if (!gap && start === null) start = x;
-    if (gap && start !== null) {
-      runs.push({ x0: start, x1: x - 1 });
-      start = null;
-    }
-  }
-  return runs;
-}
-
-function nearGap(x: number, gapCols: Set<number>, reach = 2): boolean {
-  for (let d = 1; d <= reach; d++) {
-    if (gapCols.has(x - d) || gapCols.has(x + d)) return true;
-  }
-  return false;
-}
-
-function bestRunOffset(
-  run: { x0: number; x1: number },
-  damagedCols: Set<number>,
-  gapCols: Set<number>,
-  destIsEdge: boolean
-): number {
-  const xs: number[] = [];
-  for (let x = run.x0; x <= run.x1; x++) {
-    if (damagedCols.has(x) && nearGap(x, gapCols) === destIsEdge) xs.push(x);
-  }
-  if (!xs.length) return 0;
-  let best = 0;
-  let bestScore = -1;
-  const maxd = run.x1 - run.x0;
-  for (let off = 1; off <= maxd; off++) {
-    for (const sign of [1, -1]) {
-      const d = off * sign;
-      let score = 0;
-      for (const x of xs) {
-        const sx = x + d;
-        if (sx < run.x0 || sx > run.x1 || damagedCols.has(sx)) continue;
-        if (nearGap(sx, gapCols) !== destIsEdge) continue;
-        score += 1;
-      }
-      if (score > bestScore) {
-        bestScore = score;
-        best = d;
-      }
-    }
-  }
-  return bestScore > 0 ? best : 0;
-}
-
-/**
- * Rebuild the old lock from whole neighbouring plank regions at the same Y
- * (grain, knots, nail holes, dark edges). Vertical column-stretch is the smear.
- */
-function fillPadlockHole(
-  src: ArrayLike<number>,
-  out: Uint8ClampedArray,
-  width: number,
-  leaf: LeafRect,
-  mask: Set<number>,
-  bandRows: Set<number>
-): void {
-  const key = (x: number, y: number) => y * width + x;
-  const copy = (dx: number, dy: number, sx: number, sy: number): void => {
-    const di = (dy * width + dx) * 4;
-    const si = (sy * width + sx) * 4;
-    out[di] = out[si];
-    out[di + 1] = out[si + 1];
-    out[di + 2] = out[si + 2];
-    out[di + 3] = out[si + 3];
-  };
-  const gapCols = detectCleanGapColumns(src, width, leaf, bandRows);
-  const gapList = [...gapCols].sort((a, b) => a - b);
-  const runs = plankRuns(leaf, gapCols);
-  const damagedCols = new Set<number>();
-  for (const k of mask) damagedCols.add(k % width);
-  const runOffIn = new Map<number, number>();
-  const runOffEd = new Map<number, number>();
-  for (let i = 0; i < runs.length; i++) {
-    runOffIn.set(i, bestRunOffset(runs[i], damagedCols, gapCols, false));
-    runOffEd.set(i, bestRunOffset(runs[i], damagedCols, gapCols, true));
-  }
-  const runIndex = (x: number): number => runs.findIndex((r) => x >= r.x0 && x <= r.x1);
-  const okDonor = (sx: number, sy: number, wantGap: boolean): boolean => {
-    if (sx < leaf.x0 || sx >= leaf.x1 || sy < leaf.y0 || sy >= leaf.y1) return false;
-    if (mask.has(key(sx, sy))) return false;
-    if (bandRows.has(sy)) return false;
-    return wantGap ? gapCols.has(sx) : !gapCols.has(sx);
-  };
-  for (const k of mask) {
-    const x = k % width;
-    const y = (k - x) / width;
-    if (bandRows.has(y)) {
-      for (const sign of [-1, 1]) {
-        for (let d = 4; d < leaf.x1 - leaf.x0; d++) {
-          const sx = x + d * sign;
-          if (sx >= leaf.x0 && sx < leaf.x1 && !mask.has(key(sx, y))) {
-            copy(x, y, sx, y);
-            break;
-          }
-        }
-      }
-      continue;
-    }
-    let done = false;
-    if (gapCols.has(x)) {
-      for (const gx of gapList) {
-        if (gx !== x && okDonor(gx, y, true)) {
-          copy(x, y, gx, y);
-          done = true;
-          break;
-        }
-      }
-      if (!done) {
-        const i = (y * width + x) * 4;
-        out[i] = 10;
-        out[i + 1] = 8;
-        out[i + 2] = 7;
-        out[i + 3] = 255;
-        done = true;
-      }
-    } else {
-      const ri = runIndex(x);
-      if (ri >= 0) {
-        const run = runs[ri];
-        const edge = nearGap(x, gapCols);
-        const d = (edge ? runOffEd : runOffIn).get(ri) ?? 0;
-        if (d && okDonor(x + d, y, false) && nearGap(x + d, gapCols) === edge) {
-          copy(x, y, x + d, y);
-          done = true;
-        }
-        if (!done) {
-          const rel = x - run.x0;
-          const order: number[] = [];
-          if (ri > 0) order.push(ri - 1);
-          if (ri + 1 < runs.length) order.push(ri + 1);
-          for (let i = 0; i < runs.length; i++) {
-            if (i !== ri && !order.includes(i)) order.push(i);
-          }
-          for (const oi of order) {
-            const other = runs[oi];
-            const mid = other.x0 + Math.min(rel, other.x1 - other.x0);
-            for (let k = 0; k <= other.x1 - other.x0; k++) {
-              for (const sx of [mid + k, mid - k]) {
-                if (sx < other.x0 || sx > other.x1) continue;
-                if (!okDonor(sx, y, false)) continue;
-                if (nearGap(sx, gapCols) !== edge) continue;
-                copy(x, y, sx, y);
-                done = true;
-                break;
-              }
-              if (done) break;
-            }
-            if (done) break;
-          }
-        }
-      }
-    }
-    if (!done) {
-      for (let d = 1; d < leaf.x1 - leaf.x0; d++) {
-        if (okDonor(x - d, y, false)) {
-          copy(x, y, x - d, y);
-          break;
-        }
-        if (okDonor(x + d, y, false)) {
-          copy(x, y, x + d, y);
-          break;
-        }
-      }
-    }
-  }
-}
-
-function putAged(
-  out: Uint8ClampedArray,
-  width: number,
-  x: number,
-  y: number,
-  rgb: [number, number, number]
-): void {
-  const [r, g, b] = clampLeafLuma(rgb[0], rgb[1], rgb[2]);
-  const i = (y * width + x) * 4;
-  out[i] = Math.round(Math.min(1, r) * 255);
-  out[i + 1] = Math.round(Math.min(1, g) * 255);
-  out[i + 2] = Math.round(Math.min(1, b) * 255);
-  out[i + 3] = 255;
-}
-
-/**
- * Dark grey-iron padlock hung from a staple on the upper (middle) band,
- * a little toward +U — the opening / latch edge. Shackle is a U-arc
- * through the hasp; body is a rounded shield with a keyhole.
- */
-function paintHaspAndPadlock(
-  out: Uint8ClampedArray,
-  width: number,
-  height: number,
-  leaf: LeafRect,
-  midBand: number[]
-): void {
-  const lockW = padlockWidthTexels(width, height);
-  const leafCx = (leaf.x0 + leaf.x1) * 0.5;
-  const lockCx = Math.round(leafCx + (leaf.x1 - leaf.x0) * 0.14);
-  const x0 = lockCx - Math.floor(lockW / 2);
-  const by = midBand[midBand.length - 1];
-  const outline: [number, number, number] = [0.05, 0.048, 0.046];
-  const shackle: [number, number, number] = [0.21, 0.2, 0.19];
-  const hasp: [number, number, number] = [0.1, 0.095, 0.09];
-  const body: [number, number, number] = [0.23, 0.215, 0.205];
-  const hi: [number, number, number] = [0.29, 0.275, 0.26];
-  const hole: [number, number, number] = [0.028, 0.026, 0.024];
-  // 0 empty (band/plank shows through the shackle hole), 1 outline,
-  // 2 shackle, 3 hasp staple, 4 body, 5 highlight, 6 keyhole.
-  const sprite: number[][] = [
-    [0, 1, 1, 1, 1, 0],
-    [1, 2, 2, 2, 2, 1],
-    [1, 2, 0, 0, 2, 1],
-    [1, 2, 3, 3, 2, 1],
-    [1, 2, 3, 3, 2, 1],
-    [1, 5, 4, 4, 4, 1],
-    [1, 4, 6, 6, 4, 1],
-    [1, 4, 4, 4, 4, 1],
-    [0, 1, 1, 1, 1, 0]
-  ];
-  const cols: Record<number, [number, number, number]> = {
-    1: outline,
-    2: shackle,
-    3: hasp,
-    4: body,
-    5: hi,
-    6: hole
-  };
-  const painted = new Set<number>();
-  const key = (x: number, y: number) => y * width + x;
-  const scaleX = lockW / 6;
-  const lockH = Math.max(sprite.length, Math.round(sprite.length * scaleX));
-  const scaleY = lockH / sprite.length;
-  const y0 = by - Math.round(4 * scaleY);
-  for (let j = 0; j < lockH; j++) {
-    const sj = Math.min(sprite.length - 1, Math.floor(j / scaleY));
-    for (let i = 0; i < lockW; i++) {
-      const si = Math.min(5, Math.floor(i / scaleX));
-      const v = sprite[sj][si];
-      if (!v) continue;
-      const x = x0 + i;
-      const y = y0 + j;
-      if (x < 0 || y < 0 || x >= width || y >= height) continue;
-      putAged(out, width, x, y, cols[v]);
-      painted.add(key(x, y));
-    }
-  }
-  for (const k of painted) {
-    const x = k % width;
-    const y = (k - x) / width;
-    const sx = x + 1;
-    const sy = y + 1;
-    if (sx >= width || sy >= height || painted.has(key(sx, sy))) continue;
-    const i = (sy * width + sx) * 4;
-    out[i] = Math.round(out[i] * 0.55);
-    out[i + 1] = Math.round(out[i + 1] * 0.52);
-    out[i + 2] = Math.round(out[i + 2] * 0.5);
-  }
-}
-
-function shrinkOversizedPadlock(
-  src: ArrayLike<number>,
-  out: Uint8ClampedArray,
-  width: number,
-  height: number
-): void {
-  const leaf = doorPanelLeafRect(width, height);
-  if (leaf.x1 - leaf.x0 < 16 || leaf.y1 - leaf.y0 < 16) return;
-  const groups = detectBandRows(src, width, leaf);
-  const bandRows = new Set(groups.flat());
-  const lock = detectOversizedPadlock(src, width, height, leaf, bandRows);
-  if (!lock) return;
-  const mask = padlockMask(src, width, leaf, lock, bandRows);
-  fillPadlockHole(src, out, width, leaf, mask, bandRows);
-  if (groups[0]?.length) paintHaspAndPadlock(out, width, height, leaf, groups[0]);
-}
-
-/**
- * Recolour/age pass on `door_panel.png`. Keeps the plank layout, bands,
- * and studs; shifts wood to dark grey-brown and iron to rusty matte.
- * The original oversized padlock is replaced with continued plank / band
- * pixels and a realistic lock hung from a hasp on the middle iron band.
- * Stud / rivet highlights stay dull rusty — never near white.
+ * Stud / luma clamp only. Artie's `door_panel_aged.png` is already aged —
+ * do not recolour wood or iron (that would double the wear).
  */
 export function ageDoorPanelPixels(
   src: ArrayLike<number>,
@@ -1077,10 +732,6 @@ export function ageDoorPanelPixels(
   height: number
 ): Uint8ClampedArray {
   const out = new Uint8ClampedArray(src.length);
-  const cx = (width - 1) * 0.5;
-  const cy = (height - 1) * 0.55;
-  const rx = width * 0.32;
-  const ry = height * 0.42;
   for (let y = 0; y < height; y++) {
     for (let x = 0; x < width; x++) {
       const i = (y * width + x) * 4;
@@ -1088,47 +739,26 @@ export function ageDoorPanelPixels(
       const g = src[i + 1] / 255;
       const b = src[i + 2] / 255;
       const a = src[i + 3];
+      const luma = pixelLuma(r, g, b);
       const maxc = Math.max(r, g, b);
       const minc = Math.min(r, g, b);
       const sat = maxc > 1e-6 ? (maxc - minc) / maxc : 0;
-      const luma = pixelLuma(r, g, b);
-      const dx = (x - cx) / rx;
-      const dy = (y - cy) / ry;
-      const inDoor = dx * dx + dy * dy <= 1.15;
-      const edge = Math.min(1, Math.sqrt(dx * dx + dy * dy));
-      const wood = sat > 0.12 && r > g + 0.02 && r > b + 0.04 && luma < 0.78;
-      const highlight = inDoor && !wood && sat < 0.38 && luma >= 0.55;
-      const iron = inDoor && !wood && sat < 0.28 && luma > 0.22;
       let nr = r;
       let ng = g;
       let nb = b;
-      if (wood) {
-        const grey = luma;
-        nr = grey * 0.42 + 0.1;
-        ng = grey * 0.36 + 0.08;
-        nb = grey * 0.3 + 0.06;
-        if (luma < 0.22) {
-          nr = ng = nb = luma * 0.35;
-        }
-        const grime = 1 - edge * 0.28;
-        nr *= grime;
-        ng *= grime * 0.98;
-        nb *= grime * 0.92;
-      } else if (iron || highlight) {
+      if (sat < 0.38 && luma >= 0.55) {
         [nr, ng, nb] = rustIron(luma);
       }
-      if (inDoor) {
-        [nr, ng, nb] = clampLeafLuma(nr, ng, nb);
-      }
+      [nr, ng, nb] = clampLeafLuma(nr, ng, nb);
       out[i] = Math.round(Math.min(1, nr) * 255);
       out[i + 1] = Math.round(Math.min(1, ng) * 255);
       out[i + 2] = Math.round(Math.min(1, nb) * 255);
       out[i + 3] = a;
     }
   }
-  shrinkOversizedPadlock(src, out, width, height);
   return out;
 }
+
 
 const FIELD_STONE_ROLES = new Set<QuadRole>(['lintel', 'chip']);
 
@@ -1211,7 +841,7 @@ export function leafMeshes(
   for (const q of listLeafQuads(style)) {
     pushQuad(wood, q.corners, q.kind, face, tx, tz, true, top);
   }
-  for (const q of listIronQuads(style)) {
+  for (const q of listPadlockQuads(style)) {
     pushQuad(iron, q.corners, q.kind, face, tx, tz);
   }
   return { wood, iron };

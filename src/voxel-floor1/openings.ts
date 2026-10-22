@@ -646,7 +646,7 @@ export async function buildFloor1Openings(
   const wallFiles = [...FLOOR1_WALL_FILES];
   const pngs = await Promise.all([
     loadPng('ceiling_planks_1.png'),
-    loadPng('door_panel.png'),
+    loadPng('door_panel_aged.png'),
     ...wallFiles.map((file) => loadPng(file))
   ]);
   const plankPng = pngs[0];
@@ -686,6 +686,19 @@ export async function buildFloor1Openings(
   woodMat.name = 'door_panel_aged';
   woodMat.fog = true;
   if (!realLights) patchBakeMaterial(woodMat);
+  const ironMat = new THREE.MeshPhysicalMaterial({
+    color: new THREE.Color(0.18, 0.11, 0.08),
+    roughness: 1,
+    metalness: 0,
+    clearcoat: 0,
+    sheen: 0,
+    specularIntensity: 0,
+    envMapIntensity: 0,
+    clippingPlanes: [leafClip]
+  });
+  ironMat.name = 'door_padlock_iron';
+  ironMat.fog = true;
+  if (!realLights) patchBakeMaterial(ironMat);
   const secretMats = new Map<string, THREE.MeshPhysicalMaterial>();
   const surroundMats = new Map<string, THREE.MeshPhysicalMaterial>();
   const lintelMats: THREE.MeshPhysicalMaterial[] = [];
@@ -809,6 +822,20 @@ export async function buildFloor1Openings(
           panel.userData.doorLeaf = true;
           slider.add(panel);
         }
+        if (leaf.iron.positions.length) {
+          const ironGeo = geometryWithBake([{ mesh: leaf.iron, tx: view.tx, tz: view.tz }], torches, beams);
+          if (ironGeo) {
+            const lock = new THREE.Mesh(ironGeo, ironMat);
+            lock.name = `door-lock:${visual.x},${visual.y}:${face}`;
+            lock.castShadow = true;
+            lock.receiveShadow = true;
+            lock.frustumCulled = false;
+            lock.userData.door = { x: visual.x, y: visual.y };
+            lock.userData.doorLeaf = true;
+            lock.userData.padlock = true;
+            slider.add(lock);
+          }
+        }
         slider.frustumCulled = false;
         group.add(slider);
         visual.panels.push(slider);
@@ -884,6 +911,7 @@ export async function buildFloor1Openings(
 
   system.bindLights(torches, beams, realLights, [
     woodMat,
+    ironMat,
     ...secretMats.values(),
     ...surroundMats.values(),
     ...lintelMats
