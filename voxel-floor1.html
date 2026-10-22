@@ -48,7 +48,8 @@
     }
     #game-hud button,
     #game-hud .hand-hit,
-    #game-hud .portrait-sheet-hit {
+    #game-hud .portrait-sheet-hit,
+    #message-log {
       pointer-events: auto;
     }
     #top-chrome { position: absolute; pointer-events: none; }
@@ -86,22 +87,26 @@
     #btn-oil img { width: 22px; height: 22px; }
     #message-log {
       position: absolute;
-      pointer-events: none;
-      padding: 8px 8px 8px;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 8px;
       background: rgba(6, 4, 3, 0.55);
       color: #d8ccb0;
       font-size: 14px;
       line-height: 20px;
       letter-spacing: 0.02em;
       text-shadow: 1px 1px 0 #000;
-      overflow: visible;
-      transition: opacity 0.4s ease;
+      overflow: hidden;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
     }
-    #message-log.fading { opacity: 0; }
+    #message-log.can-scroll { cursor: pointer; }
     .log-line {
+      flex: 0 0 20px;
       min-height: 20px;
       white-space: pre-wrap;
-      overflow: visible;
+      overflow: hidden;
       overflow-wrap: anywhere;
       word-break: normal;
     }

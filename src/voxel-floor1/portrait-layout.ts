@@ -30,17 +30,14 @@ export const COMPASS_ICON = 42;
 
 export const OPEN_W = 96;
 export const OPEN_H = 44;
-export const OPEN_ABOVE_LOG = 12;
+/** Gap between the Open button's bottom edge and the pad's top edge. */
+export const OPEN_ABOVE_PAD = 6;
 
-export const LOG_H = 48;
 export const LOG_MARGIN = 6;
 export const LOG_INNER = 8;
 export const LOG_PAD_GAP = 5;
 export const FONT_ADVANCE = 12;
 export const LINE_PITCH = 20;
-/** Hold the full wrapped message, then fade and shrink back to the idle 2-line box. */
-export const LOG_HOLD_MS = 4000;
-export const LOG_FADE_MS = 400;
 
 export const PAD_BTN = 44;
 export const PAD_GAP = 3;
@@ -273,13 +270,18 @@ export function measurePortraitLayout(
 
   const log = rect(
     LOG_MARGIN + safe.left,
-    viewH - LOG_MARGIN - LOG_H,
+    pad.y,
     Math.max(1, pad.x - LOG_PAD_GAP - (LOG_MARGIN + safe.left)),
-    LOG_H
+    pad.h
   );
   const logMaxChars = Math.max(1, Math.floor((log.w - LOG_INNER * 2) / FONT_ADVANCE));
 
-  const open = rect(Math.floor((W - OPEN_W) / 2), log.y - OPEN_ABOVE_LOG - OPEN_H, OPEN_W, OPEN_H);
+  const open = rect(
+    Math.floor(pad.x + (pad.w - OPEN_W) / 2),
+    pad.y - OPEN_ABOVE_PAD - OPEN_H,
+    OPEN_W,
+    OPEN_H
+  );
 
   const chromeY = safe.top + CHROME_BELOW_SAFE;
   const compass = rect(Math.floor((W - CHROME_SIZE) / 2), chromeY, CHROME_SIZE, CHROME_SIZE);
@@ -315,7 +317,8 @@ export function layoutTapTargets(layout: PortraitLayout): Array<{ name: string; 
     { name: 'bag', rect: layout.bag },
     { name: 'compass', rect: layout.compass },
     { name: 'oil', rect: layout.oil },
-    { name: 'open', rect: layout.open }
+    { name: 'open', rect: layout.open },
+    { name: 'log', rect: layout.log }
   ];
   for (const key of PAD_KEYS) out.push({ name: `pad.${key}`, rect: layout.padButtons[key] });
   for (const p of layout.portraits) {
@@ -374,26 +377,40 @@ export function wrapLogMessage(text: string, maxChars: number): string[] {
   return out.length ? out : text ? [text] : [];
 }
 
-/** Idle / short messages keep the 48 px box. Taller wraps include 8 px padding on both sides. */
-export function logHeightForLines(lineCount: number): number {
-  if (lineCount <= 2) return LOG_H;
-  return LOG_INNER * 2 + lineCount * LINE_PITCH;
+/** How many wrapped lines fit in the fixed pad-height log box. */
+export function visibleLogLineCount(logH: number): number {
+  return Math.max(1, Math.floor((logH - LOG_INNER * 2) / LINE_PITCH));
 }
 
-export function logBoxForLineCount(layout: PortraitLayout, lineCount: number): Rect {
-  const bottom = layout.log.y + layout.log.h;
-  const h = logHeightForLines(lineCount);
-  const y = Math.max(0, bottom - h);
-  return { x: layout.log.x, y, w: layout.log.w, h: bottom - y };
+/** Window of wrapped lines currently shown: newest at the bottom when scroll is 0. */
+export function logVisibleWindow(
+  lineCount: number,
+  visible: number,
+  scrollFromBottom = 0
+): { start: number; end: number } {
+  if (lineCount <= 0 || visible <= 0) return { start: 0, end: 0 };
+  if (lineCount <= visible) return { start: 0, end: lineCount };
+  const maxScroll = lineCount - visible;
+  const scroll = Math.max(0, Math.min(maxScroll, scrollFromBottom));
+  const end = lineCount - scroll;
+  return { start: end - visible, end };
 }
 
-export function openAboveLog(layout: PortraitLayout, log: Rect): Rect {
-  return {
-    x: layout.open.x,
-    y: log.y - OPEN_ABOVE_LOG - OPEN_H,
-    w: OPEN_W,
-    h: OPEN_H
-  };
+export function logVisibleSlice(lines: string[], visible: number, scrollFromBottom = 0): string[] {
+  const { start, end } = logVisibleWindow(lines.length, visible, scrollFromBottom);
+  return lines.slice(start, end);
+}
+
+/** Page older lines on tap; wrap back to the newest window after the oldest. */
+export function nextLogScrollFromBottom(
+  lineCount: number,
+  visible: number,
+  scrollFromBottom: number
+): number {
+  if (lineCount <= visible) return 0;
+  const maxScroll = lineCount - visible;
+  if (scrollFromBottom >= maxScroll) return 0;
+  return Math.min(maxScroll, scrollFromBottom + visible);
 }
 
 export function parseSafeQuery(search: string): SafeInsets | null {

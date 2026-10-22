@@ -3,15 +3,14 @@ import {
   HERO_DISPLAY,
   HP_FILL,
   HudHeroId,
-  LOG_FADE_MS,
-  LOG_HOLD_MS,
   MP_FILL,
   PAD_KEYS,
   PortraitLayout,
   Rect,
-  logBoxForLineCount,
+  logVisibleSlice,
   measurePortraitLayout,
-  openAboveLog,
+  nextLogScrollFromBottom,
+  visibleLogLineCount,
   wrapLogMessage,
   type PadKey,
   type SafeInsets
@@ -98,9 +97,8 @@ export class Floor1PartyUi {
   oil = 2;
   oilMax = 4;
   logLines: string[] = [];
-  private logMessage = '';
-  private logHoldTimer = 0;
-  private logFadeTimer = 0;
+  private logMessages: string[] = [];
+  private logScrollFromBottom = 0;
   private host: HTMLElement;
   private logEl: HTMLElement;
   private compassEl: HTMLImageElement;
@@ -155,7 +153,7 @@ export class Floor1PartyUi {
     place(this.host.querySelector('#btn-bag') as HTMLElement, layout.bag);
     place(this.host.querySelector('#compass') as HTMLElement, layout.compass);
     place(this.host.querySelector('#btn-oil') as HTMLElement, layout.oil);
-    this.placeLogAndOpen();
+    this.renderLog();
     place(this.host.querySelector('#move-pad') as HTMLElement, layout.pad);
     for (const key of PAD_KEYS) {
       const btn = document.getElementById(PAD_BTN_ID[key]);
@@ -188,23 +186,24 @@ export class Floor1PartyUi {
 
   pushLog(text: string): void {
     if (!text) return;
-    this.logMessage = text;
-    this.logLines = wrapLogMessage(text, this.layout.logMaxChars);
-    this.logEl.classList.remove('fading');
-    this.placeLogAndOpen();
-    this.armLogIdle();
+    this.logMessages.push(text);
+    this.logScrollFromBottom = 0;
+    this.renderLog();
   }
 
-  private placeLogAndOpen(): void {
-    if (this.logMessage) {
-      this.logLines = wrapLogMessage(this.logMessage, this.layout.logMaxChars);
-    }
-    const log = logBoxForLineCount(this.layout, this.logLines.length);
-    const open = openAboveLog(this.layout, log);
-    place(this.logEl, log);
-    place(this.doorBtn, open);
+  private renderLog(): void {
+    this.logLines = this.logMessages.flatMap((text) => wrapLogMessage(text, this.layout.logMaxChars));
+    const visible = visibleLogLineCount(this.layout.log.h);
+    this.logScrollFromBottom = Math.min(
+      this.logScrollFromBottom,
+      Math.max(0, this.logLines.length - visible)
+    );
+    const shown = logVisibleSlice(this.logLines, visible, this.logScrollFromBottom);
+    place(this.logEl, this.layout.log);
+    place(this.doorBtn, this.layout.open);
+    this.logEl.classList.toggle('can-scroll', this.logLines.length > visible);
     this.logEl.replaceChildren();
-    for (const line of this.logLines) {
+    for (const line of shown) {
       const row = document.createElement('div');
       row.className = 'log-line';
       row.textContent = line;
@@ -212,18 +211,15 @@ export class Floor1PartyUi {
     }
   }
 
-  private armLogIdle(): void {
-    window.clearTimeout(this.logHoldTimer);
-    window.clearTimeout(this.logFadeTimer);
-    this.logHoldTimer = window.setTimeout(() => {
-      this.logEl.classList.add('fading');
-      this.logFadeTimer = window.setTimeout(() => {
-        this.logMessage = '';
-        this.logLines = [];
-        this.logEl.classList.remove('fading');
-        this.placeLogAndOpen();
-      }, LOG_FADE_MS);
-    }, LOG_HOLD_MS);
+  private pageLog(): void {
+    const visible = visibleLogLineCount(this.layout.log.h);
+    if (this.logLines.length <= visible) return;
+    this.logScrollFromBottom = nextLogScrollFromBottom(
+      this.logLines.length,
+      visible,
+      this.logScrollFromBottom
+    );
+    this.renderLog();
   }
 
   setHeroDowned(id: HudHeroId, downed: boolean): void {
@@ -290,6 +286,11 @@ export class Floor1PartyUi {
     click('btn-door', () => this.hooks.onInteract());
     click('btn-menu', () => this.hooks.onMenu());
     click('btn-bag', () => this.hooks.onBag());
+    this.logEl.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      this.pageLog();
+    });
     this.sheetEl.querySelector('.overlay-close')?.addEventListener('click', () => this.closeOverlays());
     this.bagEl.querySelector('.overlay-close')?.addEventListener('click', () => this.closeOverlays());
     this.menuEl.querySelector('.overlay-close')?.addEventListener('click', () => this.closeOverlays());

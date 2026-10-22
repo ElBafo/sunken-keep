@@ -545,7 +545,7 @@ async function boot(): Promise<void> {
   const swipeFromView = (e: PointerEvent): boolean => {
     if (partyUi?.overlayOpen()) return false;
     const t = e.target as HTMLElement | null;
-    if (t?.closest?.('button, .hand-hit, .portrait-cell, .overlay, #stats')) return false;
+    if (t?.closest?.('button, .hand-hit, .portrait-cell, .overlay, #stats, #message-log')) return false;
     return e.clientY < latestLayout.view.h && e.clientY >= 0;
   };
 

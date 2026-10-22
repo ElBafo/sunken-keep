@@ -11,18 +11,21 @@ import {
   AIR_SAFE_BOTTOM,
   AIR_SAFE_TOP,
   CAMERA_HFOV_DEG,
-  LINE_PITCH,
-  LOG_INNER,
+  OPEN_ABOVE_PAD,
+  OPEN_H,
+  OPEN_W,
   TAP_MIN_PT,
   horizontalFov,
   layoutTapTargets,
-  logBoxForLineCount,
+  logVisibleSlice,
+  logVisibleWindow,
   measurePortraitLayout,
-  openAboveLog,
+  nextLogScrollFromBottom,
   overlayRects,
   rectsOverlap,
   rectsTouchSafe,
   verticalFovForAspect,
+  visibleLogLineCount,
   wrapLogMessage,
   type PortraitLayout,
   type Rect
@@ -91,9 +94,9 @@ describe('voxel-floor1 Option A portrait layout maths', () => {
         ['ilsevar', 210, 105, 128],
         ['mags', 315, 105, 128]
       ],
-      log: [6, 696, 271, 744],
+      log: [6, 653, 271, 744],
       logMaxChars: 20,
-      open: [162, 640, 258, 684],
+      open: [297, 603, 393, 647],
       compass: [188, 63, 232, 107],
       pad: [276, 653, 414, 744]
     });
@@ -113,9 +116,9 @@ describe('voxel-floor1 Option A portrait layout maths', () => {
         ['ilsevar', 196, 99, 120],
         ['mags', 295, 98, 120]
       ],
-      log: [6, 644, 244, 692],
+      log: [6, 601, 244, 692],
       logMaxChars: 18,
-      open: [148, 588, 244, 632],
+      open: [270, 551, 366, 595],
       compass: [174, 63, 218, 107],
       pad: [249, 601, 387, 692]
     });
@@ -174,14 +177,34 @@ describe('voxel-floor1 Option A portrait layout maths', () => {
       expect(byId.mags.bars.mp).toBeNull();
       expect(byId.wren.bars.mp).not.toBeNull();
       expect(byId.ilsevar.bars.mp).not.toBeNull();
+      expect(layout.log.y).toBe(layout.pad.y);
+      expect(layout.log.h).toBe(layout.pad.h);
+      expect(layout.log.y + layout.log.h).toBe(layout.pad.y + layout.pad.h);
+      expect(layout.log.x + layout.log.w + 5).toBe(layout.pad.x);
+      expect(layout.open.w).toBe(OPEN_W);
+      expect(layout.open.h).toBe(OPEN_H);
+      expect(layout.open.x).toBe(Math.floor(layout.pad.x + (layout.pad.w - OPEN_W) / 2));
+      expect(layout.open.y + layout.open.h + OPEN_ABOVE_PAD).toBe(layout.pad.y);
       expect(rectsOverlap(layout.log, layout.pad)).toBe(false);
       expect(rectsOverlap(layout.open, layout.pad)).toBe(false);
       expect(rectsOverlap(layout.open, layout.log)).toBe(false);
       expect(layout.pad.y + layout.pad.h).toBeLessThanOrEqual(layout.view.y + layout.view.h);
       expect(layout.log.y + layout.log.h).toBeLessThanOrEqual(layout.view.y + layout.view.h);
     }
+    const overlays = ['menu', 'bag', 'compass', 'oil', 'open', 'log', 'pad'] as const;
+    for (const layout of [air, phone]) {
+      const named = Object.fromEntries(overlayRects(layout).map((t) => [t.name, t.rect]));
+      for (let i = 0; i < overlays.length; i++) {
+        for (let j = i + 1; j < overlays.length; j++) {
+          expect(rectsOverlap(named[overlays[i]], named[overlays[j]]), `${overlays[i]} vs ${overlays[j]}`).toBe(false);
+        }
+      }
+    }
+    // d1 floor band bottoms from the Option A mock (flask sits on/above that band).
     expect(air.pad.y).toBeGreaterThanOrEqual(544);
     expect(phone.pad.y).toBeGreaterThanOrEqual(509);
+    expect(air.open.y).toBeGreaterThanOrEqual(544);
+    expect(phone.open.y).toBeGreaterThanOrEqual(509);
   });
 });
 
@@ -202,8 +225,8 @@ function longestExistingLogMessage(): string {
   return existingLogMessages().reduce((best, text) => (text.length > best.length ? text : best), '');
 }
 
-describe('growing message log keeps full game text', () => {
-  it('word-wraps the longest existing message at 393 wide and lifts Open above it', () => {
+describe('fixed pad-height message log keeps full game text', () => {
+  it('word-wraps the longest existing message at 393 wide without shortening it', () => {
     const phone = measurePortraitLayout(393, 852, {
       top: AIR_SAFE_TOP,
       right: 0,
@@ -216,18 +239,58 @@ describe('growing message log keeps full game text', () => {
     expect(lines.join('')).not.toMatch(/\.\.\.|…/);
     expect(lines.join('').replace(/\s+/g, '')).toBe(msg.replace(/\s+/g, ''));
     expect(lines.join(' ').split(/\s+/).filter(Boolean)).toEqual(msg.split(/\s+/).filter(Boolean));
-    expect(lines.length).toBeGreaterThan(2);
     expect(lines.every((line) => line.length <= phone.logMaxChars)).toBe(true);
 
-    const log = logBoxForLineCount(phone, lines.length);
-    const open = openAboveLog(phone, log);
-    expect(log.h).toBe(LOG_INNER * 2 + lines.length * LINE_PITCH);
-    expect(log.h).toBeGreaterThan(phone.log.h);
-    expect(log.y + log.h).toBe(phone.log.y + phone.log.h);
-    expect(log.y).toBeLessThan(phone.log.y);
-    expect(open.h).toBeGreaterThanOrEqual(TAP_MIN_PT);
-    expect(open.y + open.h).toBe(log.y - 12);
-    expect(rectsOverlap(open, log)).toBe(false);
-    expect(log.y).toBeGreaterThanOrEqual(0);
+    const visible = visibleLogLineCount(phone.log.h);
+    expect(phone.log.h).toBe(phone.pad.h);
+    expect(visible).toBe(3);
+    expect(lines.length).toBeLessThanOrEqual(visible);
+    expect(logVisibleSlice(lines, visible, 0)).toEqual(lines);
+  });
+
+  it('shows the last lines of a taller wrap and pages older lines on tap', () => {
+    const phone = measurePortraitLayout(393, 852, {
+      top: AIR_SAFE_TOP,
+      right: 0,
+      bottom: AIR_SAFE_BOTTOM,
+      left: 0
+    });
+    const visible = visibleLogLineCount(phone.log.h);
+    const messages = existingLogMessages()
+      .filter((text) => text.length > phone.logMaxChars)
+      .slice(0, 3);
+    expect(messages.length).toBeGreaterThanOrEqual(2);
+    const oneMessage = wrapLogMessage(messages.join(' '), phone.logMaxChars);
+    expect(oneMessage.length).toBeGreaterThan(visible);
+    expect(logVisibleSlice(oneMessage, visible, 0)).toEqual(oneMessage.slice(oneMessage.length - visible));
+
+    const lines = messages.flatMap((text) => wrapLogMessage(text, phone.logMaxChars));
+    expect(lines.length).toBeGreaterThan(visible);
+    expect(lines.join('')).not.toMatch(/\.\.\.|…/);
+
+    const newest = logVisibleSlice(lines, visible, 0);
+    expect(newest).toEqual(lines.slice(lines.length - visible));
+    expect(newest[newest.length - 1]).toBe(lines[lines.length - 1]);
+
+    const afterTap = nextLogScrollFromBottom(lines.length, visible, 0);
+    expect(afterTap).toBeGreaterThan(0);
+    const older = logVisibleSlice(lines, visible, afterTap);
+    expect(older[0]).toBe(lines[logVisibleWindow(lines.length, visible, afterTap).start]);
+    expect(older.join('')).not.toBe(newest.join(''));
+
+    let scroll = 0;
+    const seen: string[] = [];
+    const seenSet = new Set<string>();
+    for (let i = 0; i < lines.length + 2; i++) {
+      for (const line of logVisibleSlice(lines, visible, scroll)) {
+        if (!seenSet.has(line)) {
+          seenSet.add(line);
+          seen.push(line);
+        }
+      }
+      scroll = nextLogScrollFromBottom(lines.length, visible, scroll);
+    }
+    expect(seen.sort()).toEqual([...lines].sort());
+    expect(scroll).toBe(0);
   });
 });
