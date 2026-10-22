@@ -82,9 +82,10 @@ describe('voxel-floor1 is a standalone Vite page', () => {
     expect(partyUi).toContain('import.meta.env.BASE_URL');
     expect(partyUi).toContain('setIcon(this.host.querySelector(\'#btn-bag\'), HUD_ICON.bag)');
     expect(partyUi).toContain('setIcon(this.host.querySelector(\'#btn-oil\'), HUD_ICON.oil)');
-    expect(html).toContain('%BASE_URL%art/ui/panel/icon_bag.png');
-    expect(html).toContain('%BASE_URL%art/ui/items/icon_oil.png');
-    expect(html).not.toMatch(/src="\/sunken-keep\/art\//);
+    expect(html).toContain('src="/art/ui/panel/icon_bag.png"');
+    expect(html).toContain('src="/art/ui/items/icon_oil.png"');
+    expect(html).not.toContain('%BASE_URL%');
+    expect(html).not.toMatch(/src="\/sunken-keep\//);
     expect(existsSync(resolve(__dirname, '../public/art/ui/panel/icon_bag.png'))).toBe(true);
     expect(existsSync(resolve(__dirname, '../public/art/ui/items/icon_oil.png'))).toBe(true);
   });
