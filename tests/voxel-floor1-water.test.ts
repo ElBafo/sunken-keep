@@ -20,10 +20,15 @@ import {
   listWaterGlintCells,
   listWaterRegions,
   paintedFloorSize,
+  blendWaterOverInner,
+  pickWaterInnerIndex,
   puddleAlpha,
   puddleCoverage,
   puddleEdgeInset,
   puddleEdgeIsIrregular,
+  rimMaskForCell,
+  rotateMaskCW,
+  rgbaToMask,
   waterDeepness
 } from '../src/voxel-floor1/water';
 
@@ -115,6 +120,38 @@ describe('voxel-floor1 water is one puddle per region', () => {
   });
 });
 
+describe('voxel-floor1 water bed is inner plus dry-side rims', () => {
+  it('picks inner or inner_2 per cell and never rims a water-water join', () => {
+    const a = pickWaterInnerIndex(2, 2);
+    expect(a === 0 || a === 1).toBe(true);
+    expect(pickWaterInnerIndex(2, 2)).toBe(a);
+    expect(pickWaterInnerIndex(3, 1)).not.toBeUndefined();
+
+    const north = new Float32Array([1, 1, 0, 0]);
+    const east = rotateMaskCW(north, 2, 1);
+    expect(Array.from(east)).toEqual([0, 1, 0, 1]);
+    const south = rotateMaskCW(north, 2, 2);
+    expect(Array.from(south)).toEqual([0, 0, 1, 1]);
+    const west = rotateMaskCW(north, 2, 3);
+    expect(Array.from(west)).toEqual([1, 0, 1, 0]);
+
+    const interior = rimMaskForCell(floor1Map, 2, 2, north, 2);
+    expect(Math.max(...interior)).toBe(0);
+    const southShore = rimMaskForCell(floor1Map, 2, 4, north, 2);
+    expect(southShore[2]).toBeGreaterThan(0.5);
+    expect(southShore[3]).toBeGreaterThan(0.5);
+    expect(southShore[0]).toBe(0);
+
+    const inner = new Uint8ClampedArray([10, 20, 30, 255, 10, 20, 30, 255, 10, 20, 30, 255, 10, 20, 30, 255]);
+    const water = new Uint8ClampedArray([200, 180, 160, 255, 200, 180, 160, 255, 200, 180, 160, 255, 200, 180, 160, 255]);
+    const mask = new Float32Array([1, 0, 0, 0]);
+    const mix = blendWaterOverInner(inner, water, mask, 2);
+    expect(mix[0]).toBe(200);
+    expect(mix[4]).toBe(10);
+    expect(rgbaToMask(new Uint8ClampedArray([255, 255, 255, 255]), 1)[0]).toBe(1);
+  });
+});
+
 describe('voxel-floor1 water dip leaves no border gap', () => {
   const defaultSize = CELL + 2 * (CAMERA_NEAR + 0.12);
 
@@ -159,8 +196,12 @@ describe('voxel-floor1 water dip leaves no border gap', () => {
     expect(level).not.toContain('applyWaterBedPose');
     expect(main).toContain('buildFloor1Water');
     expect(water).toContain('listWaterRegions');
+    expect(water).toContain('pickWaterInnerIndex');
+    expect(water).toContain('rimMaskForCell');
     expect(water).toContain('paintSoftBlob');
+    expect(water).toContain('water-shimmer');
     expect(water).not.toContain('water-sparkles');
+    expect(water).not.toMatch(/flipX|repeatWrapping.*water|scale\.x\s*=\s*-1/);
     expect(water).not.toContain('water-lips');
     expect(water).not.toContain('onBeforeCompile');
     expect(water).not.toContain('ShaderMaterial');

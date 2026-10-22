@@ -84,6 +84,7 @@ type Floor1Api = {
   setPosition: (x: number, y: number, dir: number) => void;
   setLookPitch: (rad: number) => void;
   setLookYaw: (rad: number) => void;
+  setShotPose: (x: number, y: number, z: number, pitch: number, yaw: number) => void;
   stepForward: () => boolean;
   stepBack: () => boolean;
   turnLeft: () => boolean;
@@ -644,6 +645,13 @@ async function boot(): Promise<void> {
     },
     setLookYaw: (rad) => {
       camera.rotation.y = rad;
+      camera.updateMatrixWorld();
+    },
+    setShotPose: (x, y, z, pitch, yaw) => {
+      camera.position.set(x, y, z);
+      camera.rotation.order = 'YXZ';
+      camera.rotation.x = pitch;
+      camera.rotation.y = yaw;
       camera.updateMatrixWorld();
     },
     stepForward: () => beginStep(1),
