@@ -1,17 +1,21 @@
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import * as THREE from 'three';
 import { describe, expect, it } from 'vitest';
-import { CAMERA_NEAR, CELL } from '../src/voxel-floor1/constants';
-import { floor1Sconces } from '../src/voxel-floor1/fixtures';
+import { CAMERA_NEAR, CELL, TORCH_DISTANCE } from '../src/voxel-floor1/constants';
+import { floor1Sconces, torchWorldPos } from '../src/voxel-floor1/fixtures';
 import { floor1Map, isWaterCell, isWaterTile, tileAt } from '../src/voxel-floor1/layout';
 import { paintedShellMaterial } from '../src/voxel-floor1/painted';
 import {
+  CISTERN_BED_FILE,
   WATER_DIP_DEEP,
   WATER_DIP_SHALLOW,
   WATER_FACES,
   WATER_INSET_MAX,
   WATER_INSET_MIN,
+  WATER_NOISE_SPAN,
+  cisternBedWorldUv,
+  cisternRegion,
   dryFacingFaces,
   floorDip,
   hasWaterNeighbor,
@@ -26,10 +30,15 @@ import {
   puddleCoverage,
   puddleEdgeInset,
   puddleEdgeIsIrregular,
+  regionWorldUv,
   rimMaskForCell,
   rotateMaskCW,
   rgbaToMask,
-  waterDeepness
+  torchWarmthAt,
+  waterDeepness,
+  waterRippleHeight,
+  waterWorldNoise,
+  waterWorldUv
 } from '../src/voxel-floor1/water';
 
 const SRC = resolve(__dirname, '../src/voxel-floor1');
@@ -200,6 +209,11 @@ describe('voxel-floor1 water dip leaves no border gap', () => {
     expect(water).toContain('rimMaskForCell');
     expect(water).toContain('paintSoftBlob');
     expect(water).toContain('water-shimmer');
+    expect(water).toContain('waterWorldNoise');
+    expect(water).toContain('tryLoadOptionalPng');
+    expect(water).toContain('CISTERN_BED_FILE');
+    expect(water).toContain('regionWorldUv');
+    expect(water).toContain('torchWarmthAt');
     expect(water).not.toContain('water-sparkles');
     expect(water).not.toMatch(/flipX|repeatWrapping.*water|scale\.x\s*=\s*-1/);
     expect(water).not.toContain('water-lips');
@@ -207,5 +221,50 @@ describe('voxel-floor1 water dip leaves no border gap', () => {
     expect(water).not.toContain('ShaderMaterial');
     expect(water).not.toContain('../proto3d/');
     expect(water).toContain('castShadow = false');
+  });
+});
+
+describe('voxel-floor1 water is one world-space pool', () => {
+  it('drives ripple and shimmer by world position with no 2 m repeat', () => {
+    expect(WATER_NOISE_SPAN).toBeGreaterThan(8);
+    expect(waterWorldUv(CELL, 0).u).toBeCloseTo(CELL / WATER_NOISE_SPAN, 6);
+    expect(Math.abs(waterWorldNoise(0, 0) - waterWorldNoise(CELL, 0))).toBeGreaterThan(0.05);
+    expect(Math.abs(waterWorldNoise(4, 5) - waterWorldNoise(4 + CELL, 5))).toBeGreaterThan(0.05);
+    expect(Math.abs(waterWorldNoise(3.99, 7) - waterWorldNoise(4.01, 7))).toBeLessThan(0.02);
+    expect(Math.abs(waterRippleHeight(4, 5, 1.5) - waterRippleHeight(4 + CELL, 5, 1.5))).toBeGreaterThan(
+      0.0003
+    );
+    const a = waterWorldNoise(4, 5, 0);
+    const b = waterWorldNoise(4, 5, 8);
+    expect(Math.abs(a - b)).toBeGreaterThan(0.05);
+  });
+
+  it('keeps torch-radius warmth on lit water and leaves the cellar dark', () => {
+    const torch = floor1Sconces.find((s) => s.x === 4 && s.y === 1);
+    expect(torch).toBeTruthy();
+    const p = torchWorldPos(torch!);
+    expect(torchWarmthAt(p.x, p.z, floor1Sconces)).toBeGreaterThan(0.9);
+    expect(torchWarmthAt(6, 2, floor1Sconces)).toBeGreaterThan(0.25);
+    expect(torchWarmthAt(2, 8, floor1Sconces)).toBeLessThan(0.05);
+    expect(torchWarmthAt(10, 22, floor1Sconces)).toBe(0);
+    expect(TORCH_DISTANCE).toBeGreaterThan(4);
+  });
+
+  it('maps the cistern bed to pool-bounds 0..1 and falls back until the file exists', () => {
+    const region = cisternRegion(floor1Map);
+    expect(region).toBeTruthy();
+    const sw = regionWorldUv(region!, (region!.minX - 0.5) * CELL, (region!.minY - 0.5) * CELL);
+    const ne = regionWorldUv(region!, (region!.maxX + 0.5) * CELL, (region!.maxY + 0.5) * CELL);
+    expect(sw.u).toBeCloseTo(0, 5);
+    expect(sw.v).toBeCloseTo(0, 5);
+    expect(ne.u).toBeCloseTo(1, 5);
+    expect(ne.v).toBeCloseTo(1, 5);
+    const mid = cisternBedWorldUv(floor1Map, 4, 5);
+    expect(mid.u).toBeGreaterThan(0.3);
+    expect(mid.u).toBeLessThan(0.7);
+    expect(mid.v).toBeGreaterThan(0.3);
+    expect(mid.v).toBeLessThan(0.7);
+    expect(CISTERN_BED_FILE).toBe('floor_water_cistern_bed.png');
+    expect(existsSync(resolve(__dirname, '../public/proto3d/tex3d', CISTERN_BED_FILE))).toBe(false);
   });
 });

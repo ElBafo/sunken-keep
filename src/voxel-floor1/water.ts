@@ -1,6 +1,13 @@
 import * as THREE from 'three';
-import { CELL, SCONCE_RADIUS_TILES } from './constants';
-import { FACE_INTO_ROOM, floodReach, sconceIsLit, sconceRoom, type SconceSpec } from './fixtures';
+import { CELL, SCONCE_RADIUS_TILES, TORCH_DISTANCE } from './constants';
+import {
+  FACE_INTO_ROOM,
+  floodReach,
+  sconceIsLit,
+  sconceRoom,
+  torchWorldPos,
+  type SconceSpec
+} from './fixtures';
 import { isWaterCell, tileAt, type FloorMap } from './layout';
 import { paintedShellMaterial } from './painted';
 import { loadPng, textureFromPixels } from '../voxel-lab/materials';
@@ -12,7 +19,9 @@ export const WATER_DIP_SHALLOW = 0.028;
 export const WATER_DIP_DEEP = 0.06;
 export const WATER_FLOOR_SEGS = 16;
 export const WATER_RIPPLE_AMP = 0.005;
-const WATER_RIPPLE_HZ = 0.14;
+/** One noise tile is larger than any pool so a 2 m cell cannot read as a repeat. */
+export const WATER_NOISE_SPAN = 24;
+export const CISTERN_BED_FILE = 'floor_water_cistern_bed.png';
 export const WATER_INNER_FILES = ['floor_water_inner.png', 'floor_water_inner_2.png'] as const;
 export const WATER_RIM_FILE = 'floor_water.png';
 export const WATER_RIM_MASK_N = 'floor_water_rim_mask_n.png';
@@ -121,6 +130,76 @@ export function hash01(x: number, y: number, salt = 0): number {
 
 export function pickWaterInnerIndex(tx: number, tz: number): 0 | 1 {
   return hash01(tx, tz, 41) < 0.5 ? 0 : 1;
+}
+
+export function isCisternRegion(region: WaterRegion): boolean {
+  return region.cells.some((c) => c.x === 2 && c.y === 2);
+}
+
+export function cisternRegion(map: FloorMap): WaterRegion | undefined {
+  return listWaterRegions(map).find(isCisternRegion);
+}
+
+/** Pool AABB in world metres, mapped to 0..1. North is v=0. */
+export function regionWorldUv(region: WaterRegion, wx: number, wz: number): { u: number; v: number } {
+  const minWx = (region.minX - 0.5) * CELL;
+  const minWz = (region.minY - 0.5) * CELL;
+  const spanX = (region.maxX - region.minX + 1) * CELL;
+  const spanZ = (region.maxY - region.minY + 1) * CELL;
+  return {
+    u: (wx - minWx) / spanX,
+    v: (wz - minWz) / spanZ
+  };
+}
+
+export function cisternBedWorldUv(map: FloorMap, wx: number, wz: number): { u: number; v: number } {
+  const region = cisternRegion(map);
+  if (!region) return { u: 0, v: 0 };
+  return regionWorldUv(region, wx, wz);
+}
+
+export async function tryLoadOptionalPng(file: string): Promise<Awaited<ReturnType<typeof loadPng>> | null> {
+  try {
+    return await loadPng(file);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Low-frequency world noise. Periods are 12–20 m, so a 2 m cell is a
+ * slice of one wave, not a tile. `t` is seconds of slow drift.
+ */
+export function waterWorldNoise(wx: number, wz: number, t = 0): number {
+  const a = Math.sin(wx * 0.41 + wz * 0.17 + t * 0.28);
+  const b = Math.sin(-wx * 0.22 + wz * 0.36 + t * 0.19 + 1.7);
+  const c = Math.sin(wx * 0.15 + wz * 0.13 + t * 0.11 + 0.6);
+  return a * 0.52 + b * 0.33 + c * 0.15;
+}
+
+export function waterRippleHeight(wx: number, wz: number, t = 0): number {
+  return WATER_RIPPLE_AMP * waterWorldNoise(wx, wz, t);
+}
+
+export function waterWorldUv(wx: number, wz: number): { u: number; v: number } {
+  return { u: wx / WATER_NOISE_SPAN, v: wz / WATER_NOISE_SPAN };
+}
+
+/** 0–1 how much a water point sits inside a lit torch pool. */
+export function torchWarmthAt(
+  wx: number,
+  wz: number,
+  sconces: readonly SconceSpec[],
+  radius = TORCH_DISTANCE
+): number {
+  let best = 0;
+  for (const s of sconces) {
+    if (!sconceIsLit(s)) continue;
+    const p = torchWorldPos(s);
+    const t = 1 - Math.hypot(wx - p.x, wz - p.z) / radius;
+    if (t > 0) best = Math.max(best, t * t);
+  }
+  return best;
 }
 
 export function rgbaToMask(data: ArrayLike<number>, size: number): Float32Array {
@@ -531,23 +610,19 @@ function mergeGeometries(geos: THREE.BufferGeometry[]): THREE.BufferGeometry | n
   return out;
 }
 
-function makeRippleNormal(size = 64): THREE.DataTexture {
+function makeRippleNormal(size = 128): THREE.DataTexture {
   const data = new Uint8Array(size * size * 4);
   const height = (x: number, y: number): number => {
-    const u = x / size;
-    const v = y / size;
-    return (
-      Math.sin(u * Math.PI * 4.4) * 0.42 +
-      Math.sin((u * 0.7 + v) * Math.PI * 3.1) * 0.3 +
-      Math.sin((v * 1.4 - u * 0.5) * Math.PI * 6.2) * 0.18
-    );
+    const wx = (x / size) * WATER_NOISE_SPAN;
+    const wz = (y / size) * WATER_NOISE_SPAN;
+    return waterWorldNoise(wx, wz);
   };
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const dx = height(x + 1, y) - height(x - 1, y);
       const dy = height(x, y + 1) - height(x, y - 1);
-      let nx = -dx * 3.2;
-      let ny = -dy * 3.2;
+      let nx = -dx * 2.4;
+      let ny = -dy * 2.4;
       let nz = 1;
       const len = Math.hypot(nx, ny, nz) || 1;
       nx /= len;
@@ -658,18 +733,22 @@ function makeSoftShimmer(): THREE.CanvasTexture {
   canvas.width = w;
   canvas.height = h;
   const ctx = canvas.getContext('2d')!;
-  ctx.clearRect(0, 0, w, h);
-  const blobs = [
-    [40, 70, 38, 18, 0.42],
-    [120, 40, 52, 16, 0.3],
-    [200, 110, 34, 22, 0.36],
-    [70, 180, 46, 20, 0.28],
-    [170, 200, 40, 14, 0.33],
-    [150, 130, 28, 12, 0.22]
-  ] as const;
-  for (const [x, y, rx, ry, a] of blobs) {
-    paintSoftBlob(ctx, x, y, rx, ry, '255, 214, 160', a);
+  const img = ctx.createImageData(w, h);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const wx = (x / w) * WATER_NOISE_SPAN;
+      const wz = (y / h) * WATER_NOISE_SPAN;
+      const n = waterWorldNoise(wx, wz);
+      const peak = Math.max(0, n);
+      const a = peak * peak * 0.55;
+      const i = (y * w + x) * 4;
+      img.data[i] = 255;
+      img.data[i + 1] = 214;
+      img.data[i + 2] = 160;
+      img.data[i + 3] = Math.round(a * 255);
+    }
   }
+  ctx.putImageData(img, 0, 0);
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
@@ -684,8 +763,12 @@ function cellGrid(
   tx: number,
   tz: number,
   map: FloorMap,
-  kind: 'floor' | 'puddle',
-  atlas?: { index: number; cols: number; rows: number }
+  kind: 'floor' | 'puddle' | 'shimmer',
+  opts?: {
+    atlas?: { index: number; cols: number; rows: number };
+    region?: WaterRegion;
+    sconces?: readonly SconceSpec[];
+  }
 ): THREE.BufferGeometry {
   const segs = WATER_FLOOR_SEGS;
   const geo = new THREE.PlaneGeometry(CELL, CELL, segs, segs);
@@ -693,6 +776,9 @@ function cellGrid(
   const pos = geo.getAttribute('position');
   const uvAttr = geo.getAttribute('uv');
   const col = new Float32Array(pos.count * 4);
+  const atlas = opts?.atlas;
+  const region = opts?.region;
+  const sconces = opts?.sconces;
   for (let i = 0; i < pos.count; i++) {
     const wx = pos.getX(i) + tx * CELL;
     const wz = pos.getZ(i) + tz * CELL;
@@ -701,9 +787,13 @@ function cellGrid(
     const cover = puddleCoverage(map, tx, tz, u, v);
     const dip = floorDip(map, tx, tz, u, v);
     const deep = waterDeepness(map, tx, tz, u, v);
+    const warmth = sconces ? torchWarmthAt(wx, wz, sconces) : 0;
     if (kind === 'floor') {
       pos.setXYZ(i, wx, dip, wz);
-      if (atlas) {
+      if (region) {
+        const uv = regionWorldUv(region, wx, wz);
+        uvAttr.setXY(i, uv.u, uv.v);
+      } else if (atlas) {
         const colI = atlas.index % atlas.cols;
         const rowI = Math.floor(atlas.index / atlas.cols);
         uvAttr.setXY(i, (colI + u) / atlas.cols, (rowI + v) / atlas.rows);
@@ -717,14 +807,27 @@ function cellGrid(
       col[i * 4 + 1] = k;
       col[i * 4 + 2] = k;
       col[i * 4 + 3] = 1;
+    } else if (kind === 'shimmer') {
+      pos.setXYZ(i, wx, dip + 0.004, wz);
+      const wuv = waterWorldUv(wx, wz);
+      uvAttr.setXY(i, wuv.u, wuv.v);
+      const veil = smoothstep(0.2, 0.7, cover) * warmth;
+      col[i * 4] = 1;
+      col[i * 4 + 1] = 0.9;
+      col[i * 4 + 2] = 0.72;
+      col[i * 4 + 3] = veil;
     } else {
       pos.setXYZ(i, wx, dip + 0.002, wz);
-      uvAttr.setXY(i, wx / (CELL * 2.8), wz / (CELL * 2.8));
+      const wuv = waterWorldUv(wx, wz);
+      uvAttr.setXY(i, wuv.u, wuv.v);
       const edgeClear = 1 - 0.18 * (1 - smoothstep(0.15, 0.65, cover));
-      col[i * 4] = (WATER_SHALLOW_RGB.r + (WATER_DEEP_RGB.r - WATER_SHALLOW_RGB.r) * deep) * edgeClear;
-      col[i * 4 + 1] = (WATER_SHALLOW_RGB.g + (WATER_DEEP_RGB.g - WATER_SHALLOW_RGB.g) * deep) * edgeClear;
-      col[i * 4 + 2] = (WATER_SHALLOW_RGB.b + (WATER_DEEP_RGB.b - WATER_SHALLOW_RGB.b) * deep) * edgeClear;
-      col[i * 4 + 3] = puddleAlpha(map, tx, tz, u, v);
+      col[i * 4] =
+        (WATER_SHALLOW_RGB.r + (WATER_DEEP_RGB.r - WATER_SHALLOW_RGB.r) * deep) * edgeClear * (1 + 0.55 * warmth);
+      col[i * 4 + 1] =
+        (WATER_SHALLOW_RGB.g + (WATER_DEEP_RGB.g - WATER_SHALLOW_RGB.g) * deep) * edgeClear * (1 + 0.22 * warmth);
+      col[i * 4 + 2] =
+        (WATER_SHALLOW_RGB.b + (WATER_DEEP_RGB.b - WATER_SHALLOW_RGB.b) * deep) * edgeClear * (1 + 0.08 * warmth);
+      col[i * 4 + 3] = puddleAlpha(map, tx, tz, u, v) * (0.92 + 0.2 * warmth);
     }
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 4));
@@ -744,20 +847,27 @@ export async function buildFloor1Water(
   group.userData.castWhenOn = false;
 
   const cells = listWaterCells(map);
-  const [innerA, innerB, rimPng, maskPng] = await Promise.all([
+  const cistern = cisternRegion(map);
+  const [innerA, innerB, rimPng, maskPng, cisternBed] = await Promise.all([
     loadPng(WATER_INNER_FILES[0]),
     loadPng(WATER_INNER_FILES[1]),
     loadPng(WATER_RIM_FILE),
-    loadPng(WATER_RIM_MASK_N)
+    loadPng(WATER_RIM_MASK_N),
+    tryLoadOptionalPng(CISTERN_BED_FILE)
   ]);
+  const useCisternBed = !!(cistern && cisternBed);
+  const cisternKeys = new Set(
+    useCisternBed && cistern ? cistern.cells.map((c) => `${c.x},${c.y}`) : []
+  );
+  const atlasCells = cells.filter((c) => !cisternKeys.has(`${c.x},${c.y}`));
   const size = maskPng.data.width;
   const northMask = rgbaToMask(maskPng.data.data, size);
   const inners = [innerA.data.data, innerB.data.data] as const;
-  const { cols, rows } = waterAtlasGrid(cells.length);
+  const { cols, rows } = waterAtlasGrid(atlasCells.length);
   const atlasW = cols * size;
   const atlasH = rows * size;
   const atlasData = new Uint8ClampedArray(atlasW * atlasH * 4);
-  cells.forEach((c, index) => {
+  atlasCells.forEach((c, index) => {
     const inner = inners[pickWaterInnerIndex(c.x, c.y)];
     const mask = rimMaskForCell(map, c.x, c.y, northMask, size);
     const blended = blendWaterOverInner(inner, rimPng.data.data, mask, size);
@@ -768,26 +878,52 @@ export async function buildFloor1Water(
       atlasData.set(blended.subarray(y * size * 4, (y + 1) * size * 4), dest);
     }
   });
-  const atlasTex = textureFromPixels({ width: atlasW, height: atlasH, data: atlasData });
-  atlasTex.flipY = false;
   const ripple = makeRippleNormal();
-  const floorMat = paintedShellMaterial(atlasTex, undefined, 'floor_water.png');
-  floorMat.vertexColors = true;
-  floorMat.specularIntensity = 0;
-  floorMat.map!.flipY = false;
-  floorMat.map!.needsUpdate = true;
-
-  const floorGeos = cells.map((c, index) => cellGrid(c.x, c.y, map, 'floor', { index, cols, rows }));
-  const floorGeo = mergeGeometries(floorGeos);
-  floorGeo?.computeVertexNormals();
-  if (floorGeo) {
-    const mesh = new THREE.Mesh(floorGeo, floorMat);
-    mesh.name = 'water-broken-floor';
-    mesh.castShadow = false;
-    mesh.receiveShadow = true;
-    mesh.userData.castWhenOn = false;
-    mesh.frustumCulled = false;
-    group.add(mesh);
+  if (useCisternBed && cistern && cisternBed) {
+    const bedTex = cisternBed.texture;
+    bedTex.flipY = false;
+    bedTex.wrapS = THREE.ClampToEdgeWrapping;
+    bedTex.wrapT = THREE.ClampToEdgeWrapping;
+    const bedMat = paintedShellMaterial(bedTex, undefined, CISTERN_BED_FILE);
+    bedMat.vertexColors = true;
+    bedMat.specularIntensity = 0;
+    bedMat.map!.flipY = false;
+    bedMat.map!.needsUpdate = true;
+    const bedGeos = cistern.cells.map((c) => cellGrid(c.x, c.y, map, 'floor', { region: cistern }));
+    const bedGeo = mergeGeometries(bedGeos);
+    bedGeo?.computeVertexNormals();
+    if (bedGeo) {
+      const mesh = new THREE.Mesh(bedGeo, bedMat);
+      mesh.name = 'water-cistern-bed';
+      mesh.castShadow = false;
+      mesh.receiveShadow = true;
+      mesh.userData.castWhenOn = false;
+      mesh.frustumCulled = false;
+      group.add(mesh);
+    }
+  }
+  if (atlasCells.length) {
+    const atlasTex = textureFromPixels({ width: atlasW, height: atlasH, data: atlasData });
+    atlasTex.flipY = false;
+    const floorMat = paintedShellMaterial(atlasTex, undefined, 'floor_water.png');
+    floorMat.vertexColors = true;
+    floorMat.specularIntensity = 0;
+    floorMat.map!.flipY = false;
+    floorMat.map!.needsUpdate = true;
+    const floorGeos = atlasCells.map((c, index) =>
+      cellGrid(c.x, c.y, map, 'floor', { atlas: { index, cols, rows } })
+    );
+    const floorGeo = mergeGeometries(floorGeos);
+    floorGeo?.computeVertexNormals();
+    if (floorGeo) {
+      const mesh = new THREE.Mesh(floorGeo, floorMat);
+      mesh.name = 'water-broken-floor';
+      mesh.castShadow = false;
+      mesh.receiveShadow = true;
+      mesh.userData.castWhenOn = false;
+      mesh.frustumCulled = false;
+      group.add(mesh);
+    }
   }
 
   const puddleMat = new THREE.MeshPhysicalMaterial({
@@ -796,7 +932,7 @@ export async function buildFloor1Water(
     metalness: 0,
     clearcoat: 0,
     sheen: 0,
-    specularIntensity: 0.18,
+    specularIntensity: 0.22,
     envMapIntensity: 0,
     transparent: true,
     opacity: 1,
@@ -806,17 +942,22 @@ export async function buildFloor1Water(
     emissiveIntensity: 0,
     vertexColors: true,
     normalMap: ripple,
-    normalScale: new THREE.Vector2(0.9, 0.9)
+    normalScale: new THREE.Vector2(1.15, 1.15)
   });
-  const puddleGeos = cells.map((c) => cellGrid(c.x, c.y, map, 'puddle'));
+  const puddleGeos = cells.map((c) => cellGrid(c.x, c.y, map, 'puddle', { sconces }));
   let puddle: THREE.Mesh | null = null;
   let restY: Float32Array | null = null;
+  let restWarm: Float32Array | null = null;
   const puddleGeo = mergeGeometries(puddleGeos);
   puddleGeo?.computeVertexNormals();
   if (puddleGeo) {
     const pos = puddleGeo.getAttribute('position');
     restY = new Float32Array(pos.count);
-    for (let i = 0; i < pos.count; i++) restY[i] = pos.getY(i);
+    restWarm = new Float32Array(pos.count);
+    for (let i = 0; i < pos.count; i++) {
+      restY[i] = pos.getY(i);
+      restWarm[i] = torchWarmthAt(pos.getX(i), pos.getZ(i), sconces);
+    }
     const mesh = new THREE.Mesh(puddleGeo, puddleMat);
     mesh.name = 'water-puddles';
     mesh.castShadow = false;
@@ -911,65 +1052,47 @@ export async function buildFloor1Water(
   }
 
   let shimmerMat: THREE.MeshBasicMaterial | null = null;
-  const glintKeys = new Set(listWaterGlintCells(map, sconces).map((c) => `${c.x},${c.y}`));
-  const shimmerRegions = listWaterRegions(map).filter((r) =>
-    r.cells.some((c) => glintKeys.has(`${c.x},${c.y}`))
-  );
-  if (shimmerRegions.length) {
+  const shimmerGeos = cells.map((c) => cellGrid(c.x, c.y, map, 'shimmer', { sconces }));
+  const shimmerGeo = mergeGeometries(shimmerGeos);
+  if (shimmerGeo) {
     shimmerMat = new THREE.MeshBasicMaterial({
       map: makeSoftShimmer(),
       color: 0xf2d4a0,
       transparent: true,
-      opacity: 0.26,
+      opacity: 0.42,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       fog: true,
       toneMapped: false,
+      vertexColors: true,
       side: THREE.DoubleSide
     });
-    const geos = shimmerRegions.map((r) => {
-      const sx = (r.maxX - r.minX + 1) * CELL * 0.9;
-      const sz = (r.maxY - r.minY + 1) * CELL * 0.9;
-      const cx = ((r.minX + r.maxX) / 2) * CELL;
-      const cz = ((r.minY + r.maxY) / 2) * CELL;
-      const mid = r.cells[Math.floor(r.cells.length / 2)] ?? r.cells[0];
-      const y = puddleSurfaceY(map, mid.x, mid.y, 0.5, 0.5) + 0.006;
-      const g = new THREE.PlaneGeometry(sx, sz);
-      g.rotateX(-Math.PI / 2);
-      g.translate(cx, y, cz);
-      return g;
-    });
-    const geo = mergeGeometries(geos);
-    if (geo) {
-      const mesh = new THREE.Mesh(geo, shimmerMat);
-      mesh.name = 'water-shimmer';
-      mesh.castShadow = false;
-      mesh.receiveShadow = false;
-      mesh.userData.castWhenOn = false;
-      mesh.frustumCulled = false;
-      mesh.renderOrder = 4;
-      group.add(mesh);
-    }
+    const mesh = new THREE.Mesh(shimmerGeo, shimmerMat);
+    mesh.name = 'water-shimmer';
+    mesh.castShadow = false;
+    mesh.receiveShadow = false;
+    mesh.userData.castWhenOn = false;
+    mesh.frustumCulled = false;
+    mesh.renderOrder = 4;
+    group.add(mesh);
   }
 
   return {
     group,
     update: (now, freeze) => {
       const t = freeze ? 0 : now * 0.001;
-      if (puddleMat.normalMap) puddleMat.normalMap.offset.set(t * 0.02, t * 0.012);
-      if (puddle && restY && !freeze) {
+      if (puddleMat.normalMap) puddleMat.normalMap.offset.set(t * 0.011, t * 0.007);
+      if (puddle && restY && restWarm && !freeze) {
         const pos = puddle.geometry.getAttribute('position');
-        const wave = t * Math.PI * 2 * WATER_RIPPLE_HZ;
         for (let i = 0; i < pos.count; i++) {
-          const x = pos.getX(i);
-          const z = pos.getZ(i);
-          pos.setY(i, restY[i] + WATER_RIPPLE_AMP * Math.sin(x * 1.7 + wave) * Math.cos(z * 1.3 + wave * 0.7));
+          const amp = 0.5 + 0.85 * restWarm[i];
+          pos.setY(i, restY[i] + waterRippleHeight(pos.getX(i), pos.getZ(i), t) * amp);
         }
         pos.needsUpdate = true;
       }
       if (shimmerMat) {
-        shimmerMat.opacity = freeze ? 0.26 : 0.26 * (0.78 + 0.22 * Math.sin(t * 0.7));
-        if (shimmerMat.map) shimmerMat.map.offset.set(t * 0.012, t * 0.007);
+        shimmerMat.opacity = freeze ? 0.42 : 0.42 * (0.82 + 0.18 * Math.sin(t * 0.45));
+        if (shimmerMat.map) shimmerMat.map.offset.set(t * 0.006, t * 0.004);
       }
     }
   };
