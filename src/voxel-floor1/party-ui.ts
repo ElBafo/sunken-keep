@@ -167,12 +167,6 @@ export class Floor1PartyUi {
     root.style.setProperty('--strip-h', `${layout.strip.h}px`);
     root.style.setProperty('--safe-top', `${layout.safe.top}px`);
     root.style.setProperty('--safe-bottom', `${layout.safe.bottom}px`);
-    place(this.host.querySelector('#top-chrome') as HTMLElement, {
-      x: 0,
-      y: 0,
-      w: layout.cssW,
-      h: layout.view.h
-    });
     place(this.host.querySelector('#btn-menu') as HTMLElement, layout.menu);
     place(this.host.querySelector('#btn-bag') as HTMLElement, layout.bag);
     place(this.host.querySelector('#compass') as HTMLElement, layout.compass);

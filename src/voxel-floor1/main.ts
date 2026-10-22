@@ -540,20 +540,20 @@ async function boot(): Promise<void> {
   let swipeY = 0;
   let swipeDown = false;
   const swipeThreshold = 50;
+  const swipeFromView = (e: PointerEvent): boolean => {
+    if (partyUi?.overlayOpen()) return false;
+    const t = e.target as HTMLElement | null;
+    if (t?.closest?.('button, .hand-hit, .portrait-cell, .overlay, #stats')) return false;
+    return e.clientY < latestLayout.view.h && e.clientY >= 0;
+  };
 
-  canvas.addEventListener('pointerdown', (e) => {
-    if ((e.target as HTMLElement).closest?.('button')) return;
-    if (!e.isPrimary) return;
+  window.addEventListener('pointerdown', (e) => {
+    if (!e.isPrimary || !swipeFromView(e)) return;
     swipeDown = true;
     swipeX = e.clientX;
     swipeY = e.clientY;
-    try {
-      canvas.setPointerCapture(e.pointerId);
-    } catch {
-      /* optional */
-    }
   });
-  canvas.addEventListener('pointerup', (e) => {
+  window.addEventListener('pointerup', (e) => {
     if (!e.isPrimary || !swipeDown) return;
     swipeDown = false;
     const dx = e.clientX - swipeX;
@@ -574,7 +574,7 @@ async function boot(): Promise<void> {
       else beginStep(1);
     }
   });
-  canvas.addEventListener('pointercancel', () => {
+  window.addEventListener('pointercancel', () => {
     swipeDown = false;
   });
 
