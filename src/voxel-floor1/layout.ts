@@ -43,6 +43,8 @@ export type FloorTile = {
   secretOpen?: boolean;
   shallowWater?: boolean;
   deepWater?: boolean;
+  /** Classic walk-onto bark id (`public/levels/floor1.ts`). */
+  bark?: string;
 };
 
 export type FloorMap = {

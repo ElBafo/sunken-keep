@@ -43,6 +43,7 @@ import {
   type LightMode,
   type QualityLevel
 } from './lights';
+import { Floor1Gameplay } from './gameplay';
 import { doorBetween, doorEdgeAt, floor1Map, tileAt } from './layout';
 import { buildFloor1 } from './level';
 import { buildFloor1Markers } from './markers';
@@ -117,6 +118,16 @@ type Floor1Api = {
   secretOpen: (x: number, y: number) => boolean;
   interact: () => string;
   objectNames: () => string[];
+  phase: string;
+  introVisible: boolean;
+  titleVisible: boolean;
+  audioUnlocked: boolean;
+  lastBark: string | null;
+  lastBarkTrigger: string | null;
+  skipIntro: () => void;
+  speakBark: (trigger: string, speaker?: HudHeroId) => boolean;
+  unlockAudio: () => void;
+  storyLog: (key: string) => string;
   lights: {
     mode: LightMode;
     lantern: number;
@@ -158,8 +169,11 @@ async function boot(): Promise<void> {
   const hiresShot = params.get('shot') === '1';
   const lightMode = parseLightMode(location.search, readStoredQuality());
   const quality = qualityFromLightMode(lightMode);
+  const gameplay = new Floor1Gameplay(location.search, quality);
   const devHud = showDevHud();
   hud.hidden = !devHud;
+  loading.textContent = 'Loading story…';
+  await gameplay.loadStory(location.search);
 
   const btnDoor = document.getElementById('btn-door') as HTMLButtonElement | null;
   let hasKey = params.get('key') === '1';
@@ -251,6 +265,7 @@ async function boot(): Promise<void> {
   lanternLight.layers.enable(BRACKET_LAYER);
   lanternSpot.layers.enable(BRACKET_LAYER);
   scene.add(camera);
+  gameplay.attach(scene);
 
   const mover = new GridMover(camera, floor1Map);
 
@@ -424,6 +439,7 @@ async function boot(): Promise<void> {
       const ok = openings.system.openSecret(pos.x, pos.y, performance.now());
       if (ok) {
         showPrompt('The stone grinds aside.');
+        gameplay.onSecretOpened();
         markers.update();
       }
       return ok ? 'secret' : 'none';
@@ -486,6 +502,7 @@ async function boot(): Promise<void> {
   };
 
   const beginStep = (dirSign: 1 | -1): boolean => {
+    if (!gameplay.allowsInput()) return false;
     if (dirSign === 1) {
       const pos = facing();
       const tile = tileAt(floor1Map, pos.x, pos.y);
@@ -505,12 +522,14 @@ async function boot(): Promise<void> {
     return true;
   };
 
-  const onArrived = (): void => {
+  const onArrived = (fromStep = false): void => {
     level.activate(mover.x, mover.y);
     placeLights(performance.now());
+    if (fromStep) gameplay.onStep(mover.x, mover.y);
   };
 
   const beginStrafe = (dirSign: 1 | -1): boolean => {
+    if (!gameplay.allowsInput()) return false;
     if (!mover.strafe(dirSign)) return false;
     stepTracking = true;
     stepWorstMs = 0;
@@ -525,13 +544,13 @@ async function boot(): Promise<void> {
   await portraitsReady;
   partyUi = Floor1PartyUi.mount(
     {
-      onTurnLeft: () => mover.turn(1),
-      onTurnRight: () => mover.turn(-1),
+      onTurnLeft: () => gameplay.allowsInput() && mover.turn(1),
+      onTurnRight: () => gameplay.allowsInput() && mover.turn(-1),
       onStepForward: () => beginStep(1),
       onStepBack: () => beginStep(-1),
       onStrafeLeft: () => beginStrafe(-1),
       onStrafeRight: () => beginStrafe(1),
-      onInteract: () => interact(),
+      onInteract: () => (gameplay.allowsInput() ? interact() : 'none'),
       onMenu: () => partyUi?.toggleMenu(),
       onBag: () => partyUi?.toggleBag(),
       onPortrait: (id) => partyUi?.openSheet(id),
@@ -545,15 +564,26 @@ async function boot(): Promise<void> {
   );
   partyUi.setCompass(mover.dir);
   resize();
+  await gameplay.start({
+    pushLog: (text) => partyUi?.pushLog(text),
+    setSpeaking: (id) => partyUi?.setSpeaking(id),
+    party: () =>
+      (['brannoc', 'wren', 'ilsevar', 'mags'] as const).map((id) => {
+        const hero = partyUi!.heroes[id];
+        return { id, hp: hero.hp, downed: hero.downed };
+      }),
+    oil: () => partyUi?.oil ?? 2
+  });
 
   let swipeX = 0;
   let swipeY = 0;
   let swipeDown = false;
   const swipeThreshold = 50;
   const swipeFromView = (e: PointerEvent): boolean => {
+    if (!gameplay.allowsInput()) return false;
     if (partyUi?.overlayOpen()) return false;
     const t = e.target as HTMLElement | null;
-    if (t?.closest?.('button, .hand-hit, .portrait-cell, .overlay, #stats, #message-log')) return false;
+    if (t?.closest?.('button, .hand-hit, .portrait-cell, .overlay, #stats, #message-log, #tap-to-start, #intro-overlay, #title-overlay')) return false;
     return e.clientY < latestLayout.view.h && e.clientY >= 0;
   };
 
@@ -589,6 +619,10 @@ async function boot(): Promise<void> {
   });
 
   window.addEventListener('keydown', (e) => {
+    if (!gameplay.allowsInput()) {
+      if (e.key === 'Escape' && gameplay.phase === 'intro') gameplay.skipIntro();
+      return;
+    }
     if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') beginStep(1);
     if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') beginStep(-1);
     if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A' || e.key === 'q') mover.turn(1);
@@ -634,7 +668,7 @@ async function boot(): Promise<void> {
       mover.setPosition(x, y, dir);
       camera.rotation.x = CAMERA_PITCH;
       prepareCell(x, y);
-      onArrived();
+      onArrived(true);
     },
     stepWorstMs: 0,
     stepWorstWorkMs: 0,
@@ -660,12 +694,20 @@ async function boot(): Promise<void> {
     },
     stepForward: () => beginStep(1),
     stepBack: () => beginStep(-1),
-    turnLeft: () => mover.turn(1),
-    turnRight: () => mover.turn(-1),
+    turnLeft: () => gameplay.allowsInput() && mover.turn(1),
+    turnRight: () => gameplay.allowsInput() && mover.turn(-1),
     strafeLeft: () => beginStrafe(-1),
     strafeRight: () => beginStrafe(1),
-    setHeroDowned: (id, downed) => partyUi?.setHeroDowned(id, downed),
-    setHeroHp: (id, hp) => partyUi?.setHeroHp(id, hp),
+    setHeroDowned: (id, downed) => {
+      partyUi?.setHeroDowned(id, downed);
+      const hero = partyUi?.heroes[id];
+      if (hero) gameplay.noteHero(id, hero.hp, hero.downed);
+    },
+    setHeroHp: (id, hp) => {
+      partyUi?.setHeroHp(id, hp);
+      const hero = partyUi?.heroes[id];
+      if (hero) gameplay.noteHero(id, hero.hp, hero.downed);
+    },
     pushLog: (text) => partyUi?.pushLog(text),
     get logLines() {
       return partyUi?.logLines.slice() ?? [];
@@ -703,6 +745,28 @@ async function boot(): Promise<void> {
     openSecret: (x, y) => openings.system.openSecret(x, y, performance.now()),
     secretOpen: (x, y) => openings.system.isOpen(x, y),
     interact,
+    get phase() {
+      return gameplay.phase;
+    },
+    get introVisible() {
+      return gameplay.introVisible();
+    },
+    get titleVisible() {
+      return gameplay.titleVisible();
+    },
+    get audioUnlocked() {
+      return gameplay.audioUnlocked;
+    },
+    get lastBark() {
+      return gameplay.lastBark ? `${gameplay.story.speakerName(gameplay.lastBark.speaker)}: ${gameplay.lastBark.text}` : null;
+    },
+    get lastBarkTrigger() {
+      return gameplay.lastBarkTrigger;
+    },
+    skipIntro: () => gameplay.skipIntro(),
+    speakBark: (trigger, speaker) => gameplay.speakBark(trigger, speaker),
+    unlockAudio: () => gameplay.unlock(),
+    storyLog: (key) => gameplay.storyLog(key),
     lights: lights.stats,
     objectNames: () => {
       const names: string[] = [];
@@ -736,9 +800,12 @@ async function boot(): Promise<void> {
     const cutoff = now - STATS_WINDOW_MS;
     while (frameSamples.length > 1 && frameSamples[0].t < cutoff) frameSamples.shift();
 
+    const fromX = mover.x;
+    const fromY = mover.y;
     const arrived = mover.update(now);
-    if (arrived) onArrived();
+    if (arrived) onArrived(fromX !== mover.x || fromY !== mover.y);
     else if (!stepTracking && !mover.moving && level.pump()) level.warm(uploadPending);
+    gameplay.update(now, mover.x, mover.y, mover.dir);
     openings.system.update(now);
     markers.update();
     water.update(now, preserveBuffer, camera);

@@ -145,6 +145,7 @@ export class Floor1PartyUi {
   heroes: Record<HudHeroId, PartyHeroState>;
   oil = 2;
   oilMax = 4;
+  speaking: HudHeroId | null = null;
   logLines: string[] = [];
   private logMessages: string[] = [];
   private logScrollFromBottom = 0;
@@ -281,6 +282,12 @@ export class Floor1PartyUi {
     this.renderLog();
   }
 
+  setSpeaking(id: HudHeroId | null): void {
+    if (this.speaking === id) return;
+    this.speaking = id;
+    this.drawPortraits();
+  }
+
   setHeroDowned(id: HudHeroId, downed: boolean): void {
     const hero = this.heroes[id];
     hero.downed = downed;
@@ -396,8 +403,10 @@ export class Floor1PartyUi {
       const hero = this.heroes[spec.id];
       const cell = document.createElement('div');
       const downed = hero.downed || hero.hp <= 0;
-      cell.className = `portrait-cell${downed ? ' downed' : ''}`;
+      const speaking = this.speaking === spec.id;
+      cell.className = `portrait-cell${downed ? ' downed' : ''}${speaking ? ' speaking' : ''}`;
       cell.dataset.hero = spec.id;
+      if (speaking) cell.dataset.speaking = '1';
       cell.dataset.state = portraitState(hero.hp, hero.maxHp, hero.downed);
       place(cell, { x: spec.rect.x - this.layout.strip.x, y: 0, w: spec.rect.w, h: spec.rect.h });
 
