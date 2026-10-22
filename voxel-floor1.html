@@ -20,48 +20,243 @@
       font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
       color: #d8ccb0;
     }
+    #safe-probe {
+      position: absolute;
+      pointer-events: none;
+      padding-top: var(--safe-top, env(safe-area-inset-top, 0px));
+      padding-right: var(--safe-right, env(safe-area-inset-right, 0px));
+      padding-bottom: var(--safe-bottom, env(safe-area-inset-bottom, 0px));
+      padding-left: var(--safe-left, env(safe-area-inset-left, 0px));
+    }
     #floor1-canvas {
       display: block;
       position: absolute;
       left: 0;
-      right: 0;
       top: 0;
-      bottom: 0;
-      margin: auto;
-      width: auto;
-      height: auto;
+      width: 100%;
+      height: var(--view-h, 100%);
+      margin: 0;
       image-rendering: pixelated;
       image-rendering: crisp-edges;
       touch-action: none;
     }
+    #game-hud {
+      position: fixed;
+      inset: 0;
+      z-index: 5;
+      pointer-events: none;
+    }
+    #game-hud button,
+    #game-hud .hand-hit,
+    #game-hud .portrait-sheet-hit,
+    #message-log {
+      pointer-events: auto;
+    }
+    #top-chrome { position: absolute; pointer-events: none; }
+    #top-chrome button, #compass { pointer-events: auto; }
+    .hud-chrome, #compass {
+      position: absolute;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
+      border: 0;
+      background: rgba(8, 6, 4, 0.42);
+      color: #e8d8a0;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .hud-chrome img, #compass img {
+      display: block;
+      width: 24px;
+      height: 24px;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+    #compass { background: transparent; }
+    #compass img { width: 42px; height: 42px; }
+    #btn-oil {
+      flex-direction: column;
+      gap: 0;
+      font-size: 11px;
+      letter-spacing: 0.04em;
+      line-height: 1;
+      text-shadow: 0 1px 0 #000;
+    }
+    #btn-oil img { width: 22px; height: 22px; }
+    #message-log {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-end;
+      padding: 8px;
+      background: rgba(6, 4, 3, 0.55);
+      color: #d8ccb0;
+      font-size: 14px;
+      line-height: 20px;
+      letter-spacing: 0.02em;
+      text-shadow: 1px 1px 0 #000;
+      overflow: hidden;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #message-log.can-scroll { cursor: pointer; }
+    .log-line {
+      flex: 0 0 20px;
+      min-height: 20px;
+      white-space: pre;
+      overflow: hidden;
+      overflow-wrap: normal;
+      word-break: normal;
+    }
+    #btn-door {
+      position: absolute;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0;
+      border: 0;
+      background-color: transparent;
+      background-image: url('/art/ui/panel/button_9slice.png');
+      background-size: 100% 100%;
+      image-rendering: pixelated;
+      color: #e8d8a0;
+      font-family: inherit;
+      font-size: 14px;
+      letter-spacing: 0.06em;
+      text-shadow: 0 1px 0 #000;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #btn-door.visible { display: flex; }
+    #btn-door:active { background-image: url('/art/ui/panel/button_pressed_9slice.png'); }
+    #move-pad {
+      position: absolute;
+      pointer-events: none;
+    }
+    #move-pad button {
+      position: absolute;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0;
+      border: 1px solid rgba(80, 64, 44, 0.55);
+      border-radius: 6px;
+      background: rgba(10, 8, 6, 0.48);
+      color: #e8d8a0;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #move-pad button:active { background: rgba(28, 22, 14, 0.7); }
+    #move-pad button img {
+      display: block;
+      width: 24px;
+      height: 24px;
+      margin: 0 auto;
+      image-rendering: pixelated;
+    }
+    #party-strip {
+      position: absolute;
+      left: 0;
+      overflow: hidden;
+      pointer-events: auto;
+      box-shadow: inset 0 1px 0 #8a6a32;
+    }
+    .portrait-cell {
+      position: absolute;
+      top: 0;
+      overflow: hidden;
+      box-shadow: inset -1px 0 0 #0a0806;
+    }
+    .portrait-cell:last-child { box-shadow: none; }
+    .portrait-face {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
+      object-position: 0 0;
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+    .portrait-cell.downed .portrait-face {
+      filter: grayscale(0.6);
+    }
+    .portrait-downed-veil {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      pointer-events: none;
+    }
+    .bar-fade {
+      position: absolute;
+      background: linear-gradient(to top, rgba(6, 4, 3, 0.92), rgba(6, 4, 3, 0));
+      pointer-events: none;
+    }
+    .vital-bar {
+      position: absolute;
+      box-sizing: border-box;
+      padding: 1px;
+      background: #1a1210;
+      pointer-events: none;
+    }
+    .vital-fill {
+      height: 4px;
+    }
+    .hand-hit {
+      position: absolute;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+      z-index: 2;
+    }
+    .hand-icon {
+      position: absolute;
+      display: block;
+      border-radius: 5px;
+      background: rgba(8, 6, 4, 0.62);
+      image-rendering: pixelated;
+      image-rendering: crisp-edges;
+    }
+    .portrait-sheet-hit {
+      position: absolute;
+      inset: 0;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      cursor: pointer;
+      z-index: 1;
+      -webkit-tap-highlight-color: transparent;
+    }
+    #home-band {
+      position: absolute;
+      left: 0;
+      background-color: #1a1612;
+      background-image: url('/art/ui/layout585/stone_strip_tile.png');
+      background-repeat: repeat;
+      image-rendering: pixelated;
+      pointer-events: none;
+    }
     #hud {
       position: fixed;
-      top: max(10px, env(safe-area-inset-top));
-      left: 10px;
-      right: 10px;
-      z-index: 5;
+      top: calc(var(--safe-top, env(safe-area-inset-top, 0px)) + 112px);
+      left: 8px;
+      z-index: 4;
       display: flex;
-      flex-wrap: wrap;
-      gap: 8px;
-      align-items: flex-start;
       pointer-events: none;
     }
     #hud[hidden] { display: none; }
-    #gfx {
-      position: fixed;
-      top: max(10px, env(safe-area-inset-top));
-      right: 10px;
-      z-index: 5;
-    }
-    #gfx .lab {
-      min-width: 88px;
-      font-size: 12px;
-    }
     #stats {
       pointer-events: auto;
       user-select: text;
       -webkit-user-select: text;
-      flex: 0 0 auto;
       white-space: nowrap;
       background: rgba(0, 0, 0, 0.82);
       color: #c8ff9a;
@@ -73,42 +268,6 @@
       text-shadow: 0 1px 0 #000;
     }
     #stats b { color: #e7ffc4; font-weight: 700; }
-    #move {
-      position: fixed;
-      bottom: max(16px, env(safe-area-inset-bottom));
-      left: 50%;
-      transform: translateX(-50%);
-      display: flex;
-      flex-wrap: wrap;
-      justify-content: center;
-      gap: 10px;
-      z-index: 5;
-      width: max-content;
-      max-width: calc(100% - 16px);
-    }
-    button.lab {
-      min-width: 48px;
-      min-height: 48px;
-      padding: 8px 12px;
-      border: 1px solid #6a5a40;
-      background: rgba(18, 14, 10, 0.82);
-      color: #e8d8a0;
-      font-family: inherit;
-      font-size: 13px;
-      letter-spacing: 0.04em;
-      border-radius: 8px;
-      cursor: pointer;
-      touch-action: manipulation;
-      -webkit-tap-highlight-color: transparent;
-    }
-    button.lab:active { background: rgba(40, 32, 20, 0.95); }
-    button.lab.turn {
-      min-width: 88px;
-      min-height: 48px;
-      padding: 10px 12px;
-      font-size: 12px;
-      line-height: 1.2;
-    }
     #loading {
       position: fixed;
       inset: 0;
@@ -121,44 +280,133 @@
       color: #e8d8a0;
     }
     #loading.hidden { display: none; }
-    #prompt {
+    .overlay {
       position: fixed;
-      left: 50%;
-      bottom: max(88px, calc(env(safe-area-inset-bottom) + 72px));
-      transform: translateX(-50%);
-      z-index: 6;
-      max-width: min(92vw, 420px);
-      padding: 10px 14px;
-      background: rgba(8, 6, 4, 0.88);
-      border: 1px solid #6a5a40;
-      border-radius: 8px;
-      color: #e8d8a0;
-      font-size: 14px;
-      line-height: 1.35;
-      text-align: center;
-      pointer-events: none;
+      inset: 0;
+      z-index: 12;
+      background: rgba(4, 3, 2, 0.72);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: max(16px, env(safe-area-inset-top)) 16px max(16px, env(safe-area-inset-bottom));
     }
-    #prompt[hidden] { display: none; }
-    #btn-door { display: none; }
-    #btn-door.visible { display: inline-flex; align-items: center; }
+    .overlay[hidden] { display: none; }
+    .overlay-panel {
+      width: min(360px, 100%);
+      background: #16110c;
+      border: 1px solid #6a5a40;
+      color: #d8ccb0;
+      padding: 16px;
+    }
+    .overlay-panel h2 {
+      font-size: 16px;
+      font-weight: 600;
+      color: #e8d8a0;
+      margin-bottom: 10px;
+    }
+    .sheet-body { display: flex; gap: 12px; align-items: flex-start; }
+    .sheet-portrait-wrap {
+      position: relative;
+      width: 96px;
+      height: 117px;
+      overflow: hidden;
+      flex: 0 0 auto;
+    }
+    .sheet-portrait {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
+      object-position: 0 0;
+      image-rendering: pixelated;
+    }
+    .sheet-portrait-wrap.downed .sheet-portrait { filter: grayscale(0.6); }
+    .sheet-copy { font-size: 13px; line-height: 1.45; }
+    .sheet-down { color: #a85848; margin-top: 6px; }
+    .overlay-close {
+      min-width: 44px;
+      min-height: 44px;
+      margin-top: 14px;
+      padding: 0 16px;
+      border: 1px solid #6a5a40;
+      background: #1c1610;
+      color: #e8d8a0;
+      font-family: inherit;
+      cursor: pointer;
+    }
+    #menu-overlay .overlay-panel { display: flex; flex-direction: column; gap: 10px; }
+    button.lab {
+      min-width: 48px;
+      min-height: 48px;
+      padding: 8px 12px;
+      border: 1px solid #6a5a40;
+      background: rgba(18, 14, 10, 0.82);
+      color: #e8d8a0;
+      font-family: inherit;
+      font-size: 13px;
+      letter-spacing: 0.04em;
+      cursor: pointer;
+      touch-action: manipulation;
+      -webkit-tap-highlight-color: transparent;
+    }
+    button.lab:active { background: rgba(40, 32, 20, 0.95); }
   </style>
 </head>
 <body>
+  <div id="safe-probe" aria-hidden="true"></div>
   <canvas id="floor1-canvas"></canvas>
   <div id="loading">Loading textures…</div>
+  <div id="game-hud">
+    <div id="top-chrome">
+      <button id="btn-menu" class="hud-chrome" type="button" aria-label="Menu">
+        <img src="/art/ui/panel/icon_menu.png" alt="" />
+      </button>
+      <button id="btn-bag" class="hud-chrome" type="button" aria-label="Bag">
+        <img src="/art/ui/panel/icon_bag.png" alt="" />
+      </button>
+      <div id="compass" aria-label="Compass">
+        <img id="compass-face" src="/art/ui/panel/compass_N.png" alt="" />
+      </div>
+      <button id="btn-oil" class="hud-chrome" type="button" aria-label="Oil">
+        <img src="/art/ui/items/icon_oil.png" alt="" />
+        <span id="oil-count">2/4</span>
+      </button>
+    </div>
+    <button id="btn-door" type="button" aria-label="Open door">Open</button>
+    <div id="message-log" aria-live="polite"></div>
+    <div id="move-pad">
+      <button id="btn-left" type="button" aria-label="Turn left"><img src="/art/ui/panel/icon_turn_left.png" alt="" /></button>
+      <button id="btn-fwd" type="button" aria-label="Step forward"><img src="/art/ui/panel/icon_forward.png" alt="" /></button>
+      <button id="btn-right" type="button" aria-label="Turn right"><img src="/art/ui/panel/icon_turn_right.png" alt="" /></button>
+      <button id="btn-strafe-left" type="button" aria-label="Strafe left"><img src="/art/ui/panel/icon_strafe_left.png" alt="" /></button>
+      <button id="btn-back" type="button" aria-label="Step back"><img src="/art/ui/panel/icon_back.png" alt="" /></button>
+      <button id="btn-strafe-right" type="button" aria-label="Strafe right"><img src="/art/ui/panel/icon_strafe_right.png" alt="" /></button>
+    </div>
+    <div id="party-strip"></div>
+    <div id="home-band"></div>
+  </div>
   <div id="hud" hidden>
     <div id="stats">—</div>
   </div>
-  <div id="gfx">
-    <button id="btn-quality" class="lab" type="button" aria-label="Graphics quality">Gfx Max</button>
+  <div id="hero-sheet" class="overlay" hidden>
+    <div class="overlay-panel">
+      <div class="sheet-body"></div>
+      <button class="overlay-close" type="button">Close</button>
+    </div>
   </div>
-  <div id="prompt" hidden></div>
-  <div id="move">
-    <button id="btn-left" class="lab turn" type="button" aria-label="Turn left">Turn Left</button>
-    <button id="btn-back" class="lab" type="button" aria-label="Step back">▼</button>
-    <button id="btn-fwd" class="lab" type="button" aria-label="Step forward">▲</button>
-    <button id="btn-right" class="lab turn" type="button" aria-label="Turn right">Turn Right</button>
-    <button id="btn-door" class="lab" type="button" aria-label="Open door">Open</button>
+  <div id="bag-overlay" class="overlay" hidden>
+    <div class="overlay-panel">
+      <h2>Bag</h2>
+      <p>The bag is empty on this floor walk.</p>
+      <button class="overlay-close" type="button">Close</button>
+    </div>
+  </div>
+  <div id="menu-overlay" class="overlay" hidden>
+    <div class="overlay-panel">
+      <h2>Menu</h2>
+      <button id="btn-quality" class="lab" type="button" aria-label="Graphics quality">Gfx Max</button>
+      <button class="overlay-close" type="button">Close</button>
+    </div>
   </div>
   <script type="module" src="/src/voxel-floor1/main.ts"></script>
 </body>

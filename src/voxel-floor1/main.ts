@@ -3,11 +3,10 @@ import {
   BRACKET_LAYER,
   CAMERA_FAR,
   CAMERA_FOV,
+  CAMERA_HFOV_DEG,
   CAMERA_NEAR,
   CAMERA_PITCH,
   CAMERA_VIEW_ASPECT,
-  CAMERA_VIEW_H,
-  CAMERA_VIEW_W,
   CELL,
   FOG_FAR,
   FOG_NEAR,
@@ -23,6 +22,15 @@ import {
   LANTERN_SPOT_MAP_MOBILE
 } from './constants';
 import { facingCell, GridMover } from './camera';
+import { Floor1PartyUi, preloadPortraitArt } from './party-ui';
+import {
+  applyCameraProjection,
+  measurePortraitLayout,
+  parseSafeQuery,
+  readSafeInsets,
+  type HudHeroId,
+  type PortraitLayout
+} from './portrait-layout';
 import { lookColors } from '../voxel-lab/look';
 import { applyShadowToggle, recompileShadowShaders } from '../voxel-lab/shadows';
 import { facingSconce, floor1Sconces, floor1Sunbeams, TORCH_CAPPED_PROMPT } from './fixtures';
@@ -66,9 +74,11 @@ type Floor1Api = {
   cell: number;
   eyeHeight: number;
   fov: number;
+  hfov: number;
   aspect: number;
   near: number;
   canvas: { w: number; h: number };
+  layout: PortraitLayout | null;
   position: [number, number, number];
   setPosition: (x: number, y: number, dir: number) => void;
   setLookPitch: (rad: number) => void;
@@ -77,6 +87,12 @@ type Floor1Api = {
   stepBack: () => boolean;
   turnLeft: () => boolean;
   turnRight: () => boolean;
+  strafeLeft: () => boolean;
+  strafeRight: () => boolean;
+  setHeroDowned: (id: HudHeroId, downed: boolean) => void;
+  setHeroHp: (id: HudHeroId, hp: number) => void;
+  pushLog: (text: string) => void;
+  logLines: string[];
   meanLuma: (band?: { x0?: number; x1?: number; y0?: number; y1?: number }) => number;
   meanRgb: (band?: { x0?: number; x1?: number; y0?: number; y1?: number }) => {
     r: number;
@@ -129,12 +145,10 @@ function showDevHud(): boolean {
 async function boot(): Promise<void> {
   const canvas = document.getElementById('floor1-canvas') as HTMLCanvasElement;
   const statsEl = document.getElementById('stats')!;
-  const btnFwd = document.getElementById('btn-fwd') as HTMLButtonElement;
-  const btnBack = document.getElementById('btn-back') as HTMLButtonElement;
-  const btnLeft = document.getElementById('btn-left') as HTMLButtonElement;
-  const btnRight = document.getElementById('btn-right') as HTMLButtonElement;
   const loading = document.getElementById('loading')!;
   const hud = document.getElementById('hud')!;
+  const safeProbe = document.getElementById('safe-probe');
+  const querySafe = parseSafeQuery(location.search);
 
   const params = new URLSearchParams(location.search);
   const preserveBuffer = params.get('test') === '1';
@@ -144,15 +158,13 @@ async function boot(): Promise<void> {
   const devHud = showDevHud();
   hud.hidden = !devHud;
 
-  const promptEl = document.getElementById('prompt') as HTMLDivElement | null;
   const btnDoor = document.getElementById('btn-door') as HTMLButtonElement | null;
   let hasKey = params.get('key') === '1';
   let promptText = '';
+  let partyUi: Floor1PartyUi | null = null;
   const showPrompt = (text: string): void => {
     promptText = text;
-    if (!promptEl) return;
-    promptEl.textContent = text;
-    promptEl.hidden = !text;
+    if (text) partyUi?.pushLog(text);
   };
   const btnQuality = document.getElementById('btn-quality') as HTMLButtonElement | null;
   const labelQuality = (q: QualityLevel): string => (q === 'max' ? 'Gfx Max' : 'Gfx Med');
@@ -240,6 +252,7 @@ async function boot(): Promise<void> {
   const mover = new GridMover(camera, floor1Map);
 
   loading.textContent = 'Meshing floor 1…';
+  const portraitsReady = preloadPortraitArt();
   const level = await buildFloor1(floor1Map, mover.x, mover.y, lightMode === 'all');
   scene.add(level.group);
 
@@ -254,29 +267,28 @@ async function boot(): Promise<void> {
   const markers = await buildFloor1Markers(floor1Map);
   scene.add(markers.group);
 
+  const currentSafe = (): { top: number; right: number; bottom: number; left: number } => {
+    if (querySafe) return querySafe;
+    if (safeProbe) return readSafeInsets(safeProbe);
+    return { top: 0, right: 0, bottom: 0, left: 0 };
+  };
+
   const resize = (): void => {
     const cssW = window.innerWidth;
     const cssH = window.innerHeight;
+    const layout = measurePortraitLayout(cssW, cssH, currentSafe());
     canvas.style.imageRendering = 'pixelated';
-    if (hiresShot) {
-      canvas.style.width = `${cssW}px`;
-      canvas.style.height = `${cssH}px`;
-      renderer.setSize(cssW, cssH, false);
-      camera.aspect = cssW / Math.max(1, cssH);
-      camera.updateProjectionMatrix();
-      return;
-    }
-    const scale = Math.min(cssW / CAMERA_VIEW_W, cssH / CAMERA_VIEW_H);
-    const w = Math.max(1, Math.round(CAMERA_VIEW_W * scale));
-    const h = Math.max(1, Math.round(CAMERA_VIEW_H * scale));
-    canvas.style.width = `${w}px`;
-    canvas.style.height = `${h}px`;
-    renderer.setSize(CAMERA_VIEW_W, CAMERA_VIEW_H, false);
-    camera.aspect = CAMERA_VIEW_ASPECT;
-    camera.updateProjectionMatrix();
+    canvas.style.width = `${layout.view.w}px`;
+    canvas.style.height = `${layout.view.h}px`;
+    renderer.setSize(layout.view.w, layout.view.h, false);
+    applyCameraProjection(camera, layout.projection);
+    partyUi?.applyLayout(layout);
+    latestLayout = layout;
   };
+  let latestLayout = measurePortraitLayout(window.innerWidth, window.innerHeight, currentSafe());
   resize();
   window.addEventListener('resize', resize);
+  window.addEventListener('orientationchange', resize);
   window.visualViewport?.addEventListener('resize', resize);
 
   const syncShadows = (): void => {
@@ -493,41 +505,60 @@ async function boot(): Promise<void> {
     placeLights(performance.now());
   };
 
-  btnFwd.addEventListener('click', (e) => {
-    e.stopPropagation();
-    beginStep(1);
-  });
-  btnBack.addEventListener('click', (e) => {
-    e.stopPropagation();
-    beginStep(-1);
-  });
-  btnLeft.addEventListener('click', (e) => {
-    e.stopPropagation();
-    mover.turn(1);
-  });
-  btnRight.addEventListener('click', (e) => {
-    e.stopPropagation();
-    mover.turn(-1);
-  });
+  const beginStrafe = (dirSign: 1 | -1): boolean => {
+    if (!mover.strafe(dirSign)) return false;
+    stepTracking = true;
+    stepWorstMs = 0;
+    stepWorstWorkMs = 0;
+    stepArrivalMs = 0;
+    stepBuildMs = prepareCell(mover.toX, mover.toY);
+    if (stepBuildMs > stepWorstMs) stepWorstMs = stepBuildMs;
+    if (stepBuildMs > stepWorstWorkMs) stepWorstWorkMs = stepBuildMs;
+    return true;
+  };
+
+  await portraitsReady;
+  partyUi = Floor1PartyUi.mount(
+    {
+      onTurnLeft: () => mover.turn(1),
+      onTurnRight: () => mover.turn(-1),
+      onStepForward: () => beginStep(1),
+      onStepBack: () => beginStep(-1),
+      onStrafeLeft: () => beginStrafe(-1),
+      onStrafeRight: () => beginStrafe(1),
+      onInteract: () => interact(),
+      onMenu: () => partyUi?.toggleMenu(),
+      onBag: () => partyUi?.toggleBag(),
+      onPortrait: (id) => partyUi?.openSheet(id),
+      onHand: (id, hand) => {
+        const hero = partyUi?.heroes[id];
+        const item = hand === 'main' ? hero?.main : hero?.off;
+        showPrompt(`${id} ${hand}: ${item ?? 'empty'}`);
+      }
+    },
+    latestLayout
+  );
+  partyUi.setCompass(mover.dir);
+  resize();
 
   let swipeX = 0;
   let swipeY = 0;
   let swipeDown = false;
   const swipeThreshold = 50;
+  const swipeFromView = (e: PointerEvent): boolean => {
+    if (partyUi?.overlayOpen()) return false;
+    const t = e.target as HTMLElement | null;
+    if (t?.closest?.('button, .hand-hit, .portrait-cell, .overlay, #stats, #message-log')) return false;
+    return e.clientY < latestLayout.view.h && e.clientY >= 0;
+  };
 
-  canvas.addEventListener('pointerdown', (e) => {
-    if ((e.target as HTMLElement).closest?.('button')) return;
-    if (!e.isPrimary) return;
+  window.addEventListener('pointerdown', (e) => {
+    if (!e.isPrimary || !swipeFromView(e)) return;
     swipeDown = true;
     swipeX = e.clientX;
     swipeY = e.clientY;
-    try {
-      canvas.setPointerCapture(e.pointerId);
-    } catch {
-      /* optional */
-    }
   });
-  canvas.addEventListener('pointerup', (e) => {
+  window.addEventListener('pointerup', (e) => {
     if (!e.isPrimary || !swipeDown) return;
     swipeDown = false;
     const dx = e.clientX - swipeX;
@@ -548,7 +579,7 @@ async function boot(): Promise<void> {
       else beginStep(1);
     }
   });
-  canvas.addEventListener('pointercancel', () => {
+  window.addEventListener('pointercancel', () => {
     swipeDown = false;
   });
 
@@ -557,12 +588,11 @@ async function boot(): Promise<void> {
     if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') beginStep(-1);
     if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A' || e.key === 'q') mover.turn(1);
     if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D' || e.key === 'e') mover.turn(-1);
+    if (e.key === 'z' || e.key === 'Z') beginStrafe(-1);
+    if (e.key === 'c' || e.key === 'C') beginStrafe(1);
     if (e.key === ' ' || e.key === 'Enter' || e.key === 'f' || e.key === 'F') interact();
     if (e.key === 'k' || e.key === 'K') hasKey = true;
-  });
-  btnDoor?.addEventListener('click', (e) => {
-    e.stopPropagation();
-    interact();
+    if (e.key === 'Escape') partyUi?.closeOverlays();
   });
 
   const api: Floor1Api = {
@@ -587,10 +617,12 @@ async function boot(): Promise<void> {
     lantern: true,
     cell: CELL,
     eyeHeight: camera.position.y,
-    fov: CAMERA_FOV,
-    aspect: CAMERA_VIEW_ASPECT,
+    fov: camera.fov,
+    hfov: CAMERA_HFOV_DEG,
+    aspect: camera.aspect,
     near: CAMERA_NEAR,
-    canvas: { w: CAMERA_VIEW_W, h: CAMERA_VIEW_H },
+    canvas: { w: latestLayout.view.w, h: latestLayout.view.h },
+    layout: latestLayout,
     position: [camera.position.x, camera.position.y, camera.position.z],
     setPosition: (x, y, dir) => {
       mover.setPosition(x, y, dir);
@@ -615,6 +647,14 @@ async function boot(): Promise<void> {
     stepBack: () => beginStep(-1),
     turnLeft: () => mover.turn(1),
     turnRight: () => mover.turn(-1),
+    strafeLeft: () => beginStrafe(-1),
+    strafeRight: () => beginStrafe(1),
+    setHeroDowned: (id, downed) => partyUi?.setHeroDowned(id, downed),
+    setHeroHp: (id, hp) => partyUi?.setHeroHp(id, hp),
+    pushLog: (text) => partyUi?.pushLog(text),
+    get logLines() {
+      return partyUi?.logLines.slice() ?? [];
+    },
     meanLuma: (band) => samplePixels(band).luma,
     meanRgb: (band) => {
       const s = samplePixels(band);
@@ -715,7 +755,12 @@ async function boot(): Promise<void> {
     api.gridY = mover.y;
     api.dir = mover.dir;
     api.eyeHeight = camera.position.y;
+    api.fov = camera.fov;
+    api.hfov = latestLayout.projection.hfov;
     api.aspect = camera.aspect;
+    api.canvas = { w: latestLayout.view.w, h: latestLayout.view.h };
+    api.layout = latestLayout;
+    partyUi?.setCompass(mover.dir);
     api.position = [camera.position.x, camera.position.y, camera.position.z];
     api.stepWorstMs = lastStepWorstMs;
     api.stepWorstWorkMs = lastStepWorstWorkMs;

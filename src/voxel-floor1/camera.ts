@@ -120,6 +120,17 @@ export class GridMover {
     return true;
   }
 
+  /** +1 right, −1 left, facing unchanged. */
+  strafe(dirSign: 1 | -1): boolean {
+    if (this.moving) return false;
+    const [dx, dy] = DIRS[(this.dir + (dirSign === 1 ? 1 : 3)) & 3];
+    const nx = this.x + dx;
+    const ny = this.y + dy;
+    if (!canCross(this.map, this.x, this.y, nx, ny)) return false;
+    this.start(nx, ny, this.dir, MOVE_MS, 'step');
+    return true;
+  }
+
   private start(toX: number, toY: number, toDir: number, duration: number, kind: MoveKind): void {
     this.moving = true;
     this.kind = kind;
