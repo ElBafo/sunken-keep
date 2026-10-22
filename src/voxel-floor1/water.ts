@@ -50,6 +50,9 @@ const WATER_SHALLOW_RGB = { r: 0.045, g: 0.052, b: 0.044 };
 const WATER_DEEP_RGB = { r: 0.012, g: 0.016, b: 0.014 };
 const PUDDLE_ALPHA_SHALLOW = 0.64;
 const PUDDLE_ALPHA_DEEP = 0.9;
+/** Thin enough that painted grout and the lip stay readable. */
+export const PUDDLE_ALPHA_DECAL_SHALLOW = 0.2;
+export const PUDDLE_ALPHA_DECAL_DEEP = 0.34;
 const WALL_REFLECT_RGB = { r: 0.2, g: 0.17, b: 0.14 };
 
 export const WATER_FACES = ['N', 'E', 'S', 'W'] as const;
@@ -529,11 +532,13 @@ export function waterDeepness(map: FloorMap, tx: number, tz: number, u: number, 
   return d;
 }
 
-/** Puddle veil opacity. Deep hides the bed; shallow lets floor_water read through. */
+/** Puddle veil opacity. Deep hides the bed; decal cells stay thin so the paint reads. */
 export function puddleAlpha(map: FloorMap, tx: number, tz: number, u: number, v: number): number {
   const cover = puddleCoverage(map, tx, tz, u, v);
   const deep = waterDeepness(map, tx, tz, u, v);
-  return smoothstep(0.28, 0.7, cover) * (PUDDLE_ALPHA_SHALLOW + (PUDDLE_ALPHA_DEEP - PUDDLE_ALPHA_SHALLOW) * deep);
+  const lo = hasWaterDecal(tx, tz) ? PUDDLE_ALPHA_DECAL_SHALLOW : PUDDLE_ALPHA_SHALLOW;
+  const hi = hasWaterDecal(tx, tz) ? PUDDLE_ALPHA_DECAL_DEEP : PUDDLE_ALPHA_DEEP;
+  return smoothstep(0.28, 0.7, cover) * (lo + (hi - lo) * deep);
 }
 
 /** Floor drop in metres. 0 on the matching dry-stone edge band. */
@@ -1046,7 +1051,8 @@ function decalOrientedGrid(
   rot: 0 | 90 | 180 | 270 = 0,
   mirror = false,
   atlas?: { index: number; cols: number; rows: number },
-  map?: FloorMap
+  map?: FloorMap,
+  darken = true
 ): THREE.BufferGeometry {
   const segs = map ? WATER_FLOOR_SEGS : 1;
   const geo = new THREE.PlaneGeometry(CELL, CELL, segs, segs);
@@ -1060,7 +1066,8 @@ function decalOrientedGrid(
     const u = pos.getX(i) / CELL + 0.5;
     const v = pos.getZ(i) / CELL + 0.5;
     const local = cellToDecalUv(u, v, rot, mirror);
-    pos.setXYZ(i, wx, y, wz);
+    const dip = map ? floorDip(map, tx, tz, u, v) : 0;
+    pos.setXYZ(i, wx, y + dip, wz);
     if (atlas) {
       const colI = atlas.index % atlas.cols;
       const rowI = Math.floor(atlas.index / atlas.cols);
@@ -1069,7 +1076,7 @@ function decalOrientedGrid(
       uvAttr.setXY(i, local.u, local.v);
     }
     const cover = map ? puddleCoverage(map, tx, tz, u, v) : 0;
-    const k = 1 - DECAL_MASK_DARKEN * cover;
+    const k = darken ? 1 - DECAL_MASK_DARKEN * cover : 1;
     col[i * 4] = k;
     col[i * 4 + 1] = k;
     col[i * 4 + 2] = k;
@@ -1264,11 +1271,20 @@ export async function buildFloor1Water(
       vertexColors: true
     });
     const decalGeos = decalPlacements.map(({ spec }, index) =>
-      decalOrientedGrid(spec.x, spec.y, 0.0012, spec.rot ?? 0, spec.mirror, {
-        index,
-        cols,
-        rows: 1
-      }, map)
+      decalOrientedGrid(
+        spec.x,
+        spec.y,
+        0.0012,
+        spec.rot ?? 0,
+        spec.mirror,
+        {
+          index,
+          cols,
+          rows: 1
+        },
+        map,
+        false
+      )
     );
     const decalGeo = mergeGeometries(decalGeos);
     if (decalGeo) {
