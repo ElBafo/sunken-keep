@@ -30,6 +30,7 @@ import {
   ageDoorPanelPixels,
   doorOpeningStyle,
   leafMeshes,
+  padlockIronPixels,
   openingPunchRect,
   openingSlabMeshes,
   punchOpening,
@@ -646,7 +647,7 @@ export async function buildFloor1Openings(
   const wallFiles = [...FLOOR1_WALL_FILES];
   const pngs = await Promise.all([
     loadPng('ceiling_planks_1.png'),
-    loadPng('door_panel.png'),
+    loadPng('door_panel_aged.png'),
     ...wallFiles.map((file) => loadPng(file))
   ]);
   const plankPng = pngs[0];
@@ -686,6 +687,26 @@ export async function buildFloor1Openings(
   woodMat.name = 'door_panel_aged';
   woodMat.fog = true;
   if (!realLights) patchBakeMaterial(woodMat);
+  const ironMatFor = (kind: 'body' | 'shackle', name: string): THREE.MeshPhysicalMaterial => {
+    const map = textureFromPixels({ width: 8, height: 8, data: padlockIronPixels(kind, 8) });
+    const mat = new THREE.MeshPhysicalMaterial({
+      map,
+      color: new THREE.Color(1, 1, 1),
+      roughness: 1,
+      metalness: 0,
+      clearcoat: 0,
+      sheen: 0,
+      specularIntensity: 0,
+      envMapIntensity: 0,
+      clippingPlanes: [leafClip]
+    });
+    mat.name = name;
+    mat.fog = true;
+    if (!realLights) patchBakeMaterial(mat);
+    return mat;
+  };
+  const ironMat = ironMatFor('body', 'door_padlock_iron');
+  const shackleMat = ironMatFor('shackle', 'door_padlock_shackle');
   const secretMats = new Map<string, THREE.MeshPhysicalMaterial>();
   const surroundMats = new Map<string, THREE.MeshPhysicalMaterial>();
   const lintelMats: THREE.MeshPhysicalMaterial[] = [];
@@ -809,6 +830,37 @@ export async function buildFloor1Openings(
           panel.userData.doorLeaf = true;
           slider.add(panel);
         }
+        if (leaf.iron.positions.length) {
+          const ironGeo = geometryWithBake([{ mesh: leaf.iron, tx: view.tx, tz: view.tz }], torches, beams);
+          if (ironGeo) {
+            const lock = new THREE.Mesh(ironGeo, ironMat);
+            lock.name = `door-lock:${visual.x},${visual.y}:${face}`;
+            lock.castShadow = true;
+            lock.receiveShadow = true;
+            lock.frustumCulled = false;
+            lock.userData.door = { x: visual.x, y: visual.y };
+            lock.userData.doorLeaf = true;
+            lock.userData.padlock = true;
+            slider.add(lock);
+          }
+        }
+        if (leaf.shackle.positions.length) {
+          const shackleGeo = geometryWithBake(
+            [{ mesh: leaf.shackle, tx: view.tx, tz: view.tz }],
+            torches,
+            beams
+          );
+          if (shackleGeo) {
+            const shackle = new THREE.Mesh(shackleGeo, shackleMat);
+            shackle.name = `door-lock-shackle:${visual.x},${visual.y}:${face}`;
+            shackle.castShadow = true;
+            shackle.receiveShadow = true;
+            shackle.frustumCulled = false;
+            shackle.userData.doorLeaf = true;
+            shackle.userData.padlock = true;
+            slider.add(shackle);
+          }
+        }
         slider.frustumCulled = false;
         group.add(slider);
         visual.panels.push(slider);
@@ -884,6 +936,8 @@ export async function buildFloor1Openings(
 
   system.bindLights(torches, beams, realLights, [
     woodMat,
+    ironMat,
+    shackleMat,
     ...secretMats.values(),
     ...surroundMats.values(),
     ...lintelMats

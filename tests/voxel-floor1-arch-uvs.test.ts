@@ -196,13 +196,15 @@ describe('floor-1 door opening styles', () => {
     expect(DOOR_WALL_DEPTH).toBeCloseTo(0.3, 5);
     expect(Math.abs(LEAF_FRONT - LEAF_BACK)).toBeLessThanOrEqual(ROOM_DEPTH + 1e-6);
     expect(listIronQuads('lintel').length).toBeGreaterThan(8);
-    expect(readFileSync(resolve(__dirname, '../src/voxel-floor1/door-opening.ts'), 'utf8')).toContain(
-      'door_panel'
-    );
+    const doorSrc = readFileSync(resolve(__dirname, '../src/voxel-floor1/door-opening.ts'), 'utf8');
+    expect(doorSrc).toContain('door_panel');
+    expect(doorSrc).toContain('fillLeafArchCorners');
+    expect(doorSrc).toContain('woodUv');
     const art = readFileSync(resolve(__dirname, '../docs/ART_DIRECTION.md'), 'utf8');
     expect(art).toContain('No arches');
     expect(art).toContain('slides up');
     expect(art).toContain('rectangular under the lintel');
+    expect(art).toContain('plank-column');
     expect(art).toContain('padlock');
     expect(art).toContain('door_panel.png');
     expect(art).toContain('exempt from the antique-oak');
@@ -226,7 +228,7 @@ describe('floor-1 door opening styles', () => {
     expect(src).toContain('ceiling_planks_1.png');
     expect(src).toContain('specularIntensity: 0');
     expect(src).toContain('wrapT = THREE.RepeatWrapping');
-    expect(src).toContain('door_panel.png');
+    expect(src).toContain('door_panel_aged.png');
   });
 
   it('keeps every lintel doorway watertight from both sides', () => {
