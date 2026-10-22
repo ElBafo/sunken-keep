@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { CELL, SCONCE_RADIUS_TILES, TORCH_DISTANCE } from './constants';
+import { CELL, FLOOR_VARIANTS, SCONCE_RADIUS_TILES, TORCH_DISTANCE } from './constants';
 import {
   FACE_INTO_ROOM,
   floodReach,
@@ -8,13 +8,19 @@ import {
   torchWorldPos,
   type SconceSpec
 } from './fixtures';
-import { isWaterCell, tileAt, type FloorMap } from './layout';
+import { isShellTile, isTrueWall, isWaterCell, mappedFloorFile, tileAt, type FloorMap } from './layout';
 import { paintedShellMaterial } from './painted';
+import { pickVariant } from './variants';
 import { loadPng, textureFromPixels } from '../voxel-lab/materials';
 
-/** Dip stays in the inner 70–80% of a dry-facing cell. */
-export const WATER_INSET_MIN = 0.11;
-export const WATER_INSET_MAX = 0.15;
+/** Flooded grout vs a dry slab poking out of the pool. */
+export const WATER_INSET_MIN = 0.05;
+export const WATER_INSET_MAX = 0.32;
+export const WATER_SLAB_M = 0.46;
+export const WATER_GROUT_M = 0.08;
+/** Wet stone around every shore, 20–40 cm. */
+export const WET_RING_MIN_M = 0.2;
+export const WET_RING_MAX_M = 0.4;
 export const WATER_DIP_SHALLOW = 0.028;
 export const WATER_DIP_DEEP = 0.06;
 export const WATER_FLOOR_SEGS = 16;
@@ -29,10 +35,11 @@ export const WATER_RIM_FILE = 'floor_water.png';
 export const WATER_RIM_MASK_N = 'floor_water_rim_mask_n.png';
 export const WATER_SURFACE_COLOR = 0x101410;
 export const WATER_DEEP_COLOR = 0x030403;
-const WATER_SHALLOW_RGB = { r: 0.07, g: 0.078, b: 0.07 };
-const WATER_DEEP_RGB = { r: 0.016, g: 0.02, b: 0.018 };
-const PUDDLE_ALPHA_SHALLOW = 0.4;
-const PUDDLE_ALPHA_DEEP = 0.86;
+const WATER_SHALLOW_RGB = { r: 0.032, g: 0.036, b: 0.03 };
+const WATER_DEEP_RGB = { r: 0.012, g: 0.016, b: 0.014 };
+const PUDDLE_ALPHA_SHALLOW = 0.64;
+const PUDDLE_ALPHA_DEEP = 0.9;
+const WALL_REFLECT_RGB = { r: 0.2, g: 0.17, b: 0.14 };
 
 export const WATER_FACES = ['N', 'E', 'S', 'W'] as const;
 export type WaterFace = (typeof WATER_FACES)[number];
@@ -391,42 +398,126 @@ function smoothstep(e0: number, e1: number, x: number): number {
   return t * t * (3 - 2 * t);
 }
 
-/**
- * How far the puddle body sits in from a dry face, in cell units.
- * World-space bays and tongues so a 3-cell cistern edge wanders in
- * the player's view instead of reading as one straight line.
- */
-export function puddleEdgeInset(tx: number, tz: number, face: WaterFace, along: number): number {
-  const world = face === 'N' || face === 'S' ? tx - 0.5 + along : tz - 0.5 + along;
-  const faceSeed = face.charCodeAt(0) * 0.17;
-  const mid = WATER_INSET_MIN + (WATER_INSET_MAX - WATER_INSET_MIN) * 0.5;
-  const bay =
-    0.11 * Math.sin(world * Math.PI * 1.42 + faceSeed + 0.4) +
-    0.06 * Math.sin(world * Math.PI * 2.35 + faceSeed * 2.3 + 2.2) +
-    0.034 * Math.sin(world * Math.PI * 3.9 + hash01(tx, tz, 9) * 5);
-  const tongue =
-    Math.max(0, Math.sin(world * Math.PI * 1.85 + faceSeed + 1.1)) ** 7 *
-    (0.08 + 0.045 * hash01(Math.floor(world * 2.5 + 0.2), face.charCodeAt(0), 14));
-  const bite =
-    Math.max(0, Math.sin(world * Math.PI * 1.05 + faceSeed * 1.7 + 2.1)) ** 9 * 0.06;
-  const grain = 0.018 * Math.sin(world * Math.PI * 6.4 + faceSeed * 3 + along * 8);
-  return Math.min(0.34, Math.max(0.11, mid + bay + tongue - bite) + grain);
+export type WaterGroutSampler = (wx: number, wz: number) => number;
+
+let groutSampler: WaterGroutSampler | null = null;
+
+export function setWaterGroutSampler(fn: WaterGroutSampler | null): void {
+  groutSampler = fn;
 }
 
-function crackSeep(tx: number, tz: number, u: number, v: number): number {
-  const wu = tx - 0.5 + u;
-  const wv = tz - 0.5 + v;
-  const a = Math.sin((wu * 4.6 + hash01(tx, tz, 3)) * Math.PI * 2);
-  const b = Math.sin((wv * 3.9 + hash01(tx, tz, 5)) * Math.PI * 2);
-  const c = Math.sin((wu * 1.7 - wv * 2.2 + hash01(tx, tz, 8)) * Math.PI * 2);
-  const ridge = 1 - Math.min(1, Math.abs(a * 0.5 + b * 0.28 + c * 0.22) * 2.6);
-  return Math.max(0, ridge) ** 1.6 * 0.85;
+export function floorStoneFile(tx: number, tz: number): string {
+  const mapped = mappedFloorFile(tx, tz);
+  if (mapped && !mapped.startsWith('floor_water')) return mapped;
+  for (const face of WATER_FACES) {
+    const { dx, dz } = FACE_DELTA[face];
+    const neighbor = mappedFloorFile(tx + dx, tz + dz);
+    if (neighbor && !neighbor.startsWith('floor_water')) return neighbor;
+  }
+  return pickVariant(FLOOR_VARIANTS, tx, tz, 'F');
+}
+
+/** 0–1 how much a world-tile point sits in grout or a crack (dark). */
+export function proceduralGrout(wx: number, wz: number): number {
+  const x = wx * CELL;
+  const z = wz * CELL;
+  const cycle = WATER_SLAB_M + WATER_GROUT_M;
+  const fx = ((x % cycle) + cycle) % cycle;
+  const fz = ((z % cycle) + cycle) % cycle;
+  const groutX =
+    smoothstep(WATER_SLAB_M - 0.012, WATER_SLAB_M, fx) * (1 - smoothstep(cycle - 0.01, cycle, fx));
+  const groutZ =
+    smoothstep(WATER_SLAB_M - 0.012, WATER_SLAB_M, fz) * (1 - smoothstep(cycle - 0.01, cycle, fz));
+  const n = waterWorldNoise(x * 1.8, z * 1.6, 5.4);
+  const crack = Math.max(0, n - 0.28) ** 1.6;
+  return Math.min(1, Math.max(groutX, groutZ, crack));
+}
+
+export function groutAt(wx: number, wz: number): number {
+  return groutSampler ? groutSampler(wx, wz) : proceduralGrout(wx, wz);
+}
+
+export function samplePngLuma(
+  img: { width: number; height: number; data: ArrayLike<number> },
+  u: number,
+  v: number
+): number {
+  const x = Math.min(img.width - 1, Math.max(0, Math.floor(u * img.width)));
+  const y = Math.min(img.height - 1, Math.max(0, Math.floor((1 - v) * img.height)));
+  const i = (y * img.width + x) * 4;
+  return (0.2126 * img.data[i] + 0.7152 * img.data[i + 1] + 0.0722 * img.data[i + 2]) / 255;
+}
+
+/**
+ * Dark grout / crack texels on the dry flagstone pull the waterline out.
+ * Floor stone luma is ~0.08–0.28; p10 is the mortar.
+ */
+export function makeTextureGroutSampler(
+  images: Map<string, { width: number; height: number; data: ArrayLike<number> }>,
+  fileAt: (tx: number, tz: number) => string = floorStoneFile
+): WaterGroutSampler {
+  return (wx, wz) => {
+    const tx = Math.floor(wx + 0.5);
+    const tz = Math.floor(wz + 0.5);
+    const img = images.get(fileAt(tx, tz)) ?? images.get('floor_stone.png');
+    if (!img) return proceduralGrout(wx, wz);
+    const u = wx - (tx - 0.5);
+    const v = wz - (tz - 0.5);
+    const luma = samplePngLuma(img, u, v);
+    const dark = smoothstep(0.22, 0.105, luma);
+    return Math.min(1, Math.max(dark, proceduralGrout(wx, wz) * 0.28));
+  };
+}
+
+function faceWorldAlong(
+  tx: number,
+  tz: number,
+  face: WaterFace,
+  along: number
+): { wx: number; wz: number } {
+  if (face === 'N') return { wx: tx - 0.5 + along, wz: tz - 0.5 };
+  if (face === 'S') return { wx: tx - 0.5 + along, wz: tz + 0.5 };
+  if (face === 'E') return { wx: tx + 0.5, wz: tz - 0.5 + along };
+  return { wx: tx - 0.5, wz: tz - 0.5 + along };
+}
+
+function clampInset(v: number): number {
+  return Math.min(WATER_INSET_MAX, Math.max(WATER_INSET_MIN, v));
+}
+
+/**
+ * Waterline steps around flagstone slabs. Grout and dark cracks flood
+ * further; some slabs stay dry, others sit half under.
+ */
+export function puddleEdgeInset(tx: number, tz: number, face: WaterFace, along: number): number {
+  const { wx, wz } = faceWorldAlong(tx, tz, face, along);
+  const { dx, dz } = FACE_DELTA[face];
+  const grout = groutAt(wx + dx * 0.03, wz + dz * 0.03);
+  const cycle = WATER_SLAB_M + WATER_GROUT_M;
+  const phase = hash01(tx, tz, face.charCodeAt(0)) * cycle * 0.4;
+  const alongM = along * CELL + phase;
+  const local = ((alongM % cycle) + cycle) % cycle;
+  const inGrout = local >= WATER_SLAB_M;
+  const slabI = Math.floor(alongM / cycle);
+  const slabSink = hash01(slabI, face.charCodeAt(0) + tx * 17, tz + 11);
+  const chip =
+    0.01 * Math.sin(alongM * 17 + face.charCodeAt(0)) + 0.008 * (hash01(slabI, tz, 4) - 0.5);
+  const wander = 0.05 * Math.sin(along * Math.PI * 2.15 + face.charCodeAt(0) * 0.31 + tx * 0.7);
+
+  if (inGrout || grout > 0.62) {
+    return clampInset(WATER_INSET_MIN + 0.018 * (1 - grout) + chip * 0.4 + wander * 0.4);
+  }
+  const poke = slabSink < 0.4;
+  const inset = poke
+    ? WATER_INSET_MAX - 0.035 * slabSink - 0.14 * grout
+    : WATER_INSET_MIN + 0.035 + 0.07 * slabSink - 0.09 * grout;
+  return clampInset(inset + chip + wander);
 }
 
 /**
  * 0–1 how wet a point in a water cell is.
- * Water–water joins stay wet. Dry borders inset to the inner 70–80%,
- * with only crack seepage reaching the matching stone edge.
+ * Water–water joins stay wet. Dry borders step around slabs; grout
+ * seeps closer to the matching stone edge than a dry slab does.
  */
 export function puddleCoverage(map: FloorMap, tx: number, tz: number, u: number, v: number): number {
   if (!isWaterCell(map, tx, tz)) return 0;
@@ -440,10 +531,11 @@ export function puddleCoverage(map: FloorMap, tx: number, tz: number, u: number,
   for (const s of sides) {
     if (isWaterCell(map, s.nx, s.nz)) continue;
     const inset = puddleEdgeInset(tx, tz, s.face, s.along);
-    const t = s.dist / Math.max(0.04, inset);
-    const body = smoothstep(0.32, 1, t);
+    const t = s.dist / Math.max(0.02, inset);
+    const body = smoothstep(0.78, 1.02, t);
+    const grout = groutAt(tx - 0.5 + u, tz - 0.5 + v);
     const seep =
-      crackSeep(tx, tz, u, v) * smoothstep(0.02, 0.2, s.dist) * (1 - smoothstep(0.18, 0.85, t));
+      grout * grout * smoothstep(0.012, 0.09, s.dist) * (1 - smoothstep(0.18, 1.12, t));
     wet = Math.min(wet, Math.max(body, seep));
   }
   return wet;
@@ -453,6 +545,107 @@ export function puddleCoverageWorld(map: FloorMap, wx: number, wz: number): numb
   const tx = Math.floor(wx + 0.5);
   const tz = Math.floor(wz + 0.5);
   return puddleCoverage(map, tx, tz, wx - (tx - 0.5), wz - (tz - 0.5));
+}
+
+export function wetRingWidth(wxM: number, wzM: number): number {
+  const n = 0.5 + 0.5 * waterWorldNoise(wxM * 0.65, wzM * 0.7, 2.2);
+  return WET_RING_MIN_M + (WET_RING_MAX_M - WET_RING_MIN_M) * n;
+}
+
+/** Metres from the stepped waterline. Used by the wet stone ring. */
+export function shoreDistanceM(map: FloorMap, tx: number, tz: number, u: number, v: number): number {
+  let best = Infinity;
+  if (isWaterCell(map, tx, tz)) {
+    const sides: Array<{ face: WaterFace; dist: number; along: number; nx: number; nz: number }> = [
+      { face: 'W', dist: u, along: v, nx: tx - 1, nz: tz },
+      { face: 'E', dist: 1 - u, along: v, nx: tx + 1, nz: tz },
+      { face: 'N', dist: v, along: u, nx: tx, nz: tz - 1 },
+      { face: 'S', dist: 1 - v, along: u, nx: tx, nz: tz + 1 }
+    ];
+    for (const s of sides) {
+      if (isWaterCell(map, s.nx, s.nz)) continue;
+      const inset = puddleEdgeInset(tx, tz, s.face, s.along);
+      best = Math.min(best, Math.abs(s.dist - inset) * CELL);
+    }
+    return best;
+  }
+  const sides: Array<{ face: WaterFace; dist: number; wx: number; wz: number; along: number }> = [
+    { face: 'E', dist: u, wx: tx - 1, wz: tz, along: v },
+    { face: 'W', dist: 1 - u, wx: tx + 1, wz: tz, along: v },
+    { face: 'S', dist: v, wx: tx, wz: tz - 1, along: u },
+    { face: 'N', dist: 1 - v, wx: tx, wz: tz + 1, along: u }
+  ];
+  for (const s of sides) {
+    if (!isWaterCell(map, s.wx, s.wz)) continue;
+    const inset = puddleEdgeInset(s.wx, s.wz, s.face, s.along);
+    best = Math.min(best, (s.dist + inset) * CELL);
+  }
+  return best;
+}
+
+/** 1 at the waterline, 0 outside the 20–40 cm wet band. */
+export function wetRingAmount(map: FloorMap, tx: number, tz: number, u: number, v: number): number {
+  const d = shoreDistanceM(map, tx, tz, u, v);
+  if (!Number.isFinite(d)) return 0;
+  const wxM = (tx - 0.5 + u) * CELL;
+  const wzM = (tz - 0.5 + v) * CELL;
+  const width = wetRingWidth(wxM, wzM);
+  return 1 - smoothstep(width * 0.12, width, d);
+}
+
+export function listWetRingCells(map: FloorMap): WaterCell[] {
+  const out: WaterCell[] = [];
+  const seen = new Set<string>();
+  const add = (x: number, y: number) => {
+    if (!isShellTile(tileAt(map, x, y))) return;
+    const key = `${x},${y}`;
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push({ x, y });
+  };
+  for (const cell of listWaterCells(map)) {
+    const dry = dryFacingFaces(map, cell.x, cell.y);
+    if (!dry.length) continue;
+    add(cell.x, cell.y);
+    for (const face of dry) {
+      const { dx, dz } = FACE_DELTA[face];
+      add(cell.x + dx, cell.y + dz);
+    }
+  }
+  return out;
+}
+
+/** 0–1 how close a point is to a true wall (for a broken wall reflection). */
+export function wallProximity(map: FloorMap, tx: number, tz: number, u: number, v: number): number {
+  let best = 0;
+  const sides = [
+    { dist: u, wall: isTrueWall(tileAt(map, tx - 1, tz)) },
+    { dist: 1 - u, wall: isTrueWall(tileAt(map, tx + 1, tz)) },
+    { dist: v, wall: isTrueWall(tileAt(map, tx, tz - 1)) },
+    { dist: 1 - v, wall: isTrueWall(tileAt(map, tx, tz + 1)) }
+  ];
+  for (const s of sides) {
+    if (!s.wall) continue;
+    best = Math.max(best, 1 - smoothstep(0.08, 0.72, s.dist));
+  }
+  return best;
+}
+
+/** Faint broken wall/ceiling bounce, only inside a torch pool. */
+export function puddleReflectBoost(
+  warmth: number,
+  deep: number,
+  wxM: number,
+  wzM: number,
+  wallNear: number
+): number {
+  if (warmth <= 0) return 0;
+  const n = waterWorldNoise(wxM * 1.15, wzM * 0.95, 4.2);
+  const broken = 0.28 + 0.72 * Math.max(0, n);
+  const lit = smoothstep(0, 0.06, warmth);
+  return (
+    lit * (0.05 + 0.11 * warmth) * broken * (0.4 + 0.6 * wallNear) * (1 - 0.35 * deep)
+  );
 }
 
 /**
@@ -877,7 +1070,7 @@ function cellGrid(
   tx: number,
   tz: number,
   map: FloorMap,
-  kind: 'floor' | 'puddle' | 'shimmer',
+  kind: 'floor' | 'puddle' | 'shimmer' | 'wetring',
   opts?: {
     atlas?: { index: number; cols: number; rows: number };
     region?: WaterRegion;
@@ -922,6 +1115,16 @@ function cellGrid(
       col[i * 4 + 1] = k;
       col[i * 4 + 2] = k;
       col[i * 4 + 3] = 1;
+    } else if (kind === 'wetring') {
+      const ring = wetRingAmount(map, tx, tz, u, v);
+      const y = (isWaterCell(map, tx, tz) ? dip : 0) + 0.0014;
+      pos.setXYZ(i, wx, y, wz);
+      uvAttr.setXY(i, u, v);
+      const warm = 0.55 + 0.45 * warmth;
+      col[i * 4] = 0.16 * warm + 0.12 * warmth;
+      col[i * 4 + 1] = 0.125 * warm + 0.05 * warmth;
+      col[i * 4 + 2] = 0.1 * warm;
+      col[i * 4 + 3] = ring * (0.62 + 0.2 * warmth);
     } else if (kind === 'shimmer') {
       pos.setXYZ(i, wx, dip + 0.004, wz);
       const wuv = waterWorldUv(wx, wz);
@@ -936,18 +1139,23 @@ function cellGrid(
       const wuv = waterWorldUv(wx, wz);
       uvAttr.setXY(i, wuv.u, wuv.v);
       const edgeClear = 1 - 0.18 * (1 - smoothstep(0.15, 0.65, cover));
+      const wallNear = wallProximity(map, tx, tz, u, v);
+      const bounce = puddleReflectBoost(warmth, deep, wx, wz, wallNear);
       col[i * 4] =
         (WATER_SHALLOW_RGB.r + (WATER_DEEP_RGB.r - WATER_SHALLOW_RGB.r) * deep) *
-        edgeClear *
-        (1 + 0.9 * warmth);
+          edgeClear *
+          (1 + 0.9 * warmth) +
+        WALL_REFLECT_RGB.r * bounce;
       col[i * 4 + 1] =
         (WATER_SHALLOW_RGB.g + (WATER_DEEP_RGB.g - WATER_SHALLOW_RGB.g) * deep) *
-        edgeClear *
-        (1 + 0.35 * warmth);
+          edgeClear *
+          (1 + 0.35 * warmth) +
+        WALL_REFLECT_RGB.g * bounce;
       col[i * 4 + 2] =
         (WATER_SHALLOW_RGB.b + (WATER_DEEP_RGB.b - WATER_SHALLOW_RGB.b) * deep) *
-        edgeClear *
-        (1 + 0.1 * warmth);
+          edgeClear *
+          (1 + 0.1 * warmth) +
+        WALL_REFLECT_RGB.b * bounce;
       col[i * 4 + 3] = puddleAlpha(map, tx, tz, u, v) * (1 + 0.45 * warmth);
     }
   }
@@ -969,13 +1177,20 @@ export async function buildFloor1Water(
 
   const cells = listWaterCells(map);
   const cistern = cisternRegion(map);
-  const [innerA, innerB, rimPng, maskPng, cisternBed] = await Promise.all([
+  const [innerA, innerB, rimPng, maskPng, cisternBed, ...stonePngs] = await Promise.all([
     loadPng(WATER_INNER_FILES[0]),
     loadPng(WATER_INNER_FILES[1]),
     loadPng(WATER_RIM_FILE),
     loadPng(WATER_RIM_MASK_N),
-    tryLoadOptionalPng(CISTERN_BED_FILE)
+    tryLoadOptionalPng(CISTERN_BED_FILE),
+    ...FLOOR_VARIANTS.map((file) => tryLoadOptionalPng(file))
   ]);
+  const stoneImages = new Map<string, { width: number; height: number; data: ArrayLike<number> }>();
+  FLOOR_VARIANTS.forEach((file, i) => {
+    const png = stonePngs[i];
+    if (png) stoneImages.set(file, png.data);
+  });
+  setWaterGroutSampler(stoneImages.size ? makeTextureGroutSampler(stoneImages) : null);
   const useCisternBed = !!(cistern && cisternBed);
   const cisternKeys = new Set(
     useCisternBed && cistern ? cistern.cells.map((c) => `${c.x},${c.y}`) : []
@@ -1065,7 +1280,7 @@ export async function buildFloor1Water(
     metalness: 0,
     clearcoat: 0,
     sheen: 0,
-    specularIntensity: 0.3,
+    specularIntensity: 0.38,
     envMapIntensity: 0,
     transparent: true,
     opacity: 1,
@@ -1088,6 +1303,41 @@ export async function buildFloor1Water(
     mesh.userData.castWhenOn = false;
     mesh.frustumCulled = false;
     mesh.renderOrder = 1;
+    group.add(mesh);
+  }
+
+  const wetCells = listWetRingCells(map);
+  const wetGeos = wetCells.map((c) => cellGrid(c.x, c.y, map, 'wetring', { sconces, segs: 8 }));
+  const wetGeo = mergeGeometries(wetGeos);
+  wetGeo?.computeVertexNormals();
+  if (wetGeo) {
+    const mesh = new THREE.Mesh(
+      wetGeo,
+      new THREE.MeshPhysicalMaterial({
+        color: 0xffffff,
+        roughness: 0.42,
+        metalness: 0,
+        clearcoat: 0,
+        sheen: 0,
+        specularIntensity: 0.55,
+        envMapIntensity: 0,
+        transparent: true,
+        opacity: 1,
+        depthWrite: false,
+        fog: true,
+        emissive: 0x000000,
+        vertexColors: true,
+        polygonOffset: true,
+        polygonOffsetFactor: -1,
+        polygonOffsetUnits: -1
+      })
+    );
+    mesh.name = 'water-wet-ring';
+    mesh.castShadow = false;
+    mesh.receiveShadow = true;
+    mesh.userData.castWhenOn = false;
+    mesh.frustumCulled = false;
+    mesh.renderOrder = 2;
     group.add(mesh);
   }
 

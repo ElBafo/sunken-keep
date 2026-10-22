@@ -16,6 +16,10 @@ import {
   WATER_INSET_MAX,
   WATER_INSET_MIN,
   WATER_NOISE_SPAN,
+  WATER_SLAB_M,
+  WATER_GROUT_M,
+  WET_RING_MAX_M,
+  WET_RING_MIN_M,
   cisternBedCellImageRect,
   cisternBedWorldUv,
   cisternRegion,
@@ -39,11 +43,20 @@ import {
   rotateMaskCW,
   rgbaToMask,
   cellTorchWarmth,
+  groutAt,
+  listWetRingCells,
+  makeTextureGroutSampler,
+  proceduralGrout,
+  puddleReflectBoost,
+  setWaterGroutSampler,
+  shoreDistanceM,
   torchWarmthAt,
+  wallProximity,
   waterDeepness,
   waterRippleHeight,
   waterWorldNoise,
-  waterWorldUv
+  waterWorldUv,
+  wetRingAmount
 } from '../src/voxel-floor1/water';
 
 const SRC = resolve(__dirname, '../src/voxel-floor1');
@@ -66,8 +79,10 @@ describe('voxel-floor1 water is one puddle per region', () => {
   });
 
   it('stays wet across water-to-water joins and insets only at dry borders', () => {
-    expect(WATER_INSET_MIN).toBeGreaterThanOrEqual(0.1);
-    expect(WATER_INSET_MAX).toBeLessThanOrEqual(0.16);
+    expect(WATER_INSET_MIN).toBeGreaterThanOrEqual(0.04);
+    expect(WATER_INSET_MAX).toBeGreaterThan(0.24);
+    expect(WATER_INSET_MAX).toBeLessThanOrEqual(0.34);
+    expect(WATER_INSET_MAX - WATER_INSET_MIN).toBeGreaterThan(0.15);
     expect(puddleCoverage(floor1Map, 2, 2, 0.5, 0.5)).toBeGreaterThan(0.85);
     expect(puddleCoverage(floor1Map, 2, 2, 0.99, 0.5)).toBeGreaterThan(0.8);
     expect(puddleCoverage(floor1Map, 2, 2, 0.5, 0.01)).toBeGreaterThan(0.8);
@@ -88,9 +103,9 @@ describe('voxel-floor1 water is one puddle per region', () => {
     expect(waterDeepness(floor1Map, 3, 1, 0.5, 0.5)).toBeLessThan(0.4);
     expect(puddleAlpha(floor1Map, 2, 1, 0.5, 0.5)).toBeGreaterThan(0.75);
     expect(puddleAlpha(floor1Map, 3, 1, 0.5, 0.5)).toBeGreaterThan(0.18);
-    expect(puddleAlpha(floor1Map, 3, 1, 0.5, 0.5)).toBeLessThan(0.5);
+    expect(puddleAlpha(floor1Map, 3, 1, 0.5, 0.5)).toBeLessThan(0.78);
     expect(puddleAlpha(floor1Map, 2, 1, 0.5, 0.5)).toBeGreaterThan(
-      puddleAlpha(floor1Map, 3, 1, 0.5, 0.5) + 0.3
+      puddleAlpha(floor1Map, 3, 1, 0.5, 0.5) + 0.12
     );
     expect(waterDeepness(floor1Map, 2, 1, 1, 0.5)).toBeCloseTo(
       waterDeepness(floor1Map, 3, 1, 0, 0.5),
@@ -101,12 +116,15 @@ describe('voxel-floor1 water is one puddle per region', () => {
     );
   });
 
-  it('wanders the cistern south dry edge instead of a straight cell line', () => {
+  it('steps the cistern south waterline around slabs instead of a straight cell line', () => {
+    setWaterGroutSampler(null);
     const samples: number[] = [];
     for (const x of [1, 2, 3]) {
-      for (let i = 0; i <= 10; i++) samples.push(puddleEdgeInset(x, 4, 'S', i / 10));
+      for (let i = 0; i <= 20; i++) samples.push(puddleEdgeInset(x, 4, 'S', i / 20));
     }
-    expect(Math.max(...samples) - Math.min(...samples)).toBeGreaterThan(0.08);
+    expect(Math.max(...samples) - Math.min(...samples)).toBeGreaterThan(0.12);
+    expect(Math.min(...samples)).toBeLessThan(0.1);
+    expect(Math.max(...samples)).toBeGreaterThan(0.22);
   });
 
   it('keeps puddle edges irregular and stray drips inside the cell', () => {
@@ -221,6 +239,10 @@ describe('voxel-floor1 water dip leaves no border gap', () => {
     expect(water).toContain('compositeCisternBedRims');
     expect(water).toContain('regionWorldUv');
     expect(water).toContain('torchWarmthAt');
+    expect(water).toContain('water-wet-ring');
+    expect(water).toContain('makeTextureGroutSampler');
+    expect(water).toContain('puddleReflectBoost');
+    expect(water).toContain('WET_RING_MIN_M');
     expect(water).not.toContain('water-sparkles');
     expect(water).not.toMatch(/flipX|repeatWrapping.*water|scale\.x\s*=\s*-1/);
     expect(water).not.toContain('water-lips');
@@ -338,5 +360,50 @@ print('ok', avg(1, 0), avg(1, 1), avg(1, 3), avg(2, 3))
     expect(at(5, 2)).toBeGreaterThan(100);
     expect(at(5, 3)).toBeGreaterThan(100);
     expect(readFileSync(resolve(SRC, 'water.ts'), 'utf8')).toContain('pickWaterInnerIndex');
+  });
+});
+
+describe('voxel-floor1 water pools in broken flagstone', () => {
+  it('biases the waterline toward dark grout and keeps a 20–40 cm wet ring', () => {
+    setWaterGroutSampler(null);
+    expect(WATER_SLAB_M).toBeGreaterThan(0.4);
+    expect(WATER_GROUT_M).toBeGreaterThan(0.05);
+    expect(WET_RING_MIN_M).toBeGreaterThanOrEqual(0.2);
+    expect(WET_RING_MAX_M).toBeLessThanOrEqual(0.4);
+    expect(proceduralGrout(0.5, 0.5)).toBeGreaterThanOrEqual(0);
+    const dark = new Uint8ClampedArray([18, 16, 14, 255]);
+    const pale = new Uint8ClampedArray([90, 82, 70, 255]);
+    const images = new Map([
+      ['floor_stone.png', { width: 1, height: 1, data: dark }],
+      ['floor_stone_2.png', { width: 1, height: 1, data: pale }]
+    ]);
+    const sampler = makeTextureGroutSampler(images, (tx) =>
+      tx === 2 ? 'floor_stone.png' : 'floor_stone_2.png'
+    );
+    expect(sampler(2, 5)).toBeGreaterThan(sampler(3, 5));
+    setWaterGroutSampler((wx) => (wx < 2.2 ? 0.9 : 0.05));
+    expect(groutAt(2.0, 5.0)).toBeGreaterThan(0.8);
+    const groutInset = puddleEdgeInset(2, 4, 'S', 0.12);
+    const slabInset = puddleEdgeInset(2, 4, 'S', 0.72);
+    expect(groutInset).toBeLessThan(slabInset);
+
+    const rings = listWetRingCells(floor1Map);
+    expect(rings.some((c) => c.x === 2 && c.y === 4)).toBe(true);
+    expect(rings.some((c) => c.x === 2 && c.y === 5)).toBe(true);
+    expect(rings.some((c) => c.x === 2 && c.y === 2)).toBe(false);
+    expect(wetRingAmount(floor1Map, 2, 2, 0.5, 0.5)).toBeLessThan(0.08);
+    const southInset = puddleEdgeInset(2, 4, 'S', 0.5);
+    expect(wetRingAmount(floor1Map, 2, 4, 0.5, 1 - southInset)).toBeGreaterThan(0.4);
+    expect(shoreDistanceM(floor1Map, 2, 5, 0.5, 0.5)).toBeGreaterThan(0.4);
+    expect(wetRingAmount(floor1Map, 3, 14, 0.5, 0.5)).toBe(0);
+    setWaterGroutSampler(null);
+  });
+
+  it('adds a faint broken wall reflection only inside the torch radius', () => {
+    expect(wallProximity(floor1Map, 1, 1, 0.1, 0.5)).toBeGreaterThan(0.4);
+    expect(wallProximity(floor1Map, 2, 2, 0.5, 0.5)).toBeLessThan(0.2);
+    expect(puddleReflectBoost(0, 0.2, 4, 8, 0.8)).toBe(0);
+    expect(puddleReflectBoost(0.4, 0.2, 4, 8, 0.8)).toBeGreaterThan(0.01);
+    expect(puddleReflectBoost(0.4, 0.2, 4, 8, 0.8)).toBeLessThan(0.2);
   });
 });
