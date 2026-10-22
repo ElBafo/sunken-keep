@@ -10,6 +10,7 @@ describe('voxel-floor1 is a standalone Vite page', () => {
   const proto = readFileSync(resolve(__dirname, '../proto3d.html'), 'utf8');
   const lab = readFileSync(resolve(__dirname, '../voxel-lab.html'), 'utf8');
   const main = readFileSync(resolve(__dirname, '../src/voxel-floor1/main.ts'), 'utf8');
+  const gameplay = readFileSync(resolve(__dirname, '../src/voxel-floor1/gameplay.ts'), 'utf8');
   const partyUi = readFileSync(resolve(__dirname, '../src/voxel-floor1/party-ui.ts'), 'utf8');
   const portraits = readFileSync(resolve(__dirname, '../src/voxel-floor1/portrait-layout.ts'), 'utf8');
 
@@ -29,6 +30,11 @@ describe('voxel-floor1 is a standalone Vite page', () => {
     expect(html).toContain('id="party-strip"');
     expect(html).toContain('id="message-log"');
     expect(html).toContain('id="move-pad"');
+    expect(html).toContain('id="tap-to-start"');
+    expect(html).toContain('id="intro-overlay"');
+    expect(html).toContain('id="intro-canvas"');
+    expect(html).toContain('id="title-overlay"');
+    expect(html).toContain('id="title-canvas"');
     expect(html).toContain('env(safe-area-inset-top');
     expect(html).not.toContain('id="party-hud"');
     expect(html).not.toContain('id="game-stage"');
@@ -57,6 +63,18 @@ describe('voxel-floor1 is a standalone Vite page', () => {
   it('does not import proto3d renderer modules', () => {
     expect(main).not.toContain("from '../proto3d/");
     expect(main).not.toContain('lab-render');
+    expect(main).toContain("from './gameplay'");
+    expect(gameplay).toContain("from '../proto3d/intro'");
+    expect(gameplay).toContain("from '../proto3d/intro-skip'");
+    expect(gameplay).toContain("from '../proto3d/title'");
+    expect(gameplay).toContain("from '../proto3d/audio'");
+    expect(gameplay).toContain("from '../proto3d/bark-picker'");
+    expect(gameplay).toContain("from '../proto3d/bubble'");
+    expect(gameplay).toContain("from '../proto3d/story-progress'");
+    expect(gameplay).toContain("from '../proto3d/i18n'");
+    expect(gameplay).not.toContain("from '../proto3d/renderer'");
+    expect(gameplay).not.toContain("from '../proto3d/scene-builder'");
+    expect(gameplay).not.toContain("from '../proto3d/player'");
     expect(main).toContain('measurePortraitLayout');
     expect(main).toContain('applyCameraProjection');
     expect(portraits).toContain('clearViewOffset');
