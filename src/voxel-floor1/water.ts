@@ -1,24 +1,20 @@
 import * as THREE from 'three';
 import { CELL, SCONCE_RADIUS_TILES } from './constants';
-import { FACE_INTO_ROOM, floodReach, sconceIsLit, type SconceSpec } from './fixtures';
-import { isWaterCell, type FloorMap } from './layout';
-import { enablePaintedSampling } from './painted';
+import { FACE_INTO_ROOM, floodReach, sconceIsLit, sconceRoom, type SconceSpec } from './fixtures';
+import { isWaterCell, tileAt, type FloorMap } from './layout';
+import { paintedShellMaterial } from './painted';
 import { loadPng } from '../voxel-lab/materials';
 
-/** Water surface sits this far below the dry stone floor (6–10 cm). */
-export const WATER_SURFACE_DROP = 0.08;
-/** Hairline so the painted bed does not z-fight the ripple plane. */
-export const WATER_BED_GAP = 0.004;
-export const WATER_SURFACE_Y = -WATER_SURFACE_DROP;
-export const WATER_BED_Y = WATER_SURFACE_Y - WATER_BED_GAP;
-/** Thin stone curb on water-to-dry (and water-to-wall) edges. */
-export const WATER_LIP_WIDTH = 0.06;
-/** Bed / surface overlap under the lip so the join does not open a hole. */
-export const WATER_LIP_OVERLAP = 0.008;
-export const WATER_BAND_WIDTH = 0.11;
-export const WATER_SURFACE_SEGS = 4;
-export const WATER_RIPPLE_AMP = 0.005;
+/** Dip stays in the inner 70–80% of a dry-facing cell. */
+export const WATER_INSET_MIN = 0.11;
+export const WATER_INSET_MAX = 0.15;
+export const WATER_DIP_SHALLOW = 0.03;
+export const WATER_DIP_DEEP = 0.055;
+export const WATER_FLOOR_SEGS = 8;
+export const WATER_RIPPLE_AMP = 0.004;
 const WATER_RIPPLE_HZ = 0.16;
+export const WATER_SURFACE_COLOR = 0x0b1410;
+export const WATER_DEEP_COLOR = 0x060a08;
 
 export const WATER_FACES = ['N', 'E', 'S', 'W'] as const;
 export type WaterFace = (typeof WATER_FACES)[number];
@@ -32,21 +28,15 @@ const FACE_DELTA: Record<WaterFace, { dx: number; dz: number }> = {
 
 export type WaterCell = { x: number; y: number };
 
-export type WaterLip = {
-  tx: number;
-  tz: number;
-  face: WaterFace;
-  x: number;
-  y: number;
-  z: number;
-  sx: number;
-  sy: number;
-  sz: number;
+export type WaterRegion = {
+  id: number;
+  cells: WaterCell[];
+  deep: WaterCell[];
+  minX: number;
+  maxX: number;
+  minY: number;
+  maxY: number;
 };
-
-export type Aabb = { minX: number; maxX: number; minY: number; maxY: number; minZ: number; maxZ: number };
-
-export type WaterBedRect = { minX: number; maxX: number; minZ: number; maxZ: number; y: number };
 
 export function listWaterCells(map: FloorMap): WaterCell[] {
   const out: WaterCell[] = [];
@@ -66,138 +56,217 @@ export function hasWaterNeighbor(map: FloorMap, x: number, y: number): boolean {
   return false;
 }
 
-/**
- * Lip on every water edge that does not face more water — dry walkable
- * cells and walls both open a hole if the pool drops without a curb.
- */
-export function waterEdgeNeedsLip(map: FloorMap, x: number, y: number, face: WaterFace): boolean {
-  if (!isWaterCell(map, x, y)) return false;
-  const { dx, dz } = FACE_DELTA[face];
-  return !isWaterCell(map, x + dx, y + dz);
+export function isDeepWaterCell(map: FloorMap, x: number, y: number): boolean {
+  return !!tileAt(map, x, y)?.deepWater;
 }
 
-export function waterBedSize(): number {
-  return CELL - 2 * WATER_LIP_WIDTH + WATER_LIP_OVERLAP;
-}
-
-/** Water beds inset for the lip; dry tiles that touch water stay CELL so they do not hang over the pool. */
-export function paintedFloorSize(tx: number, tz: number, map: FloorMap, defaultSize: number): number {
-  if (isWaterCell(map, tx, tz)) return waterBedSize();
-  if (hasWaterNeighbor(map, tx, tz)) return CELL;
-  return defaultSize;
-}
-
-export function applyWaterBedPose(pose: { y: number }, tx: number, tz: number, map: FloorMap): void {
-  if (isWaterCell(map, tx, tz)) pose.y += WATER_BED_Y;
-}
-
-export function waterBedRect(tx: number, tz: number): WaterBedRect {
-  const half = waterBedSize() / 2;
-  return {
-    minX: tx * CELL - half,
-    maxX: tx * CELL + half,
-    minZ: tz * CELL - half,
-    maxZ: tz * CELL + half,
-    y: WATER_BED_Y
-  };
-}
-
-export function lipBox(tx: number, tz: number, face: WaterFace): WaterLip {
-  const height = -WATER_BED_Y;
-  const y = WATER_BED_Y / 2;
-  const along = CELL;
-  const inward = WATER_LIP_WIDTH / 2;
-  if (face === 'E') {
-    return {
-      tx,
-      tz,
-      face,
-      x: (tx + 0.5) * CELL - inward,
-      y,
-      z: tz * CELL,
-      sx: WATER_LIP_WIDTH,
-      sy: height,
-      sz: along
-    };
-  }
-  if (face === 'W') {
-    return {
-      tx,
-      tz,
-      face,
-      x: (tx - 0.5) * CELL + inward,
-      y,
-      z: tz * CELL,
-      sx: WATER_LIP_WIDTH,
-      sy: height,
-      sz: along
-    };
-  }
-  if (face === 'S') {
-    return {
-      tx,
-      tz,
-      face,
-      x: tx * CELL,
-      y,
-      z: (tz + 0.5) * CELL - inward,
-      sx: along,
-      sy: height,
-      sz: WATER_LIP_WIDTH
-    };
-  }
-  return {
-    tx,
-    tz,
-    face,
-    x: tx * CELL,
-    y,
-    z: (tz - 0.5) * CELL + inward,
-    sx: along,
-    sy: height,
-    sz: WATER_LIP_WIDTH
-  };
-}
-
-export function listWaterLips(map: FloorMap): WaterLip[] {
-  const out: WaterLip[] = [];
-  for (const cell of listWaterCells(map)) {
-    for (const face of WATER_FACES) {
-      if (waterEdgeNeedsLip(map, cell.x, cell.y, face)) {
-        out.push(lipBox(cell.x, cell.y, face));
-      }
-    }
+export function dryFacingFaces(map: FloorMap, x: number, y: number): WaterFace[] {
+  const out: WaterFace[] = [];
+  for (const face of WATER_FACES) {
+    const { dx, dz } = FACE_DELTA[face];
+    if (!isWaterCell(map, x + dx, y + dz)) out.push(face);
   }
   return out;
 }
 
-export function lipBounds(lip: WaterLip): Aabb {
-  return {
-    minX: lip.x - lip.sx / 2,
-    maxX: lip.x + lip.sx / 2,
-    minY: lip.y - lip.sy / 2,
-    maxY: lip.y + lip.sy / 2,
-    minZ: lip.z - lip.sz / 2,
-    maxZ: lip.z + lip.sz / 2
-  };
+/** One puddle per connected water region — cistern and cellar, not 12 separate pools. */
+export function listWaterRegions(map: FloorMap): WaterRegion[] {
+  const seen = new Set<string>();
+  const regions: WaterRegion[] = [];
+  for (const cell of listWaterCells(map)) {
+    const key = `${cell.x},${cell.y}`;
+    if (seen.has(key)) continue;
+    const cells: WaterCell[] = [];
+    const queue = [cell];
+    seen.add(key);
+    while (queue.length) {
+      const cur = queue.shift()!;
+      cells.push(cur);
+      for (const face of WATER_FACES) {
+        const { dx, dz } = FACE_DELTA[face];
+        const nx = cur.x + dx;
+        const ny = cur.y + dz;
+        const nk = `${nx},${ny}`;
+        if (seen.has(nk) || !isWaterCell(map, nx, ny)) continue;
+        seen.add(nk);
+        queue.push({ x: nx, y: ny });
+      }
+    }
+    const xs = cells.map((c) => c.x);
+    const ys = cells.map((c) => c.y);
+    regions.push({
+      id: regions.length,
+      cells,
+      deep: cells.filter((c) => isDeepWaterCell(map, c.x, c.y)),
+      minX: Math.min(...xs),
+      maxX: Math.max(...xs),
+      minY: Math.min(...ys),
+      maxY: Math.max(...ys)
+    });
+  }
+  return regions;
 }
 
-/** True when the curb meets the bed and the dry floor with no open gap. */
-export function lipSealsBed(lip: WaterLip, bed: WaterBedRect): boolean {
-  const b = lipBounds(lip);
-  if (b.maxY < -1e-4) return false;
-  if (b.minY > WATER_SURFACE_Y + 1e-4) return false;
-  const overlap = 0.002;
-  if (lip.face === 'E') {
-    return b.maxX >= (lip.tx + 0.5) * CELL - 1e-4 && b.minX <= bed.maxX + overlap;
+export function hash01(x: number, y: number, salt = 0): number {
+  const n = Math.sin(x * 127.1 + y * 311.7 + salt * 74.2) * 43758.5453;
+  return n - Math.floor(n);
+}
+
+function smoothstep(e0: number, e1: number, x: number): number {
+  const t = Math.min(1, Math.max(0, (x - e0) / (e1 - e0)));
+  return t * t * (3 - 2 * t);
+}
+
+/** Seeded warp so a dry-facing puddle edge is not a straight cell line. */
+export function puddleEdgeInset(tx: number, tz: number, face: WaterFace, along: number): number {
+  const n = hash01(tx, tz, face.charCodeAt(0));
+  const mid = WATER_INSET_MIN + (WATER_INSET_MAX - WATER_INSET_MIN) * n;
+  const wobble =
+    0.048 * Math.sin(along * Math.PI * 2 * (1.7 + n) + n * 6.2) +
+    0.028 * Math.sin(along * Math.PI * 5.3 + hash01(tx, tz, 9) * 8);
+  return Math.min(0.2, Math.max(0.07, mid + wobble));
+}
+
+function crackSeep(tx: number, tz: number, u: number, v: number): number {
+  const a = Math.sin((u * 7.3 + hash01(tx, tz, 3)) * Math.PI * 2);
+  const b = Math.sin((v * 6.1 + hash01(tx, tz, 5)) * Math.PI * 2);
+  const ridge = 1 - Math.min(1, Math.abs(a * 0.65 + b * 0.35) * 3.4);
+  return Math.max(0, ridge) ** 2 * 0.55 * hash01(tx, tz, 7);
+}
+
+/**
+ * 0–1 how wet a point in a water cell is.
+ * Water–water joins stay wet. Dry borders inset to the inner 70–80%,
+ * with only crack seepage reaching the matching stone edge.
+ */
+export function puddleCoverage(map: FloorMap, tx: number, tz: number, u: number, v: number): number {
+  if (!isWaterCell(map, tx, tz)) return 0;
+  let wet = 1;
+  const sides: Array<{ face: WaterFace; dist: number; along: number; nx: number; nz: number }> = [
+    { face: 'W', dist: u, along: v, nx: tx - 1, nz: tz },
+    { face: 'E', dist: 1 - u, along: v, nx: tx + 1, nz: tz },
+    { face: 'N', dist: v, along: u, nx: tx, nz: tz - 1 },
+    { face: 'S', dist: 1 - v, along: u, nx: tx, nz: tz + 1 }
+  ];
+  for (const s of sides) {
+    if (isWaterCell(map, s.nx, s.nz)) continue;
+    const inset = puddleEdgeInset(tx, tz, s.face, s.along);
+    const t = s.dist / Math.max(0.04, inset);
+    const body = smoothstep(0.2, 1, t);
+    const seep =
+      crackSeep(tx, tz, u, v) * smoothstep(0.02, 0.09, s.dist) * (1 - smoothstep(0.28, 1, t));
+    wet = Math.min(wet, Math.max(body, seep));
   }
-  if (lip.face === 'W') {
-    return b.minX <= (lip.tx - 0.5) * CELL + 1e-4 && b.maxX >= bed.minX - overlap;
+  return wet;
+}
+
+export function puddleCoverageWorld(map: FloorMap, wx: number, wz: number): number {
+  const tx = Math.floor(wx + 0.5);
+  const tz = Math.floor(wz + 0.5);
+  return puddleCoverage(map, tx, tz, wx - (tx - 0.5), wz - (tz - 0.5));
+}
+
+/** Floor drop in metres. 0 on the matching dry-stone edge band. */
+export function floorDip(map: FloorMap, tx: number, tz: number, u: number, v: number): number {
+  const cover = puddleCoverage(map, tx, tz, u, v);
+  if (cover < 0.08) return 0;
+  const deep = isDeepWaterCell(map, tx, tz);
+  const seed = hash01(tx, tz, 11);
+  const maxDip = deep
+    ? WATER_DIP_DEEP + 0.005 * seed
+    : WATER_DIP_SHALLOW + 0.012 * (seed - 0.35);
+  const off =
+    0.12 * Math.sin((u + hash01(tx, tz, 13)) * Math.PI * 2) * Math.cos((v + seed) * Math.PI * 2);
+  return -Math.max(0.018, maxDip + off * 0.01) * smoothstep(0.12, 0.78, cover);
+}
+
+export function puddleSurfaceY(map: FloorMap, tx: number, tz: number, u: number, v: number): number {
+  return floorDip(map, tx, tz, u, v) + 0.002;
+}
+
+/** True when a dry-border contour is not a straight cell-aligned line. */
+export function puddleEdgeIsIrregular(map: FloorMap, tx: number, tz: number, face: WaterFace): boolean {
+  if (!dryFacingFaces(map, tx, tz).includes(face)) return false;
+  const samples: number[] = [];
+  for (let i = 0; i <= 12; i++) {
+    const along = i / 12;
+    let u = 0.5;
+    let v = 0.5;
+    const find = (dist: number): number => {
+      if (face === 'W') {
+        u = dist;
+        v = along;
+      } else if (face === 'E') {
+        u = 1 - dist;
+        v = along;
+      } else if (face === 'N') {
+        u = along;
+        v = dist;
+      } else {
+        u = along;
+        v = 1 - dist;
+      }
+      return puddleCoverage(map, tx, tz, u, v);
+    };
+    let lo = 0;
+    let hi = 0.35;
+    for (let k = 0; k < 10; k++) {
+      const mid = (lo + hi) / 2;
+      if (find(mid) > 0.45) hi = mid;
+      else lo = mid;
+    }
+    samples.push((lo + hi) / 2);
   }
-  if (lip.face === 'S') {
-    return b.maxZ >= (lip.tz + 0.5) * CELL - 1e-4 && b.minZ <= bed.maxZ + overlap;
+  const min = Math.min(...samples);
+  const max = Math.max(...samples);
+  return max - min > 0.02;
+}
+
+export function paintedFloorSize(tx: number, tz: number, map: FloorMap, defaultSize: number): number {
+  if (isWaterCell(map, tx, tz) || hasWaterNeighbor(map, tx, tz)) return CELL;
+  return defaultSize;
+}
+
+export type StrayPuddle = { tx: number; tz: number; x: number; z: number; sx: number; sz: number; rot: number };
+
+/** Tiny extra puddles stay inside the cell, near a dry edge. */
+export function listStrayPuddles(map: FloorMap): StrayPuddle[] {
+  const out: StrayPuddle[] = [];
+  for (const cell of listWaterCells(map)) {
+    const dry = dryFacingFaces(map, cell.x, cell.y);
+    if (!dry.length) continue;
+    const n = 1 + (hash01(cell.x, cell.y, 21) > 0.62 ? 1 : 0);
+    for (let i = 0; i < n; i++) {
+      const face = dry[Math.floor(hash01(cell.x, cell.y, 22 + i) * dry.length) % dry.length];
+      const along = 0.22 + 0.56 * hash01(cell.x, cell.y, 30 + i);
+      const inset = 0.18 + 0.12 * hash01(cell.x, cell.y, 40 + i);
+      let lu = 0.5;
+      let lv = 0.5;
+      if (face === 'W') {
+        lu = inset;
+        lv = along;
+      } else if (face === 'E') {
+        lu = 1 - inset;
+        lv = along;
+      } else if (face === 'N') {
+        lu = along;
+        lv = inset;
+      } else {
+        lu = along;
+        lv = 1 - inset;
+      }
+      out.push({
+        tx: cell.x,
+        tz: cell.y,
+        x: (cell.x - 0.5) * CELL + lu * CELL,
+        z: (cell.y - 0.5) * CELL + lv * CELL,
+        sx: 0.16 + 0.12 * hash01(cell.x, cell.y, 50 + i),
+        sz: 0.12 + 0.1 * hash01(cell.x, cell.y, 60 + i),
+        rot: (hash01(cell.x, cell.y, 70 + i) - 0.5) * 1.4
+      });
+    }
   }
-  return b.minZ <= (lip.tz - 0.5) * CELL + 1e-4 && b.maxZ >= bed.minZ - overlap;
+  return out;
 }
 
 export function listWaterGlintCells(map: FloorMap, sconces: readonly SconceSpec[]): WaterCell[] {
@@ -205,10 +274,7 @@ export function listWaterGlintCells(map: FloorMap, sconces: readonly SconceSpec[
   const out: WaterCell[] = [];
   for (const s of sconces) {
     if (!sconceIsLit(s)) continue;
-    const room = {
-      x: s.x + Math.round(FACE_INTO_ROOM[s.face].nx),
-      y: s.y + Math.round(FACE_INTO_ROOM[s.face].nz)
-    };
+    const room = sconceRoom(s);
     for (const key of floodReach(map, room.x, room.y, SCONCE_RADIUS_TILES)) {
       const [x, y] = key.split(',').map(Number);
       if (!isWaterCell(map, x, y) || seen.has(key)) continue;
@@ -219,17 +285,72 @@ export function listWaterGlintCells(map: FloorMap, sconces: readonly SconceSpec[
   return out;
 }
 
+export type WaterTorchMark = {
+  kind: 'streak' | 'wall';
+  tx: number;
+  tz: number;
+  x: number;
+  y: number;
+  z: number;
+  rotY: number;
+  sx: number;
+  sz: number;
+};
+
+export function planeRotY(ax: number, az: number): number {
+  return Math.atan2(-az, ax);
+}
+
+export function listWaterTorchMarks(map: FloorMap, sconces: readonly SconceSpec[]): WaterTorchMark[] {
+  const out: WaterTorchMark[] = [];
+  for (const s of sconces) {
+    if (!sconceIsLit(s)) continue;
+    const room = sconceRoom(s);
+    if (!isWaterCell(map, room.x, room.y)) continue;
+    const { nx, nz } = FACE_INTO_ROOM[s.face];
+    const wallX = room.x * CELL - nx * (CELL / 2);
+    const wallZ = room.y * CELL - nz * (CELL / 2);
+    const y = puddleSurfaceY(map, room.x, room.y, 0.5 - nx * 0.2, 0.5 - nz * 0.2) + 0.004;
+    out.push({
+      kind: 'streak',
+      tx: room.x,
+      tz: room.y,
+      x: wallX + nx * (0.22 + 0.7),
+      y,
+      z: wallZ + nz * (0.22 + 0.7),
+      rotY: planeRotY(nx, nz),
+      sx: 1.35,
+      sz: 0.48
+    });
+    out.push({
+      kind: 'wall',
+      tx: room.x,
+      tz: room.y,
+      x: wallX + nx * 0.2,
+      y: y - 0.001,
+      z: wallZ + nz * 0.2,
+      rotY: planeRotY(-nz, nx),
+      sx: CELL * 0.62,
+      sz: 0.26
+    });
+  }
+  return out;
+}
+
 function mergeGeometries(geos: THREE.BufferGeometry[]): THREE.BufferGeometry | null {
   if (!geos.length) return null;
   let vCount = 0;
   let iCount = 0;
+  let hasColor = false;
   for (const g of geos) {
     vCount += g.getAttribute('position').count;
     iCount += g.getIndex()?.count ?? g.getAttribute('position').count;
+    if (g.getAttribute('color')) hasColor = true;
   }
   const pos = new Float32Array(vCount * 3);
   const nrm = new Float32Array(vCount * 3);
   const uv = new Float32Array(vCount * 2);
+  const col = hasColor ? new Float32Array(vCount * 4) : null;
   const idx = new Uint32Array(iCount);
   let vo = 0;
   let io = 0;
@@ -238,6 +359,7 @@ function mergeGeometries(geos: THREE.BufferGeometry[]): THREE.BufferGeometry | n
     const p = g.getAttribute('position');
     const n = g.getAttribute('normal');
     const u = g.getAttribute('uv');
+    const c = g.getAttribute('color');
     const ix = g.getIndex();
     for (let i = 0; i < p.count; i++) {
       pos[(vo + i) * 3] = p.getX(i);
@@ -251,6 +373,19 @@ function mergeGeometries(geos: THREE.BufferGeometry[]): THREE.BufferGeometry | n
       if (u) {
         uv[(vo + i) * 2] = u.getX(i);
         uv[(vo + i) * 2 + 1] = u.getY(i);
+      }
+      if (col) {
+        if (c) {
+          col[(vo + i) * 4] = c.getX(i);
+          col[(vo + i) * 4 + 1] = c.getY(i);
+          col[(vo + i) * 4 + 2] = c.getZ(i);
+          col[(vo + i) * 4 + 3] = c.itemSize > 3 ? c.getW(i) : 1;
+        } else {
+          col[(vo + i) * 4] = 1;
+          col[(vo + i) * 4 + 1] = 1;
+          col[(vo + i) * 4 + 2] = 1;
+          col[(vo + i) * 4 + 3] = 1;
+        }
       }
     }
     if (ix) {
@@ -266,6 +401,7 @@ function mergeGeometries(geos: THREE.BufferGeometry[]): THREE.BufferGeometry | n
   out.setAttribute('position', new THREE.BufferAttribute(pos, 3));
   out.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
   out.setAttribute('uv', new THREE.BufferAttribute(uv, 2));
+  if (col) out.setAttribute('color', new THREE.BufferAttribute(col, 4));
   out.setIndex(new THREE.BufferAttribute(idx, 1));
   return out;
 }
@@ -276,17 +412,17 @@ function makeRippleNormal(size = 64): THREE.DataTexture {
     const u = x / size;
     const v = y / size;
     return (
-      Math.sin(u * Math.PI * 3.2) * 0.32 +
-      Math.sin((u * 0.65 + v) * Math.PI * 2.4) * 0.22 +
-      Math.sin((v * 1.15 - u * 0.4) * Math.PI * 4.1) * 0.12
+      Math.sin(u * Math.PI * 4.4) * 0.42 +
+      Math.sin((u * 0.7 + v) * Math.PI * 3.1) * 0.3 +
+      Math.sin((v * 1.4 - u * 0.5) * Math.PI * 6.2) * 0.18
     );
   };
   for (let y = 0; y < size; y++) {
     for (let x = 0; x < size; x++) {
       const dx = height(x + 1, y) - height(x - 1, y);
       const dy = height(x, y + 1) - height(x, y - 1);
-      let nx = -dx * 1.8;
-      let ny = -dy * 1.8;
+      let nx = -dx * 3.2;
+      let ny = -dy * 3.2;
       let nz = 1;
       const len = Math.hypot(nx, ny, nz) || 1;
       nx /= len;
@@ -310,19 +446,77 @@ function makeRippleNormal(size = 64): THREE.DataTexture {
   return tex;
 }
 
-function makeGlintTexture(): THREE.CanvasTexture {
-  const size = 32;
+function makeStreakAtlas(): THREE.CanvasTexture {
+  const w = 128;
+  const h = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext('2d')!;
+  ctx.clearRect(0, 0, w, h);
+  for (let x = 0; x < w; x++) {
+    const t = x / w;
+    const fall = (1 - t) * (1 - t);
+    const gap = Math.sin(x * 0.38) * Math.sin(x * 0.11);
+    if (gap < -0.35) continue;
+    const mid = 32 + 9 * Math.sin(x * 0.17) + 5 * Math.sin(x * 0.41);
+    const half = 5 + 3 * Math.abs(Math.sin(x * 0.23));
+    const g = ctx.createLinearGradient(x, mid - half * 2, x, mid + half * 2);
+    g.addColorStop(0, 'rgba(0,0,0,0)');
+    g.addColorStop(0.45, `rgba(255, 196, 120, ${0.15 * fall})`);
+    g.addColorStop(0.5, `rgba(255, 226, 168, ${0.85 * fall})`);
+    g.addColorStop(0.55, `rgba(210, 150, 70, ${0.2 * fall})`);
+    g.addColorStop(1, 'rgba(0,0,0,0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x, mid - half * 2, 1, half * 4);
+    if (x % 9 === 0) {
+      ctx.fillStyle = `rgba(255, 236, 190, ${0.55 * fall})`;
+      ctx.fillRect(x, mid - 1 + Math.sin(x * 0.5) * 6, 3, 1);
+    }
+  }
+  for (let x = 0; x < w; x++) {
+    const t = x / w;
+    if (Math.sin(x * 0.5 + 1.2) < 0.15) continue;
+    const mid = 96 + 4 * Math.sin(x * 0.21);
+    const a = (1 - t) * 0.4;
+    ctx.fillStyle = `rgba(198, 150, 88, ${a})`;
+    ctx.fillRect(x, mid - 6, 1, 12);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearFilter;
+  tex.generateMipmaps = false;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+function makeSparkleTexture(): THREE.CanvasTexture {
+  const size = 64;
   const canvas = document.createElement('canvas');
   canvas.width = size;
   canvas.height = size;
   const ctx = canvas.getContext('2d')!;
-  const g = ctx.createRadialGradient(16, 16, 1, 16, 16, 15);
-  g.addColorStop(0, 'rgba(255, 214, 150, 0.85)');
-  g.addColorStop(0.4, 'rgba(196, 150, 88, 0.28)');
-  g.addColorStop(1, 'rgba(0, 0, 0, 0)');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, size, size);
+  ctx.clearRect(0, 0, size, size);
+  const dashes = [
+    [8, 18, 7, 1],
+    [22, 40, 5, 1],
+    [40, 12, 6, 1],
+    [14, 50, 4, 1],
+    [48, 34, 8, 1],
+    [30, 26, 3, 1],
+    [54, 52, 5, 1]
+  ];
+  for (const [x, y, w, h] of dashes) {
+    const g = ctx.createLinearGradient(x, y, x + w, y);
+    g.addColorStop(0, 'rgba(255, 200, 120, 0)');
+    g.addColorStop(0.5, 'rgba(255, 230, 170, 0.95)');
+    g.addColorStop(1, 'rgba(255, 200, 120, 0)');
+    ctx.fillStyle = g;
+    ctx.fillRect(x, y, w, h);
+  }
   const tex = new THREE.CanvasTexture(canvas);
+  tex.wrapS = THREE.RepeatWrapping;
+  tex.wrapT = THREE.RepeatWrapping;
   tex.magFilter = THREE.LinearFilter;
   tex.minFilter = THREE.LinearFilter;
   tex.generateMipmaps = false;
@@ -330,107 +524,43 @@ function makeGlintTexture(): THREE.CanvasTexture {
   return tex;
 }
 
-function makeBandTexture(): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 32;
-  canvas.height = 8;
-  const ctx = canvas.getContext('2d')!;
-  const g = ctx.createLinearGradient(0, 0, 32, 0);
-  g.addColorStop(0, 'rgba(4, 3, 3, 0.82)');
-  g.addColorStop(0.4, 'rgba(6, 5, 4, 0.4)');
-  g.addColorStop(1, 'rgba(8, 7, 6, 0)');
-  ctx.fillStyle = g;
-  ctx.fillRect(0, 0, 32, 8);
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.magFilter = THREE.LinearFilter;
-  tex.minFilter = THREE.LinearFilter;
-  tex.generateMipmaps = false;
-  tex.needsUpdate = true;
-  return tex;
-}
-
-function setLipUvs(geo: THREE.BufferGeometry, lip: WaterLip): void {
-  const uv = geo.getAttribute('uv');
+function cellGrid(tx: number, tz: number, map: FloorMap, kind: 'floor' | 'puddle'): THREE.BufferGeometry {
+  const segs = WATER_FLOOR_SEGS;
+  const geo = new THREE.PlaneGeometry(CELL, CELL, segs, segs);
+  geo.rotateX(-Math.PI / 2);
   const pos = geo.getAttribute('position');
+  const col = new Float32Array(pos.count * 4);
+  const colors = kind === 'puddle';
   for (let i = 0; i < pos.count; i++) {
-    const lx = pos.getX(i);
-    const ly = pos.getY(i);
-    const lz = pos.getZ(i);
-    const along = Math.abs(lip.sx - CELL) < 1e-4 ? lx : lz;
-    uv.setXY(i, (along + CELL / 2) / CELL, (ly + lip.sy / 2) / CELL);
+    const wx = pos.getX(i) + tx * CELL;
+    const wz = pos.getZ(i) + tz * CELL;
+    const u = pos.getX(i) / CELL + 0.5;
+    const v = pos.getZ(i) / CELL + 0.5;
+    const cover = puddleCoverage(map, tx, tz, u, v);
+    const dip = floorDip(map, tx, tz, u, v);
+    if (kind === 'floor') {
+      pos.setXYZ(i, wx, dip, wz);
+      const wet = smoothstep(0.08, 0.4, cover) * (1 - smoothstep(0.45, 0.95, cover));
+      const k = 1 - 0.38 * wet;
+      col[i * 4] = k * 0.92;
+      col[i * 4 + 1] = k * 0.9;
+      col[i * 4 + 2] = k * 0.86;
+      col[i * 4 + 3] = 1;
+    } else {
+      const deep = isDeepWaterCell(map, tx, tz);
+      pos.setXYZ(i, wx, dip + 0.0025, wz);
+      const alpha = smoothstep(0.14, 0.42, cover) * (deep ? 0.78 : 0.4);
+      const edgeClear = 1 - 0.35 * (1 - smoothstep(0.2, 0.7, cover));
+      col[i * 4] = deep ? 0.22 : 0.32 * edgeClear;
+      col[i * 4 + 1] = deep ? 0.3 : 0.42 * edgeClear;
+      col[i * 4 + 2] = deep ? 0.24 : 0.34 * edgeClear;
+      col[i * 4 + 3] = alpha;
+    }
   }
-  uv.needsUpdate = true;
-}
-
-function surfacePlane(tx: number, tz: number): THREE.BufferGeometry {
-  const geo = new THREE.PlaneGeometry(waterBedSize(), waterBedSize(), WATER_SURFACE_SEGS, WATER_SURFACE_SEGS);
-  geo.rotateX(-Math.PI / 2);
-  geo.translate(tx * CELL, WATER_SURFACE_Y, tz * CELL);
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 4));
+  geo.computeVertexNormals();
+  void colors;
   return geo;
-}
-
-function bandPlane(lip: WaterLip): THREE.BufferGeometry {
-  const along = lip.face === 'E' || lip.face === 'W' ? lip.sz : lip.sx;
-  const geo = new THREE.PlaneGeometry(along, WATER_BAND_WIDTH);
-  geo.rotateX(-Math.PI / 2);
-  const inset = WATER_LIP_WIDTH + WATER_BAND_WIDTH / 2 - WATER_LIP_OVERLAP * 0.5;
-  let x = lip.tx * CELL;
-  let z = lip.tz * CELL;
-  let rotY = 0;
-  if (lip.face === 'E') {
-    x = (lip.tx + 0.5) * CELL - inset;
-    rotY = Math.PI / 2;
-  } else if (lip.face === 'W') {
-    x = (lip.tx - 0.5) * CELL + inset;
-    rotY = -Math.PI / 2;
-  } else if (lip.face === 'S') {
-    z = (lip.tz + 0.5) * CELL - inset;
-    rotY = 0;
-  } else {
-    z = (lip.tz - 0.5) * CELL + inset;
-    rotY = Math.PI;
-  }
-  geo.rotateY(rotY);
-  geo.translate(x, WATER_SURFACE_Y + 0.0015, z);
-  return geo;
-}
-
-function stoneLipMaterial(map: THREE.Texture): THREE.MeshPhysicalMaterial {
-  enablePaintedSampling(map);
-  map.wrapS = THREE.RepeatWrapping;
-  map.wrapT = THREE.RepeatWrapping;
-  return new THREE.MeshPhysicalMaterial({
-    map,
-    roughness: 1,
-    metalness: 0,
-    clearcoat: 0,
-    sheen: 0,
-    specularIntensity: 0,
-    envMapIntensity: 0,
-    fog: true,
-    emissive: 0x000000,
-    emissiveIntensity: 0
-  });
-}
-
-function waterSurfaceMaterial(normal: THREE.Texture): THREE.MeshPhysicalMaterial {
-  return new THREE.MeshPhysicalMaterial({
-    color: 0x1a201c,
-    roughness: 0.74,
-    metalness: 0,
-    clearcoat: 0,
-    sheen: 0,
-    specularIntensity: 0.14,
-    envMapIntensity: 0,
-    transparent: true,
-    opacity: 0.3,
-    depthWrite: false,
-    fog: true,
-    emissive: 0x000000,
-    emissiveIntensity: 0,
-    normalMap: normal,
-    normalScale: new THREE.Vector2(0.32, 0.32)
-  });
 }
 
 export async function buildFloor1Water(
@@ -445,112 +575,175 @@ export async function buildFloor1Water(
   group.userData.castWhenOn = false;
 
   const cells = listWaterCells(map);
-  const lips = listWaterLips(map);
-  const stone = await loadPng('floor_stone.png');
+  const waterPng = await loadPng('floor_water.png');
   const ripple = makeRippleNormal();
+  const floorMat = paintedShellMaterial(waterPng.texture, undefined, 'floor_water.png');
+  floorMat.vertexColors = true;
+  floorMat.specularIntensity = 0;
 
-  if (lips.length) {
-    const geos = lips.map((lip) => {
-      const g = new THREE.BoxGeometry(lip.sx, lip.sy, lip.sz);
-      setLipUvs(g, lip);
-      g.translate(lip.x, lip.y, lip.z);
+  const floorGeos = cells.map((c) => cellGrid(c.x, c.y, map, 'floor'));
+  const floorGeo = mergeGeometries(floorGeos);
+  if (floorGeo) {
+    const mesh = new THREE.Mesh(floorGeo, floorMat);
+    mesh.name = 'water-broken-floor';
+    mesh.castShadow = false;
+    mesh.receiveShadow = true;
+    mesh.userData.castWhenOn = false;
+    mesh.frustumCulled = false;
+    group.add(mesh);
+  }
+
+  const puddleMat = new THREE.MeshPhysicalMaterial({
+    color: WATER_SURFACE_COLOR,
+    roughness: 0.58,
+    metalness: 0,
+    clearcoat: 0,
+    sheen: 0,
+    specularIntensity: 0.28,
+    envMapIntensity: 0,
+    transparent: true,
+    opacity: 1,
+    depthWrite: false,
+    fog: true,
+    emissive: 0x000000,
+    emissiveIntensity: 0,
+    vertexColors: true,
+    normalMap: ripple,
+    normalScale: new THREE.Vector2(0.55, 0.55)
+  });
+  const puddleGeos = cells.map((c) => cellGrid(c.x, c.y, map, 'puddle'));
+  let puddle: THREE.Mesh | null = null;
+  let restY: Float32Array | null = null;
+  const puddleGeo = mergeGeometries(puddleGeos);
+  if (puddleGeo) {
+    const pos = puddleGeo.getAttribute('position');
+    restY = new Float32Array(pos.count);
+    for (let i = 0; i < pos.count; i++) restY[i] = pos.getY(i);
+    const mesh = new THREE.Mesh(puddleGeo, puddleMat);
+    mesh.name = 'water-puddles';
+    mesh.castShadow = false;
+    mesh.receiveShadow = true;
+    mesh.userData.castWhenOn = false;
+    mesh.frustumCulled = false;
+    mesh.renderOrder = 1;
+    group.add(mesh);
+    puddle = mesh;
+  }
+
+  const strays = listStrayPuddles(map);
+  if (strays.length) {
+    const geos = strays.map((s) => {
+      const g = new THREE.PlaneGeometry(s.sx, s.sz, 1, 1);
+      g.rotateX(-Math.PI / 2);
+      g.rotateY(s.rot);
+      const y = puddleSurfaceY(map, s.tx, s.tz, 0.5, 0.5) + 0.001;
+      g.translate(s.x, y, s.z);
       return g;
     });
     const geo = mergeGeometries(geos);
     if (geo) {
-      const mesh = new THREE.Mesh(geo, stoneLipMaterial(stone.texture));
-      mesh.name = 'water-lips';
-      mesh.castShadow = false;
-      mesh.receiveShadow = true;
-      mesh.userData.castWhenOn = false;
-      mesh.frustumCulled = false;
-      group.add(mesh);
-    }
-  }
-
-  let surface: THREE.Mesh | null = null;
-  let restY: Float32Array | null = null;
-  if (cells.length) {
-    const geo = mergeGeometries(cells.map((c) => surfacePlane(c.x, c.y)));
-    if (geo) {
-      const pos = geo.getAttribute('position');
-      restY = new Float32Array(pos.count);
-      for (let i = 0; i < pos.count; i++) restY[i] = pos.getY(i);
-      const mesh = new THREE.Mesh(geo, waterSurfaceMaterial(ripple));
-      mesh.name = 'water-surface';
-      mesh.castShadow = false;
-      mesh.receiveShadow = true;
-      mesh.userData.castWhenOn = false;
-      mesh.frustumCulled = false;
-      mesh.renderOrder = 1;
-      group.add(mesh);
-      surface = mesh;
-    }
-  }
-
-  if (lips.length) {
-    const geo = mergeGeometries(lips.map(bandPlane));
-    if (geo) {
       const mesh = new THREE.Mesh(
         geo,
         new THREE.MeshPhysicalMaterial({
-          map: makeBandTexture(),
-          color: 0xffffff,
-          roughness: 1,
+          color: WATER_SURFACE_COLOR,
+          roughness: 0.62,
           metalness: 0,
-          clearcoat: 0,
-          specularIntensity: 0,
-          envMapIntensity: 0,
           transparent: true,
-          opacity: 1,
+          opacity: 0.38,
           depthWrite: false,
           fog: true,
+          specularIntensity: 0.18,
+          envMapIntensity: 0,
           emissive: 0x000000,
-          emissiveIntensity: 0
+          normalMap: ripple,
+          normalScale: new THREE.Vector2(0.4, 0.4)
         })
       );
-      mesh.name = 'water-edge-band';
+      mesh.name = 'water-stray-puddles';
       mesh.castShadow = false;
       mesh.receiveShadow = false;
       mesh.userData.castWhenOn = false;
       mesh.frustumCulled = false;
-      mesh.renderOrder = 2;
+      mesh.renderOrder = 1;
       group.add(mesh);
     }
   }
 
+  const marks = listWaterTorchMarks(map, sconces);
+  const atlas = makeStreakAtlas();
+  if (marks.length) {
+    const geos = marks.map((m) => {
+      const g = new THREE.PlaneGeometry(m.sx, m.sz);
+      g.rotateX(-Math.PI / 2);
+      g.rotateY(m.rotY);
+      const uv = g.getAttribute('uv');
+      for (let i = 0; i < uv.count; i++) {
+        const u = uv.getX(i);
+        const v = uv.getY(i);
+        if (m.kind === 'streak') uv.setXY(i, u, v * 0.5);
+        else uv.setXY(i, u, 0.5 + v * 0.5);
+      }
+      g.translate(m.x, m.y, m.z);
+      return g;
+    });
+    const geo = mergeGeometries(geos);
+    if (geo) {
+      const mesh = new THREE.Mesh(
+        geo,
+        new THREE.MeshBasicMaterial({
+          map: atlas,
+          color: 0xffe2a4,
+          transparent: true,
+          opacity: 0.72,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          fog: true,
+          toneMapped: false,
+          side: THREE.DoubleSide
+        })
+      );
+      mesh.name = 'water-torch-marks';
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      mesh.userData.castWhenOn = false;
+      mesh.frustumCulled = false;
+      mesh.renderOrder = 3;
+      group.add(mesh);
+    }
+  }
+
+  let sparkleMat: THREE.MeshBasicMaterial | null = null;
   const glintCells = listWaterGlintCells(map, sconces);
-  let glintMat: THREE.MeshBasicMaterial | null = null;
   if (glintCells.length) {
-    const glintMap = makeGlintTexture();
-    glintMat = new THREE.MeshBasicMaterial({
-      map: glintMap,
-      color: 0xffe2a4,
+    sparkleMat = new THREE.MeshBasicMaterial({
+      map: makeSparkleTexture(),
+      color: 0xffe6b0,
       transparent: true,
-      opacity: 0.34,
+      opacity: 0.42,
       depthWrite: false,
-      depthTest: true,
       blending: THREE.AdditiveBlending,
       fog: true,
       toneMapped: false,
       side: THREE.DoubleSide
     });
-    const geos = glintCells.map((cell) => {
-      const g = new THREE.PlaneGeometry(CELL * 0.42, CELL * 0.42);
+    const geos = glintCells.map((c) => {
+      const g = new THREE.PlaneGeometry(CELL * 0.72, CELL * 0.72);
       g.rotateX(-Math.PI / 2);
-      g.translate(cell.x * CELL, WATER_SURFACE_Y + 0.006, cell.y * CELL);
+      const y = puddleSurfaceY(map, c.x, c.y, 0.5, 0.5) + 0.005;
+      g.translate(c.x * CELL, y, c.y * CELL);
+      const uv = g.getAttribute('uv');
+      for (let i = 0; i < uv.count; i++) uv.setXY(i, uv.getX(i) * 2.2, uv.getY(i) * 2.2);
       return g;
     });
     const geo = mergeGeometries(geos);
     if (geo) {
-      const mesh = new THREE.Mesh(geo, glintMat);
-      mesh.name = 'water-glints';
+      const mesh = new THREE.Mesh(geo, sparkleMat);
+      mesh.name = 'water-sparkles';
       mesh.castShadow = false;
       mesh.receiveShadow = false;
       mesh.userData.castWhenOn = false;
-      mesh.userData.skipVertexLighting = true;
       mesh.frustumCulled = false;
-      mesh.renderOrder = 3;
+      mesh.renderOrder = 4;
       group.add(mesh);
     }
   }
@@ -559,30 +752,20 @@ export async function buildFloor1Water(
     group,
     update: (now, freeze) => {
       const t = freeze ? 0 : now * 0.001;
-      if (surface) {
-        const mat = surface.material as THREE.MeshPhysicalMaterial;
-        if (mat.normalMap) {
-          mat.normalMap.offset.set(t * 0.012, t * 0.007);
+      if (puddleMat.normalMap) puddleMat.normalMap.offset.set(t * 0.014, t * 0.008);
+      if (puddle && restY && !freeze) {
+        const pos = puddle.geometry.getAttribute('position');
+        const wave = t * Math.PI * 2 * WATER_RIPPLE_HZ;
+        for (let i = 0; i < pos.count; i++) {
+          const x = pos.getX(i);
+          const z = pos.getZ(i);
+          pos.setY(i, restY[i] + WATER_RIPPLE_AMP * Math.sin(x * 1.7 + wave) * Math.cos(z * 1.3 + wave * 0.7));
         }
-        if (restY && !freeze) {
-          const pos = surface.geometry.getAttribute('position');
-          const wave = t * Math.PI * 2 * WATER_RIPPLE_HZ;
-          for (let i = 0; i < pos.count; i++) {
-            const x = pos.getX(i);
-            const z = pos.getZ(i);
-            pos.setY(
-              i,
-              restY[i] +
-                WATER_RIPPLE_AMP *
-                  Math.sin(x * 1.65 + wave) *
-                  Math.cos(z * 1.28 + wave * 0.72)
-            );
-          }
-          pos.needsUpdate = true;
-        }
+        pos.needsUpdate = true;
       }
-      if (glintMat) {
-        glintMat.opacity = freeze ? 0.34 : 0.34 * (0.84 + 0.16 * Math.sin(t * 1.05));
+      if (sparkleMat) {
+        sparkleMat.opacity = freeze ? 0.42 : 0.42 * (0.8 + 0.2 * Math.sin(t * 1.15));
+        if (sparkleMat.map) sparkleMat.map.offset.set(t * 0.02, t * 0.01);
       }
     }
   };
