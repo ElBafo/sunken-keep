@@ -395,14 +395,17 @@ describe('voxel-floor1 puddle decals lock to floor_stone', () => {
   });
 
   it('rotates and mirrors floor UVs identically to the decal', () => {
-    expect(decalUv(0.2, 0.3, 0, false)).toEqual({ u: 0.2, v: 0.3 });
-    expect(decalUv(0.2, 0.3, 90, false)).toEqual({ u: 0.3, v: 0.8 });
-    expect(decalUv(0.2, 0.3, 180, false)).toEqual({ u: 0.8, v: 0.7 });
-    expect(decalUv(0.2, 0.3, 270, false)).toEqual({ u: 0.7, v: 0.2 });
-    expect(decalUv(0.2, 0.3, 0, true)).toEqual({ u: 0.8, v: 0.3 });
-    expect(decalUv(0.2, 0.3, 90, true)).toEqual({ u: 0.3, v: 0.2 });
-    const north = cellToDecalUv(0.25, 0.1, 0, false);
-    expect(north).toEqual({ u: 0.25, v: 0.9 });
+    const uv = (got: { u: number; v: number }, u: number, v: number) => {
+      expect(got.u).toBeCloseTo(u, 10);
+      expect(got.v).toBeCloseTo(v, 10);
+    };
+    uv(decalUv(0.2, 0.3, 0, false), 0.2, 0.3);
+    uv(decalUv(0.2, 0.3, 90, false), 0.3, 0.8);
+    uv(decalUv(0.2, 0.3, 180, false), 0.8, 0.7);
+    uv(decalUv(0.2, 0.3, 270, false), 0.7, 0.2);
+    uv(decalUv(0.2, 0.3, 0, true), 0.8, 0.3);
+    uv(decalUv(0.2, 0.3, 90, true), 0.3, 0.2);
+    uv(cellToDecalUv(0.25, 0.1, 0, false), 0.25, 0.9);
     expect(cellToDecalUv(0.25, 0.1, 90, false)).toEqual(decalUv(0.25, 0.9, 90, false));
     expect(cellToDecalUv(0.25, 0.1, 180, true)).toEqual(decalUv(0.25, 0.9, 180, true));
   });
