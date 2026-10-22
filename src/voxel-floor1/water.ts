@@ -3,16 +3,17 @@ import { CELL, SCONCE_RADIUS_TILES, TORCH_DISTANCE } from './constants';
 import {
   FACE_INTO_ROOM,
   floodReach,
+  floor1Sunbeams,
   sconceIsLit,
   sconceRoom,
   torchWorldPos,
-  type SconceSpec
+  type SconceSpec,
+  type SunbeamSpec
 } from './fixtures';
 import { isTrueWall, isWaterCell, tileAt, type FloorMap } from './layout';
 import { paintedShellMaterial } from './painted';
 import { loadPng, textureFromPixels } from '../voxel-lab/materials';
 import {
-  CISTERN_SHORE_Y,
   DECAL_MASK_DARKEN,
   WATER_DECAL_FLOOR_FILE,
   WATER_DECAL_PX,
@@ -47,14 +48,17 @@ export const WATER_RIM_FILE = 'floor_water.png';
 export const WATER_RIM_MASK_N = 'floor_water_rim_mask_n.png';
 export const WATER_SURFACE_COLOR = 0x101410;
 export const WATER_DEEP_COLOR = 0x030403;
-const WATER_SHALLOW_RGB = { r: 0.045, g: 0.052, b: 0.044 };
-const WATER_DEEP_RGB = { r: 0.012, g: 0.016, b: 0.014 };
-const PUDDLE_ALPHA_SHALLOW = 0.64;
-const PUDDLE_ALPHA_DEEP = 0.9;
-/** Thin enough that painted grout and the lip stay readable. */
-export const PUDDLE_ALPHA_DECAL_SHALLOW = 0.2;
-export const PUDDLE_ALPHA_DECAL_DEEP = 0.34;
-const WALL_REFLECT_RGB = { r: 0.2, g: 0.17, b: 0.14 };
+const WATER_SHALLOW_RGB = { r: 0.03, g: 0.036, b: 0.03 };
+const WATER_DEEP_RGB = { r: 0.01, g: 0.012, b: 0.011 };
+const PUDDLE_ALPHA_SHALLOW = 0.16;
+const PUDDLE_ALPHA_DEEP = 0.3;
+/** Decal cells keep almost no veil so the painted lip and grout stay visible. */
+export const PUDDLE_ALPHA_DECAL_SHALLOW = 0.04;
+export const PUDDLE_ALPHA_DECAL_DEEP = 0.08;
+export const PUDDLE_SPECULAR = 0.07;
+/** Dark splash under a ceiling beam — smaller than a cell, not a glow disc. */
+export const WATER_SPLASH_M = 0.7;
+const WALL_REFLECT_RGB = { r: 0.12, g: 0.1, b: 0.08 };
 
 export const WATER_FACES = ['N', 'E', 'S', 'W'] as const;
 export type WaterFace = (typeof WATER_FACES)[number];
@@ -533,12 +537,11 @@ export function waterDeepness(map: FloorMap, tx: number, tz: number, u: number, 
   return d;
 }
 
-/** Puddle veil opacity. Deep hides the bed; cellar decals stay thin so the paint reads. */
+/** Puddle veil opacity. Thin dark tint; painted decal cells stay almost clear. */
 export function puddleAlpha(map: FloorMap, tx: number, tz: number, u: number, v: number): number {
   const cover = puddleCoverage(map, tx, tz, u, v);
   const deep = waterDeepness(map, tx, tz, u, v);
-  const shore = hasWaterDecal(tx, tz) && tz === CISTERN_SHORE_Y;
-  const decal = hasWaterDecal(tx, tz) && !shore;
+  const decal = hasWaterDecal(tx, tz);
   const lo = decal ? PUDDLE_ALPHA_DECAL_SHALLOW : PUDDLE_ALPHA_SHALLOW;
   const hi = decal ? PUDDLE_ALPHA_DECAL_DEEP : PUDDLE_ALPHA_DEEP;
   return smoothstep(0.28, 0.7, cover) * (lo + (hi - lo) * deep);
@@ -678,6 +681,25 @@ export function planeRotY(ax: number, az: number): number {
   return Math.atan2(-az, ax);
 }
 
+export function listWaterfallSplashes(
+  map: FloorMap,
+  beams: readonly SunbeamSpec[] = floor1Sunbeams
+): Array<{ tx: number; tz: number; x: number; y: number; z: number; span: number }> {
+  const out: Array<{ tx: number; tz: number; x: number; y: number; z: number; span: number }> = [];
+  for (const b of beams) {
+    if (!isWaterCell(map, b.x, b.y)) continue;
+    out.push({
+      tx: b.x,
+      tz: b.y,
+      x: b.wx,
+      y: puddleSurfaceY(map, b.x, b.y, 0.5, 0.5) + 0.006,
+      z: b.wz,
+      span: WATER_SPLASH_M
+    });
+  }
+  return out;
+}
+
 export function listWaterTorchMarks(map: FloorMap, sconces: readonly SconceSpec[]): WaterTorchMark[] {
   const out: WaterTorchMark[] = [];
   for (const s of sconces) {
@@ -692,23 +714,23 @@ export function listWaterTorchMarks(map: FloorMap, sconces: readonly SconceSpec[
       kind: 'streak',
       tx: room.x,
       tz: room.y,
-      x: wallX + nx * 0.85,
+      x: wallX + nx * 0.42,
       y,
-      z: wallZ + nz * 0.85,
+      z: wallZ + nz * 0.42,
       rotY: planeRotY(nx, nz),
-      sx: 1.6,
-      sz: 0.85
+      sx: 0.36,
+      sz: 0.14
     });
     out.push({
       kind: 'wall',
       tx: room.x,
       tz: room.y,
-      x: wallX + nx * 0.18,
+      x: wallX + nx * 0.16,
       y: y - 0.001,
-      z: wallZ + nz * 0.18,
+      z: wallZ + nz * 0.16,
       rotY: planeRotY(-nz, nx),
-      sx: CELL * 0.72,
-      sz: 0.34
+      sx: 0.4,
+      sz: 0.12
     });
   }
   return out;
@@ -912,8 +934,8 @@ function makeSoftShimmer(): THREE.CanvasTexture {
       const wx = (x / w) * WATER_NOISE_SPAN;
       const wz = (y / h) * WATER_NOISE_SPAN;
       const n = waterWorldNoise(wx, wz);
-      const peak = Math.max(0, n * 0.5 + 0.5);
-      const a = peak * peak * 0.72;
+      const peak = Math.max(0, n);
+      const a = peak * peak * peak * 0.22;
       const i = (y * w + x) * 4;
       img.data[i] = 255;
       img.data[i + 1] = 214;
@@ -925,6 +947,75 @@ function makeSoftShimmer(): THREE.CanvasTexture {
   const tex = new THREE.CanvasTexture(canvas);
   tex.wrapS = THREE.RepeatWrapping;
   tex.wrapT = THREE.RepeatWrapping;
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearFilter;
+  tex.generateMipmaps = false;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+/** Dark broken rings where a ceiling beam hits the pool. No filled disc. */
+function makeWaterfallSplash(): THREE.CanvasTexture {
+  const s = 256;
+  const canvas = document.createElement('canvas');
+  canvas.width = s;
+  canvas.height = s;
+  const ctx = canvas.getContext('2d')!;
+  const img = ctx.createImageData(s, s);
+  const cx = (s - 1) * 0.5;
+  for (let y = 0; y < s; y++) {
+    for (let x = 0; x < s; x++) {
+      const dx = (x - cx) / cx;
+      const dy = (y - cx) / cx;
+      const r = Math.hypot(dx, dy);
+      const ang = Math.atan2(dy, dx);
+      const wobble = 0.05 * Math.sin(ang * 5.4 + 0.7) + 0.028 * Math.sin(ang * 11.2 + 1.4);
+      const rr = r + wobble;
+      const ring =
+        Math.exp(-(((rr - 0.26) * 16) ** 2)) * 0.45 +
+        Math.exp(-(((rr - 0.46) * 12) ** 2)) * 0.72 +
+        Math.exp(-(((rr - 0.66) * 9) ** 2)) * 0.38;
+      const broken = 0.42 + 0.58 * Math.max(0, Math.sin(ang * 3.6 + 0.9));
+      const spray =
+        Math.exp(-(((rr - 0.58) * 8) ** 2)) * broken * (0.35 + 0.65 * Math.max(0, Math.sin(ang * 7.1)));
+      const fade = 1 - smoothstep(0.8, 1.05, r);
+      const a = Math.min(1, (ring + spray) * fade);
+      const i = (y * s + x) * 4;
+      img.data[i] = 10;
+      img.data[i + 1] = 14;
+      img.data[i + 2] = 12;
+      img.data[i + 3] = Math.round(a * 230);
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.magFilter = THREE.LinearFilter;
+  tex.minFilter = THREE.LinearFilter;
+  tex.generateMipmaps = false;
+  tex.needsUpdate = true;
+  return tex;
+}
+
+/** A few warm specks on the splash ring — never a filled glow. */
+function makeSplashGlints(): THREE.CanvasTexture {
+  const s = 128;
+  const canvas = document.createElement('canvas');
+  canvas.width = s;
+  canvas.height = s;
+  const ctx = canvas.getContext('2d')!;
+  ctx.clearRect(0, 0, s, s);
+  const spots = [
+    [0.72, 0.28, 2.2],
+    [0.3, 0.34, 1.7],
+    [0.78, 0.62, 1.9],
+    [0.4, 0.76, 1.5],
+    [0.58, 0.2, 1.4],
+    [0.22, 0.58, 1.6]
+  ] as const;
+  for (const [u, v, rad] of spots) {
+    paintSoftBlob(ctx, u * s, v * s, rad, rad * 0.7, '232, 176, 110', 0.7);
+  }
+  const tex = new THREE.CanvasTexture(canvas);
   tex.magFilter = THREE.LinearFilter;
   tex.minFilter = THREE.LinearFilter;
   tex.generateMipmaps = false;
@@ -985,10 +1076,11 @@ function cellGrid(
       pos.setXYZ(i, wx, dip + 0.004, wz);
       const wuv = waterWorldUv(wx, wz);
       uvAttr.setXY(i, wuv.u, wuv.v);
-      const veil = smoothstep(0.18, 0.62, cover) * warmth ** 0.65;
+      const peak = smoothstep(0.62, 0.88, waterWorldNoise(wx, wz, 3.1));
+      const veil = peak * smoothstep(0.28, 0.7, cover) * warmth ** 1.35 * 0.16;
       col[i * 4] = 1;
-      col[i * 4 + 1] = 0.9;
-      col[i * 4 + 2] = 0.72;
+      col[i * 4 + 1] = 0.86;
+      col[i * 4 + 2] = 0.62;
       col[i * 4 + 3] = veil;
     } else {
       pos.setXYZ(i, wx, dip + 0.002, wz);
@@ -1000,19 +1092,19 @@ function cellGrid(
       col[i * 4] =
         (WATER_SHALLOW_RGB.r + (WATER_DEEP_RGB.r - WATER_SHALLOW_RGB.r) * deep) *
           edgeClear *
-          (1 + 0.9 * warmth) +
+          (1 + 0.12 * warmth) +
         WALL_REFLECT_RGB.r * bounce;
       col[i * 4 + 1] =
         (WATER_SHALLOW_RGB.g + (WATER_DEEP_RGB.g - WATER_SHALLOW_RGB.g) * deep) *
           edgeClear *
-          (1 + 0.35 * warmth) +
+          (1 + 0.08 * warmth) +
         WALL_REFLECT_RGB.g * bounce;
       col[i * 4 + 2] =
         (WATER_SHALLOW_RGB.b + (WATER_DEEP_RGB.b - WATER_SHALLOW_RGB.b) * deep) *
           edgeClear *
-          (1 + 0.1 * warmth) +
+          (1 + 0.04 * warmth) +
         WALL_REFLECT_RGB.b * bounce;
-      col[i * 4 + 3] = puddleAlpha(map, tx, tz, u, v) * (1 + 0.45 * warmth);
+      col[i * 4 + 3] = puddleAlpha(map, tx, tz, u, v) * (1 + 0.05 * warmth);
     }
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 4));
@@ -1297,18 +1389,18 @@ export async function buildFloor1Water(
       mesh.receiveShadow = true;
       mesh.userData.castWhenOn = false;
       mesh.frustumCulled = false;
-      mesh.renderOrder = 1;
+      mesh.renderOrder = 2;
       group.add(mesh);
     }
   }
 
   const puddleMat = new THREE.MeshPhysicalMaterial({
     color: 0xffffff,
-    roughness: 0.7,
+    roughness: 0.92,
     metalness: 0,
     clearcoat: 0,
     sheen: 0,
-    specularIntensity: 0.38,
+    specularIntensity: PUDDLE_SPECULAR,
     envMapIntensity: 0,
     transparent: true,
     opacity: 1,
@@ -1318,9 +1410,11 @@ export async function buildFloor1Water(
     emissiveIntensity: 0,
     vertexColors: true,
     normalMap: ripple,
-    normalScale: new THREE.Vector2(1.15, 1.15)
+    normalScale: new THREE.Vector2(0.55, 0.55)
   });
-  const puddleGeos = cells.map((c) => cellGrid(c.x, c.y, map, 'puddle', { sconces }));
+  const puddleGeos = cells
+    .filter((c) => !hasWaterDecal(c.x, c.y))
+    .map((c) => cellGrid(c.x, c.y, map, 'puddle', { sconces }));
   const puddleGeo = mergeGeometries(puddleGeos);
   puddleGeo?.computeVertexNormals();
   if (puddleGeo) {
@@ -1396,9 +1490,9 @@ export async function buildFloor1Water(
         geo,
         new THREE.MeshBasicMaterial({
           map: atlas,
-          color: 0xf0d09a,
+          color: 0xd9b07a,
           transparent: true,
-          opacity: 0.72,
+          opacity: 0.28,
           depthWrite: false,
           blending: THREE.AdditiveBlending,
           fog: false,
@@ -1417,7 +1511,9 @@ export async function buildFloor1Water(
   }
 
   let shimmerMat: THREE.MeshBasicMaterial | null = null;
-  const shimmerCells = cells.filter((c) => cellTorchWarmth(c.x, c.y, sconces) > 0.03);
+  const shimmerCells = cells.filter(
+    (c) => !hasWaterDecal(c.x, c.y) && cellTorchWarmth(c.x, c.y, sconces) > 0.03
+  );
   const shimmerGeos = shimmerCells.map((c) =>
     cellGrid(c.x, c.y, map, 'shimmer', { sconces, segs: 8 })
   );
@@ -1425,9 +1521,9 @@ export async function buildFloor1Water(
   if (shimmerGeo) {
     shimmerMat = new THREE.MeshBasicMaterial({
       map: makeSoftShimmer(),
-      color: 0xf2d4a0,
+      color: 0xe2c090,
       transparent: true,
-      opacity: 0.7,
+      opacity: 0.28,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       fog: false,
@@ -1445,14 +1541,81 @@ export async function buildFloor1Water(
     group.add(mesh);
   }
 
+  let splashMat: THREE.MeshBasicMaterial | null = null;
+  const splashes = listWaterfallSplashes(map);
+  if (splashes.length) {
+    splashMat = new THREE.MeshBasicMaterial({
+      map: makeWaterfallSplash(),
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.9,
+      depthWrite: false,
+      fog: true,
+      toneMapped: true,
+      side: THREE.DoubleSide
+    });
+    const splashGeos = splashes.map((s) => {
+      const g = new THREE.PlaneGeometry(s.span, s.span);
+      g.rotateX(-Math.PI / 2);
+      g.translate(s.x, s.y, s.z);
+      return g;
+    });
+    const splashGeo = mergeGeometries(splashGeos);
+    if (splashGeo) {
+      const mesh = new THREE.Mesh(splashGeo, splashMat);
+      mesh.name = 'water-fall-splash';
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      mesh.userData.castWhenOn = false;
+      mesh.frustumCulled = false;
+      mesh.renderOrder = 5;
+      group.add(mesh);
+    }
+    const glintGeos = splashes.map((s) => {
+      const g = new THREE.PlaneGeometry(s.span * 0.85, s.span * 0.85);
+      g.rotateX(-Math.PI / 2);
+      g.translate(s.x, s.y + 0.001, s.z);
+      return g;
+    });
+    const glintGeo = mergeGeometries(glintGeos);
+    if (glintGeo) {
+      const mesh = new THREE.Mesh(
+        glintGeo,
+        new THREE.MeshBasicMaterial({
+          map: makeSplashGlints(),
+          color: 0xf0c48a,
+          transparent: true,
+          opacity: 0.42,
+          depthWrite: false,
+          blending: THREE.AdditiveBlending,
+          fog: false,
+          toneMapped: false,
+          side: THREE.DoubleSide
+        })
+      );
+      mesh.name = 'water-fall-glints';
+      mesh.castShadow = false;
+      mesh.receiveShadow = false;
+      mesh.userData.castWhenOn = false;
+      mesh.frustumCulled = false;
+      mesh.renderOrder = 6;
+      group.add(mesh);
+    }
+  }
+
   return {
     group,
     update: (now, freeze) => {
       const t = freeze ? 0 : now * 0.001;
       if (puddleMat.normalMap) puddleMat.normalMap.offset.set(t * 0.011, t * 0.007);
       if (shimmerMat) {
-        shimmerMat.opacity = freeze ? 0.7 : 0.7 * (0.82 + 0.18 * Math.sin(t * 0.45));
+        shimmerMat.opacity = freeze ? 0.28 : 0.28 * (0.84 + 0.16 * Math.sin(t * 0.45));
         if (shimmerMat.map) shimmerMat.map.offset.set(t * 0.006, t * 0.004);
+      }
+      if (splashMat?.map) {
+        const spin = freeze ? 0 : t * 0.12;
+        splashMat.map.center.set(0.5, 0.5);
+        splashMat.map.rotation = spin;
       }
     }
   };

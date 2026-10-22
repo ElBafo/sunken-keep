@@ -39,6 +39,8 @@ import {
   WATER_NOISE_SPAN,
   PUDDLE_ALPHA_DECAL_DEEP,
   PUDDLE_ALPHA_DECAL_SHALLOW,
+  PUDDLE_SPECULAR,
+  WATER_SPLASH_M,
   cisternBedCellImageRect,
   cisternBedWorldUv,
   cisternRegion,
@@ -49,6 +51,7 @@ import {
   listStrayPuddles,
   listWaterCells,
   listWaterGlintCells,
+  listWaterfallSplashes,
   listWaterRegions,
   paintedFloorSize,
   blendWaterOverInner,
@@ -111,11 +114,12 @@ describe('voxel-floor1 water is one puddle per region', () => {
     expect(waterDeepness(floor1Map, 2, 1, 0.5, 0.5)).toBe(1);
     expect(waterDeepness(floor1Map, 2, 2, 0.5, 0.5)).toBe(1);
     expect(waterDeepness(floor1Map, 3, 1, 0.5, 0.5)).toBeLessThan(0.4);
-    expect(puddleAlpha(floor1Map, 2, 1, 0.5, 0.5)).toBeGreaterThan(0.75);
-    expect(puddleAlpha(floor1Map, 3, 1, 0.5, 0.5)).toBeGreaterThan(0.18);
-    expect(puddleAlpha(floor1Map, 3, 1, 0.5, 0.5)).toBeLessThan(0.78);
+    expect(puddleAlpha(floor1Map, 2, 1, 0.5, 0.5)).toBeGreaterThan(0.2);
+    expect(puddleAlpha(floor1Map, 2, 1, 0.5, 0.5)).toBeLessThan(0.4);
+    expect(puddleAlpha(floor1Map, 3, 1, 0.5, 0.5)).toBeGreaterThan(0.08);
+    expect(puddleAlpha(floor1Map, 3, 1, 0.5, 0.5)).toBeLessThan(0.28);
     expect(puddleAlpha(floor1Map, 2, 1, 0.5, 0.5)).toBeGreaterThan(
-      puddleAlpha(floor1Map, 3, 1, 0.5, 0.5) + 0.12
+      puddleAlpha(floor1Map, 3, 1, 0.5, 0.5) + 0.05
     );
     expect(waterDeepness(floor1Map, 2, 1, 1, 0.5)).toBeCloseTo(
       waterDeepness(floor1Map, 3, 1, 0, 0.5),
@@ -231,6 +235,8 @@ describe('voxel-floor1 water dip leaves no border gap', () => {
     expect(water).toContain('rimMaskForCell');
     expect(water).toContain('paintSoftBlob');
     expect(water).toContain('water-shimmer');
+    expect(water).toContain('water-fall-splash');
+    expect(water).toContain('water-fall-glints');
     expect(water).toContain('waterWorldNoise');
     expect(water).toContain('tryLoadOptionalPng');
     expect(water).toContain('CISTERN_BED_FILE');
@@ -483,17 +489,28 @@ describe('voxel-floor1 puddle decals lock to floor_stone', () => {
     expect(floorDip(floor1Map, 1, 4, 0.5, 0.92)).toBeCloseTo(0, 3);
   });
 
-  it('keeps the water veil thin on cellar decals and joins the cistern shore', () => {
+  it('keeps the water veil thin on painted decal cells', () => {
     expect(hasWaterDecal(1, 4)).toBe(true);
     expect(hasWaterDecal(5, 11)).toBe(true);
     expect(hasWaterDecal(2, 1)).toBe(false);
-    expect(PUDDLE_ALPHA_DECAL_SHALLOW).toBeLessThan(0.28);
-    expect(PUDDLE_ALPHA_DECAL_DEEP).toBeLessThan(0.42);
-    expect(puddleAlpha(floor1Map, 5, 11, 0.5, 0.5)).toBeLessThan(0.4);
-    expect(puddleAlpha(floor1Map, 1, 4, 0.5, 0.5)).toBeGreaterThan(
-      puddleAlpha(floor1Map, 5, 11, 0.5, 0.5)
-    );
-    expect(puddleAlpha(floor1Map, 2, 1, 0.5, 0.5)).toBeGreaterThan(0.75);
+    expect(PUDDLE_ALPHA_DECAL_SHALLOW).toBeLessThan(0.08);
+    expect(PUDDLE_ALPHA_DECAL_DEEP).toBeLessThan(0.12);
+    expect(puddleAlpha(floor1Map, 5, 11, 0.5, 0.5)).toBeLessThan(0.12);
+    expect(puddleAlpha(floor1Map, 1, 4, 0.5, 0.5)).toBeLessThan(0.12);
+    expect(puddleAlpha(floor1Map, 2, 1, 0.5, 0.5)).toBeGreaterThan(0.2);
+    expect(PUDDLE_SPECULAR).toBeLessThan(0.12);
+  });
+});
+
+describe('voxel-floor1 waterfall splash is a dark ring, not a disc', () => {
+  it('places a small splash under the cistern ceiling beam', () => {
+    const hits = listWaterfallSplashes(floor1Map);
+    expect(WATER_SPLASH_M).toBeGreaterThan(0.4);
+    expect(WATER_SPLASH_M).toBeLessThan(1.1);
+    expect(hits.some((h) => h.tx === 2 && h.tz === 2)).toBe(true);
+    expect(hits.every((h) => h.span === WATER_SPLASH_M)).toBe(true);
+    expect(hits.every((h) => isWaterCell(floor1Map, h.tx, h.tz))).toBe(true);
+    expect(readFileSync(resolve(SRC, 'water.ts'), 'utf8')).toContain('makeWaterfallSplash');
   });
 });
 
