@@ -24,6 +24,19 @@ import {
 
 const BASE = import.meta.env.BASE_URL;
 
+/** Public HUD art. `hudAsset` prefixes Vite's `BASE_URL` (`/sunken-keep/` on Pages and `vite`). */
+export const HUD_ICON = {
+  menu: 'art/ui/panel/icon_menu.png',
+  bag: 'art/ui/panel/icon_bag.png',
+  oil: 'art/ui/items/icon_oil.png',
+  turn_left: 'art/ui/panel/icon_turn_left.png',
+  forward: 'art/ui/panel/icon_forward.png',
+  turn_right: 'art/ui/panel/icon_turn_right.png',
+  strafe_left: 'art/ui/panel/icon_strafe_left.png',
+  back: 'art/ui/panel/icon_back.png',
+  strafe_right: 'art/ui/panel/icon_strafe_right.png'
+} as const;
+
 const HAND_FILE: Record<string, string> = {
   axe: 'hand_axe.png',
   shield: 'hand_shield.png',
@@ -71,8 +84,13 @@ export type PartyUiHooks = {
   onHand: (id: HudHeroId, hand: 'main' | 'off') => void;
 };
 
-function asset(rel: string): string {
+export function hudAsset(rel: string): string {
   return `${BASE}${rel.replace(/^\//, '')}`;
+}
+
+function setIcon(el: Element | null, rel: string): void {
+  const img = el?.querySelector('img');
+  if (img instanceof HTMLImageElement) img.src = hudAsset(rel);
 }
 
 function place(el: HTMLElement, r: Rect): void {
@@ -100,7 +118,7 @@ export function preloadPortraitArt(): Promise<void> {
           const img = new Image();
           img.onload = () => resolve();
           img.onerror = () => resolve();
-          img.src = asset(`${PORTRAIT_DIR}/${file}`);
+          img.src = hudAsset(`${PORTRAIT_DIR}/${file}`);
         })
     )
   ).then(() => undefined);
@@ -185,6 +203,15 @@ export class Floor1PartyUi {
     place(this.host.querySelector('#btn-bag') as HTMLElement, layout.bag);
     place(this.host.querySelector('#compass') as HTMLElement, layout.compass);
     place(this.host.querySelector('#btn-oil') as HTMLElement, layout.oil);
+    setIcon(this.host.querySelector('#btn-menu'), HUD_ICON.menu);
+    setIcon(this.host.querySelector('#btn-bag'), HUD_ICON.bag);
+    setIcon(this.host.querySelector('#btn-oil'), HUD_ICON.oil);
+    setIcon(document.getElementById('btn-left'), HUD_ICON.turn_left);
+    setIcon(document.getElementById('btn-fwd'), HUD_ICON.forward);
+    setIcon(document.getElementById('btn-right'), HUD_ICON.turn_right);
+    setIcon(document.getElementById('btn-strafe-left'), HUD_ICON.strafe_left);
+    setIcon(document.getElementById('btn-back'), HUD_ICON.back);
+    setIcon(document.getElementById('btn-strafe-right'), HUD_ICON.strafe_right);
     this.renderLog();
     place(this.host.querySelector('#move-pad') as HTMLElement, layout.pad);
     for (const key of PAD_KEYS) {
@@ -208,7 +235,7 @@ export class Floor1PartyUi {
 
   setCompass(dir: number): void {
     const face = COMPASS_DIR[dir & 3];
-    if (this.compassEl) this.compassEl.src = asset(`art/ui/panel/compass_${face}.png`);
+    if (this.compassEl) this.compassEl.src = hudAsset(`art/ui/panel/compass_${face}.png`);
   }
 
   setDoor(show: boolean, label: string): void {
@@ -280,7 +307,7 @@ export class Floor1PartyUi {
 
   private faceSrc(id: HudHeroId): string {
     const hero = this.heroes[id];
-    return asset(portraitRelPath(id, portraitState(hero.hp, hero.maxHp, hero.downed), this.layout.cssW));
+    return hudAsset(portraitRelPath(id, portraitState(hero.hp, hero.maxHp, hero.downed), this.layout.cssW));
   }
 
   openSheet(id: HudHeroId): void {
@@ -444,7 +471,7 @@ export class Floor1PartyUi {
     const icon = document.createElement('img');
     icon.className = 'hand-icon';
     icon.alt = '';
-    icon.src = asset(`art/ui/hands/${HAND_FILE[item] ?? 'hand_axe.png'}`);
+    icon.src = hudAsset(`art/ui/hands/${HAND_FILE[item] ?? 'hand_axe.png'}`);
     icon.style.left = `${visual.x - tap.x}px`;
     icon.style.top = `${visual.y - tap.y}px`;
     icon.style.width = `${visual.w}px`;

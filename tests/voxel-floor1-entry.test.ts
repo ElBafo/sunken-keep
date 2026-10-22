@@ -59,6 +59,7 @@ describe('voxel-floor1 is a standalone Vite page', () => {
     expect(main).not.toContain('lab-render');
     expect(main).toContain('measurePortraitLayout');
     expect(main).toContain('applyCameraProjection');
+    expect(portraits).toContain('clearViewOffset');
     expect(main).toContain("from '../voxel-lab/look'");
     expect(main).toContain('torchesActive');
     expect(main).toContain('sunbeamsActive');
@@ -72,5 +73,19 @@ describe('voxel-floor1 is a standalone Vite page', () => {
     expect(partyUi).not.toContain('art/portraits/');
     expect(html).toContain('grayscale(0.6)');
     expect(html).toContain('rgba(0, 0, 0, 0.55)');
+  });
+
+  it('sets bag and oil HUD icons through Vite BASE_URL, not a hardcoded /sunken-keep/ path', () => {
+    expect(partyUi).toContain("bag: 'art/ui/panel/icon_bag.png'");
+    expect(partyUi).toContain("oil: 'art/ui/items/icon_oil.png'");
+    expect(partyUi).toContain('export function hudAsset');
+    expect(partyUi).toContain('import.meta.env.BASE_URL');
+    expect(partyUi).toContain('setIcon(this.host.querySelector(\'#btn-bag\'), HUD_ICON.bag)');
+    expect(partyUi).toContain('setIcon(this.host.querySelector(\'#btn-oil\'), HUD_ICON.oil)');
+    expect(html).toContain('%BASE_URL%art/ui/panel/icon_bag.png');
+    expect(html).toContain('%BASE_URL%art/ui/items/icon_oil.png');
+    expect(html).not.toMatch(/src="\/sunken-keep\/art\//);
+    expect(existsSync(resolve(__dirname, '../public/art/ui/panel/icon_bag.png'))).toBe(true);
+    expect(existsSync(resolve(__dirname, '../public/art/ui/items/icon_oil.png'))).toBe(true);
   });
 });

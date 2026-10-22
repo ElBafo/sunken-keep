@@ -120,7 +120,7 @@
       padding: 0;
       border: 0;
       background-color: transparent;
-      background-image: url('/sunken-keep/art/ui/panel/button_9slice.png');
+      background-image: url('%BASE_URL%art/ui/panel/button_9slice.png');
       background-size: 100% 100%;
       image-rendering: pixelated;
       color: #e8d8a0;
@@ -133,7 +133,7 @@
       -webkit-tap-highlight-color: transparent;
     }
     #btn-door.visible { display: flex; }
-    #btn-door:active { background-image: url('/sunken-keep/art/ui/panel/button_pressed_9slice.png'); }
+    #btn-door:active { background-image: url('%BASE_URL%art/ui/panel/button_pressed_9slice.png'); }
     #move-pad {
       position: absolute;
       pointer-events: none;
@@ -239,7 +239,7 @@
       position: absolute;
       left: 0;
       background-color: #1a1612;
-      background-image: url('/sunken-keep/art/ui/layout585/stone_strip_tile.png');
+      background-image: url('%BASE_URL%art/ui/layout585/stone_strip_tile.png');
       background-repeat: repeat;
       image-rendering: pixelated;
       pointer-events: none;
@@ -359,28 +359,28 @@
   <div id="game-hud">
     <div id="top-chrome">
       <button id="btn-menu" class="hud-chrome" type="button" aria-label="Menu">
-        <img src="/sunken-keep/art/ui/panel/icon_menu.png" alt="" />
+        <img src="%BASE_URL%art/ui/panel/icon_menu.png" alt="" />
       </button>
       <button id="btn-bag" class="hud-chrome" type="button" aria-label="Bag">
-        <img src="/sunken-keep/art/ui/panel/icon_bag.png" alt="" />
+        <img src="%BASE_URL%art/ui/panel/icon_bag.png" alt="" />
       </button>
       <div id="compass" aria-label="Compass">
-        <img id="compass-face" src="/sunken-keep/art/ui/panel/compass_N.png" alt="" />
+        <img id="compass-face" src="%BASE_URL%art/ui/panel/compass_N.png" alt="" />
       </div>
       <button id="btn-oil" class="hud-chrome" type="button" aria-label="Oil">
-        <img src="/sunken-keep/art/ui/items/icon_oil.png" alt="" />
+        <img src="%BASE_URL%art/ui/items/icon_oil.png" alt="" />
         <span id="oil-count">2/4</span>
       </button>
     </div>
     <button id="btn-door" type="button" aria-label="Open door">Open</button>
     <div id="message-log" aria-live="polite"></div>
     <div id="move-pad">
-      <button id="btn-left" type="button" aria-label="Turn left"><img src="/sunken-keep/art/ui/panel/icon_turn_left.png" alt="" /></button>
-      <button id="btn-fwd" type="button" aria-label="Step forward"><img src="/sunken-keep/art/ui/panel/icon_forward.png" alt="" /></button>
-      <button id="btn-right" type="button" aria-label="Turn right"><img src="/sunken-keep/art/ui/panel/icon_turn_right.png" alt="" /></button>
-      <button id="btn-strafe-left" type="button" aria-label="Strafe left"><img src="/sunken-keep/art/ui/panel/icon_strafe_left.png" alt="" /></button>
-      <button id="btn-back" type="button" aria-label="Step back"><img src="/sunken-keep/art/ui/panel/icon_back.png" alt="" /></button>
-      <button id="btn-strafe-right" type="button" aria-label="Strafe right"><img src="/sunken-keep/art/ui/panel/icon_strafe_right.png" alt="" /></button>
+      <button id="btn-left" type="button" aria-label="Turn left"><img src="%BASE_URL%art/ui/panel/icon_turn_left.png" alt="" /></button>
+      <button id="btn-fwd" type="button" aria-label="Step forward"><img src="%BASE_URL%art/ui/panel/icon_forward.png" alt="" /></button>
+      <button id="btn-right" type="button" aria-label="Turn right"><img src="%BASE_URL%art/ui/panel/icon_turn_right.png" alt="" /></button>
+      <button id="btn-strafe-left" type="button" aria-label="Strafe left"><img src="%BASE_URL%art/ui/panel/icon_strafe_left.png" alt="" /></button>
+      <button id="btn-back" type="button" aria-label="Step back"><img src="%BASE_URL%art/ui/panel/icon_back.png" alt="" /></button>
+      <button id="btn-strafe-right" type="button" aria-label="Strafe right"><img src="%BASE_URL%art/ui/panel/icon_strafe_right.png" alt="" /></button>
     </div>
     <div id="party-strip"></div>
     <div id="home-band"></div>

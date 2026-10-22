@@ -241,7 +241,12 @@ export function applyCameraProjection(camera: PerspectiveCamera, projection: Vie
   camera.fov = projection.vfov;
   camera.aspect = projection.aspect;
   const o = projection.viewOffset;
-  camera.setViewOffset(o.fullW, o.fullH, o.x, o.y, o.w, o.h);
+  // Identity offset (no notch) must not stay in a previous overscan crop.
+  if (o.y === 0 && o.h === o.fullH && o.x === 0 && o.w === o.fullW) {
+    camera.clearViewOffset();
+  } else {
+    camera.setViewOffset(o.fullW, o.fullH, o.x, o.y, o.w, o.h);
+  }
   camera.updateProjectionMatrix();
 }
 
