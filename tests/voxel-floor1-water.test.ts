@@ -34,6 +34,7 @@ import {
   rimMaskForCell,
   rotateMaskCW,
   rgbaToMask,
+  cellTorchWarmth,
   torchWarmthAt,
   waterDeepness,
   waterRippleHeight,
@@ -245,8 +246,10 @@ describe('voxel-floor1 water is one world-space pool', () => {
     const p = torchWorldPos(torch!);
     expect(torchWarmthAt(p.x, p.z, floor1Sconces)).toBeGreaterThan(0.9);
     expect(torchWarmthAt(6, 2, floor1Sconces)).toBeGreaterThan(0.25);
-    expect(torchWarmthAt(2, 8, floor1Sconces)).toBeLessThan(0.05);
+    expect(torchWarmthAt(2, 8, floor1Sconces)).toBeLessThan(0.15);
     expect(torchWarmthAt(10, 22, floor1Sconces)).toBe(0);
+    expect(cellTorchWarmth(3, 1, floor1Sconces)).toBeGreaterThan(0.25);
+    expect(cellTorchWarmth(5, 11, floor1Sconces)).toBe(0);
     expect(TORCH_DISTANCE).toBeGreaterThan(4);
   });
 

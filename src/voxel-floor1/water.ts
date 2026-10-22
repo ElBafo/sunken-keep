@@ -186,6 +186,24 @@ export function waterWorldUv(wx: number, wz: number): { u: number; v: number } {
 }
 
 /** 0–1 how much a water point sits inside a lit torch pool. */
+export function cellTorchWarmth(
+  tx: number,
+  tz: number,
+  sconces: readonly SconceSpec[]
+): number {
+  let best = 0;
+  for (const [u, v] of [
+    [0.5, 0.5],
+    [0.08, 0.5],
+    [0.92, 0.5],
+    [0.5, 0.08],
+    [0.5, 0.92]
+  ] as const) {
+    best = Math.max(best, torchWarmthAt((tx - 0.5 + u) * CELL, (tz - 0.5 + v) * CELL, sconces));
+  }
+  return best;
+}
+
 export function torchWarmthAt(
   wx: number,
   wz: number,
@@ -197,7 +215,7 @@ export function torchWarmthAt(
     if (!sconceIsLit(s)) continue;
     const p = torchWorldPos(s);
     const t = 1 - Math.hypot(wx - p.x, wz - p.z) / radius;
-    if (t > 0) best = Math.max(best, t * t);
+    if (t > 0) best = Math.max(best, t ** 1.35);
   }
   return best;
 }
@@ -523,8 +541,8 @@ export function listWaterTorchMarks(map: FloorMap, sconces: readonly SconceSpec[
       y,
       z: wallZ + nz * 0.52,
       rotY: planeRotY(nx, nz),
-      sx: 0.95,
-      sz: 0.4
+      sx: 1.35,
+      sz: 0.62
     });
     out.push({
       kind: 'wall',
@@ -534,8 +552,8 @@ export function listWaterTorchMarks(map: FloorMap, sconces: readonly SconceSpec[
       y: y - 0.001,
       z: wallZ + nz * 0.18,
       rotY: planeRotY(-nz, nx),
-      sx: CELL * 0.55,
-      sz: 0.22
+      sx: CELL * 0.72,
+      sz: 0.34
     });
   }
   return out;
@@ -610,7 +628,7 @@ function mergeGeometries(geos: THREE.BufferGeometry[]): THREE.BufferGeometry | n
   return out;
 }
 
-function makeRippleNormal(size = 128): THREE.DataTexture {
+function makeRippleNormal(size = 64): THREE.DataTexture {
   const data = new Uint8Array(size * size * 4);
   const height = (x: number, y: number): number => {
     const wx = (x / size) * WATER_NOISE_SPAN;
@@ -739,8 +757,8 @@ function makeSoftShimmer(): THREE.CanvasTexture {
       const wx = (x / w) * WATER_NOISE_SPAN;
       const wz = (y / h) * WATER_NOISE_SPAN;
       const n = waterWorldNoise(wx, wz);
-      const peak = Math.max(0, n);
-      const a = peak * peak * 0.55;
+      const peak = Math.max(0, n * 0.5 + 0.5);
+      const a = peak * peak * 0.72;
       const i = (y * w + x) * 4;
       img.data[i] = 255;
       img.data[i + 1] = 214;
@@ -768,9 +786,10 @@ function cellGrid(
     atlas?: { index: number; cols: number; rows: number };
     region?: WaterRegion;
     sconces?: readonly SconceSpec[];
+    segs?: number;
   }
 ): THREE.BufferGeometry {
-  const segs = WATER_FLOOR_SEGS;
+  const segs = opts?.segs ?? WATER_FLOOR_SEGS;
   const geo = new THREE.PlaneGeometry(CELL, CELL, segs, segs);
   geo.rotateX(-Math.PI / 2);
   const pos = geo.getAttribute('position');
@@ -811,7 +830,7 @@ function cellGrid(
       pos.setXYZ(i, wx, dip + 0.004, wz);
       const wuv = waterWorldUv(wx, wz);
       uvAttr.setXY(i, wuv.u, wuv.v);
-      const veil = smoothstep(0.2, 0.7, cover) * warmth;
+      const veil = smoothstep(0.18, 0.62, cover) * warmth ** 0.65;
       col[i * 4] = 1;
       col[i * 4 + 1] = 0.9;
       col[i * 4 + 2] = 0.72;
@@ -1033,10 +1052,10 @@ export async function buildFloor1Water(
           map: atlas,
           color: 0xf0d09a,
           transparent: true,
-          opacity: 0.62,
+          opacity: 0.72,
           depthWrite: false,
           blending: THREE.AdditiveBlending,
-          fog: true,
+          fog: false,
           toneMapped: false,
           side: THREE.DoubleSide
         })
@@ -1052,17 +1071,20 @@ export async function buildFloor1Water(
   }
 
   let shimmerMat: THREE.MeshBasicMaterial | null = null;
-  const shimmerGeos = cells.map((c) => cellGrid(c.x, c.y, map, 'shimmer', { sconces }));
+  const shimmerCells = cells.filter((c) => cellTorchWarmth(c.x, c.y, sconces) > 0.03);
+  const shimmerGeos = shimmerCells.map((c) =>
+    cellGrid(c.x, c.y, map, 'shimmer', { sconces, segs: 8 })
+  );
   const shimmerGeo = mergeGeometries(shimmerGeos);
   if (shimmerGeo) {
     shimmerMat = new THREE.MeshBasicMaterial({
       map: makeSoftShimmer(),
       color: 0xf2d4a0,
       transparent: true,
-      opacity: 0.42,
+      opacity: 0.58,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
-      fog: true,
+      fog: false,
       toneMapped: false,
       vertexColors: true,
       side: THREE.DoubleSide
@@ -1091,7 +1113,7 @@ export async function buildFloor1Water(
         pos.needsUpdate = true;
       }
       if (shimmerMat) {
-        shimmerMat.opacity = freeze ? 0.42 : 0.42 * (0.82 + 0.18 * Math.sin(t * 0.45));
+        shimmerMat.opacity = freeze ? 0.58 : 0.58 * (0.82 + 0.18 * Math.sin(t * 0.45));
         if (shimmerMat.map) shimmerMat.map.offset.set(t * 0.006, t * 0.004);
       }
     }
