@@ -4,6 +4,7 @@ import { makeToWorld, tileFlatPose } from '../voxel-lab/faces';
 import { loadPng, pbrMap, textureFromPixels, voxelMaterial, type PngPixels } from '../voxel-lab/materials';
 import { greedyMesh, type MeshArrays } from '../voxel-lab/mesher';
 import { CAMERA_NEAR, CELL, CRACKED_CEILING_FILE, CULL_CHEB, LAYER_SIZE, VOXEL_CHEB } from './constants';
+import { applyWaterBedPose, paintedFloorSize } from './water';
 import { floor1Sconces, floor1Sunbeams } from './fixtures';
 import { canStep, chebyshev, enumerateFaces, type FaceJob, type FloorMap } from './layout';
 import { isBeamCeiling, loadCrackedCeiling } from './crack';
@@ -157,6 +158,7 @@ export async function buildFloor1(
   const prepared: PreparedFace[] = [];
   for (const job of jobs) {
     const pose = bulgePose(job.face, tileFlatPose(job.face, job.tx, job.tz, CELL, 'center'), job.bulge, CELL);
+    if (job.kind === 'floor') applyWaterBedPose(pose, job.tx, job.tz, map);
     if (job.kind === 'floor' || job.kind === 'ceiling') {
       quads += 1;
       triangles += 2;
@@ -349,7 +351,11 @@ export async function buildFloor1(
           uvRot: f.uvRot,
           uvScale: f.uvScale,
           size:
-            f.kind === 'floor' || f.kind === 'ceiling' ? CELL + 2 * (CAMERA_NEAR + 0.12) : CELL
+            f.kind === 'ceiling'
+              ? CELL + 2 * (CAMERA_NEAR + 0.12)
+              : f.kind === 'floor'
+                ? paintedFloorSize(f.tx, f.tz, map, CELL + 2 * (CAMERA_NEAR + 0.12))
+                : CELL
         })),
         torches,
         CELL,

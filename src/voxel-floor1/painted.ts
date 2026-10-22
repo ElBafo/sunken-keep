@@ -159,12 +159,14 @@ export function paintedShellMaterial(
   const mat = new THREE.MeshPhysicalMaterial({
     map,
     normalMap: normal,
-    normalScale: new THREE.Vector2(0.14, 0.14),
-    roughness: water ? 0.62 : 0.92,
+    normalScale: new THREE.Vector2(water ? 0.08 : 0.14, water ? 0.08 : 0.14),
+    // Water bed stays matte so the painted slabs read as a submerged floor,
+    // not a blotchy clearcoat patch. The still-water overlay adds the ripple.
+    roughness: water ? 0.9 : 0.92,
     metalness: 0,
     ior: 1.45,
-    clearcoat: water ? 0.12 : 0,
-    clearcoatRoughness: water ? 0.45 : 1,
+    clearcoat: 0,
+    clearcoatRoughness: 1,
     envMapIntensity: 0,
     fog: true,
     emissive: 0x000000,
@@ -174,6 +176,11 @@ export function paintedShellMaterial(
     polygonOffsetFactor: 1,
     polygonOffsetUnits: 1
   });
+  if (water) {
+    mat.color.setRGB(0.62, 0.64, 0.66);
+    mat.specularIntensity = 0;
+    mat.name = 'floor_water_bed';
+  }
   if (rubble) {
     mat.sheen = 0;
     mat.clearcoat = 0;

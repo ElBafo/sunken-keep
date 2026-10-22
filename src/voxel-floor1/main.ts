@@ -48,6 +48,7 @@ import { buildFloor1 } from './level';
 import { buildFloor1Markers } from './markers';
 import { buildFloor1Openings } from './openings';
 import { buildFloor1Props } from './props';
+import { buildFloor1Water } from './water';
 
 THREE.ColorManagement.enabled = true;
 
@@ -266,6 +267,8 @@ async function boot(): Promise<void> {
   scene.add(openings.group);
   const markers = await buildFloor1Markers(floor1Map);
   scene.add(markers.group);
+  const water = await buildFloor1Water(floor1Map, floor1Sconces);
+  scene.add(water.group);
 
   const currentSafe = (): { top: number; right: number; bottom: number; left: number } => {
     if (querySafe) return querySafe;
@@ -719,6 +722,7 @@ async function boot(): Promise<void> {
     else if (!stepTracking && !mover.moving && level.pump()) level.warm(uploadPending);
     openings.system.update(now);
     markers.update();
+    water.update(now, preserveBuffer);
     syncDoorButton();
     api.hasKey = hasKey;
 
