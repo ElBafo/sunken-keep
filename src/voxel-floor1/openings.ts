@@ -686,8 +686,11 @@ export async function buildFloor1Openings(
   woodMat.name = 'door_panel_aged';
   woodMat.fog = true;
   if (!realLights) patchBakeMaterial(woodMat);
+  const rustPx = { width: 1, height: 1, data: new Uint8ClampedArray([36, 22, 16, 255]) };
+  const rustMap = textureFromPixels(rustPx);
   const ironMat = new THREE.MeshPhysicalMaterial({
-    color: new THREE.Color(0.18, 0.11, 0.08),
+    map: rustMap,
+    color: new THREE.Color(0.22, 0.14, 0.1),
     roughness: 1,
     metalness: 0,
     clearcoat: 0,
