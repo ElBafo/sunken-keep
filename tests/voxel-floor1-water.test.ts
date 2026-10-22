@@ -263,6 +263,7 @@ describe('voxel-floor1 water dip leaves no border gap', () => {
     expect(water).toContain('water-decal-floor');
     expect(water).toContain('water-decals');
     expect(water).toContain('water-shore-wide');
+    expect(water).toContain('water-shore-paint');
     expect(water).toContain('compositeDecalOverStone');
     expect(water).toContain('shoreWideWorldUv');
     expect(water).toContain('WATER_DECAL_FLOOR_FILE');

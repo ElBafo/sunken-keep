@@ -116,6 +116,7 @@ type Floor1Api = {
   openSecret: (x: number, y: number) => boolean;
   secretOpen: (x: number, y: number) => boolean;
   interact: () => string;
+  objectNames: () => string[];
   lights: {
     mode: LightMode;
     lantern: number;
@@ -702,7 +703,14 @@ async function boot(): Promise<void> {
     openSecret: (x, y) => openings.system.openSecret(x, y, performance.now()),
     secretOpen: (x, y) => openings.system.isOpen(x, y),
     interact,
-    lights: lights.stats
+    lights: lights.stats,
+    objectNames: () => {
+      const names: string[] = [];
+      scene.traverse((obj) => {
+        if (obj.name) names.push(obj.name);
+      });
+      return names;
+    }
   };
   (window as unknown as { __voxelFloor1: Floor1Api }).__voxelFloor1 = api;
 

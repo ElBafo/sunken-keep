@@ -1437,6 +1437,51 @@ export async function buildFloor1Water(
       mesh.frustumCulled = false;
       group.add(mesh);
     }
+    const paintTex = textureFromPixels(shoreDecal);
+    paintTex.flipY = true;
+    paintTex.wrapS = THREE.ClampToEdgeWrapping;
+    paintTex.wrapT = THREE.ClampToEdgeWrapping;
+    const paintMat = new THREE.MeshPhysicalMaterial({
+      map: paintTex,
+      color: 0xffffff,
+      roughness: 1,
+      metalness: 0,
+      clearcoat: 0,
+      sheen: 0,
+      specularIntensity: 0,
+      envMapIntensity: 0,
+      transparent: true,
+      opacity: 1,
+      depthWrite: false,
+      fog: true,
+      emissive: 0x000000,
+      vertexColors: false
+    });
+    const paintGeos = shorePlacements.map(({ spec }) =>
+      decalOrientedGrid(
+        spec.x,
+        spec.y,
+        0.0012,
+        0,
+        false,
+        undefined,
+        map,
+        false,
+        false,
+        { x0: CISTERN_SHORE_XS[0], cols: SHORE_WIDE_COLS }
+      )
+    );
+    const paintGeo = mergeGeometries(paintGeos);
+    if (paintGeo) {
+      const mesh = new THREE.Mesh(paintGeo, paintMat);
+      mesh.name = 'water-shore-paint';
+      mesh.castShadow = false;
+      mesh.receiveShadow = true;
+      mesh.userData.castWhenOn = false;
+      mesh.frustumCulled = false;
+      mesh.renderOrder = 2;
+      group.add(mesh);
+    }
   }
 
   if (crackPlacements.length) {
