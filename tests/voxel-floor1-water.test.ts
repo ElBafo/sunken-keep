@@ -76,6 +76,7 @@ import {
   pickWaterInnerIndex,
   puddleAlpha,
   puddleCoverage,
+  neighborDecalMaskAcross,
   crackPuddleAlbedo,
   lanternWarmthAt,
   shoreLipResponse,
@@ -273,7 +274,8 @@ describe('voxel-floor1 water dip leaves no border gap', () => {
     expect(water).toContain('water-shore-wide');
     expect(water).toContain('water-shore-paint');
     expect(water).toContain('water-shore-rim');
-    expect(water).toContain('compositeDecalOverStone');
+    expect(water).toContain('stonePng.texture');
+    expect(water).toContain('neighborDecalMaskAcross');
     expect(water).toContain('shoreWideWorldUv');
     expect(water).toContain('shoreLipResponse');
     expect(water).toContain('WATER_DECAL_FLOOR_FILE');
@@ -465,9 +467,18 @@ describe('voxel-floor1 puddle decals lock to floor_stone', () => {
     expect(lanternWarmthAt(4, 9.08, 4, 9.08)).toBe(1);
     expect(lanternWarmthAt(4, 7.6, 4, 9.08)).toBeGreaterThan(0.2);
     const water = readFileSync(resolve(SRC, 'water.ts'), 'utf8');
+    const build = water.slice(water.indexOf('export async function buildFloor1Water'));
     expect(water).toContain('water-shore-rim');
     expect(water).toContain('SHORE_LIP_GLINT');
     expect(water).not.toContain('water-lips');
+    expect(build).toContain('paintedShellMaterial(stonePng.texture');
+    expect(build).not.toContain('compositeDecalOverStone');
+    expect(build).toContain('shorePlacements.map((p) => ({ x: p.spec.x, y: p.spec.y }))');
+    const stone = new THREE.Texture();
+    paintedShellMaterial(stone, undefined, WATER_DECAL_FLOOR_FILE);
+    expect(stone.generateMipmaps).toBe(true);
+    expect(stone.magFilter).toBe(THREE.NearestFilter);
+    expect(stone.minFilter).toBe(THREE.NearestMipmapNearestFilter);
   });
 
   it('puts puddle_3 on east-west water runs and 1/2 on leftover cells', () => {
@@ -591,6 +602,11 @@ describe('voxel-floor1 puddle decals lock to floor_stone', () => {
     expect(puddleCoverage(floor1Map, 1, 5, 0.5, 0.92)).toBeLessThan(0.3);
     expect(floorDip(floor1Map, 1, 5, 0.5, 0.12)).toBeLessThan(-0.015);
     expect(floorDip(floor1Map, 1, 5, 0.5, 0.92)).toBeCloseTo(0, 3);
+    expect(neighborDecalMaskAcross('S', 1, 5, 0.5)).toBeGreaterThan(0.7);
+    expect(puddleCoverage(floor1Map, 1, 4, 0.5, 0.98)).toBeGreaterThan(0.8);
+    expect(
+      Math.abs(floorDip(floor1Map, 1, 4, 0.5, 0.99) - floorDip(floor1Map, 1, 5, 0.5, 0.01))
+    ).toBeLessThan(0.01);
   });
 
   it('keeps the water veil thin on painted shore cells', () => {

@@ -22,7 +22,6 @@ import {
   WATER_DECAL_PX,
   cellToDecalUv,
   clearWaterDecalMasks,
-  compositeDecalOverStone,
   hasWaterDecal,
   isCrackPuddleDecal,
   isShoreWideDecal,
@@ -594,10 +593,25 @@ function crackSeep(tx: number, tz: number, u: number, v: number): number {
   return Math.max(0, ridge) ** 1.6 * 0.85;
 }
 
+/** Mask on the far side of a cell edge, or null if that neighbour has no decal. */
+export function neighborDecalMaskAcross(
+  face: WaterFace,
+  nx: number,
+  nz: number,
+  along: number
+): number | null {
+  if (face === 'W') return sampleWaterDecalMask(nx, nz, 1, along);
+  if (face === 'E') return sampleWaterDecalMask(nx, nz, 0, along);
+  if (face === 'N') return sampleWaterDecalMask(nx, nz, along, 1);
+  return sampleWaterDecalMask(nx, nz, along, 0);
+}
+
 /**
  * 0–1 how wet a point in a water cell is.
- * Painted mask (white = water) wins. Otherwise water–water joins stay
- * wet and dry borders use the wandering inset plus crack seepage.
+ * Painted mask (white = water) wins. Water–water joins stay wet, including
+ * a neighbour whose shore mask is wet at the shared edge, so the visible
+ * shoreline is the painted lip instead of the cell boundary. Dry borders
+ * use the wandering inset plus crack seepage.
  */
 export function puddleCoverage(map: FloorMap, tx: number, tz: number, u: number, v: number): number {
   const painted = sampleWaterDecalMask(tx, tz, u, v);
@@ -612,6 +626,8 @@ export function puddleCoverage(map: FloorMap, tx: number, tz: number, u: number,
   ];
   for (const s of sides) {
     if (isWaterCell(map, s.nx, s.nz)) continue;
+    const across = neighborDecalMaskAcross(s.face, s.nx, s.nz, s.along);
+    if (across != null && across > 0.45) continue;
     const inset = puddleEdgeInset(tx, tz, s.face, s.along);
     const t = s.dist / Math.max(0.04, inset);
     const body = smoothstep(0.32, 1, t);
@@ -1482,11 +1498,6 @@ export async function buildFloor1Water(
     }
   }
 
-  const stonePixels: DecalPixels = {
-    width: stonePng.data.width,
-    height: stonePng.data.height,
-    data: asBytes(stonePng.data.data)
-  };
   const shorePlacements = decalPlacements.filter((p) => isShoreWideDecal(p.spec.id));
   const crackPlacements = decalPlacements.filter((p) => !isShoreWideDecal(p.spec.id));
   let shoreRimAttr: THREE.BufferAttribute | null = null;
@@ -1518,31 +1529,11 @@ export async function buildFloor1Water(
               return out;
             })()
           };
-    const baked = compositeDecalOverStone(stonePixels, shoreDecal);
-    const shoreTex = textureFromPixels(baked);
-    shoreTex.flipY = true;
-    shoreTex.wrapS = THREE.ClampToEdgeWrapping;
-    shoreTex.wrapT = THREE.ClampToEdgeWrapping;
-    const shoreMat = paintedShellMaterial(shoreTex, undefined, WATER_DECAL_FLOOR_FILE);
+    const shoreMat = paintedShellMaterial(stonePng.texture, undefined, WATER_DECAL_FLOOR_FILE);
     shoreMat.specularIntensity = 0;
     shoreMat.vertexColors = true;
-    shoreMat.map!.flipY = true;
-    shoreMat.map!.wrapS = THREE.ClampToEdgeWrapping;
-    shoreMat.map!.wrapT = THREE.ClampToEdgeWrapping;
-    shoreMat.map!.needsUpdate = true;
     const shoreGeos = shorePlacements.map(({ spec }) =>
-      decalOrientedGrid(
-        spec.x,
-        spec.y,
-        0,
-        0,
-        false,
-        undefined,
-        map,
-        true,
-        false,
-        { x0: CISTERN_SHORE_XS[0], cols: SHORE_WIDE_COLS }
-      )
+      decalOrientedGrid(spec.x, spec.y, 0, 0, false, undefined, map, true, false)
     );
     const shoreGeo = mergeGeometries(shoreGeos);
     if (shoreGeo) {
@@ -1558,6 +1549,10 @@ export async function buildFloor1Water(
     paintTex.flipY = true;
     paintTex.wrapS = THREE.ClampToEdgeWrapping;
     paintTex.wrapT = THREE.ClampToEdgeWrapping;
+    paintTex.magFilter = THREE.LinearFilter;
+    paintTex.minFilter = THREE.LinearFilter;
+    paintTex.generateMipmaps = false;
+    paintTex.needsUpdate = true;
     const paintMat = new THREE.MeshPhysicalMaterial({
       map: paintTex,
       color: 0xffffff,
@@ -1763,9 +1758,10 @@ export async function buildFloor1Water(
     normalMap: ripple,
     normalScale: new THREE.Vector2(0.55, 0.55)
   });
-  const puddleGeos = cells
-    .filter((c) => !hasWaterDecal(c.x, c.y))
-    .map((c) => cellGrid(c.x, c.y, map, 'puddle', { sconces }));
+  const puddleGeos = [
+    ...cells.filter((c) => !hasWaterDecal(c.x, c.y)),
+    ...shorePlacements.map((p) => ({ x: p.spec.x, y: p.spec.y }))
+  ].map((c) => cellGrid(c.x, c.y, map, 'puddle', { sconces }));
   const puddleGeo = mergeGeometries(puddleGeos);
   puddleGeo?.computeVertexNormals();
   if (puddleGeo) {
