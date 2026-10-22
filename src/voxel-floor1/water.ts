@@ -41,8 +41,16 @@ import {
 /** Dry-border inset when a cell has no painted mask. */
 export const WATER_INSET_MIN = 0.11;
 export const WATER_INSET_MAX = 0.15;
-export const WATER_DIP_SHALLOW = 0.028;
-export const WATER_DIP_DEEP = 0.06;
+/** Basin drop: 6–10 cm so the surface never meets the dry floor. */
+export const WATER_DIP_SHALLOW = 0.07;
+export const WATER_DIP_DEEP = 0.1;
+/** Wet film / shimmer stay at least this far below dry stone. */
+export const WATER_SURFACE_MIN_BELOW = 0.08;
+/** Painted decals sit this far above the mesh they decorate. */
+export const DECAL_LIFT = 0.008;
+/** Pull floor decals toward the camera in depth — grazing views need more than a millimetre of Y. */
+export const DECAL_OFFSET_FACTOR = -4;
+export const DECAL_OFFSET_UNITS = -16;
 export const WATER_FLOOR_SEGS = 16;
 export const WATER_RIPPLE_AMP = 0.005;
 /** One noise tile is larger than any pool so a 2 m cell cannot read as a repeat. */
@@ -117,6 +125,14 @@ export function hasWaterNeighbor(map: FloorMap, x: number, y: number): boolean {
   for (const face of WATER_FACES) {
     const { dx, dz } = FACE_DELTA[face];
     if (isWaterCell(map, x + dx, y + dz)) return true;
+  }
+  return false;
+}
+
+export function hasDecalNeighbor(x: number, y: number): boolean {
+  for (const face of WATER_FACES) {
+    const { dx, dz } = FACE_DELTA[face];
+    if (hasWaterDecal(x + dx, y + dz)) return true;
   }
   return false;
 }
@@ -728,7 +744,7 @@ export function floorDip(map: FloorMap, tx: number, tz: number, u: number, v: nu
 }
 
 export function puddleSurfaceY(map: FloorMap, tx: number, tz: number, u: number, v: number): number {
-  return floorDip(map, tx, tz, u, v) + 0.002;
+  return waterOverlayY(floorDip(map, tx, tz, u, v));
 }
 
 /** True when a dry-border contour is not a straight cell-aligned line. */
@@ -771,7 +787,17 @@ export function puddleEdgeIsIrregular(map: FloorMap, tx: number, tz: number, fac
 
 export function paintedFloorSize(tx: number, tz: number, map: FloorMap, defaultSize: number): number {
   if (isWaterCell(map, tx, tz) || hasWaterNeighbor(map, tx, tz)) return CELL;
+  if (hasWaterDecal(tx, tz) || hasDecalNeighbor(tx, tz)) return CELL;
   return defaultSize;
+}
+
+/**
+ * Wet-film / shimmer height. Follows the basin, but never rises onto the
+ * dry floor — that 1–2 mm lift was coplanar with floor_stone at the door
+ * and shore and z-fought as a flat tan sheet.
+ */
+export function waterOverlayY(dip: number, lift = DECAL_LIFT): number {
+  return Math.min(dip + lift, -WATER_SURFACE_MIN_BELOW);
 }
 
 export type StrayPuddle = { tx: number; tz: number; x: number; z: number; sx: number; sz: number; rot: number };
@@ -1242,7 +1268,7 @@ function cellGrid(
       col[i * 4 + 2] = k;
       col[i * 4 + 3] = 1;
     } else if (kind === 'shimmer') {
-      pos.setXYZ(i, wx, dip + 0.004, wz);
+      pos.setXYZ(i, wx, waterOverlayY(dip, DECAL_LIFT + 0.004), wz);
       const wuv = waterWorldUv(wx, wz);
       uvAttr.setXY(i, wuv.u, wuv.v);
       const peak = smoothstep(0.62, 0.88, waterWorldNoise(wx, wz, 3.1));
@@ -1252,7 +1278,7 @@ function cellGrid(
       col[i * 4 + 2] = 0.62;
       col[i * 4 + 3] = veil;
     } else {
-      pos.setXYZ(i, wx, dip + 0.002, wz);
+      pos.setXYZ(i, wx, waterOverlayY(dip), wz);
       const wuv = waterWorldUv(wx, wz);
       uvAttr.setXY(i, wuv.u, wuv.v);
       const edgeClear = 1 - 0.18 * (1 - smoothstep(0.15, 0.65, cover));
@@ -1356,6 +1382,25 @@ function decalOrientedGrid(
   geo.setAttribute('color', new THREE.BufferAttribute(col, 4));
   geo.computeVertexNormals();
   return geo;
+}
+
+/** Transparent floor overlays: no depth write, pulled forward, discard empty texels. */
+function floorOverlayFlags(alphaTest = 0.04): {
+  transparent: true;
+  depthWrite: false;
+  polygonOffset: true;
+  polygonOffsetFactor: number;
+  polygonOffsetUnits: number;
+  alphaTest: number;
+} {
+  return {
+    transparent: true,
+    depthWrite: false,
+    polygonOffset: true,
+    polygonOffsetFactor: DECAL_OFFSET_FACTOR,
+    polygonOffsetUnits: DECAL_OFFSET_UNITS,
+    alphaTest
+  };
 }
 
 export async function buildFloor1Water(
@@ -1562,9 +1607,8 @@ export async function buildFloor1Water(
       sheen: 0,
       specularIntensity: 0,
       envMapIntensity: 0,
-      transparent: true,
+      ...floorOverlayFlags(),
       opacity: 1,
-      depthWrite: false,
       fog: true,
       emissive: 0x000000,
       vertexColors: false
@@ -1573,7 +1617,7 @@ export async function buildFloor1Water(
       decalOrientedGrid(
         spec.x,
         spec.y,
-        0.0012,
+        DECAL_LIFT,
         0,
         false,
         undefined,
@@ -1598,7 +1642,7 @@ export async function buildFloor1Water(
       decalOrientedGrid(
         spec.x,
         spec.y,
-        0.0024,
+        DECAL_LIFT + 0.004,
         0,
         false,
         undefined,
@@ -1630,9 +1674,8 @@ export async function buildFloor1Water(
         rimGeo,
         new THREE.MeshBasicMaterial({
           color: 0xe8b57a,
-          transparent: true,
+          ...floorOverlayFlags(0.01),
           opacity: 0.5,
-          depthWrite: false,
           blending: THREE.AdditiveBlending,
           fog: false,
           toneMapped: false,
@@ -1703,9 +1746,8 @@ export async function buildFloor1Water(
       sheen: 0,
       specularIntensity: 0,
       envMapIntensity: 0,
-      transparent: true,
+      ...floorOverlayFlags(),
       opacity: 1,
-      depthWrite: false,
       fog: true,
       emissive: 0x000000,
       vertexColors: true
@@ -1714,7 +1756,7 @@ export async function buildFloor1Water(
       decalOrientedGrid(
         spec.x,
         spec.y,
-        0.0012,
+        DECAL_LIFT,
         spec.rot ?? 0,
         spec.mirror,
         {
@@ -1748,9 +1790,8 @@ export async function buildFloor1Water(
     sheen: 0,
     specularIntensity: PUDDLE_SPECULAR,
     envMapIntensity: 0,
-    transparent: true,
+    ...floorOverlayFlags(),
     opacity: 1,
-    depthWrite: false,
     fog: true,
     emissive: 0x000000,
     emissiveIntensity: 0,
@@ -1758,10 +1799,9 @@ export async function buildFloor1Water(
     normalMap: ripple,
     normalScale: new THREE.Vector2(0.55, 0.55)
   });
-  const puddleGeos = [
-    ...cells.filter((c) => !hasWaterDecal(c.x, c.y)),
-    ...shorePlacements.map((p) => ({ x: p.spec.x, y: p.spec.y }))
-  ].map((c) => cellGrid(c.x, c.y, map, 'puddle', { sconces }));
+  const puddleGeos = cells
+    .filter((c) => !hasWaterDecal(c.x, c.y))
+    .map((c) => cellGrid(c.x, c.y, map, 'puddle', { sconces }));
   const puddleGeo = mergeGeometries(puddleGeos);
   puddleGeo?.computeVertexNormals();
   if (puddleGeo) {
@@ -1786,9 +1826,8 @@ export async function buildFloor1Water(
       sheen: 0,
       specularIntensity: CRACK_PUDDLE_SPECULAR,
       envMapIntensity: 0,
-      transparent: true,
+      ...floorOverlayFlags(),
       opacity: 1,
-      depthWrite: false,
       fog: true,
       emissive: 0x000000,
       emissiveIntensity: 0,
@@ -1841,9 +1880,8 @@ export async function buildFloor1Water(
         glintGeo,
         new THREE.MeshBasicMaterial({
           color: 0xf0c48a,
-          transparent: true,
+          ...floorOverlayFlags(0.01),
           opacity: 0.55,
-          depthWrite: false,
           blending: THREE.AdditiveBlending,
           fog: false,
           toneMapped: false,
@@ -1879,9 +1917,8 @@ export async function buildFloor1Water(
           color: WATER_SURFACE_COLOR,
           roughness: 0.78,
           metalness: 0,
-          transparent: true,
+          ...floorOverlayFlags(),
           opacity: 0.22,
-          depthWrite: false,
           fog: true,
           specularIntensity: 0.18,
           envMapIntensity: 0,
@@ -1924,9 +1961,8 @@ export async function buildFloor1Water(
         new THREE.MeshBasicMaterial({
           map: atlas,
           color: 0xd9b07a,
-          transparent: true,
+          ...floorOverlayFlags(0.01),
           opacity: 0.28,
-          depthWrite: false,
           blending: THREE.AdditiveBlending,
           fog: false,
           toneMapped: false,
@@ -1955,9 +1991,8 @@ export async function buildFloor1Water(
     shimmerMat = new THREE.MeshBasicMaterial({
       map: makeSoftShimmer(),
       color: 0xe2c090,
-      transparent: true,
+      ...floorOverlayFlags(0.01),
       opacity: 0.28,
-      depthWrite: false,
       blending: THREE.AdditiveBlending,
       fog: false,
       toneMapped: false,
@@ -1980,9 +2015,8 @@ export async function buildFloor1Water(
     splashMat = new THREE.MeshBasicMaterial({
       map: makeWaterfallSplash(),
       color: 0xffffff,
-      transparent: true,
+      ...floorOverlayFlags(),
       opacity: 0.9,
-      depthWrite: false,
       fog: true,
       toneMapped: true,
       side: THREE.DoubleSide
@@ -2017,9 +2051,8 @@ export async function buildFloor1Water(
         new THREE.MeshBasicMaterial({
           map: makeSplashGlints(),
           color: 0xf0c48a,
-          transparent: true,
+          ...floorOverlayFlags(0.01),
           opacity: 0.42,
-          depthWrite: false,
           blending: THREE.AdditiveBlending,
           fog: false,
           toneMapped: false,
