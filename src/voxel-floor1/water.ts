@@ -51,6 +51,10 @@ export const WATER_NOISE_SPAN = 24;
 export const CISTERN_BED_FILE = 'cistern_bed.png';
 /** Artist painted north at the top of the PNG and assumed Three's default. */
 export const CISTERN_BED_FLIP_Y = true;
+/** Dry antechamber cell; its west edge is the cistern door. */
+export const CISTERN_DOOR_CELL = { x: 4, y: 2 } as const;
+/** Water cell whose east face meets that door. */
+export const CISTERN_DOOR_WATER_CELL = { x: 3, y: 2 } as const;
 export const WATER_INNER_FILES = ['floor_water_inner.png', 'floor_water_inner_2.png'] as const;
 export const WATER_RIM_FILE = 'floor_water.png';
 export const WATER_RIM_MASK_N = 'floor_water_rim_mask_n.png';
@@ -304,6 +308,38 @@ export function liftCisternBedFlags(
   return out;
 }
 
+function meanRgbaLuma(data: ArrayLike<number>): number {
+  const n = data.length >> 2;
+  if (n <= 0) return 0;
+  let s = 0;
+  for (let i = 0; i < n; i++) {
+    const o = i * 4;
+    s += 0.2126 * data[o] + 0.7152 * data[o + 1] + 0.0722 * data[o + 2];
+  }
+  return s / n;
+}
+
+/**
+ * Darken a wet-rim texture so its mean luma matches the bed. Never brightens.
+ * South/wall bed edges stay as painted; only the door still uses this strip.
+ */
+export function matchRimLumaToBed(
+  rim: ArrayLike<number>,
+  bed: ArrayLike<number>
+): Uint8ClampedArray {
+  const out = new Uint8ClampedArray(rim);
+  const rimL = meanRgbaLuma(out);
+  const bedL = meanRgbaLuma(bed);
+  const scale = rimL > 1e-6 ? Math.min(1, bedL / rimL) : 1;
+  if (scale >= 1) return out;
+  for (let i = 0; i < out.length; i += 4) {
+    out[i] = Math.min(255, out[i] * scale);
+    out[i + 1] = Math.min(255, out[i + 1] * scale);
+    out[i + 2] = Math.min(255, out[i + 2] * scale);
+  }
+  return out;
+}
+
 /** Blend the wet rim onto dry-facing sides of the cistern bed. Water–water joins stay as painted. */
 export function compositeCisternBedRims(
   bed: { width: number; height: number; data: ArrayLike<number> },
@@ -327,6 +363,35 @@ export function compositeCisternBedRims(
     writeRect(out, bed.width, x, y, w, h, blendWaterOverInner(cell, rim, mask, maskSize));
   }
   return out;
+}
+
+/**
+ * Door (4,2) is dry. Keep the bed dark on every other edge; only this
+ * east face still gets a wet rim, darkened to the bed so no pale band shows.
+ */
+export function compositeCisternDoorRim(
+  bed: { width: number; height: number; data: ArrayLike<number> },
+  rim: ArrayLike<number>,
+  northMask: Float32Array,
+  maskSize: number,
+  map: FloorMap,
+  region: WaterRegion
+): Uint8ClampedArray {
+  if (isWaterCell(map, CISTERN_DOOR_CELL.x, CISTERN_DOOR_CELL.y)) {
+    return new Uint8ClampedArray(bed.data);
+  }
+  const doorWater = region.cells.filter(
+    (c) => c.x === CISTERN_DOOR_WATER_CELL.x && c.y === CISTERN_DOOR_WATER_CELL.y
+  );
+  if (!doorWater.length) return new Uint8ClampedArray(bed.data);
+  return compositeCisternBedRims(
+    bed,
+    matchRimLumaToBed(rim, bed.data),
+    northMask,
+    maskSize,
+    map,
+    { ...region, cells: doorWater }
+  );
 }
 
 export async function tryLoadOptionalPng(file: string): Promise<Awaited<ReturnType<typeof loadPng>> | null> {
@@ -1352,11 +1417,19 @@ export async function buildFloor1Water(
   });
   const ripple = makeRippleNormal();
   if (useCisternBed && cistern && cisternBed) {
-    const bedPixels = liftCisternBedFlags({
+    const lifted = liftCisternBedFlags({
       width: cisternBed.data.width,
       height: cisternBed.data.height,
       data: asBytes(cisternBed.data.data)
     });
+    const bedPixels = compositeCisternDoorRim(
+      { width: cisternBed.data.width, height: cisternBed.data.height, data: lifted },
+      rimPng.data.data,
+      northMask,
+      size,
+      map,
+      cistern
+    );
     const bedTex = textureFromPixels({
       width: cisternBed.data.width,
       height: cisternBed.data.height,

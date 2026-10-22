@@ -38,6 +38,8 @@ import {
 import {
   CISTERN_BED_FILE,
   CISTERN_BED_FLIP_Y,
+  CISTERN_DOOR_CELL,
+  CISTERN_DOOR_WATER_CELL,
   WATER_DIP_DEEP,
   WATER_DIP_SHALLOW,
   WATER_INSET_MAX,
@@ -58,7 +60,9 @@ import {
   cisternBedCellImageRect,
   cisternBedWorldUv,
   cisternRegion,
+  compositeCisternDoorRim,
   liftCisternBedFlags,
+  matchRimLumaToBed,
   dryFacingFaces,
   floorDip,
   hasWaterNeighbor,
@@ -377,6 +381,8 @@ print('ok', avg(1, 0), avg(1, 1), avg(1, 3), avg(2, 3))
   });
 
   it('keeps the cistern bed dark at dry-facing edges and lifts flags only', () => {
+    expect(CISTERN_DOOR_CELL).toEqual({ x: 4, y: 2 });
+    expect(CISTERN_DOOR_WATER_CELL).toEqual({ x: 3, y: 2 });
     expect(dryFacingFaces(floor1Map, 3, 2)).toContain('E');
     expect(isWaterCell(floor1Map, 4, 2)).toBe(false);
     expect(isWaterCell(floor1Map, 3, 2)).toBe(true);
@@ -393,9 +399,35 @@ print('ok', avg(1, 0), avg(1, 1), avg(1, 3), avg(2, 3))
     expect(out[1]).toBe(22);
     expect(out[4]).toBeGreaterThan(58);
     expect(out[4] - out[0]).toBeGreaterThan(58 - 20);
+    const pale = new Uint8ClampedArray([80, 80, 80, 255, 80, 80, 80, 255]);
+    const matched = matchRimLumaToBed(pale, new Uint8ClampedArray([20, 20, 20, 255, 20, 20, 20, 255]));
+    expect(matched[0]).toBe(20);
+    expect(matchRimLumaToBed(pale, pale)[0]).toBe(80);
+    const region = cisternRegion(floor1Map)!;
+    const north = new Float32Array([1, 1, 0, 0]);
+    const doorBed = {
+      width: 6,
+      height: 8,
+      data: new Uint8ClampedArray(6 * 8 * 4)
+    };
+    for (let i = 0; i < 6 * 8; i++) {
+      doorBed.data[i * 4] = 20;
+      doorBed.data[i * 4 + 1] = 20;
+      doorBed.data[i * 4 + 2] = 20;
+      doorBed.data[i * 4 + 3] = 255;
+    }
+    const rim = new Uint8ClampedArray([40, 40, 40, 255, 80, 80, 80, 255, 40, 40, 40, 255, 80, 80, 80, 255]);
+    const rimmed = compositeCisternDoorRim(doorBed, rim, north, 2, floor1Map, region);
+    const at = (x: number, y: number) => rimmed[(y * 6 + x) * 4];
+    expect(at(2, 3)).toBe(20);
+    expect(at(2, 7)).toBe(20);
+    expect(at(5, 2)).not.toBe(20);
+    expect(at(5, 2)).toBeLessThan(50);
+    expect(at(5, 3)).toBeLessThan(50);
     const src = readFileSync(resolve(SRC, 'water.ts'), 'utf8');
     const build = src.slice(src.indexOf('export async function buildFloor1Water'));
     expect(build).toContain('liftCisternBedFlags');
+    expect(build).toContain('compositeCisternDoorRim');
     expect(build).not.toContain('compositeCisternBedRims');
     expect(src).toContain('pickWaterInnerIndex');
   });
