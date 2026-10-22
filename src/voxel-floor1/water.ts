@@ -29,7 +29,7 @@ export const WATER_SURFACE_COLOR = 0x101410;
 export const WATER_DEEP_COLOR = 0x030403;
 const WATER_SHALLOW_RGB = { r: 0.07, g: 0.078, b: 0.07 };
 const WATER_DEEP_RGB = { r: 0.016, g: 0.02, b: 0.018 };
-const PUDDLE_ALPHA_SHALLOW = 0.26;
+const PUDDLE_ALPHA_SHALLOW = 0.4;
 const PUDDLE_ALPHA_DEEP = 0.86;
 
 export const WATER_FACES = ['N', 'E', 'S', 'W'] as const;
@@ -537,12 +537,12 @@ export function listWaterTorchMarks(map: FloorMap, sconces: readonly SconceSpec[
       kind: 'streak',
       tx: room.x,
       tz: room.y,
-      x: wallX + nx * 0.52,
+      x: wallX + nx * 0.85,
       y,
-      z: wallZ + nz * 0.52,
+      z: wallZ + nz * 0.85,
       rotY: planeRotY(nx, nz),
-      sx: 1.35,
-      sz: 0.62
+      sx: 1.6,
+      sz: 0.85
     });
     out.push({
       kind: 'wall',
@@ -841,12 +841,18 @@ function cellGrid(
       uvAttr.setXY(i, wuv.u, wuv.v);
       const edgeClear = 1 - 0.18 * (1 - smoothstep(0.15, 0.65, cover));
       col[i * 4] =
-        (WATER_SHALLOW_RGB.r + (WATER_DEEP_RGB.r - WATER_SHALLOW_RGB.r) * deep) * edgeClear * (1 + 0.55 * warmth);
+        (WATER_SHALLOW_RGB.r + (WATER_DEEP_RGB.r - WATER_SHALLOW_RGB.r) * deep) *
+        edgeClear *
+        (1 + 0.9 * warmth);
       col[i * 4 + 1] =
-        (WATER_SHALLOW_RGB.g + (WATER_DEEP_RGB.g - WATER_SHALLOW_RGB.g) * deep) * edgeClear * (1 + 0.22 * warmth);
+        (WATER_SHALLOW_RGB.g + (WATER_DEEP_RGB.g - WATER_SHALLOW_RGB.g) * deep) *
+        edgeClear *
+        (1 + 0.35 * warmth);
       col[i * 4 + 2] =
-        (WATER_SHALLOW_RGB.b + (WATER_DEEP_RGB.b - WATER_SHALLOW_RGB.b) * deep) * edgeClear * (1 + 0.08 * warmth);
-      col[i * 4 + 3] = puddleAlpha(map, tx, tz, u, v) * (0.92 + 0.2 * warmth);
+        (WATER_SHALLOW_RGB.b + (WATER_DEEP_RGB.b - WATER_SHALLOW_RGB.b) * deep) *
+        edgeClear *
+        (1 + 0.1 * warmth);
+      col[i * 4 + 3] = puddleAlpha(map, tx, tz, u, v) * (1 + 0.45 * warmth);
     }
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 4));
@@ -947,11 +953,11 @@ export async function buildFloor1Water(
 
   const puddleMat = new THREE.MeshPhysicalMaterial({
     color: 0xffffff,
-    roughness: 0.8,
+    roughness: 0.7,
     metalness: 0,
     clearcoat: 0,
     sheen: 0,
-    specularIntensity: 0.22,
+    specularIntensity: 0.3,
     envMapIntensity: 0,
     transparent: true,
     opacity: 1,
@@ -964,19 +970,9 @@ export async function buildFloor1Water(
     normalScale: new THREE.Vector2(1.15, 1.15)
   });
   const puddleGeos = cells.map((c) => cellGrid(c.x, c.y, map, 'puddle', { sconces }));
-  let puddle: THREE.Mesh | null = null;
-  let restY: Float32Array | null = null;
-  let restWarm: Float32Array | null = null;
   const puddleGeo = mergeGeometries(puddleGeos);
   puddleGeo?.computeVertexNormals();
   if (puddleGeo) {
-    const pos = puddleGeo.getAttribute('position');
-    restY = new Float32Array(pos.count);
-    restWarm = new Float32Array(pos.count);
-    for (let i = 0; i < pos.count; i++) {
-      restY[i] = pos.getY(i);
-      restWarm[i] = torchWarmthAt(pos.getX(i), pos.getZ(i), sconces);
-    }
     const mesh = new THREE.Mesh(puddleGeo, puddleMat);
     mesh.name = 'water-puddles';
     mesh.castShadow = false;
@@ -985,7 +981,6 @@ export async function buildFloor1Water(
     mesh.frustumCulled = false;
     mesh.renderOrder = 1;
     group.add(mesh);
-    puddle = mesh;
   }
 
   const strays = listStrayPuddles(map);
@@ -1081,7 +1076,7 @@ export async function buildFloor1Water(
       map: makeSoftShimmer(),
       color: 0xf2d4a0,
       transparent: true,
-      opacity: 0.58,
+      opacity: 0.7,
       depthWrite: false,
       blending: THREE.AdditiveBlending,
       fog: false,
@@ -1104,16 +1099,8 @@ export async function buildFloor1Water(
     update: (now, freeze) => {
       const t = freeze ? 0 : now * 0.001;
       if (puddleMat.normalMap) puddleMat.normalMap.offset.set(t * 0.011, t * 0.007);
-      if (puddle && restY && restWarm && !freeze) {
-        const pos = puddle.geometry.getAttribute('position');
-        for (let i = 0; i < pos.count; i++) {
-          const amp = 0.5 + 0.85 * restWarm[i];
-          pos.setY(i, restY[i] + waterRippleHeight(pos.getX(i), pos.getZ(i), t) * amp);
-        }
-        pos.needsUpdate = true;
-      }
       if (shimmerMat) {
-        shimmerMat.opacity = freeze ? 0.58 : 0.58 * (0.82 + 0.18 * Math.sin(t * 0.45));
+        shimmerMat.opacity = freeze ? 0.7 : 0.7 * (0.82 + 0.18 * Math.sin(t * 0.45));
         if (shimmerMat.map) shimmerMat.map.offset.set(t * 0.006, t * 0.004);
       }
     }
