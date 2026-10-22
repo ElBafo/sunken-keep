@@ -1,3 +1,5 @@
+import { existsSync, readFileSync } from 'fs';
+import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
 import spec from '../public/proto3d/camera.json';
 import logEn from '../public/log.json';
@@ -22,11 +24,16 @@ import {
   measurePortraitLayout,
   nextLogScrollFromBottom,
   overlayRects,
+  parsePartyQuery,
+  portraitFile,
+  portraitState,
   rectsOverlap,
   rectsTouchSafe,
   verticalFovForAspect,
   visibleLogLineCount,
   wrapLogMessage,
+  allPortraitFiles,
+  PORTRAIT_DIR,
   type PortraitLayout,
   type Rect
 } from '../src/voxel-floor1/portrait-layout';
@@ -292,5 +299,49 @@ describe('fixed pad-height message log keeps full game text', () => {
     }
     expect(seen.sort()).toEqual([...lines].sort());
     expect(scroll).toBe(0);
+  });
+});
+
+function pngSize(buf: Buffer): { w: number; h: number } {
+  return { w: buf.readUInt32BE(16), h: buf.readUInt32BE(20) };
+}
+
+describe('voxel-floor1 expressive portrait states', () => {
+  it('picks healthy / hurt / badly_hurt / downed from HP bands', () => {
+    expect(portraitState(100, 100)).toBe('healthy');
+    expect(portraitState(67, 100)).toBe('healthy');
+    expect(portraitState(66, 100)).toBe('hurt');
+    expect(portraitState(50, 100)).toBe('hurt');
+    expect(portraitState(34, 100)).toBe('hurt');
+    expect(portraitState(33, 100)).toBe('badly_hurt');
+    expect(portraitState(1, 100)).toBe('badly_hurt');
+    expect(portraitState(0, 100)).toBe('downed');
+    expect(portraitState(100, 100, true)).toBe('downed');
+  });
+
+  it('uses 105×128 art at 400+ wide and 98×120 art below that', () => {
+    expect(portraitFile('wren', 'hurt', 420)).toBe('wren_hurt.png');
+    expect(portraitFile('wren', 'hurt', 400)).toBe('wren_hurt.png');
+    expect(portraitFile('mags', 'downed', 393)).toBe('mags_downed_393.png');
+    expect(allPortraitFiles()).toHaveLength(32);
+  });
+
+  it('keeps all 32 voxel-only portraits at the locked frame sizes', () => {
+    const dir = resolve(__dirname, `../public/${PORTRAIT_DIR}`);
+    for (const file of allPortraitFiles()) {
+      const path = resolve(dir, file);
+      expect(existsSync(path), file).toBe(true);
+      const size = pngSize(readFileSync(path));
+      if (file.endsWith('_393.png')) expect(size, file).toEqual({ w: 98, h: 120 });
+      else expect(size, file).toEqual({ w: 105, h: 128 });
+    }
+  });
+
+  it('parses ?party=wren:hurt,mags:downed', () => {
+    const maxHp = { brannoc: 45, wren: 32, ilsevar: 24, mags: 28 };
+    const party = parsePartyQuery('?party=wren:hurt,mags:downed', maxHp);
+    expect(portraitState(party.wren!.hp, maxHp.wren, party.wren!.downed)).toBe('hurt');
+    expect(portraitState(party.mags!.hp, maxHp.mags, party.mags!.downed)).toBe('downed');
+    expect(party.brannoc).toBeUndefined();
   });
 });

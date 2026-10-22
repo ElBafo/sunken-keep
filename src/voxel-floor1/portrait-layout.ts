@@ -62,6 +62,79 @@ export const HERO_DISPLAY: Record<HudHeroId, string> = {
   mags: 'Mags'
 };
 
+export const PORTRAIT_STATES = ['healthy', 'hurt', 'badly_hurt', 'downed'] as const;
+export type PortraitState = (typeof PORTRAIT_STATES)[number];
+
+/** Voxel-only portrait folder. Wide art is 105×128; `_393` is 98×120. */
+export const PORTRAIT_DIR = 'voxel-floor1/portraits';
+export const PORTRAIT_WIDE_MIN = 400;
+/** Healthy is strictly above 66%. 66% and below is hurt. */
+export const PORTRAIT_HURT_MAX = 0.66;
+/** Badly hurt is 1–33%. Anything above that through 66% is hurt. */
+export const PORTRAIT_BADLY_HURT_MAX = 0.33;
+
+export function portraitState(hp: number, maxHp: number, downed = false): PortraitState {
+  if (downed || hp <= 0) return 'downed';
+  const pct = hp / Math.max(1, maxHp);
+  if (pct <= PORTRAIT_BADLY_HURT_MAX) return 'badly_hurt';
+  if (pct <= PORTRAIT_HURT_MAX) return 'hurt';
+  return 'healthy';
+}
+
+export function portraitFile(id: HudHeroId, state: PortraitState, cssW: number): string {
+  const suffix = cssW < PORTRAIT_WIDE_MIN ? '_393' : '';
+  return `${id}_${state}${suffix}.png`;
+}
+
+export function portraitRelPath(id: HudHeroId, state: PortraitState, cssW: number): string {
+  return `${PORTRAIT_DIR}/${portraitFile(id, state, cssW)}`;
+}
+
+export function allPortraitFiles(): string[] {
+  const out: string[] = [];
+  for (const id of HERO_IDS) {
+    for (const state of PORTRAIT_STATES) {
+      out.push(`${id}_${state}.png`);
+      out.push(`${id}_${state}_393.png`);
+    }
+  }
+  return out;
+}
+
+export type PartyHpOverride = { hp: number; downed: boolean };
+
+export function hpForPortraitState(state: PortraitState, maxHp: number): PartyHpOverride {
+  if (state === 'downed') return { hp: 0, downed: true };
+  if (state === 'badly_hurt') return { hp: Math.max(1, Math.round(maxHp * 0.2)), downed: false };
+  if (state === 'hurt') return { hp: Math.round(maxHp * 0.5), downed: false };
+  return { hp: maxHp, downed: false };
+}
+
+/** `?party=wren:hurt,mags:downed` or `?party=wren:16,mags:0`. */
+export function parsePartyQuery(
+  search: string,
+  maxHp: Record<HudHeroId, number>
+): Partial<Record<HudHeroId, PartyHpOverride>> {
+  const raw = new URLSearchParams(search).get('party');
+  if (!raw) return {};
+  const out: Partial<Record<HudHeroId, PartyHpOverride>> = {};
+  for (const part of raw.split(',')) {
+    const [idRaw, specRaw] = part.split(':');
+    const id = idRaw?.trim() as HudHeroId;
+    const spec = specRaw?.trim();
+    if (!id || !spec || !HERO_IDS.includes(id)) continue;
+    if ((PORTRAIT_STATES as readonly string[]).includes(spec)) {
+      out[id] = hpForPortraitState(spec as PortraitState, maxHp[id]);
+      continue;
+    }
+    const n = Number(spec);
+    if (!Number.isFinite(n)) continue;
+    const hp = Math.max(0, Math.min(maxHp[id], Math.round(n)));
+    out[id] = { hp, downed: hp <= 0 };
+  }
+  return out;
+}
+
 export const PAD_KEYS = ['turn_left', 'forward', 'turn_right', 'strafe_left', 'back', 'strafe_right'] as const;
 export type PadKey = (typeof PAD_KEYS)[number];
 

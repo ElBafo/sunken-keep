@@ -22,7 +22,7 @@ import {
   LANTERN_SPOT_MAP_MOBILE
 } from './constants';
 import { facingCell, GridMover } from './camera';
-import { Floor1PartyUi } from './party-ui';
+import { Floor1PartyUi, preloadPortraitArt } from './party-ui';
 import {
   applyCameraProjection,
   measurePortraitLayout,
@@ -90,6 +90,7 @@ type Floor1Api = {
   strafeLeft: () => boolean;
   strafeRight: () => boolean;
   setHeroDowned: (id: HudHeroId, downed: boolean) => void;
+  setHeroHp: (id: HudHeroId, hp: number) => void;
   pushLog: (text: string) => void;
   logLines: string[];
   meanLuma: (band?: { x0?: number; x1?: number; y0?: number; y1?: number }) => number;
@@ -251,6 +252,7 @@ async function boot(): Promise<void> {
   const mover = new GridMover(camera, floor1Map);
 
   loading.textContent = 'Meshing floor 1…';
+  const portraitsReady = preloadPortraitArt();
   const level = await buildFloor1(floor1Map, mover.x, mover.y, lightMode === 'all');
   scene.add(level.group);
 
@@ -515,6 +517,7 @@ async function boot(): Promise<void> {
     return true;
   };
 
+  await portraitsReady;
   partyUi = Floor1PartyUi.mount(
     {
       onTurnLeft: () => mover.turn(1),
@@ -647,6 +650,7 @@ async function boot(): Promise<void> {
     strafeLeft: () => beginStrafe(-1),
     strafeRight: () => beginStrafe(1),
     setHeroDowned: (id, downed) => partyUi?.setHeroDowned(id, downed),
+    setHeroHp: (id, hp) => partyUi?.setHeroHp(id, hp),
     pushLog: (text) => partyUi?.pushLog(text),
     get logLines() {
       return partyUi?.logLines.slice() ?? [];

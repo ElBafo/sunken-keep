@@ -1,15 +1,21 @@
 import { DEFAULT_EQUIPMENT, type HeroId, type ItemType } from '../constants';
 import {
   HERO_DISPLAY,
+  HERO_IDS,
   HP_FILL,
   HudHeroId,
   MP_FILL,
   PAD_KEYS,
+  PORTRAIT_DIR,
   PortraitLayout,
   Rect,
+  allPortraitFiles,
   logVisibleSlice,
   measurePortraitLayout,
   nextLogScrollFromBottom,
+  parsePartyQuery,
+  portraitRelPath,
+  portraitState,
   visibleLogLineCount,
   wrapLogMessage,
   type PadKey,
@@ -76,8 +82,33 @@ function place(el: HTMLElement, r: Rect): void {
   el.style.height = `${r.h}px`;
 }
 
+export const HERO_MAX_HP: Record<HudHeroId, number> = {
+  brannoc: 45,
+  wren: 32,
+  ilsevar: 24,
+  mags: 28
+};
+
+let portraitPreload: Promise<void> | null = null;
+
+export function preloadPortraitArt(): Promise<void> {
+  if (portraitPreload) return portraitPreload;
+  portraitPreload = Promise.all(
+    allPortraitFiles().map(
+      (file) =>
+        new Promise<void>((resolve) => {
+          const img = new Image();
+          img.onload = () => resolve();
+          img.onerror = () => resolve();
+          img.src = asset(`${PORTRAIT_DIR}/${file}`);
+        })
+    )
+  ).then(() => undefined);
+  return portraitPreload;
+}
+
 function heroState(id: HudHeroId, downed = false): PartyHeroState {
-  const maxHp = id === 'brannoc' ? 45 : id === 'wren' ? 32 : id === 'ilsevar' ? 24 : 28;
+  const maxHp = HERO_MAX_HP[id];
   const maxMana = id === 'wren' ? 12 : id === 'ilsevar' ? 16 : 0;
   return {
     id,
@@ -121,6 +152,7 @@ export class Floor1PartyUi {
       ilsevar: heroState('ilsevar'),
       mags: heroState('mags')
     };
+    this.applyPartyQuery(typeof location === 'undefined' ? '' : location.search);
     this.logEl = host.querySelector('#message-log')!;
     this.compassEl = host.querySelector('#compass-face') as HTMLImageElement;
     this.oilCountEl = host.querySelector('#oil-count')!;
@@ -229,19 +261,45 @@ export class Floor1PartyUi {
     this.drawPortraits();
   }
 
+  setHeroHp(id: HudHeroId, hp: number): void {
+    const hero = this.heroes[id];
+    hero.hp = Math.max(0, Math.min(hero.maxHp, Math.round(hp)));
+    hero.downed = hero.hp <= 0;
+    this.drawPortraits();
+  }
+
+  applyPartyQuery(search: string): void {
+    const overrides = parsePartyQuery(search, HERO_MAX_HP);
+    for (const id of HERO_IDS) {
+      const next = overrides[id];
+      if (!next) continue;
+      this.heroes[id].hp = next.hp;
+      this.heroes[id].downed = next.downed;
+    }
+  }
+
+  private faceSrc(id: HudHeroId): string {
+    const hero = this.heroes[id];
+    return asset(portraitRelPath(id, portraitState(hero.hp, hero.maxHp, hero.downed), this.layout.cssW));
+  }
+
   openSheet(id: HudHeroId): void {
     const hero = this.heroes[id];
     this.closeOverlays();
     const body = this.sheetEl.querySelector('.sheet-body')!;
     const mp = hero.maxMana > 0 ? `<div>MP ${hero.mana}/${hero.maxMana}</div>` : '';
+    const downed = hero.downed || hero.hp <= 0;
     body.innerHTML =
-      `<img class="sheet-portrait${hero.downed ? ' downed' : ''}" alt="" src="${asset(`art/portraits/${id}_healthy.png`)}" />` +
+      `<div class="sheet-portrait-wrap${downed ? ' downed' : ''}">` +
+      `<img class="sheet-portrait" alt="" src="${this.faceSrc(id)}" />` +
+      (downed ? `<div class="portrait-downed-veil"></div>` : '') +
+      `</div>` +
       `<div class="sheet-copy">` +
       `<h2>${HERO_DISPLAY[id]}</h2>` +
       `<div>HP ${hero.hp}/${hero.maxHp}</div>${mp}` +
       `<div>Main ${hero.main.replace(/_/g, ' ')}</div>` +
       `<div>Off ${hero.off.replace(/_/g, ' ')}</div>` +
-      (hero.downed ? `<div class="sheet-down">Downed</div>` : '') +
+      (downed ? `<div class="sheet-down">Downed</div>` : '') +
       `</div>`;
     this.sheetEl.hidden = false;
     this.sheetEl.dataset.hero = id;
@@ -310,16 +368,23 @@ export class Floor1PartyUi {
     for (const spec of this.layout.portraits) {
       const hero = this.heroes[spec.id];
       const cell = document.createElement('div');
-      cell.className = `portrait-cell${hero.downed ? ' downed' : ''}`;
+      const downed = hero.downed || hero.hp <= 0;
+      cell.className = `portrait-cell${downed ? ' downed' : ''}`;
       cell.dataset.hero = spec.id;
+      cell.dataset.state = portraitState(hero.hp, hero.maxHp, hero.downed);
       place(cell, { x: spec.rect.x - this.layout.strip.x, y: 0, w: spec.rect.w, h: spec.rect.h });
 
       const img = document.createElement('img');
       img.className = 'portrait-face';
       img.alt = HERO_DISPLAY[spec.id];
-      img.src = asset(`art/portraits/${spec.id}_healthy.png`);
+      img.src = this.faceSrc(spec.id);
       img.draggable = false;
       cell.appendChild(img);
+      if (downed) {
+        const veil = document.createElement('div');
+        veil.className = 'portrait-downed-veil';
+        cell.appendChild(veil);
+      }
 
       const fade = document.createElement('div');
       fade.className = 'bar-fade';

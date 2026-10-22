@@ -178,13 +178,19 @@
       inset: 0;
       width: 100%;
       height: 100%;
-      object-fit: cover;
-      object-position: 50% 18%;
+      object-fit: fill;
+      object-position: 0 0;
       image-rendering: pixelated;
       image-rendering: crisp-edges;
     }
     .portrait-cell.downed .portrait-face {
-      filter: grayscale(1) brightness(0.55);
+      filter: grayscale(0.6);
+    }
+    .portrait-downed-veil {
+      position: absolute;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.55);
+      pointer-events: none;
     }
     .bar-fade {
       position: absolute;
@@ -299,13 +305,22 @@
       margin-bottom: 10px;
     }
     .sheet-body { display: flex; gap: 12px; align-items: flex-start; }
-    .sheet-portrait {
+    .sheet-portrait-wrap {
+      position: relative;
       width: 96px;
-      height: 96px;
-      object-fit: cover;
+      height: 117px;
+      overflow: hidden;
+      flex: 0 0 auto;
+    }
+    .sheet-portrait {
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
+      object-position: 0 0;
       image-rendering: pixelated;
     }
-    .sheet-portrait.downed { filter: grayscale(1) brightness(0.55); }
+    .sheet-portrait-wrap.downed .sheet-portrait { filter: grayscale(0.6); }
     .sheet-copy { font-size: 13px; line-height: 1.45; }
     .sheet-down { color: #a85848; margin-top: 6px; }
     .overlay-close {

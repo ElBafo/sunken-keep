@@ -10,6 +10,8 @@ describe('voxel-floor1 is a standalone Vite page', () => {
   const proto = readFileSync(resolve(__dirname, '../proto3d.html'), 'utf8');
   const lab = readFileSync(resolve(__dirname, '../voxel-lab.html'), 'utf8');
   const main = readFileSync(resolve(__dirname, '../src/voxel-floor1/main.ts'), 'utf8');
+  const partyUi = readFileSync(resolve(__dirname, '../src/voxel-floor1/party-ui.ts'), 'utf8');
+  const portraits = readFileSync(resolve(__dirname, '../src/voxel-floor1/portrait-layout.ts'), 'utf8');
 
   it('has its own full-screen canvas and does not load the game', () => {
     expect(html).toContain('src="/src/voxel-floor1/main.ts"');
@@ -61,5 +63,14 @@ describe('voxel-floor1 is a standalone Vite page', () => {
     expect(main).toContain('torchesActive');
     expect(main).toContain('sunbeamsActive');
     expect(existsSync(resolve(__dirname, '../src/voxel-floor1/level.ts'))).toBe(true);
+  });
+
+  it('loads expressive portraits from the voxel-only folder and greys downed faces', () => {
+    expect(portraits).toContain("PORTRAIT_DIR = 'voxel-floor1/portraits'");
+    expect(partyUi).toContain('preloadPortraitArt');
+    expect(partyUi).toContain('PORTRAIT_DIR');
+    expect(partyUi).not.toContain('art/portraits/');
+    expect(html).toContain('grayscale(0.6)');
+    expect(html).toContain('rgba(0, 0, 0, 0.55)');
   });
 });
