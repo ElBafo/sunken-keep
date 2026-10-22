@@ -400,25 +400,17 @@ describe('voxel-floor1 puddle decals lock to floor_stone', () => {
     expect(WATER_DECAL_DIR).toBe('puddles');
   });
 
-  const artistPuddleFile = resolve(
-    __dirname,
-    '../public/proto3d/tex3d',
-    waterDecalPng('puddle_shore_s')
-  );
-  it.skipIf(!existsSync(artistPuddleFile))(
-    'ships each artist decal as 512×512 RGBA plus a mask under puddles/',
-    () => {
-      for (const id of ['puddle_1', 'puddle_2', 'puddle_3', 'puddle_shore_s'] as const) {
-        const file = resolve(__dirname, '../public/proto3d/tex3d', waterDecalPng(id));
-        const mask = resolve(__dirname, '../public/proto3d/tex3d', waterDecalMaskPng(id));
-        expect(existsSync(file), file).toBe(true);
-        expect(existsSync(mask), mask).toBe(true);
-        const decal = readFileSync(file);
-        expect(decal.readUInt32BE(16)).toBe(512);
-        expect(decal.readUInt32BE(20)).toBe(512);
-      }
+  it('ships each artist decal as 512×512 RGBA plus a mask under puddles/', () => {
+    for (const id of ['puddle_1', 'puddle_2', 'puddle_3', 'puddle_shore_s'] as const) {
+      const file = resolve(__dirname, '../public/proto3d/tex3d', waterDecalPng(id));
+      const mask = resolve(__dirname, '../public/proto3d/tex3d', waterDecalMaskPng(id));
+      expect(existsSync(file), file).toBe(true);
+      expect(existsSync(mask), mask).toBe(true);
+      const decal = readFileSync(file);
+      expect(decal.readUInt32BE(16)).toBe(512);
+      expect(decal.readUInt32BE(20)).toBe(512);
     }
-  );
+  });
 
   it('forces floor_stone.png under every decal cell, never _2/_3/_4', () => {
     expect(WATER_DECAL_FLOOR_FILE).toBe('floor_stone.png');
