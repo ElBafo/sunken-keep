@@ -8,13 +8,17 @@ import { loadPng } from '../voxel-lab/materials';
 /** Dip stays in the inner 70–80% of a dry-facing cell. */
 export const WATER_INSET_MIN = 0.11;
 export const WATER_INSET_MAX = 0.15;
-export const WATER_DIP_SHALLOW = 0.03;
-export const WATER_DIP_DEEP = 0.055;
+export const WATER_DIP_SHALLOW = 0.028;
+export const WATER_DIP_DEEP = 0.06;
 export const WATER_FLOOR_SEGS = 8;
 export const WATER_RIPPLE_AMP = 0.004;
 const WATER_RIPPLE_HZ = 0.16;
-export const WATER_SURFACE_COLOR = 0x0b1410;
-export const WATER_DEEP_COLOR = 0x060a08;
+export const WATER_SURFACE_COLOR = 0x1a2c22;
+export const WATER_DEEP_COLOR = 0x040706;
+const WATER_SHALLOW_RGB = { r: 0x1a / 255, g: 0x2c / 255, b: 0x22 / 255 };
+const WATER_DEEP_RGB = { r: 0x04 / 255, g: 0x07 / 255, b: 0x06 / 255 };
+const PUDDLE_ALPHA_SHALLOW = 0.26;
+const PUDDLE_ALPHA_DEEP = 0.92;
 
 export const WATER_FACES = ['N', 'E', 'S', 'W'] as const;
 export type WaterFace = (typeof WATER_FACES)[number];
@@ -166,18 +170,48 @@ export function puddleCoverageWorld(map: FloorMap, wx: number, wz: number): numb
   return puddleCoverage(map, tx, tz, wx - (tx - 0.5), wz - (tz - 0.5));
 }
 
+/**
+ * 0–1 how deep a point is. Deep tiles are 1; the basin falls off into
+ * neighbouring shallow cells so (2,1)/(2,2) read as one darker channel.
+ */
+export function waterDeepness(map: FloorMap, tx: number, tz: number, u: number, v: number): number {
+  if (!isWaterCell(map, tx, tz)) return 0;
+  if (isDeepWaterCell(map, tx, tz)) return 1;
+  let d = 0;
+  const sides = [
+    { nx: tx - 1, nz: tz, dist: u },
+    { nx: tx + 1, nz: tz, dist: 1 - u },
+    { nx: tx, nz: tz - 1, dist: v },
+    { nx: tx, nz: tz + 1, dist: 1 - v }
+  ];
+  for (const s of sides) {
+    if (!isDeepWaterCell(map, s.nx, s.nz)) continue;
+    d = Math.max(d, (1 - smoothstep(0, 0.58, s.dist)) * 0.74);
+  }
+  return d;
+}
+
+/** Puddle veil opacity. Deep hides the bed; shallow lets floor_water read through. */
+export function puddleAlpha(map: FloorMap, tx: number, tz: number, u: number, v: number): number {
+  const cover = puddleCoverage(map, tx, tz, u, v);
+  const deep = waterDeepness(map, tx, tz, u, v);
+  return smoothstep(0.14, 0.38, cover) * (PUDDLE_ALPHA_SHALLOW + (PUDDLE_ALPHA_DEEP - PUDDLE_ALPHA_SHALLOW) * deep);
+}
+
 /** Floor drop in metres. 0 on the matching dry-stone edge band. */
 export function floorDip(map: FloorMap, tx: number, tz: number, u: number, v: number): number {
   const cover = puddleCoverage(map, tx, tz, u, v);
   if (cover < 0.08) return 0;
-  const deep = isDeepWaterCell(map, tx, tz);
+  const deep = waterDeepness(map, tx, tz, u, v);
   const seed = hash01(tx, tz, 11);
-  const maxDip = deep
-    ? WATER_DIP_DEEP + 0.005 * seed
-    : WATER_DIP_SHALLOW + 0.012 * (seed - 0.35);
+  const maxDip =
+    WATER_DIP_SHALLOW +
+    (WATER_DIP_DEEP - WATER_DIP_SHALLOW) * deep +
+    0.005 * seed * deep +
+    0.01 * (seed - 0.35) * (1 - deep);
   const off =
     0.12 * Math.sin((u + hash01(tx, tz, 13)) * Math.PI * 2) * Math.cos((v + seed) * Math.PI * 2);
-  return -Math.max(0.018, maxDip + off * 0.01) * smoothstep(0.12, 0.78, cover);
+  return -Math.max(0.016, maxDip + off * 0.01) * smoothstep(0.12, 0.78, cover);
 }
 
 export function puddleSurfaceY(map: FloorMap, tx: number, tz: number, u: number, v: number): number {
@@ -538,23 +572,23 @@ function cellGrid(tx: number, tz: number, map: FloorMap, kind: 'floor' | 'puddle
     const v = pos.getZ(i) / CELL + 0.5;
     const cover = puddleCoverage(map, tx, tz, u, v);
     const dip = floorDip(map, tx, tz, u, v);
+    const deep = waterDeepness(map, tx, tz, u, v);
     if (kind === 'floor') {
       pos.setXYZ(i, wx, dip, wz);
       const wet = smoothstep(0.08, 0.4, cover) * (1 - smoothstep(0.45, 0.95, cover));
-      const k = 1 - 0.38 * wet;
+      const bedHide = 0.58 * deep * smoothstep(0.18, 0.82, cover);
+      const k = 1 - 0.4 * wet - bedHide;
       col[i * 4] = k * 0.92;
       col[i * 4 + 1] = k * 0.9;
       col[i * 4 + 2] = k * 0.86;
       col[i * 4 + 3] = 1;
     } else {
-      const deep = isDeepWaterCell(map, tx, tz);
       pos.setXYZ(i, wx, dip + 0.0025, wz);
-      const alpha = smoothstep(0.14, 0.42, cover) * (deep ? 0.78 : 0.4);
-      const edgeClear = 1 - 0.35 * (1 - smoothstep(0.2, 0.7, cover));
-      col[i * 4] = deep ? 0.22 : 0.32 * edgeClear;
-      col[i * 4 + 1] = deep ? 0.3 : 0.42 * edgeClear;
-      col[i * 4 + 2] = deep ? 0.24 : 0.34 * edgeClear;
-      col[i * 4 + 3] = alpha;
+      const edgeClear = 1 - 0.28 * (1 - smoothstep(0.2, 0.7, cover));
+      col[i * 4] = (WATER_SHALLOW_RGB.r + (WATER_DEEP_RGB.r - WATER_SHALLOW_RGB.r) * deep) * edgeClear;
+      col[i * 4 + 1] = (WATER_SHALLOW_RGB.g + (WATER_DEEP_RGB.g - WATER_SHALLOW_RGB.g) * deep) * edgeClear;
+      col[i * 4 + 2] = (WATER_SHALLOW_RGB.b + (WATER_DEEP_RGB.b - WATER_SHALLOW_RGB.b) * deep) * edgeClear;
+      col[i * 4 + 3] = puddleAlpha(map, tx, tz, u, v);
     }
   }
   geo.setAttribute('color', new THREE.BufferAttribute(col, 4));
@@ -594,7 +628,7 @@ export async function buildFloor1Water(
   }
 
   const puddleMat = new THREE.MeshPhysicalMaterial({
-    color: WATER_SURFACE_COLOR,
+    color: 0xffffff,
     roughness: 0.58,
     metalness: 0,
     clearcoat: 0,

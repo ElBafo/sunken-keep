@@ -20,9 +20,11 @@ import {
   listWaterGlintCells,
   listWaterRegions,
   paintedFloorSize,
+  puddleAlpha,
   puddleCoverage,
   puddleEdgeInset,
-  puddleEdgeIsIrregular
+  puddleEdgeIsIrregular,
+  waterDeepness
 } from '../src/voxel-floor1/water';
 
 const SRC = resolve(__dirname, '../src/voxel-floor1');
@@ -57,6 +59,19 @@ describe('voxel-floor1 water is one puddle per region', () => {
     expect(dryFacingFaces(floor1Map, 2, 2)).toEqual([]);
     expect(dryFacingFaces(floor1Map, 3, 1)).toContain('E');
     expect(dryFacingFaces(floor1Map, 3, 1)).not.toContain('W');
+  });
+
+  it('reads the cistern deep lane darker and more opaque than the shallow rim', () => {
+    expect(cistern?.deep.some((c) => c.x === 2 && c.y === 1)).toBe(true);
+    expect(cistern?.deep.some((c) => c.x === 2 && c.y === 2)).toBe(true);
+    expect(waterDeepness(floor1Map, 2, 1, 0.5, 0.5)).toBe(1);
+    expect(waterDeepness(floor1Map, 2, 2, 0.5, 0.5)).toBe(1);
+    expect(waterDeepness(floor1Map, 3, 1, 0.5, 0.5)).toBeLessThan(0.4);
+    expect(puddleAlpha(floor1Map, 2, 1, 0.5, 0.5)).toBeGreaterThan(0.75);
+    expect(puddleAlpha(floor1Map, 3, 1, 0.5, 0.5)).toBeLessThan(0.45);
+    expect(puddleAlpha(floor1Map, 2, 1, 0.5, 0.5)).toBeGreaterThan(
+      puddleAlpha(floor1Map, 3, 1, 0.5, 0.5) + 0.3
+    );
   });
 
   it('keeps puddle edges irregular and stray drips inside the cell', () => {
