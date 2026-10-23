@@ -42,6 +42,7 @@ describe('voxel floor 1 intro / audio / bark port', () => {
     expect(gameplay).toContain("from '../proto3d/layout585'");
     expect(gameplay).toContain("from '../proto3d/note-reader'");
     expect(gameplay).toContain('this.story.readableItem');
+    expect(gameplay).toContain('this.hooks?.usePotion?.(hero, kind)');
     expect(html).toContain('id="note-overlay"');
     expect(html).toContain('id="note-canvas"');
     expect(gameplay).toContain('enterPlayFromIntro');

@@ -1,5 +1,5 @@
 import type { Scene } from 'three';
-import type { HeroId, HandSlot } from '../core/types';
+import type { CombatEvent, HeroId, HandSlot } from '../core/types';
 import { floor1 as rawFloor1 } from '../../public/levels/floor1';
 import { fetchJsonCached } from '../proto3d/asset-cache';
 import { AudioManager } from '../proto3d/audio';
@@ -75,6 +75,8 @@ export type GameplayHooks = {
   hideItemAt?: (x: number, y: number) => void;
   openChestAt?: (x: number, y: number) => void;
   unlockFacingDoor?: () => string;
+  monsterAt?: (x: number, y: number) => { kind: string } | undefined;
+  usePotion?: (hero: HudHeroId, kind: 'red' | 'blue' | 'green') => CombatEvent[] | undefined;
 };
 
 export { DOOR_LOCKED_MESSAGE };
@@ -122,6 +124,7 @@ export class Floor1Gameplay {
   inventory: InventoryUi | null = null;
   noteReader: NoteReader | null = null;
   noteOpen = false;
+  gameOver = false;
   phase: GameplayPhase = 'boot';
   audioUnlocked = false;
   lastBark: BarkLine | null = null;
@@ -145,7 +148,7 @@ export class Floor1Gameplay {
   }
 
   allowsInput(): boolean {
-    return this.phase === 'play' && !this.noteOpen;
+    return this.phase === 'play' && !this.noteOpen && !this.gameOver;
   }
 
   introVisible(): boolean {
@@ -324,6 +327,12 @@ export class Floor1Gameplay {
   pickupItemAt(x: number, y: number): boolean {
     const tile = tileAt(floor1Map, x, y);
     if (!tile || !lootRevealed(floor1Map, x, y)) return false;
+    const guard = this.hooks?.monsterAt?.(x, y);
+    if (guard && (tile.item || (tile.chest && !tile.chestOpen))) {
+      this.showMessage(this.story.log('item_guarded', { monster: this.story.monsterName(guard.kind) }));
+      this.audio.playUi('item_use_fail');
+      return true;
+    }
     if (tile.chest && !tile.chestOpen) return this.lootChest(x, y, tile);
     if (!tile.item) return false;
     const id = normalizeItemId(tile.item);
@@ -434,40 +443,21 @@ export class Floor1Gameplay {
   drinkBagSlot(index: number, hero: HudHeroId): void {
     const slot = this.bag.slots[index];
     if (!slot) return;
-    const member = this.hooks?.party().find((h) => h.id === hero);
-    if (!member) return;
-    if (slot.item === 'potion_red') {
-      const max = member.maxHp ?? member.hp ?? 1;
-      const hp = member.hp ?? max;
-      if (hp >= max) {
-        this.showMessage(this.story.log('full_health', { hero: this.story.heroName(hero) }));
-        this.audio.playUi('item_use_fail');
-        return;
-      }
-      if (!this.bag.takeAt(index, 1)) return;
-      this.hooks?.setHeroHp?.(hero, Math.min(max, hp + 15));
-      this.showMessage(this.story.log('drink_potion', { hero: this.story.heroName(hero), n: 15 }));
-    } else if (slot.item === 'potion_blue') {
-      const max = member.maxMana ?? 0;
-      const mana = member.mana ?? 0;
-      if (max <= 0) {
-        this.showMessage(this.story.log('no_mana_pool', { hero: this.story.heroName(hero) }));
-        this.audio.playUi('item_use_fail');
-        return;
-      }
-      if (!this.bag.takeAt(index, 1)) return;
-      this.hooks?.setHeroMana?.(hero, Math.min(max, mana + 8));
-      this.showMessage(this.story.log('drink_mana', { hero: this.story.heroName(hero), n: 8 }));
-    } else if (slot.item === 'potion_green') {
-      const max = member.maxHp ?? member.hp ?? 1;
-      const hp = member.hp ?? max;
-      if (!this.bag.takeAt(index, 1)) return;
-      this.hooks?.setHeroHp?.(hero, Math.min(max, hp + 5));
-      this.showMessage(this.story.log('drink_green', { hero: this.story.heroName(hero), n: 5 }));
-    } else {
+    const kind =
+      slot.item === 'potion_red' ? 'red' : slot.item === 'potion_blue' ? 'blue' : slot.item === 'potion_green' ? 'green' : null;
+    if (!kind) return;
+    const events = this.hooks?.usePotion?.(hero, kind);
+    if (!events) {
+      this.audio.playUi('item_use_fail');
       return;
     }
-    this.audio.playUi('potion');
+    const failed = events.some((e) => e.type === 'log' && (e.key === 'full_health' || e.key === 'no_mana_pool'));
+    if (failed || !this.bag.takeAt(index, 1)) {
+      this.audio.playUi('item_use_fail');
+      if (this.inventory) this.inventory.pickHero = null;
+      this.inventory?.redraw();
+      return;
+    }
     if (this.inventory) this.inventory.pickHero = null;
     this.inventory?.redraw();
   }
@@ -551,6 +541,30 @@ export class Floor1Gameplay {
     document.getElementById('note-overlay')?.classList.remove('show');
     this.noteOpen = false;
     return wasOpen;
+  }
+
+  showGameOver(): void {
+    this.gameOver = true;
+    try {
+      this.audio.stopFloorLoops();
+      this.audio.stopWindup();
+      this.audio.playUi('game_over');
+    } catch {
+      // Audio may still be unlocking.
+    }
+    const title = document.getElementById('gameover-title');
+    const body = document.getElementById('gameover-body');
+    const btn = document.getElementById('btn-go-floor');
+    const save = document.getElementById('btn-go-autosave');
+    if (title) title.textContent = this.story.uiText('game_over.title');
+    if (body) body.textContent = this.story.uiText('game_over.body');
+    if (btn) btn.textContent = this.story.uiText('game_over.load_floor', { n: 1 });
+    if (save) save.hidden = true;
+    document.getElementById('gameover')?.classList.add('show');
+  }
+
+  gameOverVisible(): boolean {
+    return !!document.getElementById('gameover')?.classList.contains('show');
   }
 
   private readBagSlot(index: number): void {
