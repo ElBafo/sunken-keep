@@ -74,6 +74,7 @@ export type PartyHeroState = {
   recovery: { main: number; off: number };
   pendingPerk: number | null;
   level: number;
+  xp: number;
 };
 
 export type PartyUiHooks = {
@@ -147,7 +148,8 @@ function heroState(id: HudHeroId, downed = false): PartyHeroState {
     formation: DEFAULT_FORMATION[id as HeroId],
     recovery: { main: 0, off: 0 },
     pendingPerk: null,
-    level: 1
+    level: 1,
+    xp: 0
   };
 }
 
@@ -364,6 +366,8 @@ export class Floor1PartyUi {
       `</div>` +
       `<div class="sheet-copy">` +
       `<h2>${HERO_DISPLAY[id]}</h2>` +
+      `<div>Level ${hero.level}</div>` +
+      `<div>XP ${hero.xp}</div>` +
       `<div>HP ${hero.hp}/${hero.maxHp}</div>${mp}` +
       `<div>Main ${hero.main.replace(/_/g, ' ')}</div>` +
       `<div>Off ${hero.off.replace(/_/g, ' ')}</div>` +
@@ -399,6 +403,13 @@ export class Floor1PartyUi {
     this.bagEl.hidden = true;
     this.menuEl.hidden = true;
     this.closePerkScreen();
+  }
+
+  clearLog(): void {
+    this.logLines = [];
+    this.logMessages = [];
+    this.logScrollFromBottom = 0;
+    this.renderLog();
   }
 
   overlayOpen(): boolean {
@@ -440,6 +451,7 @@ export class Floor1PartyUi {
       formation?: FormationRow;
       pendingPerk?: number | null;
       level?: number;
+      xp?: number;
     }
   ): void {
     const hero = this.heroes[id];
@@ -456,6 +468,7 @@ export class Floor1PartyUi {
     }
     if (state.pendingPerk !== undefined) hero.pendingPerk = state.pendingPerk;
     if (state.level != null) hero.level = state.level;
+    if (state.xp != null) hero.xp = state.xp;
     this.drawPortraits();
   }
 

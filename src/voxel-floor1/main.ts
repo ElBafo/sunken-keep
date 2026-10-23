@@ -45,12 +45,13 @@ import {
   type QualityLevel
 } from './lights';
 import { Floor1Gameplay } from './gameplay';
+import { snapshotHero, type SavePayload } from './saves';
 import { litFarBeams, litFarTorches, tileInLightFlood } from './bake';
 import { HERO_IDS, loadFloor1Combat } from './combat';
 import { Floor1Monsters } from './monsters';
 import { loadPerkCopy } from './perks';
 import { buildFloor1Items } from './floor-items';
-import { doorBetween, doorEdgeAt, floor1Map, tileAt } from './layout';
+import { doorBetween, doorEdgeAt, FLOOR1_DOOR_EDGES, floor1Map, tileAt } from './layout';
 import { buildFloor1 } from './level';
 import { buildFloor1Markers } from './markers';
 import { buildFloor1Openings } from './openings';
@@ -171,6 +172,43 @@ type Floor1Api = {
   flashFlank: (side: 'left' | 'right' | 'behind') => void;
   lastFlank: () => 'left' | 'right' | 'behind' | null;
   gameOverVisible: () => boolean;
+  captureSave: () => SavePayload;
+  applySave: (save: SavePayload) => void;
+  saveToSlot: (slot: number) => boolean;
+  loadFromSlot: (slot: number) => boolean;
+  requestManualSave: () => void;
+  requestManualLoad: () => void;
+  tryAutosave: () => boolean;
+  canAutosave: () => boolean;
+  takeFloorSnapshot: () => void;
+  loadAutosave: () => void;
+  fireVisibilityAutosave: () => boolean;
+  mapState: () => {
+    position: { x: number; y: number; dir: number };
+    oil: number;
+    bag: Array<{ item: string; count: number; journalPage?: number }>;
+    party: Array<{
+      id: string;
+      hp: number;
+      maxHp: number;
+      mana: number;
+      maxMana: number;
+      level: number;
+      xp: number;
+      pendingPerk: number | null;
+      downed: boolean;
+      main: string;
+      off: string;
+      armour?: string;
+    }>;
+    doors: Array<{ x: number; y: number; open: boolean; locked: boolean }>;
+    items: Array<{ x: number; y: number; item?: string; visible?: boolean }>;
+    monsters: Array<{ id: string; kind: string; x: number; y: number; hp: number; alive: boolean }>;
+    flags: string[];
+    firedOnce: string[];
+    goals: Record<string, string>;
+    journalPages: string[];
+  };
   skipIntro: () => void;
   speakBark: (trigger: string, speaker?: HudHeroId) => boolean;
   unlockAudio: () => void;
@@ -671,7 +709,8 @@ async function boot(): Promise<void> {
       partyUi.syncHero(id, {
         ...hero,
         pendingPerk: hero.pendingPerk,
-        level: hero.level
+        level: hero.level,
+        xp: hero.xp
       });
     }
   };
@@ -763,7 +802,66 @@ async function boot(): Promise<void> {
     openChestAt: (x, y) => floorItems.openChestAt(x, y),
     unlockFacingDoor: () => handleDoor(),
     monsterAt: (x, y) => combat.monsterAt(x, y),
-    usePotion: (hero, kind) => combat.usePotion(hero, kind, nowSec())
+    usePotion: (hero, kind) => combat.usePotion(hero, kind, nowSec()),
+    position: () => ({ x: mover.x, y: mover.y, dir: mover.dir }),
+    setPosition: (x, y, dir) => {
+      mover.hold = false;
+      mover.setPosition(x, y, dir);
+      camera.rotation.x = CAMERA_PITCH;
+      prepareCell(x, y);
+      onArrived(false);
+    },
+    snapshotParty: () =>
+      HERO_IDS.map((id) => snapshotHero(combat.engine.heroes[id], partyUi?.heroes[id]?.armour)),
+    applyParty: (party) => {
+      combat.applySavedParty(party);
+      for (const hero of party) {
+        partyUi?.setHand(hero.id, 'main', hero.equipment.main);
+        partyUi?.setHand(hero.id, 'off', hero.equipment.off);
+        partyUi?.setArmour(hero.id, hero.armour);
+        gameplay.noteHero(hero.id, hero.hp, hero.downed);
+      }
+      syncEquipment();
+    },
+    snapshotMonsters: () => combat.snapshotMonsters(),
+    restoreMonsters: (list) => {
+      combat.restoreMonsters(list);
+      void monsters.resetFromCombat(list);
+    },
+    restoreVisuals: () => {
+      for (const visual of openings.system.all()) {
+        const tile = tileAt(floor1Map, visual.x, visual.y);
+        if (!tile) continue;
+        const open = visual.kind === 'door' ? !!tile.doorOpen : !!tile.secretOpen;
+        openings.system.snapOpen(visual, open);
+        if (visual.kind === 'door' && !open && tile.doorLocked) tile.doorLocked = true;
+      }
+      floorItems.resetFromMap();
+      markers.update();
+      combat.refreshOccupancy();
+      partyUi?.hideFrostHint();
+      clearFlankFlash();
+    },
+    combatBusy: () => ({
+      fight: combat.inCombat(),
+      gameOver: combat.gameOver,
+      near: combat.nearestMonsterDist(),
+      lowHp: combat.allHeroesUnderHpFrac(0.25)
+    }),
+    frostHintDismissed: () => combat.frostHintDismissed,
+    setFrostHintDismissed: (on) => {
+      combat.frostHintDismissed = on;
+      if (on) {
+        combat.dismissFrostHint();
+        partyUi?.dismissFrostHint();
+      } else {
+        combat.frostHintDismissed = false;
+        partyUi && (partyUi.frostHintDismissed = false);
+      }
+    },
+    closeOverlays: () => partyUi?.closeOverlays(),
+    clearLog: () => partyUi?.clearLog(),
+    syncHud: () => syncPartyHud()
   });
   combat.attach({
     pushLog: (text) => partyUi?.pushLog(text),
@@ -821,7 +919,18 @@ async function boot(): Promise<void> {
   syncEquipment();
   syncPartyHud();
   combat.setParty(mover.x, mover.y, mover.dir);
-  document.getElementById('btn-go-floor')?.addEventListener('click', () => location.reload());
+  document.getElementById('btn-save')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    partyUi?.closeOverlays();
+    gameplay.requestManualSave();
+  });
+  document.getElementById('btn-load')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    partyUi?.closeOverlays();
+    gameplay.requestManualLoad();
+  });
   if (debugKey) gameplay.giveItem('key');
 
   let swipeX = 0;
@@ -1089,11 +1198,16 @@ async function boot(): Promise<void> {
     getHeroes: () =>
       HERO_IDS.map((id) => {
         const hero = partyUi!.heroes[id];
+        const live = combat.engine.heroes[id];
         return {
           id,
           hp: hero.hp,
           maxHp: hero.maxHp,
           mana: hero.mana,
+          maxMana: hero.maxMana,
+          level: live?.level ?? hero.level,
+          xp: live?.xp ?? hero.xp,
+          pendingPerk: live?.pendingPerk ?? hero.pendingPerk,
           downed: hero.downed,
           state: portraitState(hero.hp, hero.maxHp, hero.downed)
         };
@@ -1132,6 +1246,66 @@ async function boot(): Promise<void> {
     flashFlank: (side) => flashFlank(side),
     lastFlank: () => combat.lastFlank,
     gameOverVisible: () => gameplay.gameOverVisible(),
+    captureSave: () => gameplay.captureSave('slot'),
+    applySave: (save) => gameplay.applySave(save),
+    saveToSlot: (slot) => gameplay.commitSlot(slot),
+    loadFromSlot: (slot) => gameplay.loadFromSlot(slot),
+    requestManualSave: () => gameplay.requestManualSave(),
+    requestManualLoad: () => gameplay.requestManualLoad(),
+    tryAutosave: () => gameplay.tryAutosave('auto'),
+    canAutosave: () => gameplay.canAutosave(),
+    takeFloorSnapshot: () => gameplay.takeFloorSnapshot(),
+    loadAutosave: () => gameplay.loadAutosave(),
+    fireVisibilityAutosave: () => gameplay.tryAutosave('quiet'),
+    mapState: () => {
+      const save = gameplay.captureSave('slot');
+      return {
+        position: { ...save.position },
+        oil: save.oil,
+        bag: save.bag.map((s) => ({ item: s.item, count: s.count, journalPage: s.journalPage })),
+        party: save.party.map((h) => ({
+          id: h.id,
+          hp: h.hp,
+          maxHp: h.maxHp,
+          mana: h.mana,
+          maxMana: h.maxMana,
+          level: h.level,
+          xp: h.xp,
+          pendingPerk: h.pendingPerk,
+          downed: h.downed,
+          main: h.equipment.main,
+          off: h.equipment.off,
+          armour: h.armour
+        })),
+        doors: FLOOR1_DOOR_EDGES.map((edge) => {
+          const tile = tileAt(floor1Map, edge.x, edge.y);
+          return {
+            x: edge.x,
+            y: edge.y,
+            open: !!tile?.doorOpen,
+            locked: !!tile?.doorLocked && !tile.doorOpen
+          };
+        }),
+        items: floorItems.snapshot().map((row) => ({
+          x: row.x,
+          y: row.y,
+          item: row.item,
+          visible: row.visible
+        })),
+        monsters: combat.engine.monsters.map((m) => ({
+          id: m.id,
+          kind: m.kind,
+          x: m.x,
+          y: m.y,
+          hp: m.hp,
+          alive: m.alive
+        })),
+        flags: save.flags,
+        firedOnce: save.firedOnce,
+        goals: save.goals,
+        journalPages: save.journalPages
+      };
+    },
     skipIntro: () => gameplay.skipIntro(),
     speakBark: (trigger, speaker) => gameplay.speakBark(trigger, speaker),
     unlockAudio: () => gameplay.unlock(),

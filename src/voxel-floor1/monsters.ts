@@ -133,6 +133,24 @@ export class Floor1Monsters {
     this.darkFx.syncEyes(this.asScene(this.group), this.sprites, monsters, this.audio ?? undefined);
   }
 
+  async resetFromCombat(
+    monsters: Array<{
+      id: string;
+      kind: string;
+      x: number;
+      y: number;
+      alive: boolean;
+      pairSlot?: 'left' | 'right';
+      pairId?: string;
+    }>
+  ): Promise<void> {
+    this.sprites.resetMonsters(classicFloor1);
+    this.darkFx.resetEyes(this.audio ?? undefined);
+    for (const id of [...this.lit.keys()]) this.dropLit(id);
+    await this.sprites.syncLiveMonsters(this.asScene(this.hidden), monsters);
+    this.darkFx.syncEyes(this.asScene(this.group), this.sprites, monsters, this.audio ?? undefined);
+  }
+
   move(id: string, from: { x: number; y: number }, to: { x: number; y: number }): void {
     this.sprites.moveMonsterId(id, to.x, to.y);
     this.darkFx.moveEyeById(id, from.x, from.y, to.x, to.y, this.audio ?? undefined);

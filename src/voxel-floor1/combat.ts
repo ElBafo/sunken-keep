@@ -11,6 +11,7 @@ import {
   type Occupancy,
   type RulesData
 } from '../core';
+import type { SavedHero, SavedMonster } from '../proto3d/saves';
 import { isSlimeKind, takeSlimeFrostBark } from '../core/slime-frost';
 import { fetchJsonCached } from '../proto3d/asset-cache';
 import { floor1 as classicFloor1 } from '../proto3d/floor-data';
@@ -276,6 +277,57 @@ export class Floor1Combat {
 
   forceWipe(): CombatEvent[] {
     return this.applyEvents(this.engine.forceWipe());
+  }
+
+  resetParty(): void {
+    this.engine.resetParty();
+    this.perkHooks = [];
+    this.chosenPerks.clear();
+    this.lastFlank = null;
+    this.lastHand = null;
+    this.handTapCount = 0;
+    this.frostHintArmed = false;
+    this.frostHintDismissed = false;
+  }
+
+  applySavedParty(party: SavedHero[]): void {
+    this.resetParty();
+    for (const hero of party) this.engine.applyHero(hero);
+    this.engine.pendingPerks = HERO_IDS.flatMap((id) => {
+      const level = this.engine.heroes[id].pendingPerk;
+      return level ? [{ hero: id, level }] : [];
+    });
+    this.perkHooks = this.engine.pendingPerks.slice();
+  }
+
+  restoreMonsters(list: SavedMonster[]): void {
+    this.engine.restoreMonsters(list);
+    this.engine.fight = null;
+    this.engine.gameOver = false;
+  }
+
+  snapshotMonsters(): SavedMonster[] {
+    return this.engine.monsters.map((m) => ({
+      id: m.id,
+      kind: m.kind,
+      x: m.x,
+      y: m.y,
+      hp: m.hp,
+      maxHp: m.maxHp,
+      alive: m.alive,
+      split: m.split,
+      splitDone: m.splitDone,
+      pairSlot: m.pairSlot,
+      pairId: m.pairId
+    }));
+  }
+
+  nearestMonsterDist(): number {
+    return this.engine.nearestMonsterDist();
+  }
+
+  allHeroesUnderHpFrac(frac: number): boolean {
+    return this.engine.allHeroesUnderHpFrac(frac);
   }
 
   flushHeldLogs(): void {

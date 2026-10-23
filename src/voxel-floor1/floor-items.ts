@@ -73,6 +73,7 @@ export async function buildFloor1Items(map: FloorMap): Promise<{
   update: (camera: THREE.Camera) => void;
   hideAt: (x: number, y: number) => void;
   openChestAt: (x: number, y: number) => void;
+  resetFromMap: () => void;
   isPresent: (x: number, y: number) => boolean;
   snapshot: () => Array<{ x: number; y: number; item: string; visible: boolean }>;
 }> {
@@ -146,6 +147,19 @@ export async function buildFloor1Items(map: FloorMap): Promise<{
     }
   };
 
+  const setChestOpen = (visual: FloorItemVisual, open: boolean): void => {
+    const file = open ? ITEM_DEF.chest_open.file : ITEM_DEF.chest.file;
+    const tex = textures.get(file);
+    if (tex) {
+      const mat = visual.mesh.material as THREE.MeshPhysicalMaterial;
+      mat.map = tex;
+      mat.needsUpdate = true;
+    }
+    visual.item = open ? 'chest_open' : 'chest';
+    visual.mesh.userData.item = 'chest';
+    visual.pickedUp = false;
+  };
+
   const hideAt = (x: number, y: number): void => {
     for (const visual of visuals) {
       if (visual.x !== x || visual.y !== y) continue;
@@ -159,15 +173,19 @@ export async function buildFloor1Items(map: FloorMap): Promise<{
     for (const visual of visuals) {
       if (visual.x !== x || visual.y !== y) continue;
       if (visual.item !== 'chest' && visual.item !== 'chest_open') continue;
-      const openTex = textures.get(ITEM_DEF.chest_open.file);
-      if (openTex) {
-        const mat = visual.mesh.material as THREE.MeshPhysicalMaterial;
-        mat.map = openTex;
-        mat.needsUpdate = true;
+      setChestOpen(visual, true);
+    }
+    syncVisible();
+  };
+
+  const resetFromMap = (): void => {
+    for (const visual of visuals) {
+      const tile = tileAt(map, visual.x, visual.y);
+      if (visual.item === 'chest' || visual.item === 'chest_open') {
+        setChestOpen(visual, !!tile?.chestOpen);
+        continue;
       }
-      visual.item = 'chest_open';
-      visual.mesh.userData.item = 'chest';
-      visual.pickedUp = false;
+      visual.pickedUp = !tile?.item;
     }
     syncVisible();
   };
@@ -179,6 +197,7 @@ export async function buildFloor1Items(map: FloorMap): Promise<{
     update,
     hideAt,
     openChestAt,
+    resetFromMap,
     isPresent: (x, y) => visuals.some((v) => v.x === x && v.y === y && v.mesh.visible),
     snapshot: () =>
       visuals.map((v) => ({

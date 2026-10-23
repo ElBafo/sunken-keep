@@ -43,13 +43,31 @@ import { floor1Map, tileAt, type FloorTile } from './layout';
 import { DOOR_LOCKED_MESSAGE, lootRevealed } from './loot';
 import type { HudHeroId } from './portrait-layout';
 import type { QualityLevel } from './lights';
+import {
+  FLOOR_NUMBER,
+  SAVE_VERSION,
+  applyFloorTiles,
+  applySconces,
+  floorState,
+  loadFloorSnapshot,
+  loadSlot,
+  newestAutosave,
+  snapshotCurrentFloor,
+  writeAutosave,
+  writeFloorSnapshot,
+  writeSlot,
+  type SaveKind,
+  type SavePayload,
+  type SavedHero,
+  type SavedMonster
+} from './saves';
 
 export type GameplayPhase = 'boot' | 'tap' | 'title' | 'intro' | 'play';
 
 export type GameplayFlags = {
   /** `?test=1` without `?title=1` — skip tap/title/intro so existing floor tests stay playable. */
   skipChrome: boolean;
-  /** `?title=1` — Classic title after the first tap; New Game starts the intro. */
+  /** Title after the first tap (Classic). `?test=1` hides it unless `?title=1`. */
   showTitle: boolean;
 };
 
@@ -77,6 +95,19 @@ export type GameplayHooks = {
   unlockFacingDoor?: () => string;
   monsterAt?: (x: number, y: number) => { kind: string } | undefined;
   usePotion?: (hero: HudHeroId, kind: 'red' | 'blue' | 'green') => CombatEvent[] | undefined;
+  position?: () => { x: number; y: number; dir: number };
+  setPosition?: (x: number, y: number, dir: number) => void;
+  snapshotParty?: () => SavedHero[];
+  applyParty?: (party: SavedHero[]) => void;
+  snapshotMonsters?: () => SavedMonster[];
+  restoreMonsters?: (list: SavedMonster[]) => void | Promise<void>;
+  restoreVisuals?: () => void;
+  combatBusy?: () => { fight: boolean; gameOver: boolean; near: number; lowHp: boolean };
+  frostHintDismissed?: () => boolean;
+  setFrostHintDismissed?: (on: boolean) => void;
+  closeOverlays?: () => void;
+  clearLog?: () => void;
+  syncHud?: () => void;
 };
 
 export { DOOR_LOCKED_MESSAGE };
@@ -87,7 +118,7 @@ export function parseGameplayFlags(search: string): GameplayFlags {
   const title = q.get('title') === '1';
   return {
     skipChrome: test && !title,
-    showTitle: title
+    showTitle: !test || title
   };
 }
 
@@ -141,6 +172,14 @@ export class Floor1Gameplay {
   private lastHp: Record<string, { hp: number; downed: boolean }> = {};
   private firedCells = new Set<string>();
   private storyFlags = new Set<string>();
+  private journalPages = new Set<string>();
+  private dialogue = new Map<string, string>();
+  private floorStates: Record<string, SavePayload['floors'][string]> = {};
+  private playAccMs = 0;
+  private playStartedAt = 0;
+  private pendingStartSnapshot = false;
+  private visibilityWired = false;
+  currentSlot = 0;
 
   constructor(search: string, quality: QualityLevel) {
     this.flags = parseGameplayFlags(search);
@@ -148,7 +187,7 @@ export class Floor1Gameplay {
   }
 
   allowsInput(): boolean {
-    return this.phase === 'play' && !this.noteOpen && !this.gameOver;
+    return this.phase === 'play' && !this.noteOpen && !this.gameOver && !this.titleVisible();
   }
 
   introVisible(): boolean {
@@ -211,19 +250,18 @@ export class Floor1Gameplay {
     const scene = this.scene;
     if (scene) void this.audio.loadBeforePlaySounds(scene);
     void this.audio.loadIntroMusic();
-    if (this.flags.showTitle) void this.title?.loadEssential();
+    void this.title?.loadEssential();
+    this.wireVisibilityAutosave();
+    this.wireGameOver();
+    this.applyStoryLabels();
     if (this.flags.skipChrome) {
       this.hideTap();
       this.beginPlay();
       return;
     }
-    if (this.flags.showTitle) {
-      this.phase = 'tap';
-      this.showTap('tap_to_start');
-      if (this.pendingTap) this.consumeTitleTap();
-      return;
-    }
-    await this.openIntro();
+    this.phase = 'tap';
+    this.showTap('tap_to_start');
+    if (this.pendingTap) this.consumeTitleTap();
   }
 
   unlock(): void {
@@ -273,6 +311,7 @@ export class Floor1Gameplay {
       this.audio.playStep('step');
     }
     this.fireTileBark(x, y);
+    this.fireTileStepUi(x, y);
   }
 
   onSecretOpened(): void {
@@ -552,14 +591,7 @@ export class Floor1Gameplay {
     } catch {
       // Audio may still be unlocking.
     }
-    const title = document.getElementById('gameover-title');
-    const body = document.getElementById('gameover-body');
-    const btn = document.getElementById('btn-go-floor');
-    const save = document.getElementById('btn-go-autosave');
-    if (title) title.textContent = this.story.uiText('game_over.title');
-    if (body) body.textContent = this.story.uiText('game_over.body');
-    if (btn) btn.textContent = this.story.uiText('game_over.load_floor', { n: 1 });
-    if (save) save.hidden = true;
+    this.refreshGameOverButtons();
     document.getElementById('gameover')?.classList.add('show');
   }
 
@@ -575,9 +607,12 @@ export class Floor1Gameplay {
     if (doc.kind === 'journal') {
       const page = slot.journalPage && slot.journalPage > 0 ? slot.journalPage : 1;
       const introKey = journalIntroKey(page);
+      const trigger = journalTriggerId(page);
       if (this.progress.fire(introKey)) this.pushStoryLog(introKey);
       else this.showMessage(this.story.log(introKey));
-      this.progress.fire(journalTriggerId(page));
+      this.progress.fire(trigger);
+      this.journalPages.add(introKey);
+      this.journalPages.add(trigger);
     }
     this.showNote(doc.title, doc.text);
   }
@@ -733,9 +768,17 @@ export class Floor1Gameplay {
       void this.openIntro();
       return;
     }
-    if (action.type === 'continue' || action.type === 'load' || action.type === 'open_load' || action.type === 'save') {
-      this.showTitleToast(this.story.uiText('status.no_saves'));
+    if (action.type === 'open_load') {
+      void this.openLoadSlots();
+      return;
     }
+    if (action.type === 'continue' || action.type === 'load') {
+      this.title?.hide();
+      this.audio.markPlayStarted();
+      this.runContinue(action.payload);
+      return;
+    }
+    if (action.type === 'save') this.commitSlot(action.slot);
   }
 
   private showTitleToast(text: string): void {
@@ -759,6 +802,7 @@ export class Floor1Gameplay {
     this.title?.refreshHint();
     this.title?.layoutButtons();
     this.setTapStatus(this.phase === 'tap' ? 'tap_to_start' : 'loading');
+    this.applyStoryLabels();
   }
 
   private async openIntro(): Promise<void> {
@@ -784,24 +828,45 @@ export class Floor1Gameplay {
     if (this.audioUnlocked) this.audio.crossfadeToIntro();
   }
 
-  private beginPlay(): void {
-    if (this.playStarted) return;
+  private beginPlay(from?: SavePayload): void {
+    if (this.playStarted && !from) return;
+    const first = !this.playStarted;
     this.playStarted = true;
     this.phase = 'play';
+    this.gameOver = false;
     this.hideTap();
-    if (typeof document !== 'undefined') document.getElementById('intro-overlay')?.classList.remove('show');
+    if (typeof document !== 'undefined') {
+      document.getElementById('intro-overlay')?.classList.remove('show');
+      document.getElementById('gameover')?.classList.remove('show');
+    }
     this.introSkip?.hide();
     this.title?.hide();
     this.unlock();
-    this.progress.startNewGame();
-    this.director.reset();
-    this.audio.markPlayStarted();
-    this.audio.armFirstFightCap();
-    void this.audio.startPlayStreaming();
-    this.audio.crossfadeToAct1();
-    if (this.progress.fire('enter_floor1')) this.pushStoryLog('enter_floor1');
-    this.progress.fire('f1_start');
-    this.startFloorAudio();
+    if (from) {
+      this.applySave(from);
+    } else {
+      this.progress.startNewGame();
+      this.director.reset();
+      this.journalPages.clear();
+      this.dialogue.clear();
+      this.floorStates = {};
+      this.playAccMs = 0;
+      this.playStartedAt = performance.now();
+      this.pendingStartSnapshot = true;
+      if (this.progress.fire('enter_floor1')) this.pushStoryLog('enter_floor1');
+      this.progress.fire('f1_start');
+      if (this.pendingStartSnapshot) {
+        this.takeFloorSnapshot();
+        this.pendingStartSnapshot = false;
+      }
+    }
+    if (first) {
+      this.audio.markPlayStarted();
+      this.audio.armFirstFightCap();
+      void this.audio.startPlayStreaming();
+      this.audio.crossfadeToAct1();
+      this.startFloorAudio();
+    }
   }
 
   private startFloorAudio(): void {
@@ -821,6 +886,254 @@ export class Floor1Gameplay {
     }
   }
 
+  private rebuildAudioFromState(): void {
+    try {
+      this.audio.stopPresenceLoops();
+      this.audio.rebuildFloorLoops({
+        oil: this.hooks?.oil() ?? 2,
+        sconces: floor1Sconces,
+        leeches: (this.hooks?.snapshotMonsters?.() ?? []).map((m) => ({
+          kind: m.kind,
+          x: m.x,
+          y: m.y,
+          alive: m.alive
+        })),
+        carriedTorch: false
+      });
+    } catch {
+      this.startFloorAudio();
+    }
+  }
+
+  private applyStoryLabels(): void {
+    const door = document.getElementById('btn-door');
+    if (door && !door.textContent) door.textContent = this.story.uiText('controls.door');
+    const save = document.getElementById('btn-save');
+    if (save) save.textContent = this.story.uiText('buttons.save') || 'Save';
+    const load = document.getElementById('btn-load');
+    if (load) load.textContent = this.story.titleText('buttons.load') || 'Load';
+    this.refreshGameOverButtons();
+    this.introSkip?.refresh();
+  }
+
+  private refreshGameOverButtons(): void {
+    const title = document.getElementById('gameover-title');
+    const body = document.getElementById('gameover-body');
+    const goSave = document.getElementById('btn-go-autosave');
+    const goFloor = document.getElementById('btn-go-floor');
+    if (title) title.textContent = this.story.uiText('game_over.title');
+    if (body) body.textContent = this.story.uiText('game_over.body');
+    if (goSave) {
+      goSave.textContent = this.story.uiText('game_over.load_last');
+      goSave.hidden = !newestAutosave();
+    }
+    if (goFloor) goFloor.textContent = this.story.uiText('game_over.load_floor', { n: FLOOR_NUMBER });
+  }
+
+  private wireGameOver(): void {
+    if (typeof document === 'undefined') return;
+    const save = document.getElementById('btn-go-autosave');
+    const floor = document.getElementById('btn-go-floor');
+    if (save && !save.dataset.bound) {
+      save.dataset.bound = '1';
+      save.addEventListener('click', () => this.loadAutosave());
+    }
+    if (floor && !floor.dataset.bound) {
+      floor.dataset.bound = '1';
+      floor.addEventListener('click', () => this.restartFloor());
+    }
+  }
+
+  private wireVisibilityAutosave(): void {
+    if (this.visibilityWired || typeof document === 'undefined') return;
+    this.visibilityWired = true;
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.tryAutosave('quiet');
+    });
+    window.addEventListener('pagehide', () => this.tryAutosave('quiet'));
+  }
+
+  private playTimeMs(): number {
+    if (!this.playStartedAt) return this.playAccMs;
+    return this.playAccMs + Math.max(0, performance.now() - this.playStartedAt);
+  }
+
+  captureSave(kind: SaveKind = 'slot'): SavePayload {
+    const pos = this.hooks?.position?.() ?? { x: floor1Map.startX, y: floor1Map.startY, dir: floor1Map.startDir };
+    this.floorStates[String(FLOOR_NUMBER)] = snapshotCurrentFloor(floor1Map, this.hooks?.snapshotMonsters?.() ?? []);
+    const story = this.progress.serialize();
+    const flags = new Set(this.storyFlags);
+    if (this.hooks?.frostHintDismissed?.()) flags.add('frost_hint_dismissed');
+    for (const key of this.firedCells) flags.add(key);
+    return {
+      version: SAVE_VERSION,
+      kind,
+      timestamp: Date.now(),
+      playTimeMs: this.playTimeMs(),
+      locale: this.story.locale,
+      floor: FLOOR_NUMBER,
+      position: { ...pos },
+      oil: this.hooks?.oil() ?? 2,
+      party: this.hooks?.snapshotParty?.() ?? [],
+      bag: this.bag.serialize(),
+      floors: { ...this.floorStates },
+      flags: [...flags],
+      firedOnce: story.fired,
+      goals: story.goals,
+      journalPages: [...this.journalPages],
+      dialogue: Object.fromEntries(this.dialogue),
+      escapeRunActive: false,
+      leader: 'brannoc'
+    };
+  }
+
+  applySave(save: SavePayload): void {
+    try {
+      this.audio.fadeGameOver(300);
+    } catch {
+      // Audio may still be unlocking.
+    }
+    this.director.clearQueue();
+    this.bubble?.hide();
+    document.getElementById('gameover')?.classList.remove('show');
+    this.gameOver = false;
+    this.hooks?.clearLog?.();
+    this.lastMessage = '';
+    this.storyFlags = new Set(save.flags ?? []);
+    this.firedCells = new Set([...this.storyFlags].filter((id) => id.startsWith('bark:')));
+    this.progress.restore({ fired: save.firedOnce, goals: save.goals });
+    this.playAccMs = save.playTimeMs ?? 0;
+    this.playStartedAt = performance.now();
+    this.hooks?.setOil?.(save.oil);
+    this.bag.load(save.bag ?? []);
+    this.floorStates = { ...(save.floors ?? {}) };
+    this.journalPages = new Set(save.journalPages ?? []);
+    this.dialogue = new Map(Object.entries(save.dialogue ?? {}));
+    const floor = floorState(save) ?? this.floorStates[String(save.floor)];
+    applyFloorTiles(floor1Map, floor?.tiles);
+    applySconces(floor?.sconces);
+    this.hooks?.applyParty?.(save.party ?? []);
+    void this.hooks?.restoreMonsters?.(floor?.monsters ?? []);
+    this.hooks?.setFrostHintDismissed?.(this.storyFlags.has('frost_hint_dismissed'));
+    this.hooks?.setPosition?.(save.position.x, save.position.y, save.position.dir);
+    this.hooks?.restoreVisuals?.();
+    this.hooks?.closeOverlays?.();
+    this.closeBag();
+    this.hideNote();
+    this.inventory?.redraw();
+    this.hooks?.syncHud?.();
+    this.refreshGameOverButtons();
+    this.rebuildAudioFromState();
+    this.phase = 'play';
+    this.playStarted = true;
+  }
+
+  canAutosave(): boolean {
+    if (this.phase !== 'play') return false;
+    const busy = this.hooks?.combatBusy?.();
+    if (this.gameOver || busy?.gameOver) return false;
+    if (busy?.fight) return false;
+    if (busy && busy.near <= 2) return false;
+    if (busy?.lowHp) return false;
+    return true;
+  }
+
+  tryAutosave(_reason = 'auto'): boolean {
+    if (!this.canAutosave()) return false;
+    return writeAutosave(this.captureSave('autosave'));
+  }
+
+  takeFloorSnapshot(): void {
+    writeFloorSnapshot(this.captureSave('floor'));
+  }
+
+  saveBlockedReason(): string | null {
+    if (this.hooks?.combatBusy?.().fight) return 'combat';
+    return null;
+  }
+
+  requestManualSave(): void {
+    const blocked = this.saveBlockedReason();
+    if (blocked) {
+      this.showMessage(this.story.titleText('save_blocked'));
+      this.audio.playUi('ui_button_denied');
+      return;
+    }
+    void this.openSaveSlots();
+  }
+
+  requestManualLoad(): void {
+    void this.openLoadSlots();
+  }
+
+  private async openSaveSlots(): Promise<void> {
+    if (!this.title) return;
+    this.hooks?.closeOverlays?.();
+    await this.title.loadEssential();
+    await this.title.loadRest();
+    this.title.prepareSave(this.captureSave('slot'));
+    this.title.show('save');
+  }
+
+  private async openLoadSlots(): Promise<void> {
+    if (!this.title) return;
+    this.hooks?.closeOverlays?.();
+    await this.title.loadEssential();
+    await this.title.loadRest();
+    this.title.show('load');
+  }
+
+  private runContinue(payload: SavePayload): void {
+    if (this.playStarted) this.applySave(payload);
+    else this.beginPlay(payload);
+  }
+
+  commitSlot(slot: number): boolean {
+    const payload = this.captureSave('slot');
+    if (writeSlot(slot, payload)) {
+      this.currentSlot = slot;
+      this.showMessage(this.story.titleText('saved'));
+      this.audio.playUi('save');
+      this.title?.hide();
+      return true;
+    }
+    this.showMessage(this.story.uiText('status.save_failed'));
+    return false;
+  }
+
+  loadFromSlot(slot: number): boolean {
+    const data = loadSlot(slot);
+    if (!data || data === 'corrupt') return false;
+    this.runContinue(data);
+    this.title?.hide();
+    return true;
+  }
+
+  loadAutosave(): void {
+    try {
+      this.audio.fadeGameOver(300);
+    } catch {
+      // Audio may still be unlocking.
+    }
+    const save = newestAutosave();
+    if (save) this.applySave(save);
+    else this.restartFloor();
+  }
+
+  restartFloor(): void {
+    try {
+      this.audio.fadeGameOver(300);
+    } catch {
+      // Audio may still be unlocking.
+    }
+    const snap = loadFloorSnapshot(FLOOR_NUMBER);
+    if (snap) {
+      this.applySave(snap);
+      return;
+    }
+    if (typeof location !== 'undefined') location.reload();
+  }
+
   private pushStoryLog(key: string): void {
     const text = this.story.log(key);
     if (!text) return;
@@ -834,7 +1147,20 @@ export class Floor1Gameplay {
     if (!bark) return;
     const key = `bark:${bark}`;
     if (this.firedCells.has(key) || !this.progress.fire(bark)) return;
-    if (this.speakBark(bark)) this.firedCells.add(key);
+    if (this.speakBark(bark)) {
+      this.firedCells.add(key);
+      this.storyFlags.add(key);
+    }
+  }
+
+  /** Full `ui_text` line every visit. Voxel wraps it; never the `_short` sibling. */
+  fireTileStepUi(x: number, y: number): void {
+    const tile = tileAt(floor1Map, x, y);
+    const path = typeof tile?.stepUi === 'string' ? tile.stepUi : '';
+    if (!path) return;
+    const toast = this.story.uiText(path);
+    if (!toast) return;
+    this.showMessage(toast);
   }
 
   private flushBarks(nowMs: number): void {

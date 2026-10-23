@@ -51,6 +51,10 @@ export type FloorTile = {
   chest?: boolean;
   chestItems?: string[];
   chestOpen?: boolean;
+  /** Classic stairs tile. Floor 1 only has `down` at the coming-soon square. */
+  stairs?: 'up' | 'down';
+  /** Classic `ui_text` path shown every time the party steps onto the tile. */
+  stepUi?: string;
 };
 
 export type FloorMap = {
