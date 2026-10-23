@@ -35,6 +35,8 @@ async function boot(page: import('@playwright/test').Page) {
   );
 }
 
+test.use({ viewport: { width: 420, height: 912 }, hasTouch: true, isMobile: true });
+
 test('voxel floor 1: pick up a key, unlock its door, open the bag and equip', async ({ page }) => {
   test.setTimeout(120000);
   mkdirSync(OUT, { recursive: true });
@@ -78,7 +80,7 @@ test('voxel floor 1: pick up a key, unlock its door, open the bag and equip', as
   expect(locked.result).toBe('unlocking');
   expect(locked.stillLocked).toBe(false);
   expect(locked.bag.some((s) => s.item === 'key')).toBe(false);
-  expect(locked.ui).toContain('door_unlock');
+  expect(locked.message).toMatch(/key turns|lock groans/i);
 
   await page.evaluate(() => {
     const api = (window as unknown as { __voxelFloor1: Floor1 }).__voxelFloor1;
