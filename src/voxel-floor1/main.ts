@@ -34,7 +34,9 @@ import {
 } from './portrait-layout';
 import { lookColors } from '../voxel-lab/look';
 import { applyShadowToggle, recompileShadowShaders } from '../voxel-lab/shadows';
+import { CaveInWorld } from './cave-in-world';
 import { facingSconce, floor1Sconces, floor1Sunbeams, TORCH_CAPPED_PROMPT } from './fixtures';
+import { buildFloor1Stairs } from './stairs';
 import {
   Floor1Lights,
   parseLightMode,
@@ -45,12 +47,13 @@ import {
   type QualityLevel
 } from './lights';
 import { Floor1Gameplay } from './gameplay';
+import { snapshotHero, type SavePayload } from './saves';
 import { litFarBeams, litFarTorches, tileInLightFlood } from './bake';
 import { HERO_IDS, loadFloor1Combat } from './combat';
 import { Floor1Monsters } from './monsters';
 import { loadPerkCopy } from './perks';
 import { buildFloor1Items } from './floor-items';
-import { doorBetween, doorEdgeAt, floor1Map, tileAt } from './layout';
+import { doorBetween, doorEdgeAt, FLOOR1_DOOR_EDGES, floor1Map, tileAt } from './layout';
 import { buildFloor1 } from './level';
 import { buildFloor1Markers } from './markers';
 import { buildFloor1Openings } from './openings';
@@ -171,6 +174,65 @@ type Floor1Api = {
   flashFlank: (side: 'left' | 'right' | 'behind') => void;
   lastFlank: () => 'left' | 'right' | 'behind' | null;
   gameOverVisible: () => boolean;
+  captureSave: () => SavePayload;
+  applySave: (save: SavePayload) => void;
+  saveToSlot: (slot: number) => boolean;
+  loadFromSlot: (slot: number) => boolean;
+  requestManualSave: () => void;
+  requestManualLoad: () => void;
+  tryAutosave: () => boolean;
+  canAutosave: () => boolean;
+  takeFloorSnapshot: () => void;
+  loadAutosave: () => void;
+  fireVisibilityAutosave: () => boolean;
+  playOpeningCaveIn: (instant?: boolean) => void;
+  skipCaveIn: () => void;
+  caveInDone: () => boolean;
+  caveInBusy: () => boolean;
+  rubbleBlocking: (x: number, y: number) => boolean;
+  takeFacingTorch: () => boolean;
+  snuffFacingTorch: () => boolean;
+  handleFacingTorch: () => boolean;
+  torchChoiceVisible: () => boolean;
+  confirmTakeTorch: () => void;
+  confirmSnuffTorch: () => void;
+  sconces: () => Array<{ x: number; y: number; face: string; lit: boolean; empty: boolean; capped: boolean }>;
+  openSettings: () => void;
+  hideSettings: () => void;
+  settingsVisible: () => boolean;
+  getSoundOn: () => boolean;
+  getQualityPref: () => QualityLevel;
+  getLayoutMode: () => string;
+  titleMode: () => string | null;
+  titleVisibleNow: () => boolean;
+  hitTitleBack: () => boolean;
+  setHand: (id: HudHeroId, hand: 'main' | 'off', item: string) => void;
+  mapState: () => {
+    position: { x: number; y: number; dir: number };
+    oil: number;
+    bag: Array<{ item: string; count: number; journalPage?: number }>;
+    party: Array<{
+      id: string;
+      hp: number;
+      maxHp: number;
+      mana: number;
+      maxMana: number;
+      level: number;
+      xp: number;
+      pendingPerk: number | null;
+      downed: boolean;
+      main: string;
+      off: string;
+      armour?: string;
+    }>;
+    doors: Array<{ x: number; y: number; open: boolean; locked: boolean }>;
+    items: Array<{ x: number; y: number; item?: string; visible?: boolean }>;
+    monsters: Array<{ id: string; kind: string; x: number; y: number; hp: number; alive: boolean }>;
+    flags: string[];
+    firedOnce: string[];
+    goals: Record<string, string>;
+    journalPages: string[];
+  };
   skipIntro: () => void;
   speakBark: (trigger: string, speaker?: HudHeroId) => boolean;
   unlockAudio: () => void;
@@ -332,6 +394,9 @@ async function boot(): Promise<void> {
   loading.textContent = 'Placing torches…';
   const props = await buildFloor1Props(floor1Sconces, floor1Sunbeams);
   scene.add(props.group);
+  const caveInWorld = new CaveInWorld();
+  await caveInWorld.load(scene);
+  scene.add(await buildFloor1Stairs());
   const openings = await buildFloor1Openings(floor1Map, lightMode === 'all');
   scene.add(openings.group);
   const floorItems = await buildFloor1Items(floor1Map);
@@ -510,9 +575,17 @@ async function boot(): Promise<void> {
   };
   const tryPickup = (x: number, y: number): boolean => gameplay.pickupItemAt(x, y);
   const interact = (): string => {
+    if (gameplay.caveInBusy) {
+      gameplay.skipCaveIn();
+      return 'cave_in_skip';
+    }
     if (gameplay.hideNote()) {
       combat.flushHeldLogs();
       return 'note';
+    }
+    if (document.getElementById('torch-choice')?.classList.contains('show')) {
+      gameplay.hideTorchChoice();
+      return 'torch';
     }
     if (tryPickup(mover.x, mover.y)) return 'pickup';
     const pos = facing();
@@ -527,6 +600,7 @@ async function boot(): Promise<void> {
       }
       return ok ? 'secret' : 'none';
     }
+    if (gameplay.handleFacingTorch()) return 'torch';
     const ahead = doorAhead();
     if (ahead) return handleDoor(ahead.x, ahead.y);
     const sconce = facingSconce(floor1Sconces, mover.x, mover.y, mover.dir);
@@ -585,7 +659,11 @@ async function boot(): Promise<void> {
   };
 
   const perkOpen = (): boolean => !!partyUi?.perkScreenOpen();
-  const inputOk = (): boolean => gameplay.allowsInput() && !perkOpen();
+  const inputOk = (): boolean => gameplay.allowsMove() && !perkOpen();
+  const syncTorches = (): void => {
+    props.syncFromSconces();
+    lights.relight();
+  };
 
   let flankTimer: ReturnType<typeof setTimeout> | null = null;
   const clearFlankFlash = (): void => {
@@ -671,7 +749,8 @@ async function boot(): Promise<void> {
       partyUi.syncHero(id, {
         ...hero,
         pendingPerk: hero.pendingPerk,
-        level: hero.level
+        level: hero.level,
+        xp: hero.xp
       });
     }
   };
@@ -707,7 +786,7 @@ async function boot(): Promise<void> {
       onStepBack: () => beginStep(-1),
       onStrafeLeft: () => beginStrafe(-1),
       onStrafeRight: () => beginStrafe(1),
-      onInteract: () => (inputOk() ? interact() : 'none'),
+      onInteract: () => (gameplay.caveInBusy || inputOk() ? interact() : 'none'),
       onMenu: () => partyUi?.toggleMenu(),
       onBag: () => {
         partyUi?.closeOverlays();
@@ -763,7 +842,77 @@ async function boot(): Promise<void> {
     openChestAt: (x, y) => floorItems.openChestAt(x, y),
     unlockFacingDoor: () => handleDoor(),
     monsterAt: (x, y) => combat.monsterAt(x, y),
-    usePotion: (hero, kind) => combat.usePotion(hero, kind, nowSec())
+    usePotion: (hero, kind) => combat.usePotion(hero, kind, nowSec()),
+    position: () => ({ x: mover.x, y: mover.y, dir: mover.dir }),
+    setPosition: (x, y, dir) => {
+      mover.hold = false;
+      mover.setPosition(x, y, dir);
+      camera.rotation.x = CAMERA_PITCH;
+      prepareCell(x, y);
+      onArrived(false);
+    },
+    snapshotParty: () =>
+      HERO_IDS.map((id) => snapshotHero(combat.engine.heroes[id], partyUi?.heroes[id]?.armour)),
+    applyParty: (party) => {
+      combat.applySavedParty(party);
+      for (const hero of party) {
+        partyUi?.setHand(hero.id, 'main', hero.equipment.main);
+        partyUi?.setHand(hero.id, 'off', hero.equipment.off);
+        partyUi?.setArmour(hero.id, hero.armour);
+        gameplay.noteHero(hero.id, hero.hp, hero.downed);
+      }
+      syncEquipment();
+    },
+    snapshotMonsters: () => combat.snapshotMonsters(),
+    restoreMonsters: (list) => {
+      combat.restoreMonsters(list);
+      void monsters.resetFromCombat(list);
+    },
+    restoreVisuals: () => {
+      for (const visual of openings.system.all()) {
+        const tile = tileAt(floor1Map, visual.x, visual.y);
+        if (!tile) continue;
+        const open = visual.kind === 'door' ? !!tile.doorOpen : !!tile.secretOpen;
+        openings.system.snapOpen(visual, open);
+        if (visual.kind === 'door' && !open && tile.doorLocked) tile.doorLocked = true;
+      }
+      floorItems.resetFromMap();
+      markers.update();
+      combat.refreshOccupancy();
+      partyUi?.hideFrostHint();
+      clearFlankFlash();
+      syncTorches();
+      caveInWorld.sync(gameplay.caveInDone());
+    },
+    startMove: (x, y, dir, ms, ease) => {
+      mover.startTo(x, y, dir, ms, dir === mover.dir ? 'step' : 'turn', ease ?? 'inout');
+    },
+    isMoving: () => mover.moving,
+    applyRubble: () => caveInWorld.applyRubble(),
+    resetRubble: () => caveInWorld.resetRubble(),
+    setDust: (frame) => caveInWorld.setDust(frame),
+    syncTorches,
+    facingSconce: () => facingSconce(floor1Sconces, mover.x, mover.y, mover.dir),
+    combatBusy: () => ({
+      fight: combat.inCombat(),
+      gameOver: combat.gameOver,
+      near: combat.nearestMonsterDist(),
+      lowHp: combat.allHeroesUnderHpFrac(0.25)
+    }),
+    frostHintDismissed: () => combat.frostHintDismissed,
+    setFrostHintDismissed: (on) => {
+      combat.frostHintDismissed = on;
+      if (on) {
+        combat.dismissFrostHint();
+        partyUi?.dismissFrostHint();
+      } else {
+        combat.frostHintDismissed = false;
+        partyUi && (partyUi.frostHintDismissed = false);
+      }
+    },
+    closeOverlays: () => partyUi?.closeOverlays(),
+    clearLog: () => partyUi?.clearLog(),
+    syncHud: () => syncPartyHud()
   });
   combat.attach({
     pushLog: (text) => partyUi?.pushLog(text),
@@ -821,7 +970,24 @@ async function boot(): Promise<void> {
   syncEquipment();
   syncPartyHud();
   combat.setParty(mover.x, mover.y, mover.dir);
-  document.getElementById('btn-go-floor')?.addEventListener('click', () => location.reload());
+  document.getElementById('btn-save')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    partyUi?.closeOverlays();
+    gameplay.requestManualSave();
+  });
+  document.getElementById('btn-load')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    partyUi?.closeOverlays();
+    gameplay.requestManualLoad();
+  });
+  document.getElementById('btn-settings')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    partyUi?.closeOverlays();
+    gameplay.openSettings();
+  });
   if (debugKey) gameplay.giveItem('key');
 
   let swipeX = 0;
@@ -832,7 +998,7 @@ async function boot(): Promise<void> {
     if (!gameplay.allowsInput()) return false;
     if (partyUi?.overlayOpen() || gameplay.bagOpen()) return false;
     const t = e.target as HTMLElement | null;
-    if (t?.closest?.('button, .hand-hit, .portrait-cell, .overlay, #stats, #message-log, #tap-to-start, #intro-overlay, #title-overlay, #inventory-screen, #note-overlay, #perk-screen')) return false;
+    if (t?.closest?.('button, .hand-hit, .portrait-cell, .overlay, #stats, #message-log, #tap-to-start, #intro-overlay, #title-overlay, #inventory-screen, #note-overlay, #perk-screen, #settings-overlay, #torch-choice')) return false;
     return e.clientY < latestLayout.view.h && e.clientY >= 0;
   };
 
@@ -1089,11 +1255,16 @@ async function boot(): Promise<void> {
     getHeroes: () =>
       HERO_IDS.map((id) => {
         const hero = partyUi!.heroes[id];
+        const live = combat.engine.heroes[id];
         return {
           id,
           hp: hero.hp,
           maxHp: hero.maxHp,
           mana: hero.mana,
+          maxMana: hero.maxMana,
+          level: live?.level ?? hero.level,
+          xp: live?.xp ?? hero.xp,
+          pendingPerk: live?.pendingPerk ?? hero.pendingPerk,
           downed: hero.downed,
           state: portraitState(hero.hp, hero.maxHp, hero.downed)
         };
@@ -1132,6 +1303,96 @@ async function boot(): Promise<void> {
     flashFlank: (side) => flashFlank(side),
     lastFlank: () => combat.lastFlank,
     gameOverVisible: () => gameplay.gameOverVisible(),
+    captureSave: () => gameplay.captureSave('slot'),
+    applySave: (save) => gameplay.applySave(save),
+    saveToSlot: (slot) => gameplay.commitSlot(slot),
+    loadFromSlot: (slot) => gameplay.loadFromSlot(slot),
+    requestManualSave: () => gameplay.requestManualSave(),
+    requestManualLoad: () => gameplay.requestManualLoad(),
+    tryAutosave: () => gameplay.tryAutosave('auto'),
+    canAutosave: () => gameplay.canAutosave(),
+    takeFloorSnapshot: () => gameplay.takeFloorSnapshot(),
+    loadAutosave: () => gameplay.loadAutosave(),
+    playOpeningCaveIn: (instant?: boolean) => gameplay.playOpeningCaveIn(!!instant),
+    skipCaveIn: () => gameplay.skipCaveIn(),
+    caveInDone: () => gameplay.caveInDone(),
+    caveInBusy: () => gameplay.caveInBusy,
+    rubbleBlocking: (x: number, y: number) => !!tileAt(floor1Map, x, y)?.wall,
+    takeFacingTorch: () => gameplay.takeFacingTorch(),
+    snuffFacingTorch: () => gameplay.snuffFacingTorch(),
+    handleFacingTorch: () => gameplay.handleFacingTorch(),
+    torchChoiceVisible: () => !!document.getElementById('torch-choice')?.classList.contains('show'),
+    confirmTakeTorch: () => document.getElementById('btn-torch-take')?.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, isPrimary: true })),
+    confirmSnuffTorch: () => document.getElementById('btn-torch-snuff')?.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, isPrimary: true })),
+    sconces: () => floor1Sconces.map((s) => ({ x: s.x, y: s.y, face: s.face, lit: !!s.lit, empty: !!s.empty, capped: !!s.capped })),
+    openSettings: () => gameplay.openSettings(),
+    hideSettings: () => gameplay.hideSettings(),
+    settingsVisible: () => gameplay.settingsVisible(),
+    getSoundOn: () => gameplay.getSoundOn(),
+    getQualityPref: () => gameplay.getQualityPref(),
+    getLayoutMode: () => document.body.classList.contains('layout-edge') ? 'edge' : 'framed',
+    titleMode: () => gameplay.title?.getMode() ?? null,
+    titleVisibleNow: () => gameplay.titleVisible(),
+    hitTitleBack: () => {
+      const title = gameplay.title;
+      if (!title) return false;
+      title.press('Back');
+      return !title.visible;
+    },
+    setHand: (id, hand, item) => {
+      partyUi?.setHand(id, hand, item);
+      combat.setEquipment(id, hand, item);
+    },
+    fireVisibilityAutosave: () => gameplay.tryAutosave('quiet'),
+    mapState: () => {
+      const save = gameplay.captureSave('slot');
+      return {
+        position: { ...save.position },
+        oil: save.oil,
+        bag: save.bag.map((s) => ({ item: s.item, count: s.count, journalPage: s.journalPage })),
+        party: save.party.map((h) => ({
+          id: h.id,
+          hp: h.hp,
+          maxHp: h.maxHp,
+          mana: h.mana,
+          maxMana: h.maxMana,
+          level: h.level,
+          xp: h.xp,
+          pendingPerk: h.pendingPerk,
+          downed: h.downed,
+          main: h.equipment.main,
+          off: h.equipment.off,
+          armour: h.armour
+        })),
+        doors: FLOOR1_DOOR_EDGES.map((edge) => {
+          const tile = tileAt(floor1Map, edge.x, edge.y);
+          return {
+            x: edge.x,
+            y: edge.y,
+            open: !!tile?.doorOpen,
+            locked: !!tile?.doorLocked && !tile.doorOpen
+          };
+        }),
+        items: floorItems.snapshot().map((row) => ({
+          x: row.x,
+          y: row.y,
+          item: row.item,
+          visible: row.visible
+        })),
+        monsters: combat.engine.monsters.map((m) => ({
+          id: m.id,
+          kind: m.kind,
+          x: m.x,
+          y: m.y,
+          hp: m.hp,
+          alive: m.alive
+        })),
+        flags: save.flags,
+        firedOnce: save.firedOnce,
+        goals: save.goals,
+        journalPages: save.journalPages
+      };
+    },
     skipIntro: () => gameplay.skipIntro(),
     speakBark: (trigger, speaker) => gameplay.speakBark(trigger, speaker),
     unlockAudio: () => gameplay.unlock(),

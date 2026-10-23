@@ -51,6 +51,10 @@ export type FloorTile = {
   chest?: boolean;
   chestItems?: string[];
   chestOpen?: boolean;
+  /** Classic stairs tile. Floor 1 only has `down` at the coming-soon square. */
+  stairs?: 'up' | 'down';
+  /** Classic `ui_text` path shown every time the party steps onto the tile. */
+  stepUi?: string;
 };
 
 export type FloorMap = {
@@ -165,6 +169,17 @@ export function isShellTile(tile: FloorTile | undefined): boolean {
 
 export function canStep(map: FloorMap, x: number, y: number): boolean {
   return isWalkableTile(tileAt(map, x, y));
+}
+
+/** Cave-in rubble: the trigger cell becomes a blocking wall after the crash. */
+export function setRubbleWall(map: FloorMap, x: number, y: number, on: boolean): void {
+  const tile = tileAt(map, x, y);
+  if (!tile) return;
+  tile.wall = on;
+}
+
+export function rubbleBlocking(map: FloorMap, x: number, y: number): boolean {
+  return !!tileAt(map, x, y)?.wall;
 }
 
 export function doorEdgeAt(x: number, y: number): DoorEdge | undefined {
@@ -332,22 +347,24 @@ export function enumerateFaces(map: FloorMap): FaceJob[] {
   for (let z = 0; z < map.height; z++) {
     for (let x = 0; x < map.width; x++) {
       if (!isShellTile(map.tiles[z][x])) continue;
-      const floorFile = mappedFloorFile(x, z) ?? pickVariant(FLOOR_VARIANTS, x, z, 'F');
-      jobs.push({
-        face: 'floor',
-        tx: x,
-        tz: z,
-        file: floorFile,
-        batch: floorFile,
-        kind: 'floor',
-        wallX: x,
-        wallY: z,
-        wallFace: 'F',
-        bulge: 0,
-        uOffset: 0,
-        uvRot: 0,
-        uvScale: 1
-      });
+      if (!map.tiles[z][x].stairs) {
+        const floorFile = mappedFloorFile(x, z) ?? pickVariant(FLOOR_VARIANTS, x, z, 'F');
+        jobs.push({
+          face: 'floor',
+          tx: x,
+          tz: z,
+          file: floorFile,
+          batch: floorFile,
+          kind: 'floor',
+          wallX: x,
+          wallY: z,
+          wallFace: 'F',
+          bulge: 0,
+          uOffset: 0,
+          uvRot: 0,
+          uvScale: 1
+        });
+      }
       const ceilFile = mappedCeilingFile(x, z) ?? pickVariant(CEILING_VARIANTS, x, z, 'C');
       jobs.push({
         face: 'ceiling',

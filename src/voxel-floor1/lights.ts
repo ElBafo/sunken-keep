@@ -175,6 +175,23 @@ export class Floor1Lights {
     this.stats.sunbeams = sunbeams.length;
   }
 
+  /** Rebuild flood + slot binding after take / snuff / load. Does not realloc lights. */
+  relight(): void {
+    this.reach.clear();
+    for (const s of this.sconces) {
+      const key = sconceKey(s);
+      if (sconceIsLit(s)) {
+        const room = sconceRoom(s);
+        this.reach.set(key, floodReach(this.map, room.x, room.y, SCONCE_RADIUS_TILES));
+        this.blends.set(key, this.mode === 'all' ? 1 : 0);
+      } else {
+        this.blends.set(key, 0);
+      }
+    }
+    this.stats.torches = this.sconces.length;
+    this.stats.torchesLit = this.sconces.filter(sconceIsLit).length;
+  }
+
   setParty(px: number, py: number, now: number, freezeFlicker: boolean): void {
     const partyKey = `${px},${py}`;
     const dt = this.lastNow ? Math.min(0.08, Math.max(0, (now - this.lastNow) / 1000)) : 0;
@@ -322,11 +339,16 @@ export class Floor1Lights {
   }
 
   private placeAll(lit: SconceSpec[], now: number, freezeFlicker: boolean): void {
-    for (const s of lit) this.blends.set(sconceKey(s), 1);
+    for (const s of this.sconces) this.blends.set(sconceKey(s), sconceIsLit(s) ? 1 : 0);
     for (const b of this.sunbeams) this.blends.set(beamKey(b), 1);
     for (let i = 0; i < this.torchSlots.length; i++) {
       const s = lit[i];
-      if (!s) continue;
+      if (!s) {
+        this.torchSlots[i].point.intensity = SLOT_HOLD;
+        this.torchSlots[i].spot.intensity = SLOT_HOLD;
+        this.torchSlots[i].key = '';
+        continue;
+      }
       this.bindTorch(this.torchSlots[i], s, now, i, 1, freezeFlicker);
     }
     for (let i = 0; i < this.sunbeamSlots.length; i++) {

@@ -41,6 +41,9 @@ describe('voxel floor 1 intro / audio / bark port', () => {
     expect(gameplay).toContain("from '../proto3d/items'");
     expect(gameplay).toContain("from '../proto3d/layout585'");
     expect(gameplay).toContain("from '../proto3d/note-reader'");
+    expect(gameplay).toContain("from './saves'");
+    expect(gameplay).toContain('writeSlot');
+    expect(gameplay).toContain('writeAutosave');
     expect(gameplay).toContain('this.story.readableItem');
     expect(gameplay).toContain('this.hooks?.usePotion?.(hero, kind)');
     expect(html).toContain('id="note-overlay"');
@@ -60,7 +63,7 @@ describe('voxel floor 1 intro / audio / bark port', () => {
   it('skips the intro chrome for ?test=1 so existing floor walk tests stay playable', () => {
     expect(parseGameplayFlags('?test=1')).toEqual({ skipChrome: true, showTitle: false });
     expect(parseGameplayFlags('?test=1&title=1')).toEqual({ skipChrome: false, showTitle: true });
-    expect(parseGameplayFlags('')).toEqual({ skipChrome: false, showTitle: false });
+    expect(parseGameplayFlags('')).toEqual({ skipChrome: false, showTitle: true });
     expect(gameplay).toContain("q.get('test') === '1'");
   });
 
