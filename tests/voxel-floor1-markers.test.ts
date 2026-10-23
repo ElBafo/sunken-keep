@@ -19,7 +19,7 @@ describe('voxel-floor1 secret placeholders match Classic contents', () => {
     expect((floor1.tiles[1][5] as { carving?: string }).carving).toBe('carving_secret');
     expect((floor1.tiles[13][4] as { item?: string; journalPage?: number }).item).toBe('journal_page');
     expect((floor1.tiles[13][4] as { journalPage?: number }).journalPage).toBe(1);
-    expect(floor1SecretMarkers.map((m) => m.id)).toEqual(['carving_secret', 'journal_page_1']);
+    expect(floor1SecretMarkers.map((m) => m.id)).toEqual(['carving_secret']);
     expect(floor1SecretMarkers[0]).toMatchObject({
       x: 5,
       y: 1,
@@ -27,14 +27,6 @@ describe('voxel-floor1 secret placeholders match Classic contents', () => {
       secretY: 1,
       art: CARVING_SECRET_NEAR,
       prompt: '"We gave much. We need more."'
-    });
-    expect(floor1SecretMarkers[1]).toMatchObject({
-      x: 4,
-      y: 13,
-      secretX: 5,
-      secretY: 13,
-      art: JOURNAL_PAGE_NEAR,
-      prompt: "Orrun's journal. The ink still holds."
     });
     expect(existsSync(resolve(__dirname, '../public', CARVING_SECRET_NEAR))).toBe(true);
     expect(existsSync(resolve(__dirname, '../public', JOURNAL_PAGE_NEAR))).toBe(true);
@@ -55,9 +47,9 @@ describe('voxel-floor1 secret placeholders match Classic contents', () => {
     tileAt(floor1Map, 5, 1)!.secretOpen = true;
     tileAt(floor1Map, 5, 13)!.secretOpen = true;
     expect(markers.interact(5, 1, 0)).toBe('"We gave much. We need more."');
-    expect(markers.interact(5, 13, 3)).toBe("Orrun's journal. The ink still holds.");
-    expect(markers.interact(4, 13, 3)).toBe("Orrun's journal. The ink still holds.");
+    expect(markers.interact(5, 13, 3)).toBeNull();
+    expect(markers.interact(4, 13, 3)).toBeNull();
     expect(markers.group.getObjectByName('carving_secret')?.visible).toBe(true);
-    expect(markers.group.getObjectByName('journal_page_1')?.visible).toBe(true);
+    expect(markers.group.getObjectByName('journal_page_1')).toBeUndefined();
   });
 });

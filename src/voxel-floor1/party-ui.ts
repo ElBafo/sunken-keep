@@ -1,4 +1,4 @@
-import { DEFAULT_EQUIPMENT, type HeroId, type ItemType } from '../constants';
+import { DEFAULT_EQUIPMENT, type HeroId } from '../constants';
 import {
   HERO_DISPLAY,
   HERO_IDS,
@@ -66,8 +66,9 @@ export type PartyHeroState = {
   mana: number;
   maxMana: number;
   downed: boolean;
-  main: ItemType;
-  off: ItemType;
+  main: string;
+  off: string;
+  armour?: string;
 };
 
 export type PartyUiHooks = {
@@ -361,6 +362,21 @@ export class Floor1PartyUi {
     return !this.sheetEl.hidden || !this.bagEl.hidden || !this.menuEl.hidden;
   }
 
+  setHand(id: HudHeroId, hand: 'main' | 'off', item: string): void {
+    this.heroes[id][hand] = item;
+    this.drawPortraits();
+  }
+
+  setArmour(id: HudHeroId, item: string | undefined): void {
+    this.heroes[id].armour = item;
+  }
+
+  setHeroMana(id: HudHeroId, mana: number): void {
+    const hero = this.heroes[id];
+    hero.mana = Math.max(0, Math.min(hero.maxMana, Math.round(mana)));
+    this.drawPortraits();
+  }
+
   private bind(): void {
     const click = (id: string, fn: (e: Event) => void) => {
       document.getElementById(id)?.addEventListener('click', (e) => {
@@ -465,7 +481,7 @@ export class Floor1PartyUi {
   private handEl(
     id: HudHeroId,
     hand: 'main' | 'off',
-    item: ItemType,
+    item: string,
     visual: Rect,
     tap: Rect,
     cell: Rect
@@ -480,7 +496,7 @@ export class Floor1PartyUi {
     const icon = document.createElement('img');
     icon.className = 'hand-icon';
     icon.alt = '';
-    icon.src = hudAsset(`art/ui/hands/${HAND_FILE[item] ?? 'hand_axe.png'}`);
+    icon.src = hudAsset(`art/ui/hands/${HAND_FILE[item] ?? (item === 'iron_shield' ? 'hand_shield.png' : 'hand_axe.png')}`);
     icon.style.left = `${visual.x - tap.x}px`;
     icon.style.top = `${visual.y - tap.y}px`;
     icon.style.width = `${visual.w}px`;

@@ -3,8 +3,11 @@ import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
 import { INTRO_SKIP_MIN_TAP_PX } from '../src/proto3d/intro-skip';
 import { wrapLogMessage } from '../src/voxel-floor1/portrait-layout';
-import { floor1BarkAt, HERO_HURT_STEMS, parseGameplayFlags } from '../src/voxel-floor1/gameplay';
-import { floor1Map, tileAt } from '../src/voxel-floor1/layout';
+import { DOOR_LOCKED_MESSAGE, floor1BarkAt, HERO_HURT_STEMS, parseGameplayFlags } from '../src/voxel-floor1/gameplay';
+import { PartyBag } from '../src/proto3d/bag';
+import { canEquip, preferredHand } from '../src/proto3d/items';
+import { classicFloor1Loot } from '../src/voxel-floor1/loot';
+import { floor1Map, resetFloor1Loot, tileAt } from '../src/voxel-floor1/layout';
 
 type BarkRow = { trigger: string; speaker: string; text: string };
 
@@ -33,6 +36,14 @@ describe('voxel floor 1 intro / audio / bark port', () => {
     expect(HERO_HURT_STEMS.join(' ')).toMatch(/mags/);
     expect(gameplay).toContain("from '../proto3d/i18n'");
     expect(gameplay).toContain("from '../proto3d/story-progress'");
+    expect(gameplay).toContain("from '../proto3d/bag'");
+    expect(gameplay).toContain("from '../proto3d/inventory-ui'");
+    expect(gameplay).toContain("from '../proto3d/items'");
+    expect(gameplay).toContain("from '../proto3d/layout585'");
+    expect(gameplay).toContain("from '../proto3d/note-reader'");
+    expect(gameplay).toContain('this.story.readableItem');
+    expect(html).toContain('id="note-overlay"');
+    expect(html).toContain('id="note-canvas"');
     expect(gameplay).toContain('enterPlayFromIntro');
     expect(gameplay).toContain('mountIntroSkip');
     expect(gameplay).toContain('crossfadeToIntro');
@@ -87,5 +98,60 @@ describe('voxel floor 1 intro / audio / bark port', () => {
     expect(gameplay).not.toContain('water-decals');
     expect(main).toContain("from './water'");
     expect(index).toContain('src="/src/proto3d/main.ts"');
+  });
+
+  it('maps Classic floor-1 loot onto the same voxel cells', () => {
+    const loot = classicFloor1Loot();
+    expect(loot).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ x: 2, y: 5, item: 'key' }),
+        expect.objectContaining({ x: 6, y: 3, item: 'potion_red' }),
+        expect.objectContaining({ x: 5, y: 5, item: 'potion_blue' }),
+        expect.objectContaining({ x: 7, y: 7, item: 'potion_green' }),
+        expect.objectContaining({ x: 12, y: 8, item: 'oil_flask' }),
+        expect.objectContaining({ x: 4, y: 10, item: 'potion_red' }),
+        expect.objectContaining({ x: 4, y: 13, item: 'journal_page', journalPage: 1 }),
+        expect.objectContaining({ x: 5, y: 7, chest: true, chestItems: ['potion_red'] })
+      ])
+    );
+    expect(loot.some((row) => row.x === 4 && row.y === 2)).toBe(false);
+  });
+
+  it('keeps the keyhole lock line and can pick up a key, then equip from the bag', () => {
+    expect(DOOR_LOCKED_MESSAGE).toBe('The door is locked. It needs a key.');
+    expect(gameplay).toContain('DOOR_LOCKED_MESSAGE');
+    expect(gameplay).toContain("playDoor('door_locked'");
+    expect(gameplay).toContain("playDoor('door_unlock'");
+    expect(main).toContain("showPrompt('The door is locked. It needs a key.')");
+    expect(main).toContain('pickupItemAt');
+    expect(main).toContain('equipBagSlot');
+    resetFloor1Loot();
+    expect(tileAt(floor1Map, 2, 5)?.item).toBe('key');
+    const bag = new PartyBag();
+    const id = tileAt(floor1Map, 2, 5)!.item!;
+    expect(bag.add(id)).toBe(1);
+    tileAt(floor1Map, 2, 5)!.item = undefined;
+    expect(bag.has('key')).toBe(true);
+    expect(tileAt(floor1Map, 2, 5)?.item).toBeUndefined();
+    expect(bag.remove('key', 1)).toBe(true);
+    expect(bag.has('key')).toBe(false);
+    bag.add('iron_shield');
+    expect(canEquip('iron_shield', 'mags')).toBe(true);
+    expect(preferredHand('iron_shield')).toBe('off');
+    const taken = bag.takeAt(0, 1);
+    expect(taken?.item).toBe('iron_shield');
+    bag.add('tricks_pouch');
+    expect(bag.has('tricks_pouch')).toBe(true);
+    resetFloor1Loot();
+  });
+
+  it('opens the classic journal reader from the bag and keeps the HUD bag button above the bag', () => {
+    expect(gameplay).toContain('readBagSlot');
+    expect(gameplay).toContain('journalIntroKey');
+    expect(gameplay).toContain('NOTE_SCROLL_SFX');
+    expect(gameplay).not.toMatch(/The Tide asks only for fire/);
+    expect(html).toMatch(/#btn-bag\s*\{\s*z-index:\s*100;/);
+    expect(html).toMatch(/#inventory-screen[\s\S]*z-index:\s*90/);
+    expect(html).toMatch(/#note-overlay[\s\S]*z-index:\s*400/);
   });
 });

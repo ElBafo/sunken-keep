@@ -35,6 +35,13 @@ describe('voxel-floor1 is a standalone Vite page', () => {
     expect(html).toContain('id="intro-canvas"');
     expect(html).toContain('id="title-overlay"');
     expect(html).toContain('id="title-canvas"');
+    expect(html).toContain('id="inventory-screen"');
+    expect(html).toContain('id="inventory-canvas"');
+    expect(html).toContain('id="note-overlay"');
+    expect(html).toContain('id="note-canvas"');
+    expect(html).toContain('id="btn-bag"');
+    expect(html).toMatch(/#btn-bag\s*\{\s*z-index:\s*100;/);
+    expect(html).toMatch(/#note-overlay[\s\S]*rgba\(8,\s*6,\s*4/);
     expect(html).toContain('env(safe-area-inset-top');
     expect(html).not.toContain('id="party-hud"');
     expect(html).not.toContain('id="game-stage"');

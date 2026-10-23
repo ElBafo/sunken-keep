@@ -67,6 +67,9 @@
       touch-action: manipulation;
       -webkit-tap-highlight-color: transparent;
     }
+    #btn-bag {
+      z-index: 100;
+    }
     .hud-chrome img, #compass img {
       display: block;
       width: 24px;
@@ -465,6 +468,77 @@
     }
     #title-toast.show { opacity: 1; }
     #speech-bubble { display: none; }
+    #inventory-screen {
+      position: fixed;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 90;
+      display: none;
+      background: #000;
+      touch-action: none;
+      pointer-events: auto;
+    }
+    #inventory-screen.show { display: block; }
+    #note-overlay {
+      position: fixed;
+      inset: 0;
+      z-index: 400;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(8, 6, 4, 0.62);
+      pointer-events: none;
+      touch-action: none;
+    }
+    #note-overlay.show {
+      display: flex;
+      pointer-events: auto;
+    }
+    #note-canvas {
+      display: block;
+      width: 92%;
+      height: auto;
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
+      box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
+    }
+    #note-title,
+    #note-text {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0 0 0 0);
+    }
+    #inventory-canvas {
+      display: block;
+      width: 100%;
+      height: 100%;
+      image-rendering: pixelated;
+      image-rendering: -moz-crisp-edges;
+      image-rendering: crisp-edges;
+    }
+    .inv-slot,
+    .inv-action,
+    .inv-close,
+    .inv-doll,
+    .inv-hero {
+      position: absolute;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 0;
+      border: 0;
+      background: transparent;
+      color: #d8ccb0;
+      font-family: inherit;
+      font-size: 11px;
+      cursor: pointer;
+      touch-action: none;
+      -webkit-tap-highlight-color: transparent;
+      z-index: 91;
+    }
   </style>
 </head>
 <body>
@@ -515,6 +589,9 @@
     </div>
     <div id="party-strip"></div>
     <div id="home-band"></div>
+    <div id="inventory-screen" hidden>
+      <canvas id="inventory-canvas"></canvas>
+    </div>
   </div>
   <div id="hud" hidden>
     <div id="stats">—</div>
@@ -528,9 +605,13 @@
   <div id="bag-overlay" class="overlay" hidden>
     <div class="overlay-panel">
       <h2>Bag</h2>
-      <p>The bag is empty on this floor walk.</p>
       <button class="overlay-close" type="button">Close</button>
     </div>
+  </div>
+  <div id="note-overlay">
+    <canvas id="note-canvas" width="240" height="320"></canvas>
+    <div id="note-title"></div>
+    <div id="note-text"></div>
   </div>
   <div id="menu-overlay" class="overlay" hidden>
     <div class="overlay-panel">
