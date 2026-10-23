@@ -40,16 +40,6 @@ export const floor1SecretMarkers: readonly MarkerSpec[] = [
     face: 'N',
     art: CARVING_SECRET_NEAR,
     prompt: '"We gave much. We need more."'
-  },
-  {
-    id: 'journal_page_1',
-    kind: 'journal',
-    x: 4,
-    y: 13,
-    secretX: 5,
-    secretY: 13,
-    art: JOURNAL_PAGE_NEAR,
-    prompt: "Orrun's journal. The ink still holds."
   }
 ];
 

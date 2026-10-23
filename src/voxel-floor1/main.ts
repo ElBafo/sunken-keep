@@ -44,6 +44,7 @@ import {
   type QualityLevel
 } from './lights';
 import { Floor1Gameplay } from './gameplay';
+import { buildFloor1Items } from './floor-items';
 import { doorBetween, doorEdgeAt, floor1Map, tileAt } from './layout';
 import { buildFloor1 } from './level';
 import { buildFloor1Markers } from './markers';
@@ -106,6 +107,20 @@ type Floor1Api = {
   sconceVisible: (x: number, y: number, face: string) => boolean;
   hasKey: boolean;
   giveKey: () => void;
+  giveItem: (id: string, n?: number) => number;
+  getBag: () => Array<{ item: string; count: number }>;
+  pickupHere: () => boolean;
+  pickupFacing: () => boolean;
+  pickupAt: (x: number, y: number) => boolean;
+  openBag: () => void;
+  closeBag: () => void;
+  bagOpen: () => boolean;
+  useBagSlot: (i: number) => void;
+  equipBagSlot: (i: number, hero: string, slot?: 'main' | 'off' | 'armour' | 'trinket') => boolean;
+  getHands: () => Array<{ id: string; main: string; off: string; armour?: string }>;
+  floorItems: () => Array<{ x: number; y: number; item: string; visible: boolean }>;
+  lastMessage: string;
+  lastUi: () => string[];
   prompt: string;
   doorAhead: () => { x: number; y: number } | null;
   handleDoor: (x?: number, y?: number) => string;
@@ -176,12 +191,12 @@ async function boot(): Promise<void> {
   await gameplay.loadStory(location.search);
 
   const btnDoor = document.getElementById('btn-door') as HTMLButtonElement | null;
-  let hasKey = params.get('key') === '1';
+  let debugKey = params.get('key') === '1';
   let promptText = '';
   let partyUi: Floor1PartyUi | null = null;
   const showPrompt = (text: string): void => {
     promptText = text;
-    if (text) partyUi?.pushLog(text);
+    if (text && text !== gameplay.lastMessage) partyUi?.pushLog(text);
   };
   const btnQuality = document.getElementById('btn-quality') as HTMLButtonElement | null;
   const labelQuality = (q: QualityLevel): string => (q === 'max' ? 'Gfx Max' : 'Gfx Med');
@@ -282,6 +297,8 @@ async function boot(): Promise<void> {
   scene.add(props.group);
   const openings = await buildFloor1Openings(floor1Map, lightMode === 'all');
   scene.add(openings.group);
+  const floorItems = await buildFloor1Items(floor1Map);
+  scene.add(floorItems.group);
   const markers = await buildFloor1Markers(floor1Map);
   scene.add(markers.group);
   const water = await buildFloor1Water(floor1Map, floor1Sconces);
@@ -333,6 +350,7 @@ async function boot(): Promise<void> {
       mover.kind === 'step' ? { x: mover.toX, y: mover.toY, dir: mover.toDir } : null
     );
     openings.system.setBakeBlends(lights.blends, flick);
+    floorItems.update(camera);
   };
 
   const renderFrame = (): { draws: number; tris: number } => {
@@ -418,22 +436,33 @@ async function boot(): Promise<void> {
     const edge = doorBetween(mover.x, mover.y, pos.x, pos.y);
     return edge ? { x: edge.x, y: edge.y } : null;
   };
+  const hasKeyNow = (): boolean => gameplay.hasBagKey() || debugKey;
   const handleDoor = (x?: number, y?: number): string => {
     const ahead = doorAhead();
     const tx = x ?? ahead?.x;
     const ty = y ?? ahead?.y;
     if (tx == null || ty == null || !ahead || ahead.x !== tx || ahead.y !== ty) return 'none';
-    const result = openings.system.tryDoor(tx, ty, hasKey, performance.now());
-    if (result === 'locked') showPrompt('The door is locked. It needs a key.');
-    if (result === 'unlocking') {
-      hasKey = false;
-      showPrompt('The key turns. The lock groans open.');
+    const tile = tileAt(floor1Map, tx, ty);
+    const locked = !!(tile?.doorLocked && !tile.doorOpen);
+    if (locked && !hasKeyNow()) {
+      gameplay.onDoorLocked(tx, ty);
+      showPrompt('The door is locked. It needs a key.');
+      return 'locked';
     }
+    if (locked && gameplay.hasBagKey()) gameplay.takeDoorKey();
+    else if (locked) debugKey = false;
+    const result = openings.system.tryDoor(tx, ty, true, performance.now());
+    gameplay.onDoorResult(result, tx, ty);
+    if (result === 'locked') showPrompt('The door is locked. It needs a key.');
+    if (result === 'unlocking') showPrompt('The key turns. The lock groans open.');
     if (result === 'toggled') showPrompt('');
     return result;
   };
+  const tryPickup = (x: number, y: number): boolean => gameplay.pickupItemAt(x, y);
   const interact = (): string => {
+    if (tryPickup(mover.x, mover.y)) return 'pickup';
     const pos = facing();
+    if (tryPickup(pos.x, pos.y)) return 'pickup';
     const tile = tileAt(floor1Map, pos.x, pos.y);
     if (tile?.secret && !tile.secretOpen) {
       const ok = openings.system.openSecret(pos.x, pos.y, performance.now());
@@ -502,7 +531,7 @@ async function boot(): Promise<void> {
   };
 
   const beginStep = (dirSign: 1 | -1): boolean => {
-    if (!gameplay.allowsInput()) return false;
+    if (!gameplay.allowsInput() || gameplay.bagOpen()) return false;
     if (dirSign === 1) {
       const pos = facing();
       const tile = tileAt(floor1Map, pos.x, pos.y);
@@ -529,7 +558,7 @@ async function boot(): Promise<void> {
   };
 
   const beginStrafe = (dirSign: 1 | -1): boolean => {
-    if (!gameplay.allowsInput()) return false;
+    if (!gameplay.allowsInput() || gameplay.bagOpen()) return false;
     if (!mover.strafe(dirSign)) return false;
     stepTracking = true;
     stepWorstMs = 0;
@@ -544,17 +573,24 @@ async function boot(): Promise<void> {
   await portraitsReady;
   partyUi = Floor1PartyUi.mount(
     {
-      onTurnLeft: () => gameplay.allowsInput() && mover.turn(1),
-      onTurnRight: () => gameplay.allowsInput() && mover.turn(-1),
+      onTurnLeft: () => gameplay.allowsInput() && !gameplay.bagOpen() && mover.turn(1),
+      onTurnRight: () => gameplay.allowsInput() && !gameplay.bagOpen() && mover.turn(-1),
       onStepForward: () => beginStep(1),
       onStepBack: () => beginStep(-1),
       onStrafeLeft: () => beginStrafe(-1),
       onStrafeRight: () => beginStrafe(1),
       onInteract: () => (gameplay.allowsInput() ? interact() : 'none'),
       onMenu: () => partyUi?.toggleMenu(),
-      onBag: () => partyUi?.toggleBag(),
-      onPortrait: (id) => partyUi?.openSheet(id),
+      onBag: () => {
+        partyUi?.closeOverlays();
+        gameplay.toggleBag();
+      },
+      onPortrait: (id) => {
+        if (gameplay.handlePortraitTap(id)) return;
+        partyUi?.openSheet(id);
+      },
       onHand: (id, hand) => {
+        if (gameplay.handleHandTap(id, hand)) return;
         const hero = partyUi?.heroes[id];
         const item = hand === 'main' ? hero?.main : hero?.off;
         showPrompt(`${id} ${hand}: ${item ?? 'empty'}`);
@@ -570,10 +606,33 @@ async function boot(): Promise<void> {
     party: () =>
       (['brannoc', 'wren', 'ilsevar', 'mags'] as const).map((id) => {
         const hero = partyUi!.heroes[id];
-        return { id, hp: hero.hp, downed: hero.downed };
+        return {
+          id,
+          hp: hero.hp,
+          maxHp: hero.maxHp,
+          mana: hero.mana,
+          maxMana: hero.maxMana,
+          downed: hero.downed,
+          main: hero.main,
+          off: hero.off,
+          armour: hero.armour
+        };
       }),
-    oil: () => partyUi?.oil ?? 2
+    oil: () => partyUi?.oil ?? 2,
+    setOil: (n) => partyUi?.setOil(n),
+    setHand: (id, hand, item) => partyUi?.setHand(id, hand, item),
+    setArmour: (id, item) => partyUi?.setArmour(id, item),
+    setHeroHp: (id, hp) => {
+      partyUi?.setHeroHp(id, hp);
+      const hero = partyUi?.heroes[id];
+      if (hero) gameplay.noteHero(id, hero.hp, hero.downed);
+    },
+    setHeroMana: (id, mana) => partyUi?.setHeroMana(id, mana),
+    hideItemAt: (x, y) => floorItems.hideAt(x, y),
+    openChestAt: (x, y) => floorItems.openChestAt(x, y),
+    unlockFacingDoor: () => handleDoor()
   });
+  if (debugKey) gameplay.giveItem('key');
 
   let swipeX = 0;
   let swipeY = 0;
@@ -581,9 +640,9 @@ async function boot(): Promise<void> {
   const swipeThreshold = 50;
   const swipeFromView = (e: PointerEvent): boolean => {
     if (!gameplay.allowsInput()) return false;
-    if (partyUi?.overlayOpen()) return false;
+    if (partyUi?.overlayOpen() || gameplay.bagOpen()) return false;
     const t = e.target as HTMLElement | null;
-    if (t?.closest?.('button, .hand-hit, .portrait-cell, .overlay, #stats, #message-log, #tap-to-start, #intro-overlay, #title-overlay')) return false;
+    if (t?.closest?.('button, .hand-hit, .portrait-cell, .overlay, #stats, #message-log, #tap-to-start, #intro-overlay, #title-overlay, #inventory-screen')) return false;
     return e.clientY < latestLayout.view.h && e.clientY >= 0;
   };
 
@@ -619,10 +678,18 @@ async function boot(): Promise<void> {
   });
 
   window.addEventListener('keydown', (e) => {
-    if (!gameplay.allowsInput()) {
-      if (e.key === 'Escape' && gameplay.phase === 'intro') gameplay.skipIntro();
-      return;
+    if (e.key === 'Escape') {
+      if (gameplay.bagOpen()) {
+        gameplay.closeBag();
+        return;
+      }
+      if (gameplay.phase === 'intro') {
+        gameplay.skipIntro();
+        return;
+      }
+      partyUi?.closeOverlays();
     }
+    if (!gameplay.allowsInput() || gameplay.bagOpen()) return;
     if (e.key === 'ArrowUp' || e.key === 'w' || e.key === 'W') beginStep(1);
     if (e.key === 'ArrowDown' || e.key === 's' || e.key === 'S') beginStep(-1);
     if (e.key === 'ArrowLeft' || e.key === 'a' || e.key === 'A' || e.key === 'q') mover.turn(1);
@@ -630,8 +697,11 @@ async function boot(): Promise<void> {
     if (e.key === 'z' || e.key === 'Z') beginStrafe(-1);
     if (e.key === 'c' || e.key === 'C') beginStrafe(1);
     if (e.key === ' ' || e.key === 'Enter' || e.key === 'f' || e.key === 'F') interact();
-    if (e.key === 'k' || e.key === 'K') hasKey = true;
-    if (e.key === 'Escape') partyUi?.closeOverlays();
+    if (e.key === 'k' || e.key === 'K') {
+      debugKey = true;
+      if (!gameplay.hasBagKey()) gameplay.giveItem('key');
+    }
+    if (e.key === 'i' || e.key === 'I' || e.key === 'b' || e.key === 'B') gameplay.toggleBag();
   });
 
   const api: Floor1Api = {
@@ -718,12 +788,38 @@ async function boot(): Promise<void> {
       return { r: s.r, g: s.g, b: s.b, rb: s.rb };
     },
     sconceVisible: (x, y, face) => props.sconceVisible(x, y, face),
-    hasKey,
-    giveKey: () => {
-      hasKey = true;
+    get hasKey() {
+      return hasKeyNow();
     },
+    giveKey: () => {
+      debugKey = true;
+      if (!gameplay.hasBagKey()) gameplay.giveItem('key');
+    },
+    giveItem: (id, n = 1) => gameplay.giveItem(id, n),
+    getBag: () => gameplay.bag.serialize(),
+    pickupHere: () => tryPickup(mover.x, mover.y),
+    pickupFacing: () => {
+      const pos = facing();
+      return tryPickup(pos.x, pos.y);
+    },
+    pickupAt: (x, y) => tryPickup(x, y),
+    openBag: () => gameplay.openBag(),
+    closeBag: () => gameplay.closeBag(),
+    bagOpen: () => gameplay.bagOpen(),
+    useBagSlot: (i) => gameplay.useBagSlot(i),
+    equipBagSlot: (i, hero, slot) => gameplay.equipBagSlot(i, hero as HudHeroId, slot),
+    getHands: () =>
+      (['brannoc', 'wren', 'ilsevar', 'mags'] as const).map((id) => {
+        const hero = partyUi!.heroes[id];
+        return { id, main: hero.main, off: hero.off, armour: hero.armour };
+      }),
+    floorItems: () => floorItems.snapshot(),
+    get lastMessage() {
+      return gameplay.lastMessage || promptText;
+    },
+    lastUi: () => gameplay.audio.lastUi(),
     get prompt() {
-      return promptText;
+      return promptText || gameplay.lastMessage;
     },
     doorAhead,
     handleDoor,
@@ -810,7 +906,6 @@ async function boot(): Promise<void> {
     markers.update();
     water.update(now, preserveBuffer, camera);
     syncDoorButton();
-    api.hasKey = hasKey;
 
     if (!preserveBuffer) {
       const k = 1 + LANTERN_FLICKER * Math.sin((now / LANTERN_FLICKER_MS) * Math.PI * 2);

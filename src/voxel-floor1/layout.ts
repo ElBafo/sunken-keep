@@ -45,6 +45,12 @@ export type FloorTile = {
   deepWater?: boolean;
   /** Classic walk-onto bark id (`public/levels/floor1.ts`). */
   bark?: string;
+  /** Classic floor loot — same cell as `public/levels/floor1.ts`. */
+  item?: string;
+  journalPage?: number;
+  chest?: boolean;
+  chestItems?: string[];
+  chestOpen?: boolean;
 };
 
 export type FloorMap = {
@@ -297,6 +303,21 @@ export function resetFloor1Doors(map: FloorMap = floor1Map): void {
   for (let y = 0; y < map.height; y++) {
     for (let x = 0; x < map.width; x++) {
       if (map.tiles[y][x].secret) map.tiles[y][x].secretOpen = false;
+    }
+  }
+}
+
+/** Restore Classic floor-1 items and chests after a test mutates the shared map. */
+export function resetFloor1Loot(map: FloorMap = floor1Map): void {
+  for (let y = 0; y < rawFloor1.height; y++) {
+    for (let x = 0; x < rawFloor1.width; x++) {
+      const src = rawFloor1.tiles[y][x] as FloorTile;
+      const tile = map.tiles[y][x];
+      tile.item = src.item;
+      tile.journalPage = src.journalPage;
+      tile.chest = src.chest;
+      tile.chestItems = src.chestItems ? [...src.chestItems] : undefined;
+      tile.chestOpen = src.chestOpen;
     }
   }
 }
