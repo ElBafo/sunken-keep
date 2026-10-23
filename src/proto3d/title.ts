@@ -2,7 +2,27 @@ import { drawSprite, loadSpriteImage, type SpriteImage } from './atlas';
 import { fetchJsonCached, loadHtmlImage } from './asset-cache';
 import { titleEssentialImageKeys } from './boot-assets';
 import { StoryText, type Locale } from './i18n';
-import { drawFont5x7, type FontGlyphs } from './font5x7';
+import { drawFont5x7, measureFontWidth, wrapFontToWidth, type FontGlyphs } from './font5x7';
+
+const TITLE_FONT_CELL = 6;
+const TITLE_FONT_GLYPH_H = 9;
+
+function preloadTitleFont(base = import.meta.env.BASE_URL) {
+  if (typeof document === 'undefined') return;
+  const add = (href: string, as: 'image' | 'fetch') => {
+    if (document.querySelector(`link[rel="preload"][href="${href}"]`)) return;
+    const link = document.createElement('link');
+    link.rel = 'preload';
+    link.as = as;
+    if (as === 'fetch') link.crossOrigin = 'anonymous';
+    link.href = href;
+    document.head.appendChild(link);
+  };
+  add(`${base}art/font/font_5x7.png`, 'image');
+  add(`${base}art/font/font_5x7.json`, 'fetch');
+}
+
+preloadTitleFont();
 import {
   formatPlayTime,
   hasAnySave,
@@ -310,11 +330,13 @@ export class TitleScreen {
     if (logo) ctx.drawImage(logo, this.layout.logoPos[0], this.layout.logoPos[1]);
     const tag = this.story.titleText('tagline');
     const [r, g, b] = this.layout.tagline.color;
-    ctx.fillStyle = `rgb(${r},${g},${b})`;
-    ctx.font = `${Math.max(10, this.layout.tagline.scale * 11)}px serif`;
-    ctx.textAlign = this.layout.tagline.centered ? 'center' : 'left';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(tag, this.layout.tagline.centered ? this.layout.canvas[0] / 2 : 10, this.layout.tagline.y);
+    const tagX = this.layout.tagline.centered ? this.layout.canvas[0] / 2 : 10;
+    this.paintPixelText(tag, tagX, this.layout.tagline.y, `rgb(${r},${g},${b})`, {
+      align: this.layout.tagline.centered ? 'center' : 'left',
+      valign: 'middle',
+      scale: Math.max(1, this.layout.tagline.scale),
+      maxWidth: this.layout.canvas[0] - 16
+    });
     const has = hasAnySave();
     this.paintButton('Continue', has ? 'normal' : 'dim');
     this.paintButton('New Game', 'normal');
@@ -360,26 +382,60 @@ export class TitleScreen {
           ? this.story.titleText('language.el')
           : this.story.titleText('language.en')
         : this.story.titleText(`buttons.${key}`) || name);
-    ctx.fillStyle = state === 'dim' ? '#6a6a6a' : '#d8ccb0';
-    ctx.font = `${this.layout.buttons.labelFontScale * 8}px serif`;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.fillText(label, x + bw / 2, y + bh / 2);
+    this.paintPixelText(label, x + bw / 2, y + bh / 2, state === 'dim' ? '#6a6a6a' : '#d8ccb0', {
+      align: 'center',
+      valign: 'middle',
+      scale: Math.max(1, this.layout.buttons.labelFontScale),
+      maxWidth: bw - 8
+    });
+  }
+
+  /** 5×7 atlas labels. Scale drops to 1 and wraps before any string is shortened. */
+  private paintPixelText(
+    text: string,
+    x: number,
+    y: number,
+    colour: string,
+    opts: {
+      align?: 'left' | 'center';
+      valign?: 'top' | 'middle';
+      scale?: number;
+      maxWidth?: number;
+    } = {}
+  ) {
+    if (!this.font || !text) return;
+    const preferred = Math.max(1, Math.round(opts.scale ?? 1));
+    const maxW = opts.maxWidth;
+    let scale = preferred;
+    if (maxW && measureFontWidth(text, this.fontGlyphs, TITLE_FONT_CELL, scale) > maxW) scale = 1;
+    const lines = maxW
+      ? wrapFontToWidth(text, maxW, this.fontGlyphs, TITLE_FONT_CELL, scale)
+      : [text];
+    const glyphH = TITLE_FONT_GLYPH_H * scale;
+    const gap = scale;
+    const blockH = lines.length * glyphH + Math.max(0, lines.length - 1) * gap;
+    let dy = opts.valign === 'top' ? y : Math.round(y - blockH / 2);
+    for (const line of lines) {
+      const w = measureFontWidth(line, this.fontGlyphs, TITLE_FONT_CELL, scale);
+      const dx = opts.align === 'left' ? x : Math.round(x - w / 2);
+      drawFont5x7(this.ctx, this.font, line, dx, dy, this.fontGlyphs, TITLE_FONT_CELL, colour, undefined, scale);
+      dy += glyphH + gap;
+    }
   }
 
   private drawSlots() {
     if (!this.layout) return;
-    const ctx = this.ctx;
     const slots = listSlots();
-    ctx.fillStyle = '#d8ccb0';
-    ctx.font = 'bold 16px serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
     const heading =
       this.mode === 'save'
         ? this.story.uiText('buttons.save')
         : this.story.titleText('buttons.load');
-    ctx.fillText(heading, this.layout.canvas[0] / 2, 50);
+    this.paintPixelText(heading, this.layout.canvas[0] / 2, 50, '#d8ccb0', {
+      align: 'center',
+      valign: 'middle',
+      scale: 2,
+      maxWidth: this.layout.canvas[0] - 16
+    });
     for (let i = 0; i < 3; i++) this.drawSlot(slots[i], SLOT_X, SLOT_Y0 + i * (this.layout.saveSlot.size[1] + SLOT_GAP));
     this.paintButton('Settings', 'normal', this.story.titleText('buttons.back'));
   }
@@ -456,13 +512,22 @@ export class TitleScreen {
       ctx.fillStyle = '#2a1a14';
       ctx.fillRect(x, y, fw, fh);
     }
-    ctx.fillStyle = '#d8ccb0';
-    ctx.font = '11px serif';
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'top';
     const [t0, t1] = this.layout.overwrite.textLines;
-    ctx.fillText(this.story.titleText('overwrite.title'), x + fw / 2 + t0[0], y + t0[1]);
-    ctx.fillText(this.story.titleText('overwrite.body'), x + fw / 2 + t1[0], y + t1[1]);
+    const overMax = fw - 16;
+    this.paintPixelText(
+      this.story.titleText('overwrite.title'),
+      x + fw / 2 + t0[0],
+      y + t0[1],
+      '#d8ccb0',
+      { align: 'center', valign: 'top', scale: 1, maxWidth: overMax }
+    );
+    this.paintPixelText(
+      this.story.titleText('overwrite.body'),
+      x + fw / 2 + t1[0],
+      y + t1[1],
+      '#d8ccb0',
+      { align: 'center', valign: 'top', scale: 1, maxWidth: overMax }
+    );
     this.drawOverwriteBtn('Overwrite', x, y);
     this.drawOverwriteBtn('Keep it', x, y);
   }
@@ -472,12 +537,13 @@ export class TitleScreen {
     const [bx, by, bw, bh] = this.layout.overwrite.buttons[name];
     const img = this.images.get(this.layout.buttons.normal);
     if (img) this.ctx.drawImage(img, ox + bx, oy + by, bw, bh);
-    this.ctx.fillStyle = '#d8ccb0';
-    this.ctx.font = '10px serif';
-    this.ctx.textAlign = 'center';
-    this.ctx.textBaseline = 'middle';
     const label = name === 'Overwrite' ? this.story.titleText('overwrite.yes') : this.story.titleText('overwrite.no');
-    this.ctx.fillText(label, ox + bx + bw / 2, oy + by + bh / 2);
+    this.paintPixelText(label, ox + bx + bw / 2, oy + by + bh / 2, '#d8ccb0', {
+      align: 'center',
+      valign: 'middle',
+      scale: 1,
+      maxWidth: bw - 4
+    });
   }
 
   layoutButtons() {
