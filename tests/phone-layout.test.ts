@@ -140,11 +140,11 @@ describe('measureEdgeLayout stays in the safe content box', () => {
 
 describe('html entries expose the prototype toggle', () => {
   const proto = readFileSync(resolve(__dirname, '../proto3d.html'), 'utf8');
-  const index = readFileSync(resolve(__dirname, '../index.html'), 'utf8');
+  const classic = readFileSync(resolve(__dirname, '../classic.html'), 'utf8');
 
   it.each([
     ['proto3d.html', proto],
-    ['index.html', index]
+    ['classic.html', classic]
   ] as const)('%s keeps viewport-fit=cover and the settings menu', (_name, html) => {
     expect(html).toContain('viewport-fit=cover');
     expect(html).toContain('id="settings-overlay"');

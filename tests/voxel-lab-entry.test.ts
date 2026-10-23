@@ -52,7 +52,7 @@ describe('voxel-lab is a standalone Vite page', () => {
   });
 
   it('does not alter the game HTML entries', () => {
-    expect(index).toContain('src="/src/proto3d/main.ts"');
+    expect(index).toContain('src="/src/voxel-floor1/main.ts"');
     expect(proto).toContain('src="/src/proto3d/main.ts"');
     expect(index).not.toContain('voxel-lab.html');
     expect(index).not.toContain('src/voxel-lab');

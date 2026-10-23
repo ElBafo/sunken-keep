@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Visual polish verification', () => {
   test('capture screenshots and measure FPS', async ({ page }) => {
-    await page.goto('/sunken-keep/');
+    await page.goto('/sunken-keep/classic.html');
     await page.waitForSelector('#render-canvas', { timeout: 15000 });
     const tap = page.locator('#tap-to-start');
     if (await tap.isVisible()) {

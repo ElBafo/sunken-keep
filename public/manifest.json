@@ -1,12 +1,13 @@
 {
   "name": "The Sunken Keep",
   "short_name": "Sunken Keep",
-  "description": "First-person 3D dungeon crawler",
+  "description": "First-person dungeon crawler",
+  "id": "./",
   "start_url": "./",
   "display": "fullscreen",
   "orientation": "portrait",
-  "background_color": "#000000",
-  "theme_color": "#000000",
+  "background_color": "#050403",
+  "theme_color": "#050403",
   "icons": [
     {
       "src": "icon_drowning_192.png",

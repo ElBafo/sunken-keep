@@ -137,12 +137,12 @@ describe('lab look keeps gameplay lighting', () => {
 describe('lab light menu and HTML', () => {
   it('settings menu can toggle lab light without touching voxel-lab', () => {
     const proto = readFileSync(resolve(__dirname, '../proto3d.html'), 'utf8');
-    const index = readFileSync(resolve(__dirname, '../index.html'), 'utf8');
+    const classic = readFileSync(resolve(__dirname, '../classic.html'), 'utf8');
     expect(proto).toContain('id="btn-lab-light-on"');
-    expect(index).toContain('id="btn-lab-light-on"');
+    expect(classic).toContain('id="btn-lab-light-on"');
     expect(proto).toContain('id="settings-lab-light-label"');
     expect(proto).not.toContain('voxel-lab.html');
-    expect(index).not.toContain('src/voxel-lab');
+    expect(classic).not.toContain('src/voxel-lab');
   });
 
   it('uses Lighting Lab/Classic and 3D walls On/Off', () => {
