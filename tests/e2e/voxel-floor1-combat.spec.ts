@@ -88,7 +88,11 @@ test('voxel floor 1: walk to a rat, fight with two heroes, drink, kill', async (
   expect(wounded.hurtState).toBe('hurt');
   expect(wounded.hurtHp).toBeLessThan(wounded.startHp);
 
-  await page.waitForTimeout(250);
+  await page.waitForFunction(() => {
+    const cell = document.querySelector<HTMLElement>('.portrait-cell[data-hero="brannoc"]');
+    const img = cell?.querySelector<HTMLImageElement>('img.portrait-face');
+    return cell?.dataset.state === 'hurt' && !!img?.complete && /hurt/.test(img.src);
+  });
   await page.screenshot({ path: `${OUT}/voxel_floor1_combat_hurt_portrait.png`, fullPage: false });
 
   const drank = await page.evaluate(() => {
