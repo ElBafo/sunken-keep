@@ -206,6 +206,7 @@ type Floor1Api = {
   titleMode: () => string | null;
   titleVisibleNow: () => boolean;
   hitTitleBack: () => boolean;
+  setHand: (id: HudHeroId, hand: 'main' | 'off', item: string) => void;
   mapState: () => {
     position: { x: number; y: number; dir: number };
     oil: number;
@@ -1337,6 +1338,10 @@ async function boot(): Promise<void> {
       if (!title) return false;
       title.press('Back');
       return !title.visible;
+    },
+    setHand: (id, hand, item) => {
+      partyUi?.setHand(id, hand, item);
+      combat.setEquipment(id, hand, item);
     },
     fireVisibilityAutosave: () => gameplay.tryAutosave('quiet'),
     mapState: () => {

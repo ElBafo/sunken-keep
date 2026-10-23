@@ -1348,6 +1348,7 @@ export class Floor1Gameplay {
     this.caveInBusy = false;
     this.storyFlags.add(CAVE_IN_STATE);
     this.progress.fire(CAVE_IN_STATE);
+    this.hooks?.setPosition?.(floor1CaveInSpec.stepTo.x, floor1CaveInSpec.stepTo.y, floor1CaveInSpec.endDir);
     this.speakBark(floor1CaveInSpec.bark);
     this.caveIn.scheduleBark2(() => this.speakBark('opening_cavein_2'));
   }
@@ -1515,6 +1516,10 @@ export class Floor1Gameplay {
   takeFacingTorch(): boolean {
     const sconce = this.hooks?.facingSconce?.();
     if (!sconce?.lit || sconce.capped) return false;
+    if (!this.findFreeHand()) {
+      this.showMessage(this.story.uiText('torch_choice.hands_full') || this.story.log('hands_full'));
+      return false;
+    }
     this.takeWallTorch(sconce);
     return true;
   }

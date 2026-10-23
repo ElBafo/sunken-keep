@@ -28,7 +28,7 @@ export async function buildFloor1Stairs(): Promise<THREE.Group> {
   const group = new THREE.Group();
   group.name = 'floor1-stairs';
   const [floorPng, glowPng] = await Promise.all([
-    loadPng('floor_stone_a.png'),
+    loadPng('floor_stone.png'),
     loadPng('../fx/dark/stairs_glow.png')
   ]);
   const stone = stoneMat(floorPng.texture, 0xb8b0a4);

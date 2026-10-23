@@ -27,6 +27,7 @@ type Floor1 = {
   loadFromSlot: (slot: number) => boolean;
   requestManualLoad: () => void;
   hitTitleBack: () => boolean;
+  setHand: (id: string, hand: 'main' | 'off', item: string) => void;
   titleVisibleNow: () => boolean;
   openSettings: () => void;
   settingsVisible: () => boolean;
@@ -73,6 +74,7 @@ test('voxel floor 1: cave-in, torch, secret, door-save, settings, stairs view', 
   const torch = await page.evaluate(() => {
     const api = (window as unknown as { __voxelFloor1: Floor1 }).__voxelFloor1;
     api.setPosition(6, 5, 0);
+    api.setHand('brannoc', 'off', 'empty_hand');
     const took = api.takeFacingTorch();
     api.setPosition(3, 1, 1);
     api.handleFacingTorch();
