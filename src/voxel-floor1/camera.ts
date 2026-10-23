@@ -38,6 +38,11 @@ export function easeInOutQuad(t: number): number {
   return t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 }
 
+export function easeOutQuad(t: number): number {
+  const x = Math.min(1, Math.max(0, t));
+  return 1 - (1 - x) * (1 - x);
+}
+
 export type MoveKind = 'idle' | 'step' | 'turn';
 
 export class GridMover {
@@ -56,6 +61,7 @@ export class GridMover {
   private fromDir = 0;
   private t0 = 0;
   private duration = MOVE_MS;
+  private ease: 'inout' | 'out' = 'inout';
 
   /** Live combat occupancy — stepping onto a living monster is blocked. */
   occupied: ((x: number, y: number) => boolean) | null = null;
@@ -88,7 +94,7 @@ export class GridMover {
     if (this.hold) return false;
     if (!this.moving) return false;
     const t = Math.min(1, (now - this.t0) / this.duration);
-    const k = easeInOutQuad(t);
+    const k = this.ease === 'out' ? easeOutQuad(t) : easeInOutQuad(t);
     const gx = this.fromX + (this.toX - this.fromX) * k;
     const gy = this.fromY + (this.toY - this.fromY) * k;
     let fromRot = dirToRot(this.fromDir);
@@ -140,9 +146,29 @@ export class GridMover {
     return true;
   }
 
-  private start(toX: number, toY: number, toDir: number, duration: number, kind: MoveKind): void {
+  /** In-place turn or step with a custom duration (cave-in crash turn). */
+  startTo(
+    toX: number,
+    toY: number,
+    toDir: number,
+    duration: number,
+    kind: MoveKind,
+    ease: 'inout' | 'out' = 'inout'
+  ): void {
+    this.start(toX, toY, toDir, duration, kind, ease);
+  }
+
+  private start(
+    toX: number,
+    toY: number,
+    toDir: number,
+    duration: number,
+    kind: MoveKind,
+    ease: 'inout' | 'out' = 'inout'
+  ): void {
     this.moving = true;
     this.kind = kind;
+    this.ease = ease;
     this.fromX = this.x;
     this.fromY = this.y;
     this.fromDir = this.dir;

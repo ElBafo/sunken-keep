@@ -56,6 +56,23 @@ function cutoutFlameMat(map: THREE.Texture): THREE.MeshBasicMaterial {
   });
 }
 
+function addFlame(
+  spec: SconceSpec,
+  flameGeo: THREE.PlaneGeometry,
+  flameMat: THREE.MeshBasicMaterial
+): THREE.Mesh {
+  const flame = new THREE.Mesh(flameGeo, flameMat);
+  const pos = cupWorldPos(spec);
+  flame.position.set(pos.x, pos.y, pos.z);
+  flame.userData.noShadow = true;
+  flame.userData.isSconce = true;
+  flame.frustumCulled = false;
+  flame.castShadow = false;
+  flame.receiveShadow = false;
+  flame.renderOrder = 3;
+  return flame;
+}
+
 export async function buildFloor1Props(
   sconces: SconceSpec[],
   sunbeams: SunbeamSpec[]
@@ -63,6 +80,7 @@ export async function buildFloor1Props(
   group: THREE.Group;
   update: (camera: THREE.Camera, now: number, freeze: boolean, dest?: PropDest | null) => void;
   sconceVisible: (x: number, y: number, face: string) => boolean;
+  syncFromSconces: () => void;
 }> {
   const group = new THREE.Group();
   group.name = 'floor1-props';
@@ -98,15 +116,7 @@ export async function buildFloor1Props(
 
     let flame: THREE.Mesh | null = null;
     if (flameOnBracket(spec) && sconceIsLit(spec)) {
-      flame = new THREE.Mesh(flameGeo, flameMat);
-      const pos = cupWorldPos(spec);
-      flame.position.set(pos.x, pos.y, pos.z);
-      flame.userData.noShadow = true;
-      flame.userData.isSconce = true;
-      flame.frustumCulled = false;
-      flame.castShadow = false;
-      flame.receiveShadow = false;
-      flame.renderOrder = 3;
+      flame = addFlame(spec, flameGeo, flameMat);
       g.add(flame);
     }
 
@@ -215,12 +225,24 @@ export async function buildFloor1Props(
     }
   };
 
+  const syncFromSconces = (): void => {
+    for (const v of visuals) {
+      const want = flameOnBracket(v.spec) && sconceIsLit(v.spec);
+      if (want && !v.flame) {
+        v.flame = addFlame(v.spec, flameGeo, flameMat);
+        v.group.add(v.flame);
+      }
+      if (v.flame) v.flame.visible = want;
+    }
+  };
+
   return {
     group,
     update,
     sconceVisible: (x: number, y: number, face: string) => {
       const v = visuals.find((row) => row.spec.x === x && row.spec.y === y && row.spec.face === face);
       return v ? v.group.visible : false;
-    }
+    },
+    syncFromSconces
   };
 }

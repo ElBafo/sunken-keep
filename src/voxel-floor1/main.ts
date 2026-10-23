@@ -34,7 +34,9 @@ import {
 } from './portrait-layout';
 import { lookColors } from '../voxel-lab/look';
 import { applyShadowToggle, recompileShadowShaders } from '../voxel-lab/shadows';
+import { CaveInWorld } from './cave-in-world';
 import { facingSconce, floor1Sconces, floor1Sunbeams, TORCH_CAPPED_PROMPT } from './fixtures';
+import { buildFloor1Stairs } from './stairs';
 import {
   Floor1Lights,
   parseLightMode,
@@ -183,6 +185,27 @@ type Floor1Api = {
   takeFloorSnapshot: () => void;
   loadAutosave: () => void;
   fireVisibilityAutosave: () => boolean;
+  playOpeningCaveIn: (instant?: boolean) => void;
+  skipCaveIn: () => void;
+  caveInDone: () => boolean;
+  caveInBusy: () => boolean;
+  rubbleBlocking: (x: number, y: number) => boolean;
+  takeFacingTorch: () => boolean;
+  snuffFacingTorch: () => boolean;
+  handleFacingTorch: () => boolean;
+  torchChoiceVisible: () => boolean;
+  confirmTakeTorch: () => void;
+  confirmSnuffTorch: () => void;
+  sconces: () => Array<{ x: number; y: number; face: string; lit: boolean; empty: boolean; capped: boolean }>;
+  openSettings: () => void;
+  hideSettings: () => void;
+  settingsVisible: () => boolean;
+  getSoundOn: () => boolean;
+  getQualityPref: () => QualityLevel;
+  getLayoutMode: () => string;
+  titleMode: () => string | null;
+  titleVisibleNow: () => boolean;
+  hitTitleBack: () => boolean;
   mapState: () => {
     position: { x: number; y: number; dir: number };
     oil: number;
@@ -370,6 +393,9 @@ async function boot(): Promise<void> {
   loading.textContent = 'Placing torches…';
   const props = await buildFloor1Props(floor1Sconces, floor1Sunbeams);
   scene.add(props.group);
+  const caveInWorld = new CaveInWorld();
+  await caveInWorld.load(scene);
+  scene.add(await buildFloor1Stairs());
   const openings = await buildFloor1Openings(floor1Map, lightMode === 'all');
   scene.add(openings.group);
   const floorItems = await buildFloor1Items(floor1Map);
@@ -548,9 +574,17 @@ async function boot(): Promise<void> {
   };
   const tryPickup = (x: number, y: number): boolean => gameplay.pickupItemAt(x, y);
   const interact = (): string => {
+    if (gameplay.caveInBusy) {
+      gameplay.skipCaveIn();
+      return 'cave_in_skip';
+    }
     if (gameplay.hideNote()) {
       combat.flushHeldLogs();
       return 'note';
+    }
+    if (document.getElementById('torch-choice')?.classList.contains('show')) {
+      gameplay.hideTorchChoice();
+      return 'torch';
     }
     if (tryPickup(mover.x, mover.y)) return 'pickup';
     const pos = facing();
@@ -565,6 +599,7 @@ async function boot(): Promise<void> {
       }
       return ok ? 'secret' : 'none';
     }
+    if (gameplay.handleFacingTorch()) return 'torch';
     const ahead = doorAhead();
     if (ahead) return handleDoor(ahead.x, ahead.y);
     const sconce = facingSconce(floor1Sconces, mover.x, mover.y, mover.dir);
@@ -623,7 +658,11 @@ async function boot(): Promise<void> {
   };
 
   const perkOpen = (): boolean => !!partyUi?.perkScreenOpen();
-  const inputOk = (): boolean => gameplay.allowsInput() && !perkOpen();
+  const inputOk = (): boolean => gameplay.allowsMove() && !perkOpen();
+  const syncTorches = (): void => {
+    props.syncFromSconces();
+    lights.relight();
+  };
 
   let flankTimer: ReturnType<typeof setTimeout> | null = null;
   const clearFlankFlash = (): void => {
@@ -746,7 +785,7 @@ async function boot(): Promise<void> {
       onStepBack: () => beginStep(-1),
       onStrafeLeft: () => beginStrafe(-1),
       onStrafeRight: () => beginStrafe(1),
-      onInteract: () => (inputOk() ? interact() : 'none'),
+      onInteract: () => (gameplay.caveInBusy || inputOk() ? interact() : 'none'),
       onMenu: () => partyUi?.toggleMenu(),
       onBag: () => {
         partyUi?.closeOverlays();
@@ -841,7 +880,18 @@ async function boot(): Promise<void> {
       combat.refreshOccupancy();
       partyUi?.hideFrostHint();
       clearFlankFlash();
+      syncTorches();
+      caveInWorld.sync(gameplay.caveInDone());
     },
+    startMove: (x, y, dir, ms, ease) => {
+      mover.startTo(x, y, dir, ms, dir === mover.dir ? 'step' : 'turn', ease ?? 'inout');
+    },
+    isMoving: () => mover.moving,
+    applyRubble: () => caveInWorld.applyRubble(),
+    resetRubble: () => caveInWorld.resetRubble(),
+    setDust: (frame) => caveInWorld.setDust(frame),
+    syncTorches,
+    facingSconce: () => facingSconce(floor1Sconces, mover.x, mover.y, mover.dir),
     combatBusy: () => ({
       fight: combat.inCombat(),
       gameOver: combat.gameOver,
@@ -931,6 +981,12 @@ async function boot(): Promise<void> {
     partyUi?.closeOverlays();
     gameplay.requestManualLoad();
   });
+  document.getElementById('btn-settings')?.addEventListener('click', (e) => {
+    e.preventDefault();
+    e.stopPropagation();
+    partyUi?.closeOverlays();
+    gameplay.openSettings();
+  });
   if (debugKey) gameplay.giveItem('key');
 
   let swipeX = 0;
@@ -941,7 +997,7 @@ async function boot(): Promise<void> {
     if (!gameplay.allowsInput()) return false;
     if (partyUi?.overlayOpen() || gameplay.bagOpen()) return false;
     const t = e.target as HTMLElement | null;
-    if (t?.closest?.('button, .hand-hit, .portrait-cell, .overlay, #stats, #message-log, #tap-to-start, #intro-overlay, #title-overlay, #inventory-screen, #note-overlay, #perk-screen')) return false;
+    if (t?.closest?.('button, .hand-hit, .portrait-cell, .overlay, #stats, #message-log, #tap-to-start, #intro-overlay, #title-overlay, #inventory-screen, #note-overlay, #perk-screen, #settings-overlay, #torch-choice')) return false;
     return e.clientY < latestLayout.view.h && e.clientY >= 0;
   };
 
@@ -1256,6 +1312,32 @@ async function boot(): Promise<void> {
     canAutosave: () => gameplay.canAutosave(),
     takeFloorSnapshot: () => gameplay.takeFloorSnapshot(),
     loadAutosave: () => gameplay.loadAutosave(),
+    playOpeningCaveIn: (instant?: boolean) => gameplay.playOpeningCaveIn(!!instant),
+    skipCaveIn: () => gameplay.skipCaveIn(),
+    caveInDone: () => gameplay.caveInDone(),
+    caveInBusy: () => gameplay.caveInBusy,
+    rubbleBlocking: (x: number, y: number) => !!tileAt(floor1Map, x, y)?.wall,
+    takeFacingTorch: () => gameplay.takeFacingTorch(),
+    snuffFacingTorch: () => gameplay.snuffFacingTorch(),
+    handleFacingTorch: () => gameplay.handleFacingTorch(),
+    torchChoiceVisible: () => !!document.getElementById('torch-choice')?.classList.contains('show'),
+    confirmTakeTorch: () => document.getElementById('btn-torch-take')?.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, isPrimary: true })),
+    confirmSnuffTorch: () => document.getElementById('btn-torch-snuff')?.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, isPrimary: true })),
+    sconces: () => floor1Sconces.map((s) => ({ x: s.x, y: s.y, face: s.face, lit: !!s.lit, empty: !!s.empty, capped: !!s.capped })),
+    openSettings: () => gameplay.openSettings(),
+    hideSettings: () => gameplay.hideSettings(),
+    settingsVisible: () => gameplay.settingsVisible(),
+    getSoundOn: () => gameplay.getSoundOn(),
+    getQualityPref: () => gameplay.getQualityPref(),
+    getLayoutMode: () => document.body.classList.contains('layout-edge') ? 'edge' : 'framed',
+    titleMode: () => gameplay.title?.getMode() ?? null,
+    titleVisibleNow: () => gameplay.titleVisible(),
+    hitTitleBack: () => {
+      const title = gameplay.title;
+      if (!title) return false;
+      title.press('Back');
+      return !title.visible;
+    },
     fireVisibilityAutosave: () => gameplay.tryAutosave('quiet'),
     mapState: () => {
       const save = gameplay.captureSave('slot');

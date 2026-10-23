@@ -36,9 +36,30 @@ import { oilFlaskPlan } from '../proto3d/oil-flask';
 import { resolveLocale, StoryText, type Locale } from '../proto3d/i18n';
 import { StoryProgress } from '../proto3d/story-progress';
 import { TitleScreen, type TitleAction } from '../proto3d/title';
+import { SettingsMenu } from '../proto3d/settings-menu';
+import {
+  applyLayoutMode,
+  getLayoutMode,
+  saveLayoutMode,
+  type LayoutMode
+} from '../proto3d/phone-layout';
+import { OIL_TORCH_COST } from '../proto3d/constants';
+import {
+  CAVE_IN_CRASH_AT,
+  CAVE_IN_DUST_AT,
+  CAVE_IN_DUST_SKIP_FRAME,
+  CAVE_IN_SKIP_FADE_SEC,
+  CAVE_IN_STATE,
+  CAVE_IN_TURN_SEC,
+  CaveInDirector,
+  caveInCrashed,
+  caveInFinished,
+  dustBurstFrame
+} from '../proto3d/cave-in';
 import type { FloorData } from '../proto3d/types';
 import { CELL } from './constants';
-import { floor1Sconces } from './fixtures';
+import { floor1CaveInSpec } from './cave-in-world';
+import { floor1Sconces, torchWorldPos, type SconceSpec } from './fixtures';
 import { floor1Map, tileAt, type FloorTile } from './layout';
 import { DOOR_LOCKED_MESSAGE, lootRevealed } from './loot';
 import type { HudHeroId } from './portrait-layout';
@@ -108,6 +129,13 @@ export type GameplayHooks = {
   closeOverlays?: () => void;
   clearLog?: () => void;
   syncHud?: () => void;
+  startMove?: (x: number, y: number, dir: number, ms: number, ease?: 'inout' | 'out') => void;
+  isMoving?: () => boolean;
+  applyRubble?: () => void;
+  resetRubble?: () => void;
+  setDust?: (frame: number | null) => void;
+  syncTorches?: () => void;
+  facingSconce?: () => SconceSpec | undefined;
 };
 
 export { DOOR_LOCKED_MESSAGE };
@@ -143,6 +171,14 @@ function tapText(): HTMLElement | null {
   return document.getElementById('tap-to-start-text');
 }
 
+function loadSoundOn(): boolean {
+  try {
+    return localStorage.getItem('proto3d.sound') !== 'off';
+  } catch {
+    return true;
+  }
+}
+
 export class Floor1Gameplay {
   readonly story = new StoryText();
   readonly progress = new StoryProgress();
@@ -150,6 +186,7 @@ export class Floor1Gameplay {
   audio: AudioManager;
   intro: IntroPlayer | null = null;
   title: TitleScreen | null = null;
+  settings: SettingsMenu | null = null;
   bubble: SpeechBubble | null = null;
   bag = new PartyBag();
   inventory: InventoryUi | null = null;
@@ -180,6 +217,13 @@ export class Floor1Gameplay {
   private pendingStartSnapshot = false;
   private visibilityWired = false;
   currentSlot = 0;
+  private caveIn = new CaveInDirector();
+  caveInBusy = false;
+  private caveInClockStarted = false;
+  private caveInCrashed = false;
+  private caveInStartedAt = 0;
+  private torchChoice: SconceSpec | null = null;
+  private soundOn = true;
 
   constructor(search: string, quality: QualityLevel) {
     this.flags = parseGameplayFlags(search);
@@ -187,7 +231,17 @@ export class Floor1Gameplay {
   }
 
   allowsInput(): boolean {
-    return this.phase === 'play' && !this.noteOpen && !this.gameOver && !this.titleVisible();
+    return (
+      this.phase === 'play' &&
+      !this.noteOpen &&
+      !this.gameOver &&
+      !this.titleVisible() &&
+      !this.settings?.open
+    );
+  }
+
+  allowsMove(): boolean {
+    return this.allowsInput() && !this.caveInBusy && !this.torchChoice;
   }
 
   introVisible(): boolean {
@@ -234,6 +288,8 @@ export class Floor1Gameplay {
     if (titleCanvas) {
       this.title = new TitleScreen(titleCanvas, this.story, (action) => this.handleTitleAction(action));
     }
+    this.mountSettings();
+    this.wireTorchChoice();
     this.wireTap();
   }
 
@@ -555,6 +611,7 @@ export class Floor1Gameplay {
   update(now: number, gridX: number, gridY: number, dir: number): void {
     this.audio.updateListener(gridX, gridY, dir);
     this.audio.update(now, gridX * CELL, gridY * CELL);
+    this.updateCaveIn(now);
     if (this.phase === 'play') this.flushBarks(now);
   }
 
@@ -803,6 +860,8 @@ export class Floor1Gameplay {
     this.title?.layoutButtons();
     this.setTapStatus(this.phase === 'tap' ? 'tap_to_start' : 'loading');
     this.applyStoryLabels();
+    this.settings?.refreshLabels();
+    this.refreshSettingsExtras();
   }
 
   private async openIntro(): Promise<void> {
@@ -859,6 +918,7 @@ export class Floor1Gameplay {
         this.takeFloorSnapshot();
         this.pendingStartSnapshot = false;
       }
+      this.maybeStartCaveIn(this.flags.skipChrome);
     }
     if (first) {
       this.audio.markPlayStarted();
@@ -898,7 +958,7 @@ export class Floor1Gameplay {
           y: m.y,
           alive: m.alive
         })),
-        carriedTorch: false
+        carriedTorch: this.hasLitCarriedTorch()
       });
     } catch {
       this.startFloorAudio();
@@ -914,6 +974,8 @@ export class Floor1Gameplay {
     if (load) load.textContent = this.story.titleText('buttons.load') || 'Load';
     this.refreshGameOverButtons();
     this.introSkip?.refresh();
+    this.settings?.refreshLabels();
+    this.refreshSettingsExtras();
   }
 
   private refreshGameOverButtons(): void {
@@ -1015,8 +1077,14 @@ export class Floor1Gameplay {
     this.hooks?.applyParty?.(save.party ?? []);
     void this.hooks?.restoreMonsters?.(floor?.monsters ?? []);
     this.hooks?.setFrostHintDismissed?.(this.storyFlags.has('frost_hint_dismissed'));
+    this.caveIn.clearLeaveScreen();
+    this.caveInBusy = false;
+    this.caveInClockStarted = false;
+    this.caveInCrashed = this.caveInDone();
     this.hooks?.setPosition?.(save.position.x, save.position.y, save.position.dir);
     this.hooks?.restoreVisuals?.();
+    this.hooks?.syncTorches?.();
+    this.syncCaveInWorld();
     this.hooks?.closeOverlays?.();
     this.closeBag();
     this.hideNote();
@@ -1068,6 +1136,8 @@ export class Floor1Gameplay {
 
   private async openSaveSlots(): Promise<void> {
     if (!this.title) return;
+    this.hideSettings();
+    this.hideTorchChoice();
     this.hooks?.closeOverlays?.();
     await this.title.loadEssential();
     await this.title.loadRest();
@@ -1077,10 +1147,12 @@ export class Floor1Gameplay {
 
   private async openLoadSlots(): Promise<void> {
     if (!this.title) return;
+    this.hideSettings();
+    this.hideTorchChoice();
     this.hooks?.closeOverlays?.();
     await this.title.loadEssential();
     await this.title.loadRest();
-    this.title.show('load');
+    this.title.show('load', { resumeOnBack: this.playStarted });
   }
 
   private runContinue(payload: SavePayload): void {
@@ -1161,6 +1233,428 @@ export class Floor1Gameplay {
     const toast = this.story.uiText(path);
     if (!toast) return;
     this.showMessage(toast);
+  }
+
+  caveInDone(): boolean {
+    return this.storyFlags.has(CAVE_IN_STATE) || this.progress.fired.has(CAVE_IN_STATE);
+  }
+
+  private syncCaveInWorld(): void {
+    if (this.caveInDone()) this.hooks?.applyRubble?.();
+    else this.hooks?.resetRubble?.();
+  }
+
+  maybeStartCaveIn(instant = false): void {
+    if (this.caveInDone()) {
+      this.hooks?.applyRubble?.();
+      return;
+    }
+    const spec = floor1CaveInSpec;
+    this.hooks?.setPosition?.(spec.at.x, spec.at.y, floor1Map.startDir);
+    if (instant) {
+      this.completeCaveIn(true);
+      return;
+    }
+    this.caveIn.beginOpening(false);
+    this.caveInBusy = true;
+    this.caveInClockStarted = false;
+    this.caveInCrashed = false;
+    this.hooks?.startMove?.(spec.stepTo.x, spec.stepTo.y, floor1Map.startDir, 180, 'inout');
+  }
+
+  playOpeningCaveIn(instant = false): void {
+    const snap = this.progress.serialize();
+    this.progress.restore({
+      fired: snap.fired.filter((id) => id !== CAVE_IN_STATE && id !== 'opening_cavein' && id !== 'opening_cavein_2'),
+      goals: snap.goals
+    });
+    this.storyFlags.delete(CAVE_IN_STATE);
+    this.hooks?.resetRubble?.();
+    this.caveInBusy = false;
+    this.maybeStartCaveIn(instant);
+  }
+
+  skipCaveIn(): void {
+    if (!this.caveInBusy) return;
+    this.completeCaveIn(false);
+  }
+
+  private completeCaveIn(silent: boolean): void {
+    const spec = floor1CaveInSpec;
+    const skipAt = CAVE_IN_CRASH_AT + CAVE_IN_DUST_AT[CAVE_IN_DUST_SKIP_FRAME - 1];
+    this.caveInStartedAt = performance.now() - skipAt * 1000;
+    this.hooks?.setPosition?.(spec.stepTo.x, spec.stepTo.y, spec.endDir);
+    this.hooks?.applyRubble?.();
+    this.hooks?.setDust?.(CAVE_IN_DUST_SKIP_FRAME);
+    try {
+      this.audio.fadeCaveIn(CAVE_IN_SKIP_FADE_SEC * 1000);
+    } catch {
+      // Audio may still be unlocking.
+    }
+    this.caveInBusy = false;
+    this.caveInClockStarted = true;
+    this.caveInCrashed = true;
+    this.storyFlags.add(CAVE_IN_STATE);
+    this.progress.fire(CAVE_IN_STATE);
+    if (silent) {
+      this.caveIn.clearLeaveScreen();
+      return;
+    }
+    this.speakBark(spec.bark);
+    this.caveIn.scheduleBark2(() => this.speakBark('opening_cavein_2'));
+  }
+
+  private updateCaveIn(now: number): void {
+    const spec = floor1CaveInSpec;
+    if (this.caveInBusy && !this.caveInClockStarted) {
+      const pos = this.hooks?.position?.();
+      if (pos && !this.hooks?.isMoving?.() && pos.x === spec.stepTo.x && pos.y === spec.stepTo.y) {
+        this.caveInClockStarted = true;
+        this.caveInStartedAt = now;
+        try {
+          this.audio.playCaveIn();
+        } catch {
+          // Audio may still be unlocking.
+        }
+      }
+      return;
+    }
+    if (!this.caveInClockStarted) {
+      if (this.caveInCrashed) {
+        const t = (now - this.caveInStartedAt) / 1000 - CAVE_IN_CRASH_AT;
+        this.hooks?.setDust?.(dustBurstFrame(t));
+      }
+      return;
+    }
+    const elapsed = (now - this.caveInStartedAt) / 1000;
+    if (this.caveInBusy && !this.caveInCrashed && caveInCrashed(elapsed)) {
+      this.caveInCrashed = true;
+      const pos = this.hooks?.position?.();
+      if (!pos || pos.x !== spec.stepTo.x || pos.y !== spec.stepTo.y || this.hooks?.isMoving?.()) {
+        this.hooks?.setPosition?.(spec.stepTo.x, spec.stepTo.y, pos?.dir ?? floor1Map.startDir);
+      }
+      this.hooks?.applyRubble?.();
+      this.hooks?.setDust?.(dustBurstFrame(0));
+      this.hooks?.startMove?.(spec.stepTo.x, spec.stepTo.y, spec.endDir, CAVE_IN_TURN_SEC * 1000, 'out');
+    }
+    if (this.caveInCrashed) {
+      this.hooks?.setDust?.(dustBurstFrame(elapsed - CAVE_IN_CRASH_AT));
+    }
+    if (this.caveInBusy && caveInFinished(elapsed)) this.finishCaveInControl();
+  }
+
+  private finishCaveInControl(): void {
+    if (!this.caveInBusy) return;
+    this.caveInBusy = false;
+    this.storyFlags.add(CAVE_IN_STATE);
+    this.progress.fire(CAVE_IN_STATE);
+    this.speakBark(floor1CaveInSpec.bark);
+    this.caveIn.scheduleBark2(() => this.speakBark('opening_cavein_2'));
+  }
+
+  handleFacingTorch(): boolean {
+    const sconce = this.hooks?.facingSconce?.();
+    if (!sconce) return false;
+    if (sconce.capped) {
+      this.audio.playDoor('door_locked', sconce.x, sconce.y);
+      this.showMessage(this.story.log('torch_capped'));
+      return true;
+    }
+    if (sconce.lit) {
+      this.showTorchChoice(sconce);
+      return true;
+    }
+    if (this.hasLitCarriedTorch()) {
+      this.placeCarriedTorch(sconce);
+      return true;
+    }
+    this.relightTorch(sconce);
+    return true;
+  }
+
+  private hasLitCarriedTorch(): boolean {
+    return this.hooks?.party().some((h) => h.main === 'torch_lit' || h.off === 'torch_lit') ?? false;
+  }
+
+  private findFreeHand(): { hero: HudHeroId; hand: 'main' | 'off' } | null {
+    for (const hero of this.hooks?.party() ?? []) {
+      for (const hand of ['main', 'off'] as const) {
+        const item = hero[hand];
+        if (item === 'prayer_lantern') continue;
+        if (!item || item === 'empty_hand') return { hero: hero.id as HudHeroId, hand };
+      }
+    }
+    return null;
+  }
+
+  private takeWallTorch(sconce: SconceSpec): void {
+    if (!sconce.lit || sconce.capped) return;
+    const slot = this.findFreeHand();
+    if (!slot) {
+      this.showMessage(this.story.uiText('torch_choice.hands_full') || this.story.log('hands_full'));
+      return;
+    }
+    sconce.lit = false;
+    sconce.empty = true;
+    this.hooks?.setHand?.(slot.hero, slot.hand, 'torch_lit');
+    this.hooks?.syncTorches?.();
+    try {
+      this.audio.stopTorchLoop(sconce);
+      this.audio.startCarriedTorchLoop();
+      this.audio.playUi('torch_take');
+    } catch {
+      // Audio may still be unlocking.
+    }
+    this.showMessage(this.story.log('torch_take', { hero: this.story.heroName(slot.hero) }));
+    this.rebuildAudioFromState();
+  }
+
+  private snuffTorch(sconce: SconceSpec): void {
+    if (!sconce.lit) return;
+    sconce.lit = false;
+    sconce.empty = false;
+    this.hooks?.syncTorches?.();
+    const pos = torchWorldPos(sconce);
+    try {
+      this.audio.playPositional('torch_extinguish', pos.x, pos.y, pos.z, 1);
+      this.audio.stopTorchLoop(sconce);
+    } catch {
+      // Audio may still be unlocking.
+    }
+    this.showMessage(this.story.log('torch_snuffed', { hero: this.story.heroName(this.hooks?.party()[0]?.id ?? 'brannoc') }));
+    this.rebuildAudioFromState();
+  }
+
+  private relightTorch(sconce: SconceSpec): void {
+    if (sconce.lit) return;
+    const oil = this.hooks?.oil() ?? 0;
+    if (oil < OIL_TORCH_COST) {
+      this.showMessage(this.story.log('no_oil'));
+      return;
+    }
+    sconce.lit = true;
+    sconce.empty = false;
+    this.hooks?.setOil?.(oil - OIL_TORCH_COST);
+    this.hooks?.syncTorches?.();
+    const pos = torchWorldPos(sconce);
+    try {
+      this.audio.playPositional('torch_ignite', pos.x, pos.y, pos.z, 1);
+      window.setTimeout(() => this.audio.startTorchLoop(sconce), 400);
+    } catch {
+      // Audio may still be unlocking.
+    }
+    this.showMessage(this.story.log('torch_relit'));
+    this.rebuildAudioFromState();
+  }
+
+  private placeCarriedTorch(sconce: SconceSpec): void {
+    const hero = this.hooks?.party().find((h) => h.main === 'torch_lit' || h.off === 'torch_lit');
+    if (!hero) return;
+    const hand = hero.main === 'torch_lit' ? 'main' : 'off';
+    this.hooks?.setHand?.(hero.id as HudHeroId, hand, 'empty_hand');
+    sconce.lit = true;
+    sconce.empty = false;
+    this.hooks?.syncTorches?.();
+    try {
+      this.audio.stopCarriedTorchLoop();
+      this.audio.startTorchLoop(sconce);
+      this.audio.playUi('torch_take');
+    } catch {
+      // Audio may still be unlocking.
+    }
+    this.showMessage(this.story.log('torch_place'));
+    this.rebuildAudioFromState();
+  }
+
+  private showTorchChoice(sconce: SconceSpec): void {
+    this.torchChoice = sconce;
+    const el = document.getElementById('torch-choice');
+    if (el) {
+      el.hidden = false;
+      el.classList.add('show');
+    }
+  }
+
+  hideTorchChoice(): void {
+    this.torchChoice = null;
+    const el = document.getElementById('torch-choice');
+    if (el) {
+      el.hidden = true;
+      el.classList.remove('show');
+    }
+  }
+
+  private wireTorchChoice(): void {
+    if (typeof document === 'undefined') return;
+    const take = document.getElementById('btn-torch-take');
+    const snuff = document.getElementById('btn-torch-snuff');
+    const stop = (e: Event) => {
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    take?.addEventListener('pointerup', (e) => {
+      if (!(e as PointerEvent).isPrimary) return;
+      stop(e);
+      const sconce = this.torchChoice;
+      this.hideTorchChoice();
+      if (sconce) this.takeWallTorch(sconce);
+    });
+    snuff?.addEventListener('pointerup', (e) => {
+      if (!(e as PointerEvent).isPrimary) return;
+      stop(e);
+      const sconce = this.torchChoice;
+      this.hideTorchChoice();
+      if (sconce) this.snuffTorch(sconce);
+    });
+    take?.addEventListener('click', stop);
+    snuff?.addEventListener('click', stop);
+    if (take) take.textContent = this.story.uiText('step1_party_panel.torch_choice.take') || 'Take';
+    if (snuff) snuff.textContent = this.story.uiText('step1_party_panel.torch_choice.snuff') || 'Snuff';
+  }
+
+  takeFacingTorch(): boolean {
+    const sconce = this.hooks?.facingSconce?.();
+    if (!sconce?.lit || sconce.capped) return false;
+    this.takeWallTorch(sconce);
+    return true;
+  }
+
+  snuffFacingTorch(): boolean {
+    const sconce = this.hooks?.facingSconce?.();
+    if (!sconce?.lit || sconce.capped) return false;
+    this.snuffTorch(sconce);
+    return true;
+  }
+
+  private mountSettings(): void {
+    if (typeof document === 'undefined') return;
+    applyLayoutMode(getLayoutMode());
+    this.soundOn = loadSoundOn();
+    this.applySoundOn(this.soundOn);
+    this.settings = new SettingsMenu(this.story, {
+      getLayout: () => getLayoutMode(),
+      setLayout: (mode: LayoutMode) => {
+        saveLayoutMode(mode);
+        applyLayoutMode(mode);
+      },
+      playUi: (name) => this.audio.playUi(name),
+      getVoxel: () => true,
+      setVoxel: () => {
+        // This page is the voxel game.
+      },
+      getLabLight: () => true,
+      setLabLight: () => {
+        // Warm torch look stays on.
+      },
+      getHeightRelief: () => true,
+      setHeightRelief: () => {
+        // Height maps stay on; no rebuild.
+      }
+    });
+    this.settings.mount();
+    this.wireSettingsExtras();
+  }
+
+  private wireSettingsExtras(): void {
+    const bind = (id: string, fn: () => void): void => {
+      const el = document.getElementById(id);
+      if (!el || el.dataset.bound) return;
+      el.dataset.bound = '1';
+      el.addEventListener('click', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        fn();
+      });
+    };
+    bind('btn-lang-en', () => void this.setLocale('en'));
+    bind('btn-lang-el', () => void this.setLocale('el'));
+    bind('btn-quality-max', () => this.setQualityPref('max'));
+    bind('btn-quality-medium', () => this.setQualityPref('medium'));
+    bind('btn-sound-on', () => this.setSoundOn(true));
+    bind('btn-sound-off', () => this.setSoundOn(false));
+    this.refreshSettingsExtras();
+  }
+
+  private setQualityPref(level: QualityLevel): void {
+    try {
+      localStorage.setItem('voxel-floor1-quality', level);
+    } catch {
+      // quota
+    }
+    this.audio.playUi('ui_button');
+    this.refreshSettingsExtras();
+  }
+
+  private setSoundOn(on: boolean): void {
+    if (this.soundOn === on) return;
+    this.soundOn = on;
+    try {
+      localStorage.setItem('proto3d.sound', on ? 'on' : 'off');
+    } catch {
+      // quota
+    }
+    this.applySoundOn(on);
+    this.audio.playUi('ui_button');
+    this.refreshSettingsExtras();
+  }
+
+  private applySoundOn(on: boolean): void {
+    const ctx = this.audio.listener?.context;
+    if (!ctx) return;
+    if (on) void ctx.resume();
+    else void ctx.suspend();
+  }
+
+  private refreshSettingsExtras(): void {
+    const lang = this.story.locale;
+    document.getElementById('btn-lang-en')?.classList.toggle('selected', lang === 'en');
+    document.getElementById('btn-lang-el')?.classList.toggle('selected', lang === 'el');
+    let quality = 'max';
+    try {
+      quality = localStorage.getItem('voxel-floor1-quality') ?? 'max';
+    } catch {
+      quality = 'max';
+    }
+    document.getElementById('btn-quality-max')?.classList.toggle('selected', quality === 'max');
+    document.getElementById('btn-quality-medium')?.classList.toggle('selected', quality === 'medium');
+    document.getElementById('btn-sound-on')?.classList.toggle('selected', this.soundOn);
+    document.getElementById('btn-sound-off')?.classList.toggle('selected', !this.soundOn);
+    const langLabel = document.getElementById('settings-language-label');
+    if (langLabel) langLabel.textContent = this.story.uiText('settings.language') || 'Language';
+    const qualityLabel = document.getElementById('settings-quality-label');
+    if (qualityLabel) qualityLabel.textContent = this.story.uiText('settings.quality') || 'Quality';
+    const soundLabel = document.getElementById('settings-sound-label');
+    if (soundLabel) soundLabel.textContent = this.story.uiText('settings.sound') || 'Sound';
+    const take = document.getElementById('btn-torch-take');
+    const snuff = document.getElementById('btn-torch-snuff');
+    if (take) take.textContent = this.story.uiText('step1_party_panel.torch_choice.take') || 'Take';
+    if (snuff) snuff.textContent = this.story.uiText('step1_party_panel.torch_choice.snuff') || 'Snuff';
+  }
+
+  openSettings(): void {
+    this.settings?.show();
+    this.refreshSettingsExtras();
+  }
+
+  hideSettings(): void {
+    this.settings?.hide();
+  }
+
+  settingsVisible(): boolean {
+    return !!this.settings?.open;
+  }
+
+  getSoundOn(): boolean {
+    return this.soundOn;
+  }
+
+  getQualityPref(): QualityLevel {
+    try {
+      const raw = localStorage.getItem('voxel-floor1-quality');
+      return raw === 'medium' ? 'medium' : 'max';
+    } catch {
+      return 'max';
+    }
   }
 
   private flushBarks(nowMs: number): void {

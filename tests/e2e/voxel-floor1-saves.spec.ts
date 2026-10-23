@@ -156,6 +156,7 @@ test('voxel floor 1: save, reload, load, game over, stairs', async ({ page }) =>
 
   const stairs = await page.evaluate(() => {
     const api = (window as unknown as { __voxelFloor1: Floor1 }).__voxelFloor1;
+    api.setPosition(16, 9, 2);
     api.setPosition(16, 10, 2);
     return {
       message: api.lastMessage,

@@ -788,6 +788,98 @@
       transform: translate(1px, 1px);
     }
     .gameover-btn[hidden] { display: none; }
+    #torch-choice {
+      position: absolute;
+      left: 50%;
+      top: 38%;
+      transform: translate(-50%, -50%);
+      z-index: 40;
+      display: none;
+      gap: 10px;
+      pointer-events: auto;
+    }
+    #torch-choice.show { display: flex; }
+    .hud-choice-btn {
+      min-width: 88px;
+      min-height: 48px;
+      padding: 8px 14px;
+      border: 1px solid #6a5a40;
+      background: rgba(18, 14, 10, 0.88);
+      color: #e8d8a0;
+      font-family: inherit;
+      font-size: 14px;
+    }
+    #settings-overlay {
+      position: absolute;
+      inset: 0;
+      z-index: 350;
+      display: none;
+      align-items: center;
+      justify-content: center;
+      background: rgba(8, 6, 4, 0.72);
+      padding: 16px;
+      touch-action: none;
+    }
+    #settings-overlay.show { display: flex !important; }
+    #settings-sheet {
+      width: min(280px, 100%);
+      max-height: calc(100% - 8px);
+      overflow-y: auto;
+      padding: 16px 14px 14px;
+      background: #1a1612;
+      border: 1px solid #6a5a40;
+      color: #d8ccb0;
+      font-family: inherit;
+    }
+    #settings-title {
+      margin: 0 0 12px;
+      color: #e8d8a0;
+      font-size: 16px;
+      text-align: center;
+    }
+    #settings-layout-label,
+    #settings-voxel-label,
+    #settings-lab-light-label,
+    #settings-height-relief-label,
+    #settings-language-label,
+    #settings-quality-label,
+    #settings-sound-label {
+      margin: 0 0 8px;
+      font-size: 13px;
+    }
+    #settings-layout-row,
+    #settings-voxel-row,
+    #settings-lab-light-row,
+    #settings-height-relief-row,
+    #settings-language-row,
+    #settings-quality-row,
+    #settings-sound-row {
+      display: flex;
+      gap: 8px;
+    }
+    #settings-layout-hint,
+    #settings-voxel-hint,
+    #settings-lab-light-hint,
+    #settings-height-relief-hint {
+      margin: 6px 0 12px;
+      color: #918d7d;
+      font-size: 11px;
+      line-height: 1.35;
+    }
+    .settings-btn {
+      flex: 1;
+      min-width: 44px;
+      min-height: 44px;
+      padding: 8px 10px;
+      border: 1px solid #6a5a40;
+      background: #1c1610;
+      color: #d8ccb0;
+      font-family: inherit;
+      font-size: 13px;
+      cursor: pointer;
+    }
+    .settings-btn.selected { color: #ffbe5a; }
+    #btn-settings-close { width: 100%; margin-top: 8px; }
   </style>
 </head>
 <body>
@@ -826,6 +918,10 @@
         <img src="/art/ui/items/icon_oil.png" alt="" />
         <span id="oil-count">2/4</span>
       </button>
+    </div>
+    <div id="torch-choice" hidden>
+      <button id="btn-torch-take" class="hud-choice-btn" type="button">Take</button>
+      <button id="btn-torch-snuff" class="hud-choice-btn" type="button">Snuff</button>
     </div>
     <button id="btn-door" type="button" aria-label="Open door">Open</button>
     <div id="message-log" aria-live="polite"></div>
@@ -897,8 +993,54 @@
       <h2>Menu</h2>
       <button id="btn-save" class="lab" type="button">Save</button>
       <button id="btn-load" class="lab" type="button">Load</button>
+      <button id="btn-settings" class="lab" type="button">Settings</button>
       <button id="btn-quality" class="lab" type="button" aria-label="Graphics quality">Gfx Max</button>
       <button class="overlay-close" type="button">Close</button>
+    </div>
+  </div>
+  <div id="settings-overlay" hidden>
+    <div id="settings-sheet" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+      <h2 id="settings-title">Settings</h2>
+      <p id="settings-language-label">Language</p>
+      <div id="settings-language-row">
+        <button id="btn-lang-en" class="settings-btn selected" type="button">EN</button>
+        <button id="btn-lang-el" class="settings-btn" type="button">EL</button>
+      </div>
+      <p id="settings-sound-label">Sound</p>
+      <div id="settings-sound-row">
+        <button id="btn-sound-on" class="settings-btn selected" type="button">On</button>
+        <button id="btn-sound-off" class="settings-btn" type="button">Off</button>
+      </div>
+      <p id="settings-quality-label">Quality</p>
+      <div id="settings-quality-row">
+        <button id="btn-quality-max" class="settings-btn selected" type="button">Max</button>
+        <button id="btn-quality-medium" class="settings-btn" type="button">Medium</button>
+      </div>
+      <p id="settings-lab-light-label">Lighting</p>
+      <div id="settings-lab-light-row">
+        <button id="btn-lab-light-on" class="settings-btn selected" type="button" aria-pressed="true">Lab</button>
+        <button id="btn-lab-light-off" class="settings-btn" type="button" aria-pressed="false">Classic</button>
+      </div>
+      <p id="settings-lab-light-hint">Lab: warm pools. This page keeps the warm torch look.</p>
+      <p id="settings-height-relief-label">Height relief</p>
+      <div id="settings-height-relief-row">
+        <button id="btn-height-relief-on" class="settings-btn selected" type="button" aria-pressed="true">On</button>
+        <button id="btn-height-relief-off" class="settings-btn" type="button" aria-pressed="false">Off</button>
+      </div>
+      <p id="settings-height-relief-hint">Artie's wall and door maps. Textures without a map stay flat.</p>
+      <p id="settings-voxel-label">3D walls</p>
+      <div id="settings-voxel-row">
+        <button id="btn-voxel-on" class="settings-btn selected" type="button" aria-pressed="true">On</button>
+        <button id="btn-voxel-off" class="settings-btn" type="button" aria-pressed="false">Off</button>
+      </div>
+      <p id="settings-voxel-hint">This page is the voxel game.</p>
+      <p id="settings-layout-label">Layout</p>
+      <div id="settings-layout-row">
+        <button id="btn-layout-framed" class="settings-btn selected" type="button" aria-pressed="true">Framed</button>
+        <button id="btn-layout-edge" class="settings-btn" type="button" aria-pressed="false">Edge</button>
+      </div>
+      <p id="settings-layout-hint">Prototype. Saved on this phone. Option A portraits stay.</p>
+      <button id="btn-settings-close" class="settings-btn" type="button">Resume</button>
     </div>
   </div>
   <script type="module" src="/src/voxel-floor1/main.ts"></script>

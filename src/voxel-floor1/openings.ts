@@ -566,7 +566,9 @@ export class OpeningSystem {
     if (visual.busy || this.pendingUnlock) return 'busy';
     if (visual.tile.doorLocked && !visual.tile.doorOpen) {
       if (!hasKey) return 'locked';
+      // Logical state wins a mid-slide / unlock-lead save — the leaf is already opening.
       visual.tile.doorLocked = false;
+      visual.tile.doorOpen = true;
       this.pendingUnlock = { x, y };
       this.unlockAt = now + DOOR_UNLOCK_LEAD_MS;
       return 'unlocking';

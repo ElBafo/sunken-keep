@@ -106,6 +106,8 @@ export class TitleScreen {
   private fontGlyphs: FontGlyphs = {};
   visible = false;
   essentialReady = false;
+  /** In-game Load: Back closes the overlay instead of returning to the title menu. */
+  resumeOnBack = false;
   private restPromise: Promise<void> | null = null;
 
   constructor(canvas: HTMLCanvasElement, story: StoryText, onAction: (a: TitleAction) => void) {
@@ -203,8 +205,9 @@ export class TitleScreen {
       .catch(() => undefined);
   }
 
-  show(mode: Mode = 'title') {
+  show(mode: Mode = 'title', opts?: { resumeOnBack?: boolean }) {
     this.mode = mode;
+    this.resumeOnBack = !!opts?.resumeOnBack;
     this.overwriteSlot = null;
     this.visible = true;
     const overlay = document.getElementById('title-overlay');
@@ -216,6 +219,7 @@ export class TitleScreen {
 
   hide() {
     this.visible = false;
+    this.resumeOnBack = false;
     cancelAnimationFrame(this.raf);
     document.getElementById('title-overlay')?.classList.remove('show');
     const hint = document.getElementById('title-hint');
@@ -245,6 +249,10 @@ export class TitleScreen {
 
   getMode(): Mode {
     return this.mode;
+  }
+
+  press(id: string) {
+    this.handleHit(id);
   }
 
   prepareSave(payload: SavePayload) {
@@ -573,7 +581,8 @@ export class TitleScreen {
       return;
     }
     if (id === 'Back') {
-      if (this.mode === 'save') {
+      if (this.mode === 'save' || this.resumeOnBack) {
+        this.resumeOnBack = false;
         this.hide();
         return;
       }

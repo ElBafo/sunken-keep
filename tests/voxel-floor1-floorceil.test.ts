@@ -71,6 +71,11 @@ describe('floor-1 floor and ceiling come from Levie’s map', () => {
         if (!isShellTile(floor1Map.tiles[y][x])) continue;
         const floor = jobs.find((j) => j.kind === 'floor' && j.tx === x && j.tz === y);
         const ceil = jobs.find((j) => j.kind === 'ceiling' && j.tx === x && j.tz === y);
+        if (floor1Map.tiles[y][x].stairs) {
+          expect(floor).toBeUndefined();
+          expect(ceil?.file).toBe(mappedCeilingFile(x, y) ?? pickVariant(CEILING_VARIANTS, x, y, 'C'));
+          continue;
+        }
         expect(floor?.file).toBe(mappedFloorFile(x, y) ?? pickVariant(FLOOR_VARIANTS, x, y, 'F'));
         expect(ceil?.file).toBe(mappedCeilingFile(x, y) ?? pickVariant(CEILING_VARIANTS, x, y, 'C'));
         expect(ceil?.file).not.toBe('ceiling.png');
@@ -89,7 +94,8 @@ describe('floor-1 floor and ceiling come from Levie’s map', () => {
     expect(mappedCeilingFile(10, 2)?.startsWith('ceiling_planks_')).toBe(true);
     expect(mappedCeilingFile(2, 11)?.startsWith('ceiling_rubble_')).toBe(true);
     expect(mappedFloorFile(99, 99)).toBeUndefined();
-    expect(floor1FloorCeil.squares).toHaveLength(jobs.filter((j) => j.kind === 'floor').length);
+    expect(floor1FloorCeil.squares).toHaveLength(jobs.filter((j) => j.kind === 'floor').length + 1);
+    expect(jobs.some((j) => j.kind === 'floor' && j.tx === 16 && j.tz === 10)).toBe(false);
   });
 
   it('keeps floor_stone_3 rare, under a lamp or door, and never adjacent', () => {
