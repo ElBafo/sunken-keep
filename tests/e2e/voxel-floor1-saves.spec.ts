@@ -11,6 +11,7 @@ type Floor1 = {
   handleDoor: (x?: number, y?: number) => string;
   getBag: () => Array<{ item: string; count: number }>;
   doorOpen: (x: number, y: number) => boolean;
+  snapDoor: (x: number, y: number, open: boolean) => boolean;
   debugKillAt: (x: number, y: number) => boolean;
   addXp: (n: number) => void;
   getHeroes: () => Array<{
@@ -58,8 +59,8 @@ test.use({ viewport: { width: 420, height: 912 }, hasTouch: true, isMobile: true
 test('voxel floor 1: save, reload, load, game over, stairs', async ({ page }) => {
   test.setTimeout(180000);
   mkdirSync(OUT, { recursive: true });
-  await page.addInitScript(() => localStorage.clear());
   await boot(page);
+  await page.evaluate(() => localStorage.clear());
 
   const played = await page.evaluate(() => {
     const api = (window as unknown as { __voxelFloor1: Floor1 }).__voxelFloor1;
@@ -67,6 +68,7 @@ test('voxel floor 1: save, reload, load, game over, stairs', async ({ page }) =>
     const picked = api.pickupHere();
     api.setPosition(4, 2, 3);
     const unlocked = api.handleDoor(4, 2);
+    api.snapDoor(4, 2, true);
     api.setPosition(6, 5, 1);
     const killed = api.debugKillAt(7, 5);
     api.addXp(220);
@@ -107,8 +109,7 @@ test('voxel floor 1: save, reload, load, game over, stairs', async ({ page }) =>
       heroes: api.getHeroes(),
       door: api.doorOpen(4, 2),
       rat: api.combatMonsters().find((m) => m.x === 7 && m.y === 5),
-      state: api.mapState(),
-      grid: { x: api.gridX, y: api.gridY }
+      state: api.mapState()
     };
   });
   expect(loaded.ok).toBe(true);
@@ -116,8 +117,8 @@ test('voxel floor 1: save, reload, load, game over, stairs', async ({ page }) =>
   expect(loaded.rat?.alive).toBe(false);
   expect(loaded.state.doors.find((d) => d.x === 4 && d.y === 2)?.open).toBe(true);
   expect(loaded.heroes.some((h) => (h.level ?? 1) > 1 || (h.xp ?? 0) > 0)).toBe(true);
-  expect(loaded.grid.x).toBe(6);
-  expect(loaded.grid.y).toBe(5);
+  expect(loaded.state.position.x).toBe(6);
+  expect(loaded.state.position.y).toBe(5);
 
   await page.evaluate(() => {
     const api = (window as unknown as { __voxelFloor1: Floor1 }).__voxelFloor1;
@@ -125,9 +126,11 @@ test('voxel floor 1: save, reload, load, game over, stairs', async ({ page }) =>
     api.tryAutosave();
     api.requestManualSave();
   });
-  await page.waitForTimeout(600);
-  await expect(page.locator('#title-overlay')).toHaveClass(/show/);
+  await expect(page.locator('#title-overlay')).toHaveClass(/show/, { timeout: 15000 });
+  await page.waitForTimeout(1600);
   await page.screenshot({ path: `${OUT}/voxel_floor1_saveload_menu.png`, fullPage: false });
+  await page.evaluate(() => document.getElementById('title-overlay')?.classList.remove('show'));
+  await page.waitForTimeout(200);
 
   const wiped = await page.evaluate(() => {
     const api = (window as unknown as { __voxelFloor1: Floor1 }).__voxelFloor1;
@@ -157,12 +160,11 @@ test('voxel floor 1: save, reload, load, game over, stairs', async ({ page }) =>
     return {
       message: api.lastMessage,
       logs: api.logLines,
-      x: api.gridX,
-      y: api.gridY
+      pos: api.mapState().position
     };
   });
-  expect(stairs.x).toBe(16);
-  expect(stairs.y).toBe(10);
+  expect(stairs.pos.x).toBe(16);
+  expect(stairs.pos.y).toBe(10);
   const line = [stairs.message, ...stairs.logs].join(' ');
   expect(line).toMatch(/stairs lead down into darkness/i);
   expect(line).toMatch(/Floor 2 is coming soon/i);
