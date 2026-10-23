@@ -57,6 +57,9 @@ export class GridMover {
   private t0 = 0;
   private duration = MOVE_MS;
 
+  /** Live combat occupancy — stepping onto a living monster is blocked. */
+  occupied: ((x: number, y: number) => boolean) | null = null;
+
   constructor(
     private camera: Camera,
     private map: FloorMap
@@ -113,6 +116,7 @@ export class GridMover {
     const nx = this.x + dx * dirSign;
     const ny = this.y + dy * dirSign;
     if (!canCross(this.map, this.x, this.y, nx, ny)) return false;
+    if (this.occupied?.(nx, ny)) return false;
     this.start(nx, ny, this.dir, MOVE_MS, 'step');
     return true;
   }
@@ -131,6 +135,7 @@ export class GridMover {
     const nx = this.x + dx;
     const ny = this.y + dy;
     if (!canCross(this.map, this.x, this.y, nx, ny)) return false;
+    if (this.occupied?.(nx, ny)) return false;
     this.start(nx, ny, this.dir, MOVE_MS, 'step');
     return true;
   }

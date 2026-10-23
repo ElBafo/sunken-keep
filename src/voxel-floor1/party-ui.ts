@@ -1,4 +1,4 @@
-import { DEFAULT_EQUIPMENT, type HeroId } from '../constants';
+import { DEFAULT_EQUIPMENT, DEFAULT_FORMATION, MELEE_ITEMS, type FormationRow, type HeroId, type ItemType } from '../constants';
 import {
   HERO_DISPLAY,
   HERO_IDS,
@@ -69,6 +69,8 @@ export type PartyHeroState = {
   main: string;
   off: string;
   armour?: string;
+  formation: FormationRow;
+  recovery: { main: number; off: number };
 };
 
 export type PartyUiHooks = {
@@ -137,7 +139,9 @@ function heroState(id: HudHeroId, downed = false): PartyHeroState {
     maxMana,
     downed,
     main: DEFAULT_EQUIPMENT[id as HeroId].main,
-    off: DEFAULT_EQUIPMENT[id as HeroId].off
+    off: DEFAULT_EQUIPMENT[id as HeroId].off,
+    formation: DEFAULT_FORMATION[id as HeroId],
+    recovery: { main: 0, off: 0 }
   };
 }
 
@@ -147,7 +151,11 @@ export class Floor1PartyUi {
   oil = 2;
   oilMax = 4;
   speaking: HudHeroId | null = null;
+  inCombat = false;
   logLines: string[] = [];
+  private nowSec = 0;
+  private readyArmed = new Set<string>();
+  private onHandReady: ((name: string) => void) | null = null;
   private logMessages: string[] = [];
   private logScrollFromBottom = 0;
   private host: HTMLElement;
@@ -377,6 +385,70 @@ export class Floor1PartyUi {
     this.drawPortraits();
   }
 
+  setHandReady(fn: (name: string) => void): void {
+    this.onHandReady = fn;
+  }
+
+  syncHero(
+    id: HudHeroId,
+    state: {
+      hp: number;
+      maxHp: number;
+      mana: number;
+      maxMana: number;
+      downed?: boolean;
+      recovery?: { main: number; off: number };
+      formation?: FormationRow;
+    }
+  ): void {
+    const hero = this.heroes[id];
+    if (!hero) return;
+    hero.hp = state.hp;
+    hero.maxHp = state.maxHp;
+    hero.mana = state.mana;
+    hero.maxMana = state.maxMana;
+    hero.downed = !!state.downed;
+    if (state.formation) hero.formation = state.formation;
+    if (state.recovery) {
+      hero.recovery.main = state.recovery.main;
+      hero.recovery.off = state.recovery.off;
+    }
+    this.drawPortraits();
+  }
+
+  tick(nowMs: number): void {
+    this.nowSec = nowMs / 1000;
+    for (const id of HERO_IDS) {
+      const hero = this.heroes[id];
+      for (const hand of ['main', 'off'] as const) {
+        const key = `${id}:${hand}`;
+        if (hero.recovery[hand] > this.nowSec) this.readyArmed.add(key);
+        else if (this.readyArmed.has(key)) {
+          this.readyArmed.delete(key);
+          this.onHandReady?.('act_ready');
+        }
+      }
+    }
+    this.refreshHandState();
+  }
+
+  private refreshHandState(): void {
+    for (const btn of this.stripEl.querySelectorAll<HTMLElement>('.hand-hit')) {
+      const id = btn.dataset.hero as HudHeroId | undefined;
+      const hand = btn.dataset.hand as 'main' | 'off' | undefined;
+      if (!id || !hand) continue;
+      const hero = this.heroes[id];
+      const recovering = hero.recovery[hand] > this.nowSec;
+      const item = hand === 'main' ? hero.main : hero.off;
+      const melee =
+        MELEE_ITEMS.includes(item as ItemType) || item === 'torch_lit' || item === 'torch_burnt';
+      const outOfReach = this.inCombat && hero.formation === 'back' && melee && item !== 'wand' && item !== 'scroll';
+      btn.classList.toggle('recovering', recovering);
+      btn.classList.toggle('out-of-reach', outOfReach);
+      btn.classList.toggle('downed', hero.downed);
+    }
+  }
+
   private bind(): void {
     const click = (id: string, fn: (e: Event) => void) => {
       document.getElementById(id)?.addEventListener('click', (e) => {
@@ -491,6 +563,13 @@ export class Floor1PartyUi {
     btn.className = `hand-hit ${hand}`;
     btn.dataset.hero = id;
     btn.dataset.hand = hand;
+    const hero = this.heroes[id];
+    const recovering = hero.recovery[hand] > this.nowSec;
+    const melee = MELEE_ITEMS.includes(item as ItemType) || item === 'torch_lit' || item === 'torch_burnt';
+    const outOfReach = this.inCombat && hero.formation === 'back' && melee && item !== 'wand' && item !== 'scroll';
+    btn.classList.toggle('recovering', recovering);
+    btn.classList.toggle('out-of-reach', outOfReach);
+    btn.classList.toggle('downed', hero.downed);
     btn.setAttribute('aria-label', `${HERO_DISPLAY[id]} ${hand}`);
     place(btn, { x: tap.x - cell.x, y: tap.y - cell.y, w: tap.w, h: tap.h });
     const icon = document.createElement('img');

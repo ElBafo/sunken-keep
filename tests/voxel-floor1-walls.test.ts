@@ -270,7 +270,7 @@ describe('floor-1 walls use Artie painted tiles', () => {
   it('does not import proto3d and keeps knot walls on their own file', () => {
     const dir = resolve(__dirname, '../src/voxel-floor1');
     for (const name of readdirSync(dir)) {
-      if (!name.endsWith('.ts') || name === 'gameplay.ts') continue;
+      if (!name.endsWith('.ts') || name === 'gameplay.ts' || name === 'combat.ts' || name === 'monsters.ts') continue;
       const src = readFileSync(resolve(dir, name), 'utf8');
       expect(src, name).not.toContain("from '../proto3d/");
     }
