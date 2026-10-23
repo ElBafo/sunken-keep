@@ -1,4 +1,4 @@
-import { readFileSync } from 'fs';
+import { existsSync, readFileSync } from 'fs';
 import { resolve } from 'path';
 import { describe, expect, it } from 'vitest';
 import { parseRules, Rng } from '../src/core';
@@ -246,6 +246,16 @@ describe('voxel floor 1 monsters and combat port', () => {
     expect(wide.view.h + wide.strip.h).toBe(912);
     expect(html).toContain('id="btn-bag"');
     expect(html).toContain('z-index: 100');
+
+    const ids = Object.values(FLOOR1_PERK_CHOICES).flatMap((row) => [...row[3], ...row[5]]);
+    expect(new Set(ids).size).toBe(16);
+    for (const id of ids) {
+      for (const file of [`perk_${id}.png`, `perk_${id}_dim.png`]) {
+        const abs = resolve('public/art/ui/perks', file);
+        expect(existsSync(abs), abs).toBe(true);
+        expect(readFileSync(abs).subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))).toBe(true);
+      }
+    }
   });
 
   it('arms frost hint, flashes a flank, and fires the slime frost bark once', () => {
