@@ -5,11 +5,14 @@ import { parseRules, Rng } from '../src/core';
 import {
   classicFloor1Monsters,
   createFloor1Combat,
+  FLOOR1_PERK_CHOICES,
   parseCombatSearch,
   voxelOccupancy
 } from '../src/voxel-floor1/combat';
 import { parseGameplayFlags } from '../src/voxel-floor1/gameplay';
 import { floor1Map, isWalkableTile, tileAt } from '../src/voxel-floor1/layout';
+import { measurePortraitLayout } from '../src/voxel-floor1/portrait-layout';
+import { perkChoices, wrapPerkText } from '../src/voxel-floor1/perks';
 
 const actions = JSON.parse(readFileSync(resolve('public/levels/actions.json'), 'utf8'));
 const monstersJson = JSON.parse(readFileSync(resolve('public/levels/monsters.json'), 'utf8'));
@@ -33,6 +36,8 @@ describe('voxel floor 1 monsters and combat port', () => {
     expect(monstersSrc).toContain("from '../proto3d/sprites'");
     expect(monstersSrc).toContain('SpriteManager');
     expect(monstersSrc).toContain('MeshPhysicalMaterial');
+    expect(monstersSrc).toContain('DarkFx');
+    expect(monstersSrc).toContain('frostAmount');
     expect(gameplaySrc).toContain('usePotion');
     expect(gameplaySrc).toContain('showGameOver');
     expect(mainSrc).toContain("from './combat'");
@@ -41,6 +46,10 @@ describe('voxel floor 1 monsters and combat port', () => {
     expect(protoMain).not.toContain('voxel-floor1/combat');
     expect(html).toContain('id="gameover"');
     expect(html).toContain('id="btn-go-floor"');
+    expect(html).toContain('id="perk-screen"');
+    expect(html).toContain('id="flank-flash"');
+    expect(html).toContain('overflow-wrap: anywhere');
+    expect(html).not.toContain('text-overflow: ellipsis');
   });
 
   it('still skips intro chrome for ?test=1 and only chases when asked', () => {
@@ -183,5 +192,93 @@ describe('voxel floor 1 monsters and combat port', () => {
     const occ = voxelOccupancy(floor1Map);
     expect(occ.walkable(2, 9)).toBe(true);
     expect(occ.walkable(0, 0)).toBe(false);
+  });
+
+  it('grants XP, queues perks, opens a full-text pick, and keeps option A widths', () => {
+    const session = combat(2);
+    session.wake();
+    const hooks: string[] = [];
+    session.attach({
+      pushLog: () => undefined,
+      storyLog: (key) => key,
+      heroName: (id) => id,
+      monsterName: (id) => id,
+      playCombat: () => undefined,
+      playUi: () => undefined,
+      playHeroHurt: () => undefined,
+      playHeroDown: () => undefined,
+      setFightDuck: () => undefined,
+      stopWindup: () => undefined,
+      onLevelUp: (_hero, level) => hooks.push(`level:${level}`),
+      onPerkPending: (_hero, level) => hooks.push(`pending:${level}`),
+      onPerkHook: (_hero, level) => hooks.push(`hook:${level}`),
+      onFlank: (side) => hooks.push(`flank:${side}`),
+      onFightStart: () => hooks.push('fight_start'),
+      onFightEnd: () => hooks.push('fight_end')
+    });
+
+    const xp = session.addXp(220, 1);
+    expect(xp.some((e) => e.type === 'log' && e.key === 'xp_gain')).toBe(true);
+    expect(xp.some((e) => e.type === 'level_up' && e.hero === 'brannoc' && e.level === 3)).toBe(true);
+    expect(xp.some((e) => e.type === 'perk_pending')).toBe(true);
+    expect(hooks).toEqual(expect.arrayContaining(['level:3', 'pending:3']));
+    expect(session.engine.heroes.brannoc.pendingPerk).toBe(3);
+
+    session.engine.fight = { monsterId: 'keep_rat-1', startedAt: 1 };
+    const ended = session.finishFight(2);
+    expect(ended.some((e) => e.type === 'perk_hook' && e.hero === 'brannoc')).toBe(true);
+    expect(hooks).toContain('hook:3');
+
+    expect(perkChoices('brannoc', 3)).toEqual(FLOOR1_PERK_CHOICES.brannoc[3]);
+    expect(session.pickPerk('brannoc', 'shield_wall')).toBe(true);
+    expect(session.engine.heroes.brannoc.pendingPerk).toBeNull();
+    expect(session.chosenPerks.get('brannoc:3')).toBe('shield_wall');
+
+    const stubborn = 'Once per fight, a killing blow leaves him at 1 HP. Too rude to die.';
+    const wrapped = wrapPerkText(stubborn, 28);
+    expect(wrapped.join(' ')).toBe(stubborn);
+    expect(wrapped.every((line) => line.length <= 28 || !line.includes(' '))).toBe(true);
+
+    const wide = measurePortraitLayout(420, 912);
+    const narrow = measurePortraitLayout(393, 852);
+    expect(wide.cssW).toBe(420);
+    expect(narrow.cssW).toBe(393);
+    expect(wide.view.h + wide.strip.h).toBe(912);
+    expect(html).toContain('id="btn-bag"');
+    expect(html).toContain('z-index: 100');
+  });
+
+  it('arms frost hint, flashes a flank, and fires the slime frost bark once', () => {
+    const session = combat(4);
+    session.wake();
+    const saw: string[] = [];
+    session.attach({
+      pushLog: () => undefined,
+      storyLog: (key) => key,
+      heroName: (id) => id,
+      monsterName: (id) => id,
+      playCombat: () => undefined,
+      playUi: () => undefined,
+      playHeroHurt: () => undefined,
+      playHeroDown: () => undefined,
+      setFightDuck: () => undefined,
+      stopWindup: () => undefined,
+      onFlank: (side) => saw.push(side),
+      onSlimeFrostResist: () => saw.push('bark'),
+      onArmFrostHint: () => saw.push('hint')
+    });
+    session.applyEvents([{ type: 'hit_type', id: 'rust_crab-1', kind: 'resist', monster: 'rust_crab' }]);
+    expect(session.frostHintArmed).toBe(true);
+    expect(saw).toContain('hint');
+    session.applyEvents([{ type: 'hand_used', hero: 'ilsevar', hand: 'main', item: 'wand' }]);
+    expect(session.frostHintDismissed).toBe(true);
+
+    session.applyEvents([{ type: 'flank', side: 'right' }]);
+    expect(session.lastFlank).toBe('right');
+    expect(saw).toContain('right');
+
+    session.applyEvents([{ type: 'log', key: 'slime_frost_resist' }]);
+    session.applyEvents([{ type: 'log', key: 'slime_frost_resist' }]);
+    expect(saw.filter((x) => x === 'bark')).toEqual(['bark']);
   });
 });

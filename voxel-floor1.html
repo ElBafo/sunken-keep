@@ -49,6 +49,7 @@
     #game-hud button,
     #game-hud .hand-hit,
     #game-hud .portrait-sheet-hit,
+    #game-hud #perk-screen,
     #message-log {
       pointer-events: auto;
     }
@@ -69,6 +70,185 @@
     }
     #btn-bag {
       z-index: 100;
+    }
+    .hand-hit[data-hint="wand"],
+    .hand-hit.wand-hint {
+      outline: 1px solid #9ad4ff;
+      outline-offset: 1px;
+      box-shadow: 0 0 10px 3px rgba(140, 210, 255, 0.85);
+      background: rgba(120, 190, 255, 0.22);
+    }
+    .portrait-levelup {
+      position: absolute;
+      inset: 0;
+      width: 100%;
+      height: 100%;
+      object-fit: fill;
+      pointer-events: none;
+      image-rendering: pixelated;
+      z-index: 3;
+    }
+    .perk-badge {
+      position: absolute;
+      top: -3px;
+      right: 4px;
+      width: 11px;
+      height: 11px;
+      image-rendering: pixelated;
+      pointer-events: none;
+      z-index: 4;
+    }
+    #flank-flash {
+      position: absolute;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: var(--view-h, 100%);
+      pointer-events: none;
+      z-index: 6;
+      opacity: 0;
+      box-shadow: none;
+      transition: opacity 90ms linear;
+    }
+    #flank-flash.show { opacity: 1; }
+    #flank-flash.show[data-side="left"] {
+      box-shadow: inset 22px 0 18px -4px rgba(200, 24, 24, 0.92);
+    }
+    #flank-flash.show[data-side="right"] {
+      box-shadow: inset -22px 0 18px -4px rgba(200, 24, 24, 0.92);
+    }
+    #flank-flash.show[data-side="behind"] {
+      box-shadow: inset 0 -22px 18px -4px rgba(200, 24, 24, 0.92);
+    }
+    #perk-screen {
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 100%;
+      height: var(--view-h, 70%);
+      z-index: 12;
+      display: none;
+      align-items: stretch;
+      justify-content: center;
+      padding: 8px 8px 12px;
+      background: rgba(4, 3, 2, 0.72);
+      pointer-events: auto;
+    }
+    #perk-screen.show { display: flex; }
+    #perk-stage {
+      width: min(404px, 100%);
+      max-height: 100%;
+      overflow: auto;
+      background: #16110c url('/art/ui/perks/perk_pick_bg.png') top / 100% auto no-repeat;
+      border: 1px solid #6a5a40;
+      color: #d8ccb0;
+      padding: 12px 10px 14px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    #perk-portrait {
+      display: block;
+      width: 64px;
+      height: 64px;
+      margin: 4px auto 0;
+      object-fit: fill;
+      image-rendering: pixelated;
+    }
+    #perk-title {
+      color: #ffbe5a;
+      text-align: center;
+      font-size: 16px;
+      text-shadow: 1px 1px 0 #1a1210;
+    }
+    #perk-sub,
+    .perk-card-name,
+    .perk-card-desc {
+      white-space: normal;
+      overflow-wrap: anywhere;
+      word-break: normal;
+      text-overflow: clip;
+    }
+    #perk-sub {
+      color: #bcb8a8;
+      text-align: center;
+      font-size: 13px;
+      line-height: 1.35;
+      text-shadow: 1px 1px 0 #1a1210;
+    }
+    .perk-card {
+      display: grid;
+      grid-template-columns: 28px 1fr;
+      grid-template-rows: auto auto;
+      column-gap: 8px;
+      row-gap: 4px;
+      width: 100%;
+      min-height: 60px;
+      padding: 6px;
+      border: 1px solid #6a5a40;
+      background: #1c1610 url('/art/ui/perks/perk_card.png') center / 100% 100% no-repeat;
+      color: inherit;
+      font-family: inherit;
+      text-align: left;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+    .perk-card.selected { background-image: url('/art/ui/perks/perk_card_selected.png'); }
+    .perk-card.dim .perk-card-name { color: #867961; }
+    .perk-card-icon {
+      grid-row: 1;
+      width: 24px;
+      height: 24px;
+      image-rendering: pixelated;
+    }
+    .perk-card-name {
+      grid-column: 2;
+      color: #ffbe5a;
+      font-size: 14px;
+      text-shadow: 1px 1px 0 #1a1210;
+    }
+    .perk-card-desc {
+      grid-column: 1 / -1;
+      color: #d8ccb0;
+      font-size: 13px;
+      line-height: 1.35;
+    }
+    #perk-actions {
+      display: flex;
+      justify-content: center;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    #perk-confirm,
+    #perk-back {
+      min-width: 76px;
+      min-height: 44px;
+      padding: 0 12px;
+      border: 4px solid transparent;
+      border-image: url('/art/ui/panel/button_9slice.png') 4 fill;
+      background: transparent;
+      color: #d8ccb0;
+      font-family: inherit;
+      font-size: 13px;
+      text-shadow: 1px 1px 0 #1a1210;
+      cursor: pointer;
+    }
+    #perk-confirm:disabled { opacity: 0.45; cursor: default; }
+    #perk-confirm:not(:disabled):active,
+    #perk-back:active {
+      border-image-source: url('/art/ui/panel/button_pressed_9slice.png');
+      transform: translate(1px, 1px);
+    }
+    .sheet-gift {
+      display: block;
+      width: 100%;
+      min-height: 44px;
+      margin-top: 10px;
+      border: 1px solid #6a5a40;
+      background: #1c1610;
+      color: #ffbe5a;
+      font-family: inherit;
+      cursor: pointer;
     }
     .hud-chrome img, #compass img {
       display: block;
@@ -613,6 +793,7 @@
 <body>
   <div id="safe-probe" aria-hidden="true"></div>
   <canvas id="floor1-canvas"></canvas>
+  <div id="flank-flash" aria-hidden="true"></div>
   <div id="loading">Loading textures…</div>
   <div id="tap-to-start" class="hidden" role="button" tabindex="0">
     <div id="tap-to-start-text"></div>
@@ -658,6 +839,27 @@
     </div>
     <div id="party-strip"></div>
     <div id="home-band"></div>
+    <div id="perk-screen" hidden>
+      <div id="perk-stage">
+        <img id="perk-portrait" alt="" />
+        <div id="perk-title"></div>
+        <div id="perk-sub"></div>
+        <button class="perk-card" type="button">
+          <img class="perk-card-icon" alt="" />
+          <div class="perk-card-name"></div>
+          <div class="perk-card-desc"></div>
+        </button>
+        <button class="perk-card" type="button">
+          <img class="perk-card-icon" alt="" />
+          <div class="perk-card-name"></div>
+          <div class="perk-card-desc"></div>
+        </button>
+        <div id="perk-actions">
+          <button id="perk-back" type="button">Back</button>
+          <button id="perk-confirm" type="button" disabled>Take it</button>
+        </div>
+      </div>
+    </div>
     <div id="inventory-screen" hidden>
       <canvas id="inventory-canvas"></canvas>
     </div>

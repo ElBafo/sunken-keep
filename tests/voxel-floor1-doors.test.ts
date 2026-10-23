@@ -447,7 +447,7 @@ describe('voxel-floor1 doors match Classic timing and lock rules', () => {
     expect(tile.secretOpen).toBe(true);
     const dir = resolve(__dirname, '../src/voxel-floor1');
     for (const name of readdirSync(dir)) {
-      if (!name.endsWith('.ts') || name === 'gameplay.ts' || name === 'combat.ts' || name === 'monsters.ts') continue;
+      if (!name.endsWith('.ts') || name === 'gameplay.ts' || name === 'combat.ts' || name === 'monsters.ts' || name === 'perks.ts') continue;
       const src = readFileSync(resolve(dir, name), 'utf8');
       expect(src, name).not.toContain("from '../proto3d/");
     }

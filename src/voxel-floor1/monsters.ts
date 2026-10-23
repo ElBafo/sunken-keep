@@ -1,15 +1,54 @@
 import * as THREE from 'three';
 import { SPRITE_SURFACE_LIFT } from '../proto3d/constants';
+import { DarkFx, monsterBodyVisible } from '../proto3d/dark-fx';
 import { floor1 as classicFloor1 } from '../proto3d/floor-data';
 import { SpriteManager } from '../proto3d/sprites';
 import type { FloorData } from '../proto3d/types';
+import type { AudioManager } from '../proto3d/audio';
+import type { VertexLightingManager } from '../proto3d/vertex-lighting';
 import { SLIME_SMALL_PAN } from '../core/slime-pair';
 import type { CombatEvent } from '../core';
 
 const LIT_RENDER_ORDER = 10;
+const FROST_COLOR = 0x6fa8e8;
+
+export type SquareLight = {
+  isSquareLit: (x: number, y: number) => boolean;
+  getAmbientFloor: () => number;
+};
+
+function patchFrostLerp(material: THREE.MeshPhysicalMaterial): void {
+  if (material.userData.frostPatched) return;
+  material.userData.frostPatched = true;
+  material.userData.frostAmount = 0;
+  material.onBeforeCompile = (shader) => {
+    shader.uniforms.frostAmount = { value: material.userData.frostAmount ?? 0 };
+    shader.uniforms.frostColor = { value: new THREE.Color(FROST_COLOR) };
+    material.userData.frostUniforms = shader.uniforms;
+    shader.fragmentShader = shader.fragmentShader
+      .replace(
+        '#include <common>',
+        `#include <common>
+uniform float frostAmount;
+uniform vec3 frostColor;`
+      )
+      .replace(
+        '#include <opaque_fragment>',
+        `#include <opaque_fragment>
+  gl_FragColor.rgb = mix(gl_FragColor.rgb, frostColor, frostAmount);`
+      );
+  };
+  material.customProgramCacheKey = () => 'voxel-frost-lerp-60';
+}
+
+function setFrostAmount(material: THREE.MeshPhysicalMaterial, amount: number): void {
+  material.userData.frostAmount = amount;
+  const uniforms = material.userData.frostUniforms as { frostAmount?: { value: number } } | undefined;
+  if (uniforms?.frostAmount) uniforms.frostAmount.value = amount;
+}
 
 function litMat(map: THREE.Texture | null): THREE.MeshPhysicalMaterial {
-  return new THREE.MeshPhysicalMaterial({
+  const mat = new THREE.MeshPhysicalMaterial({
     map,
     color: 0xffffff,
     roughness: 1,
@@ -32,6 +71,8 @@ function litMat(map: THREE.Texture | null): THREE.MeshPhysicalMaterial {
     polygonOffsetFactor: -2,
     polygonOffsetUnits: -2
   });
+  patchFrostLerp(mat);
+  return mat;
 }
 
 type LitBillboard = {
@@ -49,10 +90,13 @@ type LitBillboard = {
  */
 export class Floor1Monsters {
   readonly sprites: SpriteManager;
+  readonly darkFx = new DarkFx();
   readonly group = new THREE.Group();
   readonly hidden = new THREE.Group();
   private lit = new Map<string, LitBillboard>();
   private camera: THREE.Camera;
+  private lighting: SquareLight = { isSquareLit: () => false, getAmbientFloor: () => 1 };
+  private audio: AudioManager | null = null;
 
   constructor(camera: THREE.Camera) {
     this.camera = camera;
@@ -63,6 +107,11 @@ export class Floor1Monsters {
     this.group.add(this.hidden);
   }
 
+  bindLight(lighting: SquareLight, audio?: AudioManager): void {
+    this.lighting = lighting;
+    if (audio) this.audio = audio;
+  }
+
   async load(floor: FloorData = classicFloor1): Promise<void> {
     const emptyItems: FloorData = {
       ...floor,
@@ -70,6 +119,10 @@ export class Floor1Monsters {
     };
     await this.sprites.loadSprites(this.asScene(this.group), emptyItems, { monsters: false });
     await this.sprites.ensureMonsters(this.asScene(this.hidden), floor);
+    await this.darkFx.load(this.asScene(this.group), floor, this.sprites);
+    this.group.traverse((obj) => {
+      if (obj.userData.kind === 'stairs-glow') obj.visible = false;
+    });
   }
 
   bindFromCombat(monsters: Array<{ id: string; x: number; y: number; kind: string; alive: boolean }>): void {
@@ -77,10 +130,16 @@ export class Floor1Monsters {
       if (!m.alive) continue;
       this.sprites.bindMonster(m.x, m.y, m.id, m.kind);
     }
+    this.darkFx.syncEyes(this.asScene(this.group), this.sprites, monsters, this.audio ?? undefined);
   }
 
-  move(id: string, x: number, y: number): void {
-    this.sprites.moveMonsterId(id, x, y);
+  move(id: string, from: { x: number; y: number }, to: { x: number; y: number }): void {
+    this.sprites.moveMonsterId(id, to.x, to.y);
+    this.darkFx.moveEyeById(id, from.x, from.y, to.x, to.y, this.audio ?? undefined);
+  }
+
+  removeEye(id: string): void {
+    this.darkFx.removeEyeById(id, this.audio ?? undefined);
   }
 
   playAnim(id: string, anim: 'idle' | 'attack' | 'hurt' | 'death' | 'windup', now: number): void {
@@ -103,12 +162,14 @@ export class Floor1Monsters {
     }
     this.sprites.disposeMonsterId(event.from);
     this.dropLit(event.from);
+    this.darkFx.removeEyeById(event.from, this.audio ?? undefined);
     for (const kid of event.kids) {
       this.sprites.blockFloorSpawn(kid.x, kid.y);
-      await this.sprites.addLiveMonster(this.asScene(this.hidden), kid.kind, kid.x, kid.y, kid.id, 0, {
+      const sprite = await this.sprites.addLiveMonster(this.asScene(this.hidden), kid.kind, kid.x, kid.y, kid.id, 0, {
         pairSlot: kid.slot,
         pairId: event.from
       });
+      if (sprite) this.darkFx.addEyeForHost(this.asScene(this.group), sprite);
     }
   }
 
@@ -116,7 +177,16 @@ export class Floor1Monsters {
     return slot ? SLIME_SMALL_PAN[slot] : 0;
   }
 
-  snapshot(): Array<{ id: string; kind: string; x: number; y: number; visible: boolean; yWorld: number }> {
+  snapshot(): Array<{
+    id: string;
+    kind: string;
+    x: number;
+    y: number;
+    visible: boolean;
+    yWorld: number;
+    squareLit: boolean;
+    frost: number;
+  }> {
     return this.sprites.sprites
       .filter((s) => s.kind === 'monster')
       .map((s) => {
@@ -126,8 +196,10 @@ export class Floor1Monsters {
           kind: s.monsterKind ?? '',
           x: s.x,
           y: s.y,
-          visible: !!(lit?.mesh.visible ?? (!s.hidden && !s.disposed)),
-          yWorld: lit?.mesh.position.y ?? s.object.position.y
+          visible: !!(lit?.mesh.visible ?? false),
+          yWorld: lit?.mesh.position.y ?? s.object.position.y,
+          squareLit: this.lighting.isSquareLit(s.x, s.y),
+          frost: Number(lit?.mat.userData.frostAmount ?? 0)
         };
       });
   }
@@ -139,7 +211,27 @@ export class Floor1Monsters {
   update(now: number, partyX: number, partyY: number, dir: number, camera: THREE.Camera): void {
     this.camera = camera;
     this.sprites.update(now, partyX, partyY, dir);
-    this.syncLit();
+    if (this.audio) {
+      this.darkFx.update(
+        now,
+        this.lighting as unknown as VertexLightingManager,
+        this.sprites,
+        this.audio,
+        partyX,
+        partyY
+      );
+    } else {
+      for (const sprite of this.sprites.sprites) {
+        if (sprite.kind !== 'monster' || sprite.hidden || sprite.disposed) continue;
+        const cheb = Math.max(Math.abs(sprite.x - partyX), Math.abs(sprite.y - partyY));
+        sprite.object.visible = monsterBodyVisible({
+          adjacent: cheb <= 1,
+          squareLit: this.lighting.isSquareLit(sprite.x, sprite.y),
+          forceLit: !!sprite.forceLit
+        });
+      }
+    }
+    this.syncLit(partyX, partyY);
   }
 
   private dropLit(id: string): void {
@@ -151,10 +243,18 @@ export class Floor1Monsters {
     this.lit.delete(id);
   }
 
-  private syncLit(): void {
+  private syncLit(partyX: number, partyY: number): void {
     const live = new Set<string>();
     for (const sprite of this.sprites.sprites) {
       if (sprite.kind !== 'monster') continue;
+      const showBody =
+        !sprite.hidden &&
+        !sprite.disposed &&
+        monsterBodyVisible({
+          adjacent: Math.max(Math.abs(sprite.x - partyX), Math.abs(sprite.y - partyY)) <= 1,
+          squareLit: this.lighting.isSquareLit(sprite.x, sprite.y),
+          forceLit: !!sprite.forceLit
+        });
       sprite.object.visible = false;
       const id = sprite.monsterId;
       if (!id || sprite.disposed) continue;
@@ -188,15 +288,16 @@ export class Floor1Monsters {
         row.mat.map = map;
         row.mat.needsUpdate = true;
       }
-      const frost = this.sprites.hostTint(id);
-      row.mat.color.setHex(frost);
+      const amount = Number(sprite.material.userData.frostAmount ?? 0);
+      setFrostAmount(row.mat, amount);
+      row.mat.color.setHex(0xffffff);
       row.mesh.position.copy(sprite.object.position);
       if (row.mesh.position.y < SPRITE_SURFACE_LIFT * 0.5) {
         row.mesh.position.y = SPRITE_SURFACE_LIFT;
       }
       row.mesh.scale.set(Math.sign(sprite.object.scale.x) || 1, 1, 1);
       row.mesh.lookAt(this.camera.position.x, row.mesh.position.y, this.camera.position.z);
-      row.mesh.visible = !sprite.hidden && !sprite.disposed;
+      row.mesh.visible = showBody;
     }
     for (const id of [...this.lit.keys()]) {
       if (!live.has(id)) this.dropLit(id);

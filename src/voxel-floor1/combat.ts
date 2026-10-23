@@ -11,10 +11,19 @@ import {
   type Occupancy,
   type RulesData
 } from '../core';
+import { isSlimeKind, takeSlimeFrostBark } from '../core/slime-frost';
 import { fetchJsonCached } from '../proto3d/asset-cache';
 import { floor1 as classicFloor1 } from '../proto3d/floor-data';
 import type { FloorData } from '../proto3d/types';
 import { canCross, floor1Map, isWalkableTile, isWaterCell, tileAt, type FloorMap } from './layout';
+
+/** Same two-choice lists as Classic `art/ui/perks/perks.json`. */
+export const FLOOR1_PERK_CHOICES: Record<HeroId, Record<3 | 5, [string, string]>> = {
+  brannoc: { 3: ['shield_wall', 'cleave'], 5: ['stubborn', 'heavy_swing'] },
+  mags: { 3: ['quick_hands', 'dirty_tricks'], 5: ['backstab', 'light_fingers'] },
+  wren: { 3: ['mercy', 'steady_flame'], 5: ['sanctuary', 'ember_ward'] },
+  ilsevar: { 3: ['deep_frost', 'tidecaller'], 5: ['shatter', 'cold_blood'] }
+};
 
 export type FloorMonsterSpawn = {
   x: number;
@@ -44,6 +53,15 @@ export type Floor1CombatHooks = {
   onHitType?: (id: string, kind: string, monster: string) => void;
   onGameOver?: () => void;
   onHudSync?: () => void;
+  onLevelUp?: (hero: HeroId, level: number) => void;
+  onPerkPending?: (hero: HeroId, level: number) => void;
+  onPerkHook?: (hero: HeroId, level: number) => void;
+  onFlank?: (side: 'left' | 'right' | 'behind') => void;
+  onFightStart?: () => void;
+  onFightEnd?: () => void;
+  onSlimeFrostResist?: () => void;
+  onArmFrostHint?: () => void;
+  dismissFrostHint?: () => void;
 };
 
 export function parseCombatSearch(search: string): { test: boolean; combat: boolean; seed: number } {
@@ -120,6 +138,12 @@ export class Floor1Combat {
   awake = false;
   lastHand: { hero: HeroId; hand: HandSlot } | null = null;
   handTapCount = 0;
+  perkHooks: Array<{ hero: HeroId; level: number }> = [];
+  chosenPerks = new Map<string, string>();
+  lastFlank: 'left' | 'right' | 'behind' | null = null;
+  frostHintArmed = false;
+  frostHintDismissed = false;
+  private storyFlags = new Set<string>();
   private hooks: Floor1CombatHooks | null = null;
   private heldLogs: string[] = [];
 
@@ -215,6 +239,41 @@ export class Floor1Combat {
     return this.applyEvents(this.engine.debugKillAt(x, y, now));
   }
 
+  addXp(amount: number, now: number): CombatEvent[] {
+    return this.applyEvents(this.engine.debugAddXp(amount, now));
+  }
+
+  finishFight(now: number): CombatEvent[] {
+    return this.applyEvents(this.engine.finishFight(now));
+  }
+
+  pickPerk(hero: HeroId, perkId: string): boolean {
+    const waiting = this.engine.pendingPerks.filter((p) => p.hero === hero);
+    if (!waiting.length) return false;
+    const level = (waiting[0].level === 5 ? 5 : 3) as 3 | 5;
+    const choices = FLOOR1_PERK_CHOICES[hero]?.[level];
+    if (!choices?.includes(perkId)) return false;
+    this.engine.pendingPerks = this.engine.pendingPerks.filter((p) => !(p.hero === hero && p.level === level));
+    this.perkHooks = this.perkHooks.filter((p) => !(p.hero === hero && p.level === level));
+    const next = this.engine.pendingPerks.find((p) => p.hero === hero);
+    this.engine.heroes[hero].pendingPerk = next?.level ?? null;
+    this.chosenPerks.set(`${hero}:${level}`, perkId);
+    this.hooks?.onHudSync?.();
+    return true;
+  }
+
+  pendingFor(hero: HeroId): Array<{ hero: HeroId; level: number }> {
+    return this.engine.pendingPerks.filter((p) => p.hero === hero);
+  }
+
+  nextPerkHook(): { hero: HeroId; level: number } | undefined {
+    return this.perkHooks[0] ?? this.engine.pendingPerks[0];
+  }
+
+  livingSlimes(): Array<{ id: string; kind: string; x: number; y: number; alive: boolean }> {
+    return this.engine.monsters.filter((m) => m.alive && isSlimeKind(m.kind));
+  }
+
   forceWipe(): CombatEvent[] {
     return this.applyEvents(this.engine.forceWipe());
   }
@@ -231,6 +290,9 @@ export class Floor1Combat {
       switch (e.type) {
         case 'log':
           this.combatLog(e.key, e.vars);
+          if (e.key === 'slime_frost_resist' && takeSlimeFrostBark(this.storyFlags)) {
+            this.hooks?.onSlimeFrostResist?.();
+          }
           break;
         case 'sfx':
           if (e.name === 'hero_down') break;
@@ -241,6 +303,7 @@ export class Floor1Combat {
           break;
         case 'hit_type':
           this.hooks?.onHitType?.(e.id, e.kind, e.monster);
+          if (e.kind === 'resist' && !isSlimeKind(e.monster)) this.armFrostHint();
           break;
         case 'monster_anim':
           this.hooks?.onMonsterAnim?.(e.id, e.anim);
@@ -263,11 +326,28 @@ export class Floor1Combat {
           this.hooks?.playCombat('hero_down');
           this.hooks?.playHeroDown(e.hero);
           break;
+        case 'level_up':
+          this.hooks?.onLevelUp?.(e.hero, e.level);
+          break;
+        case 'perk_pending':
+          this.hooks?.onPerkPending?.(e.hero, e.level);
+          break;
+        case 'perk_hook':
+          this.perkHooks.push({ hero: e.hero, level: e.level });
+          this.hooks?.onPerkHook?.(e.hero, e.level);
+          break;
+        case 'flank':
+          this.lastFlank = e.side;
+          this.hooks?.onFlank?.(e.side);
+          break;
         case 'fight_start':
           this.hooks?.setFightDuck(true);
+          this.hooks?.onFightStart?.();
           break;
         case 'fight_end':
           this.hooks?.setFightDuck(false);
+          this.hideFrostHint();
+          this.hooks?.onFightEnd?.();
           break;
         case 'game_over':
           this.hooks?.onGameOver?.();
@@ -275,6 +355,9 @@ export class Floor1Combat {
         case 'hand_used':
           this.lastHand = { hero: e.hero, hand: e.hand };
           this.handTapCount += 1;
+          if (e.hero === 'ilsevar' && (e.item === 'wand' || e.item === 'scroll')) {
+            this.dismissFrostHint();
+          }
           break;
         case 'out_of_reach':
         case 'denied':
@@ -312,6 +395,22 @@ export class Floor1Combat {
     if (typeof out.monster === 'string') out.monster = this.hooks?.monsterName(out.monster) ?? out.monster;
     if (typeof out.target === 'string') out.target = this.hooks?.heroName(out.target) ?? out.target;
     return out;
+  }
+
+  armFrostHint(): void {
+    if (this.frostHintDismissed) return;
+    this.frostHintArmed = true;
+    this.hooks?.onArmFrostHint?.();
+  }
+
+  hideFrostHint(): void {
+    this.frostHintArmed = false;
+  }
+
+  dismissFrostHint(): void {
+    this.frostHintDismissed = true;
+    this.frostHintArmed = false;
+    this.hooks?.dismissFrostHint?.();
   }
 
   private combatLog(key: string, vars?: CombatLogVars): void {

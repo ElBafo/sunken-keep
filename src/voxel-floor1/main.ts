@@ -45,8 +45,10 @@ import {
   type QualityLevel
 } from './lights';
 import { Floor1Gameplay } from './gameplay';
+import { litFarBeams, litFarTorches, tileInLightFlood } from './bake';
 import { HERO_IDS, loadFloor1Combat } from './combat';
 import { Floor1Monsters } from './monsters';
+import { loadPerkCopy } from './perks';
 import { buildFloor1Items } from './floor-items';
 import { doorBetween, doorEdgeAt, floor1Map, tileAt } from './layout';
 import { buildFloor1 } from './level';
@@ -155,6 +157,19 @@ type Floor1Api = {
   forceWipe: () => void;
   tickCombat: (nowSec?: number) => void;
   wakeCombat: () => void;
+  addXp: (n: number) => void;
+  finishFight: () => void;
+  pendingPerks: () => Array<{ hero: string; level: number }>;
+  perkHooks: () => Array<{ hero: string; level: number }>;
+  perkScreenOpen: () => boolean;
+  openPerkScreen: (id: HudHeroId, level?: number) => boolean;
+  pickPerk: (id: HudHeroId, perkId: string) => boolean;
+  closePerkScreen: () => void;
+  playLevelUp: (id: HudHeroId) => void;
+  armFrostHint: () => void;
+  frostHint: () => { armed: boolean; dismissed: boolean };
+  flashFlank: (side: 'left' | 'right' | 'behind') => void;
+  lastFlank: () => 'left' | 'right' | 'behind' | null;
   gameOverVisible: () => boolean;
   skipIntro: () => void;
   speakBark: (trigger: string, speaker?: HudHeroId) => boolean;
@@ -327,7 +342,17 @@ async function boot(): Promise<void> {
   scene.add(water.group);
   loading.textContent = 'Waking the halls…';
   await monsters.load();
+  const farTorches = litFarTorches(floor1Map, floor1Sconces);
+  const farBeams = litFarBeams(floor1Map, floor1Sunbeams);
+  monsters.bindLight(
+    {
+      isSquareLit: (x, y) => tileInLightFlood(x, y, farTorches, farBeams),
+      getAmbientFloor: () => 1
+    },
+    gameplay.audio
+  );
   monsters.bindFromCombat(combat.engine.monsters);
+  const perkCopy = await loadPerkCopy(gameplay.story.locale);
 
   const currentSafe = (): { top: number; right: number; bottom: number; left: number } => {
     if (querySafe) return querySafe;
@@ -559,8 +584,32 @@ async function boot(): Promise<void> {
     return raycaster.intersectObjects(targets, false).length > 0;
   };
 
+  const perkOpen = (): boolean => !!partyUi?.perkScreenOpen();
+  const inputOk = (): boolean => gameplay.allowsInput() && !perkOpen();
+
+  let flankTimer: ReturnType<typeof setTimeout> | null = null;
+  const clearFlankFlash = (): void => {
+    const el = document.getElementById('flank-flash');
+    if (!el) return;
+    el.classList.remove('show');
+    delete el.dataset.side;
+    if (flankTimer) {
+      clearTimeout(flankTimer);
+      flankTimer = null;
+    }
+  };
+  const flashFlank = (side: 'left' | 'right' | 'behind'): void => {
+    combat.lastFlank = side;
+    const el = document.getElementById('flank-flash');
+    if (!el) return;
+    el.dataset.side = side;
+    el.classList.add('show');
+    if (flankTimer) clearTimeout(flankTimer);
+    flankTimer = setTimeout(() => clearFlankFlash(), 420);
+  };
+
   const beginStep = (dirSign: 1 | -1): boolean => {
-    if (!gameplay.allowsInput() || gameplay.bagOpen()) return false;
+    if (!inputOk() || gameplay.bagOpen()) return false;
     if (dirSign === 1) {
       const pos = facing();
       const tile = tileAt(floor1Map, pos.x, pos.y);
@@ -616,11 +665,19 @@ async function boot(): Promise<void> {
   const syncPartyHud = (): void => {
     if (!partyUi) return;
     partyUi.inCombat = combat.inCombat();
-    for (const id of HERO_IDS) partyUi.syncHero(id, combat.engine.heroes[id]);
+    partyUi.setPendingList(combat.engine.pendingPerks);
+    for (const id of HERO_IDS) {
+      const hero = combat.engine.heroes[id];
+      partyUi.syncHero(id, {
+        ...hero,
+        pendingPerk: hero.pendingPerk,
+        level: hero.level
+      });
+    }
   };
 
   const useHeroHand = (id: HudHeroId, hand: 'main' | 'off'): boolean => {
-    if (!gameplay.allowsInput()) return false;
+    if (!inputOk()) return false;
     syncEquipment();
     combat.pollAwake(gameplay.audio.isFirstFightUnlocked());
     const before = combat.handTapCount;
@@ -629,7 +686,7 @@ async function boot(): Promise<void> {
   };
 
   const beginStrafe = (dirSign: 1 | -1): boolean => {
-    if (!gameplay.allowsInput() || gameplay.bagOpen()) return false;
+    if (!inputOk() || gameplay.bagOpen()) return false;
     if (!mover.strafe(dirSign)) return false;
     stepTracking = true;
     stepWorstMs = 0;
@@ -644,13 +701,13 @@ async function boot(): Promise<void> {
   await portraitsReady;
   partyUi = Floor1PartyUi.mount(
     {
-      onTurnLeft: () => gameplay.allowsInput() && !gameplay.bagOpen() && mover.turn(1),
-      onTurnRight: () => gameplay.allowsInput() && !gameplay.bagOpen() && mover.turn(-1),
+      onTurnLeft: () => inputOk() && !gameplay.bagOpen() && mover.turn(1),
+      onTurnRight: () => inputOk() && !gameplay.bagOpen() && mover.turn(-1),
       onStepForward: () => beginStep(1),
       onStepBack: () => beginStep(-1),
       onStrafeLeft: () => beginStrafe(-1),
       onStrafeRight: () => beginStrafe(1),
-      onInteract: () => (gameplay.allowsInput() ? interact() : 'none'),
+      onInteract: () => (inputOk() ? interact() : 'none'),
       onMenu: () => partyUi?.toggleMenu(),
       onBag: () => {
         partyUi?.closeOverlays();
@@ -663,10 +720,12 @@ async function boot(): Promise<void> {
       onHand: (id, hand) => {
         if (gameplay.handleHandTap(id, hand)) return;
         useHeroHand(id, hand);
-      }
+      },
+      onPickPerk: (id, perkId) => combat.pickPerk(id, perkId)
     },
     latestLayout
   );
+  partyUi.perkCopy = perkCopy;
   partyUi.setCompass(mover.dir);
   resize();
   await gameplay.start({
@@ -718,25 +777,45 @@ async function boot(): Promise<void> {
     setFightDuck: (on) => gameplay.audio.setFightDuck(on),
     stopWindup: (id) => gameplay.audio.stopWindup(id),
     noteOpen: () => gameplay.noteOpen,
-    onMonsterMove: (id, _from, to) => monsters.move(id, to.x, to.y),
+    onMonsterMove: (id, from, to) => monsters.move(id, from, to),
     onMonsterAnim: (id, anim) =>
       monsters.playAnim(id, anim as 'idle' | 'attack' | 'hurt' | 'death' | 'windup', performance.now()),
     onMonsterDead: (id) => {
       monsters.playAnim(id, 'death', performance.now());
+      monsters.removeEye(id);
       const survivor = monsters.beginPairSlide(id, performance.now());
       if (survivor) gameplay.audio.setSlimelingPan(survivor, 0);
+      gameplay.audio.syncSlimeLoops(combat.livingSlimes(), combat.inCombat());
     },
     onSlimeSplit: (event) => {
       void monsters.addSplitKids(event).then(() => {
         for (const kid of event.kids) {
           gameplay.audio.setSlimelingPan(kid.id, monsters.slimelingPan(kid.id, kid.slot));
         }
+        gameplay.audio.syncSlimeLoops(combat.livingSlimes(), combat.inCombat());
       });
     },
     onHitType: (id, kind) =>
       monsters.playHitFx(id, kind as 'hit' | 'crit' | 'resist' | 'weak', performance.now()),
     onGameOver: () => gameplay.showGameOver(),
-    onHudSync: () => syncPartyHud()
+    onHudSync: () => syncPartyHud(),
+    onLevelUp: (hero) => partyUi?.playLevelUp(hero),
+    onPerkPending: () => syncPartyHud(),
+    onPerkHook: (hero, level) => {
+      syncPartyHud();
+      if (!partyUi?.perkScreenOpen()) partyUi?.openPerkScreen(hero, level);
+    },
+    onFlank: (side) => flashFlank(side),
+    onFightStart: () => gameplay.audio.syncSlimeLoops(combat.livingSlimes(), true),
+    onFightEnd: () => {
+      gameplay.audio.stopSlimeBattleLoop();
+      gameplay.audio.syncSlimeLoops(combat.livingSlimes(), false);
+      partyUi?.hideFrostHint();
+      clearFlankFlash();
+    },
+    onSlimeFrostResist: () => gameplay.speakBark('slime_frost_resist'),
+    onArmFrostHint: () => partyUi?.armFrostHint(),
+    dismissFrostHint: () => partyUi?.dismissFrostHint()
   });
   partyUi?.setHandReady((name) => gameplay.audio.playUi(name));
   syncEquipment();
@@ -753,7 +832,7 @@ async function boot(): Promise<void> {
     if (!gameplay.allowsInput()) return false;
     if (partyUi?.overlayOpen() || gameplay.bagOpen()) return false;
     const t = e.target as HTMLElement | null;
-    if (t?.closest?.('button, .hand-hit, .portrait-cell, .overlay, #stats, #message-log, #tap-to-start, #intro-overlay, #title-overlay, #inventory-screen, #note-overlay')) return false;
+    if (t?.closest?.('button, .hand-hit, .portrait-cell, .overlay, #stats, #message-log, #tap-to-start, #intro-overlay, #title-overlay, #inventory-screen, #note-overlay, #perk-screen')) return false;
     return e.clientY < latestLayout.view.h && e.clientY >= 0;
   };
 
@@ -1032,6 +1111,26 @@ async function boot(): Promise<void> {
       combat.tick(sec ?? nowSec());
     },
     wakeCombat: () => combat.wake(),
+    addXp: (n) => {
+      combat.addXp(n, nowSec());
+    },
+    finishFight: () => {
+      combat.finishFight(nowSec());
+    },
+    pendingPerks: () => combat.engine.pendingPerks.slice(),
+    perkHooks: () => combat.perkHooks.slice(),
+    perkScreenOpen: () => !!partyUi?.perkScreenOpen(),
+    openPerkScreen: (id, level) => !!partyUi?.openPerkScreen(id, level),
+    pickPerk: (id, perkId) => combat.pickPerk(id, perkId),
+    closePerkScreen: () => partyUi?.closePerkScreen(),
+    playLevelUp: (id) => partyUi?.playLevelUp(id),
+    armFrostHint: () => {
+      combat.armFrostHint();
+      partyUi?.armFrostHint();
+    },
+    frostHint: () => ({ armed: combat.frostHintArmed, dismissed: combat.frostHintDismissed }),
+    flashFlank: (side) => flashFlank(side),
+    lastFlank: () => combat.lastFlank,
     gameOverVisible: () => gameplay.gameOverVisible(),
     skipIntro: () => gameplay.skipIntro(),
     speakBark: (trigger, speaker) => gameplay.speakBark(trigger, speaker),
