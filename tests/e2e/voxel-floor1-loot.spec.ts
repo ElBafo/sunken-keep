@@ -18,10 +18,14 @@ type Floor1 = {
   openBag: () => void;
   closeBag: () => void;
   bagOpen: () => boolean;
+  noteOpen: () => boolean;
+  hideNote: () => boolean;
+  useBagSlot: (i: number) => void;
   equipBagSlot: (i: number, hero: string) => boolean;
   getHands: () => Array<{ id: string; main: string; off: string }>;
   lastMessage: string;
   lastUi: () => string[];
+  logLines: string[];
   floorItems: () => Array<{ x: number; y: number; item: string; visible: boolean }>;
 };
 
@@ -108,4 +112,77 @@ test('voxel floor 1: pick up a key, unlock its door, open the bag and equip', as
   expect(equipped.ok).toBe(true);
   expect(equipped.hands.find((h) => h.id === 'mags')?.off).toBe('iron_shield');
   expect(equipped.bag.some((s) => s.item === 'tricks_pouch')).toBe(true);
+});
+
+test('voxel floor 1: journal reader opens from the bag and the HUD bag button closes the bag', async ({ page }) => {
+  test.setTimeout(120000);
+  mkdirSync(OUT, { recursive: true });
+  await boot(page);
+
+  const opened = await page.evaluate(() => {
+    const api = (window as unknown as { __voxelFloor1: Floor1 }).__voxelFloor1;
+    api.giveItem('journal_page');
+    const i = api.getBag().findIndex((s) => s.item === 'journal_page');
+    api.useBagSlot(i);
+    return {
+      i,
+      noteOpen: api.noteOpen(),
+      title: document.getElementById('note-title')?.textContent ?? '',
+      text: document.getElementById('note-text')?.textContent ?? '',
+      overlay: document.getElementById('note-overlay')?.classList.contains('show') ?? false,
+      message: api.lastMessage,
+      log: api.logLines
+    };
+  });
+  expect(opened.i).toBeGreaterThanOrEqual(0);
+  expect(opened.noteOpen).toBe(true);
+  expect(opened.overlay).toBe(true);
+  expect(opened.title).toMatch(/Orrun/);
+  expect(opened.text).toContain('The Tide asks only for fire.');
+  expect(opened.text).toContain('Floor by floor, we give it.');
+  expect(opened.text).toContain('- O.S.');
+  expect(opened.message).toContain('The Tide asks only for fire.');
+  expect(opened.log.some((line) => /Orrun's journal/.test(line))).toBe(true);
+  await page.waitForTimeout(400);
+  await page.screenshot({ path: `${OUT}/voxel_floor1_journal_reader.png`, fullPage: false });
+
+  await page.locator('#note-overlay').tap();
+  await page.waitForTimeout(200);
+  expect(
+    await page.evaluate(() => (window as unknown as { __voxelFloor1: Floor1 }).__voxelFloor1.noteOpen())
+  ).toBe(false);
+  await expect(page.locator('#note-overlay')).not.toHaveClass(/show/);
+
+  await page.evaluate(() => (window as unknown as { __voxelFloor1: Floor1 }).__voxelFloor1.openBag());
+  await page.waitForTimeout(400);
+  await expect(page.locator('#inventory-screen')).toBeVisible();
+  const bagBtn = page.locator('#btn-bag');
+  await expect(bagBtn).toBeVisible();
+  const stacked = await page.evaluate(() => {
+    const bag = document.getElementById('btn-bag');
+    const inv = document.getElementById('inventory-screen');
+    if (!bag || !inv) return null;
+    const bagZ = window.getComputedStyle(bag).zIndex;
+    const invZ = window.getComputedStyle(inv).zIndex;
+    const r = bag.getBoundingClientRect();
+    const top = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+    return {
+      bagZ,
+      invZ,
+      bagOnTop: !!(top && (top === bag || bag.contains(top))),
+      w: r.width,
+      h: r.height
+    };
+  });
+  expect(Number(stacked?.bagZ)).toBeGreaterThan(Number(stacked?.invZ));
+  expect(stacked?.bagOnTop).toBe(true);
+  expect((stacked?.w ?? 0) >= 44 && (stacked?.h ?? 0) >= 44).toBe(true);
+  await page.screenshot({ path: `${OUT}/voxel_floor1_bag_button.png`, fullPage: false });
+
+  await bagBtn.tap();
+  await page.waitForTimeout(200);
+  expect(
+    await page.evaluate(() => (window as unknown as { __voxelFloor1: Floor1 }).__voxelFloor1.bagOpen())
+  ).toBe(false);
+  await expect(page.locator('#inventory-screen')).toBeHidden();
 });

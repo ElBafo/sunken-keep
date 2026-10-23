@@ -115,6 +115,8 @@ type Floor1Api = {
   openBag: () => void;
   closeBag: () => void;
   bagOpen: () => boolean;
+  noteOpen: () => boolean;
+  hideNote: () => boolean;
   useBagSlot: (i: number) => void;
   equipBagSlot: (i: number, hero: string, slot?: 'main' | 'off' | 'armour' | 'trinket') => boolean;
   getHands: () => Array<{ id: string; main: string; off: string; armour?: string }>;
@@ -460,6 +462,7 @@ async function boot(): Promise<void> {
   };
   const tryPickup = (x: number, y: number): boolean => gameplay.pickupItemAt(x, y);
   const interact = (): string => {
+    if (gameplay.hideNote()) return 'note';
     if (tryPickup(mover.x, mover.y)) return 'pickup';
     const pos = facing();
     if (tryPickup(pos.x, pos.y)) return 'pickup';
@@ -642,7 +645,7 @@ async function boot(): Promise<void> {
     if (!gameplay.allowsInput()) return false;
     if (partyUi?.overlayOpen() || gameplay.bagOpen()) return false;
     const t = e.target as HTMLElement | null;
-    if (t?.closest?.('button, .hand-hit, .portrait-cell, .overlay, #stats, #message-log, #tap-to-start, #intro-overlay, #title-overlay, #inventory-screen')) return false;
+    if (t?.closest?.('button, .hand-hit, .portrait-cell, .overlay, #stats, #message-log, #tap-to-start, #intro-overlay, #title-overlay, #inventory-screen, #note-overlay')) return false;
     return e.clientY < latestLayout.view.h && e.clientY >= 0;
   };
 
@@ -679,6 +682,7 @@ async function boot(): Promise<void> {
 
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
+      if (gameplay.hideNote()) return;
       if (gameplay.bagOpen()) {
         gameplay.closeBag();
         return;
@@ -806,6 +810,8 @@ async function boot(): Promise<void> {
     openBag: () => gameplay.openBag(),
     closeBag: () => gameplay.closeBag(),
     bagOpen: () => gameplay.bagOpen(),
+    noteOpen: () => gameplay.noteOpen,
+    hideNote: () => gameplay.hideNote(),
     useBagSlot: (i) => gameplay.useBagSlot(i),
     equipBagSlot: (i, hero, slot) => gameplay.equipBagSlot(i, hero as HudHeroId, slot),
     getHands: () =>

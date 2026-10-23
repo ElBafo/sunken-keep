@@ -40,6 +40,10 @@ describe('voxel floor 1 intro / audio / bark port', () => {
     expect(gameplay).toContain("from '../proto3d/inventory-ui'");
     expect(gameplay).toContain("from '../proto3d/items'");
     expect(gameplay).toContain("from '../proto3d/layout585'");
+    expect(gameplay).toContain("from '../proto3d/note-reader'");
+    expect(gameplay).toContain('this.story.readableItem');
+    expect(html).toContain('id="note-overlay"');
+    expect(html).toContain('id="note-canvas"');
     expect(gameplay).toContain('enterPlayFromIntro');
     expect(gameplay).toContain('mountIntroSkip');
     expect(gameplay).toContain('crossfadeToIntro');
@@ -139,5 +143,15 @@ describe('voxel floor 1 intro / audio / bark port', () => {
     bag.add('tricks_pouch');
     expect(bag.has('tricks_pouch')).toBe(true);
     resetFloor1Loot();
+  });
+
+  it('opens the classic journal reader from the bag and keeps the HUD bag button above the bag', () => {
+    expect(gameplay).toContain('readBagSlot');
+    expect(gameplay).toContain('journalIntroKey');
+    expect(gameplay).toContain('NOTE_SCROLL_SFX');
+    expect(gameplay).not.toMatch(/The Tide asks only for fire/);
+    expect(html).toMatch(/#btn-bag\s*\{\s*z-index:\s*100;/);
+    expect(html).toMatch(/#inventory-screen[\s\S]*z-index:\s*90/);
+    expect(html).toMatch(/#note-overlay[\s\S]*z-index:\s*400/);
   });
 });

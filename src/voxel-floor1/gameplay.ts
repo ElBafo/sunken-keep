@@ -22,11 +22,16 @@ import {
   canEquip,
   equipSfx,
   isReadable,
+  isSilentLogKey,
+  journalIntroKey,
+  journalTriggerId,
+  NOTE_SCROLL_SFX,
   pickupSfx,
   preferredHand,
   normalizeItemId
 } from '../proto3d/items';
 import { loadLayout585 } from '../proto3d/layout585';
+import { NoteReader } from '../proto3d/note-reader';
 import { oilFlaskPlan } from '../proto3d/oil-flask';
 import { resolveLocale, StoryText, type Locale } from '../proto3d/i18n';
 import { StoryProgress } from '../proto3d/story-progress';
@@ -115,6 +120,8 @@ export class Floor1Gameplay {
   bubble: SpeechBubble | null = null;
   bag = new PartyBag();
   inventory: InventoryUi | null = null;
+  noteReader: NoteReader | null = null;
+  noteOpen = false;
   phase: GameplayPhase = 'boot';
   audioUnlocked = false;
   lastBark: BarkLine | null = null;
@@ -138,7 +145,7 @@ export class Floor1Gameplay {
   }
 
   allowsInput(): boolean {
-    return this.phase === 'play';
+    return this.phase === 'play' && !this.noteOpen;
   }
 
   introVisible(): boolean {
@@ -195,7 +202,8 @@ export class Floor1Gameplay {
     }
     if (typeof document !== 'undefined') {
       this.mountChrome();
-      void this.mountInventory();
+      this.noteReader = new NoteReader(() => this.hideNote());
+      await Promise.all([this.mountInventory(), this.noteReader.load()]);
     }
     const scene = this.scene;
     if (scene) void this.audio.loadBeforePlaySounds(scene);
@@ -334,6 +342,7 @@ export class Floor1Gameplay {
     this.showMessage(named || this.story.log('pickup_item', { item: this.story.itemName(id) }));
     if (id === 'key' || id === 'captain_key') this.progress.fire('pickup_key');
     this.inventory?.redraw();
+    if (isReadable(id)) this.readBagSlot(this.bag.slots.length - 1);
     return true;
   }
 
@@ -400,11 +409,7 @@ export class Floor1Gameplay {
     const slot = this.bag.slots[index];
     if (!slot) return;
     if (isReadable(slot.item)) {
-      const page = slot.journalPage ?? 1;
-      const key = page === 2 ? 'journal_f2' : 'read_journal';
-      if (this.progress.fire(key)) this.pushStoryLog(key);
-      else this.showMessage(this.story.log(key));
-      this.audio.playUi('scroll');
+      this.readBagSlot(index);
       return;
     }
     if (slot.item === 'potion_red' || slot.item === 'potion_blue' || slot.item === 'potion_green') {
@@ -526,6 +531,41 @@ export class Floor1Gameplay {
 
   storyLog(key: string, vars?: Record<string, string | number>): string {
     return this.story.log(key, vars);
+  }
+
+  showNote(title: string, text: string): void {
+    this.lastMessage = text;
+    const titleEl = document.getElementById('note-title');
+    const textEl = document.getElementById('note-text');
+    if (titleEl) titleEl.textContent = title;
+    if (textEl) textEl.textContent = text;
+    this.noteReader?.show(title, text);
+    document.getElementById('note-overlay')?.classList.add('show');
+    this.noteOpen = true;
+    this.audio.playUi(NOTE_SCROLL_SFX);
+  }
+
+  hideNote(): boolean {
+    const wasOpen = this.noteOpen;
+    this.noteReader?.hide();
+    document.getElementById('note-overlay')?.classList.remove('show');
+    this.noteOpen = false;
+    return wasOpen;
+  }
+
+  private readBagSlot(index: number): void {
+    const slot = this.bag.slots[index];
+    if (!slot || !isReadable(slot.item)) return;
+    const doc = this.story.readableItem(slot.item, slot.journalPage);
+    if (!doc) return;
+    if (doc.kind === 'journal') {
+      const page = slot.journalPage && slot.journalPage > 0 ? slot.journalPage : 1;
+      const introKey = journalIntroKey(page);
+      if (this.progress.fire(introKey)) this.pushStoryLog(introKey);
+      else this.showMessage(this.story.log(introKey));
+      this.progress.fire(journalTriggerId(page));
+    }
+    this.showNote(doc.title, doc.text);
   }
 
   private async mountInventory(): Promise<void> {
@@ -772,7 +812,7 @@ export class Floor1Gameplay {
     if (!text) return;
     this.lastMessage = text;
     this.hooks?.pushLog(text);
-    if (!this.story.logIsSilent(key)) this.audio.playUi('ui_log_line');
+    if (!this.story.logIsSilent(key) && !isSilentLogKey(key)) this.audio.playUi('ui_log_line');
   }
 
   private fireTileBark(x: number, y: number): void {
