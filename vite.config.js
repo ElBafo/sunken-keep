@@ -11,6 +11,7 @@ export default defineConfig({
     rollupOptions: {
       input: {
         main: resolve(__dirname, 'index.html'),
+        classic: resolve(__dirname, 'classic.html'),
         proto3d: resolve(__dirname, 'proto3d.html'),
         voxelLab: resolve(__dirname, 'voxel-lab.html'),
         voxelFloor1: resolve(__dirname, 'voxel-floor1.html')

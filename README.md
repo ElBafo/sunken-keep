@@ -41,7 +41,9 @@ The live game will be available at: `https://elbafo.github.io/sunken-keep/`
 - **Vite** + **TypeScript** + **three.js**
 - First-person 3D dungeon (the 2D canvas prototype is retired)
 - Portrait layout: 270×585, letterboxed
-- `/proto3d.html` still loads the same 3D game so old links and Home Screen icons keep working
+- `/` and `/voxel-floor1.html` load the voxel Floor 1 game
+- `/classic.html` is a hidden backup of the older proto3d build (noindex, not linked)
+- `/proto3d.html` still loads that older build so old links keep working
 
 ## Assets Still Needed
 

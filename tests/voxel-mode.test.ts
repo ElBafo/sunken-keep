@@ -193,17 +193,17 @@ describe('voxel mode keeps raycasts on original planes', () => {
 
   it('settings menu can toggle voxels without touching default HTML entry scripts', () => {
     const proto = readFileSync(resolve(__dirname, '../proto3d.html'), 'utf8');
-    const index = readFileSync(resolve(__dirname, '../index.html'), 'utf8');
+    const classic = readFileSync(resolve(__dirname, '../classic.html'), 'utf8');
     expect(proto).toContain('id="btn-voxel-on"');
-    expect(index).toContain('id="btn-voxel-on"');
+    expect(classic).toContain('id="btn-voxel-on"');
     expect(proto).toContain('id="btn-lab-light-on"');
     expect(proto).toContain('src="/src/proto3d/main.ts"');
     expect(proto).not.toContain('voxel-lab.html');
     expect(proto).not.toContain('src/voxel-lab');
-    expect(index).not.toContain('voxel-lab.html');
-    expect(index).not.toContain('src/voxel-lab');
+    expect(classic).not.toContain('voxel-lab.html');
+    expect(classic).not.toContain('src/voxel-lab');
     expect(proto).toContain('3D walls');
-    expect(index).toContain('Stone you can almost touch. Phone may sweat.');
+    expect(classic).toContain('Stone you can almost touch. Phone may sweat.');
   });
 
   it('uses 3D walls labels and the phone-may-sweat hint', () => {

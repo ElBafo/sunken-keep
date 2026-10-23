@@ -58,8 +58,8 @@ describe('voxel-floor1 is a standalone Vite page', () => {
     expect(viteJs).toContain('voxel-floor1.html');
   });
 
-  it('does not alter the game or voxel-lab HTML entries', () => {
-    expect(index).toContain('src="/src/proto3d/main.ts"');
+  it('does not alter the classic or voxel-lab HTML entries', () => {
+    expect(index).toContain('src="/src/voxel-floor1/main.ts"');
     expect(proto).toContain('src="/src/proto3d/main.ts"');
     expect(lab).toContain('src="/src/voxel-lab/main.ts"');
     expect(index).not.toContain('voxel-floor1.html');

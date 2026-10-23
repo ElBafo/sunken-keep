@@ -6,7 +6,7 @@ import { isSilentLogKey } from '../src/proto3d/items';
 describe('bark voice and capped-lamp log', () => {
   const audio = readFileSync(resolve(__dirname, '../src/proto3d/audio.ts'), 'utf8');
   const main = readFileSync(resolve(__dirname, '../src/proto3d/main.ts'), 'utf8');
-  const html = readFileSync(resolve(__dirname, '../index.html'), 'utf8');
+  const html = readFileSync(resolve(__dirname, '../classic.html'), 'utf8');
 
   it('plays vox_<hero>_talk for party speakers and quiet bark for everyone else', () => {
     const fn = audio.slice(audio.indexOf('playBarkVoice'), audio.indexOf('playHeroHurt'));

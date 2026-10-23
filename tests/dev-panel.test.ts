@@ -112,8 +112,8 @@ describe('dev opt-in', () => {
 describe('dev tools stay out of the player menu', () => {
   it('does not add resolution or capture to the ≡ settings sheet', () => {
     const proto = readFileSync(resolve(__dirname, '../proto3d.html'), 'utf8');
-    const index = readFileSync(resolve(__dirname, '../index.html'), 'utf8');
-    for (const html of [proto, index]) {
+    const classic = readFileSync(resolve(__dirname, '../classic.html'), 'utf8');
+    for (const html of [proto, classic]) {
       expect(html).not.toContain('id="dev-panel"');
       expect(html).not.toContain('id="dev-capture"');
       expect(html).not.toContain('Internal render');

@@ -10,7 +10,7 @@ async function startGame(page: Page) {
 
 test.describe('iPhone Safari rendering', () => {
   test('game loads and fills full viewport after intro', async ({ page }) => {
-    await page.goto('/sunken-keep/');
+    await page.goto('/sunken-keep/classic.html');
     await startGame(page);
     
     // Take screenshot of tap-to-start screen
@@ -47,7 +47,7 @@ test.describe('iPhone Safari rendering', () => {
   });
   
   test('control panel is visible and interactive', async ({ page }) => {
-    await page.goto('/sunken-keep/');
+    await page.goto('/sunken-keep/classic.html');
     await startGame(page);
     
     // Start game and skip intro
@@ -72,7 +72,7 @@ test.describe('iPhone Safari rendering', () => {
   });
   
   test('left and right walls are correctly positioned', async ({ page }) => {
-    await page.goto('/sunken-keep/');
+    await page.goto('/sunken-keep/classic.html');
     await startGame(page);
     
     // Start game and skip intro

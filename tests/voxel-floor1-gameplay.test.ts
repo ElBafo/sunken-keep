@@ -57,6 +57,7 @@ describe('voxel floor 1 intro / audio / bark port', () => {
     expect(gameplay).toContain("import.meta.env.BASE_URL");
     expect(main).not.toContain("from '../proto3d/");
     expect(index).not.toContain('voxel-floor1/gameplay');
+    expect(index).toContain('src="/src/voxel-floor1/main.ts"');
     expect(protoMain).not.toContain('voxel-floor1/gameplay');
   });
 
@@ -101,7 +102,9 @@ describe('voxel floor 1 intro / audio / bark port', () => {
     expect(gameplay).not.toContain("from './water'");
     expect(gameplay).not.toContain('water-decals');
     expect(main).toContain("from './water'");
-    expect(index).toContain('src="/src/proto3d/main.ts"');
+    expect(readFileSync(resolve(__dirname, '../classic.html'), 'utf8')).toContain(
+      'src="/src/proto3d/main.ts"'
+    );
   });
 
   it('maps Classic floor-1 loot onto the same voxel cells', () => {
