@@ -884,14 +884,24 @@ async function boot(): Promise<void> {
     strafeLeft: () => beginStrafe(-1),
     strafeRight: () => beginStrafe(1),
     setHeroDowned: (id, downed) => {
+      const hero = combat.engine.heroes[id];
+      if (hero) {
+        hero.downed = downed;
+        hero.hp = downed ? 0 : hero.maxHp;
+      }
       partyUi?.setHeroDowned(id, downed);
-      const hero = partyUi?.heroes[id];
-      if (hero) gameplay.noteHero(id, hero.hp, hero.downed);
+      const hud = partyUi?.heroes[id];
+      if (hud) gameplay.noteHero(id, hud.hp, hud.downed);
     },
     setHeroHp: (id, hp) => {
+      const hero = combat.engine.heroes[id];
+      if (hero) {
+        hero.hp = Math.max(0, Math.min(hero.maxHp, Math.round(hp)));
+        hero.downed = hero.hp <= 0;
+      }
       partyUi?.setHeroHp(id, hp);
-      const hero = partyUi?.heroes[id];
-      if (hero) gameplay.noteHero(id, hero.hp, hero.downed);
+      const hud = partyUi?.heroes[id];
+      if (hud) gameplay.noteHero(id, hud.hp, hud.downed);
     },
     pushLog: (text) => partyUi?.pushLog(text),
     get logLines() {
